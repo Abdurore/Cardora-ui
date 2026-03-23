@@ -1,4 +1,14 @@
+import { useState } from 'react'
+
 function CardExperience({ data, onClose }) {
+  const [noPosition, setNoPosition] = useState({ x: 0, y: 0 })
+  const [isOpened, setIsOpened] = useState(false)
+
+  const moveNoButton = () => {
+    const x = Math.floor(Math.random() * 160) - 80
+    const y = Math.floor(Math.random() * 160) - 80
+    setNoPosition({ x, y })
+  }
   return (
     <section
       className="experience"
@@ -24,24 +34,28 @@ function CardExperience({ data, onClose }) {
           </button>
         </header>
 
-        <button className="experience-open" type="button">
-          {data.content.openCta}
-        </button>
+        {!isOpened ? (
+          <button className="experience-open" type="button" onClick={() => setIsOpened(true)}>
+            {data.content.openCta}
+          </button>
+        ) : null}
 
-        <div className="experience-opened">
-          <div className="experience-shell">
-            <div className="experience-border" style={{ background: data.theme.border }} />
-            <div className="experience-body">
-              <h3 style={{ fontFamily: data.typography.title }}>{data.content.title}</h3>
-              <p>{data.content.message}</p>
-              <div className="experience-image" />
-              <button className="read-more" type="button">
-                Read more
-              </button>
-              <p className="experience-extra">{data.content.extra}</p>
+        {isOpened ? (
+          <div className="experience-opened" style={{ animation: 'card-fade 0.5s ease both' }}>
+            <div className="experience-shell">
+              <div className="experience-border" style={{ background: data.theme.border }} />
+              <div className="experience-body">
+                <h3 style={{ fontFamily: data.typography.title }}>{data.content.title}</h3>
+                <p>{data.content.message}</p>
+                <div className="experience-image" />
+                <button className="read-more" type="button">
+                  Read more
+                </button>
+                <p className="experience-extra">{data.content.extra}</p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="experience-question">
           <p>{data.content.question}</p>
@@ -49,7 +63,16 @@ function CardExperience({ data, onClose }) {
             <button className="yes" type="button">
               {data.content.yes}
             </button>
-            <button className="no" type="button">
+            <button
+              className="no"
+              type="button"
+              onMouseEnter={moveNoButton}
+              onClick={moveNoButton}
+              style={{
+                transform: `translate(${noPosition.x}px, ${noPosition.y}px)`,
+                transition: 'transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1)',
+              }}
+            >
               {data.content.no}
             </button>
           </div>

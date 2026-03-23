@@ -1,13 +1,15 @@
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import GiftCard from '../components/GiftCard.jsx'
 import { storeGifts } from '../data/catalog.js'
 
 function StoreGifts() {
+  const { currentUser, openAuthModal } = useOutletContext()
+
   return (
     <div className="page-body">
-      <ScreenHeader />
+      <ScreenHeader user={currentUser} onAuthOpen={openAuthModal} />
       <div className="screen-body">
         <div className="tabs">
           <Link className="tab" to="/store">

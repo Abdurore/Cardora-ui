@@ -1,15 +1,34 @@
-import { useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
+import { useMemo, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
-import { homeCards } from '../data/catalog.js'
+import { exploreTags, homeCards } from '../data/catalog.js'
 
 function Home() {
-  const { openExperience } = useOutletContext()
+  const { openCardDetails, favorites, toggleFavorite, currentUser, openAuthModal } =
+    useOutletContext()
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+  const [activeSuggestion, setActiveSuggestion] = useState('all')
+
+  const visibleCards = useMemo(() => {
+    let cards = homeCards
+    if (activeSuggestion !== 'all') {
+      cards = cards.filter((card) => card.category === activeSuggestion)
+    }
+    if (!showFavoritesOnly) return cards
+    return cards.filter((card) => favorites.includes(card.id))
+  }, [activeSuggestion, favorites, showFavoritesOnly])
 
   return (
     <div className="page-section">
       <h2 className="page-title">Cardora</h2>
+      <ScreenHeader
+        favoriteActive={showFavoritesOnly}
+        onFavoriteToggle={() => setShowFavoritesOnly((prev) => !prev)}
+        user={currentUser}
+        onAuthOpen={openAuthModal}
+      />
       <header className="topbar">
         <div>
           <p className="eyebrow">Cardora Web</p>
@@ -21,23 +40,52 @@ function Home() {
         </div>
         <div className="cta-row">
           <button className="primary">Start a card</button>
-          <button className="ghost">Browse templates</button>
+          <Link className="ghost" to="/explore">
+            Browse templates
+          </Link>
         </div>
       </header>
 
+      <div className="pill-row">
+        <button
+          type="button"
+          className={`pill ${activeSuggestion === 'all' ? 'active' : ''}`}
+          onClick={() => setActiveSuggestion('all')}
+        >
+          All
+        </button>
+        {exploreTags
+          .filter((tag) => tag.value !== 'all')
+          .map((tag) => (
+            <button
+              key={tag.value}
+              type="button"
+              className={`pill ${activeSuggestion === tag.value ? 'active' : ''}`}
+              onClick={() => setActiveSuggestion(tag.value)}
+            >
+              {tag.label}
+            </button>
+          ))}
+      </div>
+
       <div className="page-body">
-        <ScreenHeader />
         <div className="screen-body">
-          <div className="card-grid">
-            {homeCards.map((card, index) => (
-              <CardItem
-                key={`${card.title}-${index}`}
-                {...card}
-                variant={`v${(index % 4) + 1}`}
-                onClick={openExperience}
-              />
-            ))}
-          </div>
+          {visibleCards.length ? (
+            <div className="card-grid">
+              {visibleCards.map((card, index) => (
+                <CardItem
+                  key={`${card.title}-${index}`}
+                  {...card}
+                  variant={`v${(index % 4) + 1}`}
+                  isFavorite={favorites.includes(card.id)}
+                  onToggleFavorite={toggleFavorite}
+                  onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="empty-state">No favorites saved yet.</p>
+          )}
         </div>
         <ScreenNav />
       </div>
