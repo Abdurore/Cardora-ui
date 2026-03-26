@@ -4,9 +4,10 @@ import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
 import { exploreTags, homeCards } from '../data/catalog.js'
+import logo from '../assets/icons/logo.png'
 
 function Home() {
-  const { openCardDetails, favorites, toggleFavorite, currentUser, openAuthModal } =
+  const { openCardDetails, favorites, toggleFavorite, currentUser, openAuthModal, balance } =
     useOutletContext()
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [activeSuggestion, setActiveSuggestion] = useState('all')
@@ -27,11 +28,15 @@ function Home() {
         favoriteActive={showFavoritesOnly}
         onFavoriteToggle={() => setShowFavoritesOnly((prev) => !prev)}
         user={currentUser}
+        balance={balance}
         onAuthOpen={openAuthModal}
       />
       <header className="topbar">
         <div>
-          <p className="eyebrow">Cardora Web</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            <img src={logo} alt="Cardora logo" style={{ width: '28px', height: '28px' }} />
+            <p className="eyebrow" style={{ margin: 0 }}>Cardora Web</p>
+          </div>
           <h1>Send stunning cards to people you love</h1>
           <p className="subtext">
             A neon-lit card marketplace for birthdays, proposals, anniversaries, and
@@ -39,7 +44,9 @@ function Home() {
           </p>
         </div>
         <div className="cta-row">
-          <button className="primary">Start a card</button>
+          <Link className="primary" to="/studio">
+            Create a card
+          </Link>
           <Link className="ghost" to="/explore">
             Browse templates
           </Link>

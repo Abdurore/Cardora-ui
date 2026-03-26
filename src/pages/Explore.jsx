@@ -7,7 +7,7 @@ import searchIcon from '../assets/icons/search.png'
 import { exploreCards, exploreTags } from '../data/catalog.js'
 
 function Explore() {
-  const { openCardDetails, favorites, toggleFavorite, currentUser, openAuthModal } =
+  const { openCardDetails, favorites, toggleFavorite, currentUser, openAuthModal, balance } =
     useOutletContext()
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') || '')
@@ -37,7 +37,7 @@ function Explore() {
 
   return (
     <div className="page-body">
-      <ScreenHeader user={currentUser} onAuthOpen={openAuthModal} />
+      <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
       <div className="screen-body">
         <div className="search">
           <img className="search-icon" src={searchIcon} alt="" aria-hidden="true" />

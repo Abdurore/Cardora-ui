@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import AuthModal from '../components/AuthModal.jsx'
@@ -7,11 +7,12 @@ import '../App.css'
 function MainLayout() {
   const [selectedCard, setSelectedCard] = useState(null)
   const [favorites, setFavorites] = useState([])
-  const [balance, setBalance] = useState(34)
+  const [balance, setBalance] = useState(50)
   const [cart, setCart] = useState([])
   const [users, setUsers] = useState([])
   const [currentUserId, setCurrentUserId] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
+  const navigate = useNavigate()
 
   const currentUser = useMemo(
     () => users.find((user) => user.id === currentUserId) || null,
@@ -37,8 +38,9 @@ function MainLayout() {
           email: 'creator@cardora.com',
           password: 'cardora',
           role: 'Artist',
-          balance: 34,
+          balance: 50,
           favorites: [],
+          inventory: [],
           avatarColor: 'linear-gradient(135deg, #62ffa2, #7ef7ff)',
         },
         {
@@ -48,8 +50,9 @@ function MainLayout() {
           email: 'muse@cardora.com',
           password: 'cardora',
           role: 'Collector',
-          balance: 58,
+          balance: 50,
           favorites: [],
+          inventory: [],
           avatarColor: 'linear-gradient(135deg, #ff9bd2, #7ef7ff)',
         },
       ]
@@ -102,6 +105,30 @@ function MainLayout() {
     updateUser(currentUser.id, (user) => ({ ...user, balance: user.balance + pack.cc }))
   }
 
+  const deductCC = (amount) => {
+    if (!currentUser) {
+      setShowAuth(true)
+      return false
+    }
+    if (currentUser.balance < amount) return false
+    updateUser(currentUser.id, (user) => ({ ...user, balance: user.balance - amount }))
+    return true
+  }
+
+  const addGift = (gift) => {
+    if (!currentUser) {
+      setShowAuth(true)
+      return { ok: false, reason: 'auth' }
+    }
+    if (currentUser.balance < gift.cc) return { ok: false, reason: 'balance' }
+    updateUser(currentUser.id, (user) => ({
+      ...user,
+      balance: user.balance - gift.cc,
+      inventory: [...(user.inventory || []), { ...gift, id: `gift-${Date.now()}` }],
+    }))
+    return { ok: true }
+  }
+
   const handleLogin = (email, password) => {
     const match = users.find(
       (user) => user.email.toLowerCase() === email.toLowerCase() && user.password === password,
@@ -124,8 +151,9 @@ function MainLayout() {
       email,
       password,
       role: 'Creator',
-      balance: 20,
+      balance: 50,
       favorites: [],
+      inventory: [],
       avatarColor: 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
     }
     setUsers((prev) => [...prev, newUser])
@@ -161,10 +189,24 @@ function MainLayout() {
           currentUser,
           openAuthModal: () => setShowAuth(true),
           updateAvatar,
+          deductCC,
+          addGift,
+          inventory: currentUser?.inventory || [],
+          openEditor: (data) => {
+            navigate('/studio', { state: { cardData: data || null } })
+          },
         }}
       />
 
-      <CardDetailModal card={selectedCard} onClose={() => setSelectedCard(null)} />
+      <CardDetailModal
+        card={selectedCard}
+        onClose={() => setSelectedCard(null)}
+        balance={balance}
+        currentUser={currentUser}
+        onRequireAuth={() => setShowAuth(true)}
+        onDeductCC={deductCC}
+        inventory={currentUser?.inventory || []}
+      />
       <AuthModal
         open={showAuth}
         onClose={() => setShowAuth(false)}

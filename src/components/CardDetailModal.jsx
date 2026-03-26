@@ -1,11 +1,26 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
+import { getTierInfo } from '../utils/tier.js'
+import CardEditModal from './CardEditModal.jsx'
 
-function CardDetailModal({ card, onClose }) {
+function CardDetailModal({
+  card,
+  onClose,
+  balance = 0,
+  currentUser,
+  onRequireAuth,
+  onDeductCC,
+  inventory = [],
+}) {
   const [showForm, setShowForm] = useState(false)
   const [sent, setSent] = useState(false)
   const [startY, setStartY] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
+  const [showEditor, setShowEditor] = useState(false)
+  const [hasEdited, setHasEdited] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!card) return undefined
@@ -25,9 +40,16 @@ function CardDetailModal({ card, onClose }) {
     setShowForm(false)
     setSent(false)
     setCopied(false)
+    setError('')
+    setShowEditor(false)
+    setHasEdited(false)
   }, [card])
 
   if (!card) return null
+
+  const tierInfo = getTierInfo(card?.tier)
+  const isPremium = tierInfo.key !== 'simple'
+  const isLocked = currentUser ? balance < tierInfo.cost : false
 
   const handleTouchStart = (event) => {
     setStartY(event.touches[0].clientY)
@@ -43,11 +65,39 @@ function CardDetailModal({ card, onClose }) {
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    if (!currentUser) {
+      onRequireAuth?.()
+      return
+    }
+    if (!onDeductCC?.(tierInfo.cost)) {
+      setError('Not enough CC to send this card yet.')
+      return
+    }
+    const formData = new FormData(event.currentTarget)
+    const recipient = (formData.get('recipient') || '').toString()
+    const note = (formData.get('note') || '').toString()
+    const stored = JSON.parse(localStorage.getItem('cardora:sentCards') || '[]')
+    const newCard = {
+      id: `card-${Date.now()}`,
+      templateId: card.id,
+      title: card.title,
+      subtitle: card.subtitle,
+      message: note || card.message,
+      recipient,
+      sender: currentUser?.name || currentUser?.username || 'Cardora Creator',
+      tier: tierInfo.key,
+      createdAt: new Date().toISOString(),
+      previewVariant: card.variant,
+    }
+    stored.unshift(newCard)
+    localStorage.setItem('cardora:sentCards', JSON.stringify(stored))
     setSent(true)
     setTimeout(() => {
       setShowForm(false)
       setSent(false)
-    }, 1600)
+      onClose()
+      navigate(`/card/${newCard.id}`)
+    }, 900)
   }
 
   const handleShare = async () => {
@@ -69,12 +119,18 @@ function CardDetailModal({ card, onClose }) {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
       >
-        <div className={`detail-thumb ${card.variant || ''}`} />
+        <div className={`detail-thumb ${card.variant || ''}`}>
+          {isPremium ? <span className="detail-upgrade">Unlock full experience</span> : null}
+        </div>
         <div className="detail-body">
           <div>
             <p className="detail-eyebrow">{card.occasion}</p>
             <h3>{card.title}</h3>
             <p className="detail-subtitle">{card.subtitle}</p>
+            <div className="detail-tier">
+              <span className={`tier-badge ${tierInfo.badgeClass}`}>{tierInfo.label}</span>
+              <span className="tier-cost">{tierInfo.cost} CC</span>
+            </div>
           </div>
           <p className="detail-message">{card.message}</p>
           <div className="detail-meta">
@@ -84,8 +140,15 @@ function CardDetailModal({ card, onClose }) {
           </div>
           {!showForm ? (
             <div className="detail-actions">
-              <button className="primary" type="button" onClick={() => setShowForm(true)}>
-                Send Card
+              <button
+                className="primary"
+                type="button"
+                onClick={() => {
+                  setShowEditor(true)
+                  setError('')
+                }}
+              >
+                View Card
               </button>
               <button className="ghost" type="button" onClick={handleShare}>
                 {copied ? 'Copied!' : 'Copy Link'}
@@ -93,6 +156,7 @@ function CardDetailModal({ card, onClose }) {
               <button className="ghost" type="button" onClick={onClose}>
                 Close
               </button>
+              {error ? <p className="form-error">{error}</p> : null}
             </div>
           ) : (
             <form className="detail-form" onSubmit={handleSubmit}>
@@ -100,24 +164,28 @@ function CardDetailModal({ card, onClose }) {
                 <>
                   <label className="detail-field">
                     Recipient Name
-                    <input type="text" placeholder="e.g. Ada" required />
+                    <input name="recipient" type="text" placeholder="e.g. Ada" required />
                   </label>
                   <label className="detail-field">
                     Email
-                    <input type="email" placeholder="ada@email.com" required />
+                    <input name="email" type="email" placeholder="ada@email.com" required />
                   </label>
                   <label className="detail-field">
                     Personal Note
-                    <textarea rows="3" placeholder="Write something sweet..." />
+                    <textarea name="note" rows="3" placeholder="Write something sweet..." />
                   </label>
                   <div className="detail-actions">
-                    <button className="primary" type="submit">
-                      Send Now
+                    <button className="primary" type="submit" disabled={isLocked}>
+                      Send Now ({tierInfo.cost} CC)
                     </button>
                     <button className="ghost" type="button" onClick={() => setShowForm(false)}>
                       Back
                     </button>
                   </div>
+                  {isLocked ? (
+                    <p className="form-error">Top up your CC balance to send this card.</p>
+                  ) : null}
+                  {error ? <p className="form-error">{error}</p> : null}
                 </>
               ) : (
                 <div className="detail-sent success-pop">
@@ -131,6 +199,28 @@ function CardDetailModal({ card, onClose }) {
           )}
         </div>
       </div>
+      <CardEditModal
+        open={showEditor}
+        onClose={() => setShowEditor(false)}
+        onSave={() => {
+          setHasEdited(true)
+          setError('')
+        }}
+        onSend={() => {
+          if (!hasEdited) {
+            setError('Please save changes before sending.')
+            return
+          }
+          if (!currentUser) {
+            onRequireAuth?.()
+            return
+          }
+          setShowEditor(false)
+          setShowForm(true)
+        }}
+        inventory={inventory}
+        canSend={hasEdited}
+      />
     </section>,
     document.body,
   )

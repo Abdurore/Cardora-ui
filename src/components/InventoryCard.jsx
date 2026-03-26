@@ -1,4 +1,4 @@
-function InventoryCard({ title, amount, action, variant }) {
+function InventoryCard({ title, amount, action = 'Apply', variant }) {
   return (
     <div className={`inventory-card ${variant}`}>
       <div>

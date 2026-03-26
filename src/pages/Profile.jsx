@@ -5,7 +5,7 @@ import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
 import InventoryCard from '../components/InventoryCard.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
-import { exploreCards, homeCards, inventory, profileCreations } from '../data/catalog.js'
+import { exploreCards, homeCards, inventory as inventoryItems, profileCreations } from '../data/catalog.js'
 
 function Profile() {
   const {
@@ -20,10 +20,11 @@ function Profile() {
   const [cropSrc, setCropSrc] = useState(null)
   const allCards = [...homeCards, ...exploreCards, ...profileCreations]
   const favoriteCards = allCards.filter((card) => favorites.includes(card.id))
+  const giftInventory = currentUser ? currentUser.inventory || [] : inventoryItems
 
   return (
     <div className="page-body">
-      <ScreenHeader user={currentUser} onAuthOpen={openAuthModal} />
+      <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
       <div className="screen-body">
         <div className="profile">
           <label className="avatar upload-avatar">
@@ -88,15 +89,19 @@ function Profile() {
             ))}
           </div>
           <h4 className="section-title">Gift Inventory</h4>
-          <div className="inventory">
-            {inventory.map((gift, index) => (
-              <InventoryCard
-                key={`${gift.title}-${index}`}
-                {...gift}
-                variant={`v${(index % 4) + 1}`}
-              />
-            ))}
-          </div>
+          {giftInventory.length ? (
+            <div className="inventory">
+              {giftInventory.map((gift, index) => (
+                <InventoryCard
+                  key={`${gift.title}-${index}`}
+                  {...gift}
+                  variant={`v${(index % 4) + 1}`}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="empty-state">No gift effects purchased yet.</p>
+          )}
         </div>
       </div>
       <ScreenNav />

@@ -9,6 +9,7 @@ export const homeCards = [
     likes: '260',
     tag: '',
     category: 'proposal',
+    tier: 'signature',
   },
   {
     id: 'home-golden-anniversary',
@@ -20,6 +21,7 @@ export const homeCards = [
     likes: '950',
     tag: 'Premium',
     category: 'anniversary',
+    tier: 'signature',
   },
   {
     id: 'home-golden-heart',
@@ -31,6 +33,7 @@ export const homeCards = [
     likes: '850',
     tag: '',
     category: 'anniversary',
+    tier: 'special',
   },
   {
     id: 'home-popup-surprise',
@@ -42,6 +45,7 @@ export const homeCards = [
     likes: '850',
     tag: 'Premium',
     category: 'birthday',
+    tier: 'signature',
   },
   {
     id: 'home-vintage-bloom',
@@ -53,6 +57,7 @@ export const homeCards = [
     likes: '950',
     tag: 'Premium',
     category: 'anniversary',
+    tier: 'signature',
   },
   {
     id: 'home-cinematic-promise',
@@ -64,6 +69,7 @@ export const homeCards = [
     likes: '950',
     tag: 'Premium',
     category: 'proposal',
+    tier: 'signature',
   },
   {
     id: 'home-new-celebration',
@@ -75,6 +81,7 @@ export const homeCards = [
     likes: '0',
     tag: 'Placeholder',
     category: 'scratch',
+    tier: 'simple',
   },
   {
     id: 'home-future-memory',
@@ -86,6 +93,7 @@ export const homeCards = [
     likes: '0',
     tag: 'Placeholder',
     category: 'scratch',
+    tier: 'simple',
   },
   {
     id: 'home-future-memory-one',
@@ -97,6 +105,7 @@ export const homeCards = [
     likes: '0',
     tag: 'Placeholder',
     category: 'scratch',
+    tier: 'simple',
   },
   {
     id: 'home-future-memory-two',
@@ -108,6 +117,7 @@ export const homeCards = [
     likes: '0',
     tag: 'Placeholder',
     category: 'scratch',
+    tier: 'simple',
   },
   {
     id: 'home-future-memory-three',
@@ -119,6 +129,7 @@ export const homeCards = [
     likes: '0',
     tag: 'Placeholder',
     category: 'scratch',
+    tier: 'simple',
   },
   {
     id: 'home-future-memory-four',
@@ -130,6 +141,7 @@ export const homeCards = [
     likes: '0',
     tag: 'Placeholder',
     category: 'scratch',
+    tier: 'simple',
   },
 ]
 
@@ -152,6 +164,7 @@ export const exploreCards = [
     likes: '260',
     tag: '',
     category: 'proposal',
+    tier: 'signature',
   },
   {
     id: 'explore-golden-heart',
@@ -163,6 +176,7 @@ export const exploreCards = [
     likes: '850',
     tag: '',
     category: 'anniversary',
+    tier: 'special',
   },
   {
     id: 'explore-sarah-birthday',
@@ -174,6 +188,7 @@ export const exploreCards = [
     likes: '950',
     tag: 'Draft',
     category: 'birthday',
+    tier: 'simple',
   },
   {
     id: 'explore-20cc-anniversary',
@@ -185,6 +200,7 @@ export const exploreCards = [
     likes: '950',
     tag: 'Premium',
     category: 'anniversary',
+    tier: 'signature',
   },
   {
     id: 'explore-popup-surprise',
@@ -196,6 +212,7 @@ export const exploreCards = [
     likes: '950',
     tag: '',
     category: 'birthday',
+    tier: 'special',
   },
   {
     id: 'explore-proposal-draft',
@@ -207,6 +224,7 @@ export const exploreCards = [
     likes: '850',
     tag: 'Premium',
     category: 'proposal',
+    tier: 'signature',
   },
   {
     id: 'explore-placeholder-aura',
@@ -218,6 +236,7 @@ export const exploreCards = [
     likes: '0',
     tag: 'Placeholder',
     category: 'scratch',
+    tier: 'simple',
   },
   {
     id: 'explore-placeholder-glow',
@@ -229,6 +248,7 @@ export const exploreCards = [
     likes: '0',
     tag: 'Placeholder',
     category: 'scratch',
+    tier: 'simple',
   },
 ]
 
@@ -242,12 +262,83 @@ export const storePacks = [
 ]
 
 export const storeGifts = [
-  { title: 'Love Lock', amount: '35 CC', note: 'Enhance proposal moments with a premium interaction.' },
-  { title: 'Confetti Bomb', amount: '20 CC', note: 'Instantly add a party vibe to any celebration.' },
-  { title: 'Neon Rose', amount: '40 CC', note: 'Add a romantic floral overlay.' },
-  { title: 'Diamond Heart', amount: '50 CC', note: 'Showcase your moment with a sparkling heart effect.' },
-  { title: 'Firework Dust', amount: '25 CC', note: 'Placeholder effect to add extra shimmer.' },
-  { title: 'Golden Halo', amount: '45 CC', note: 'Placeholder glow to frame your story.' },
+  {
+    title: 'Heart Bloom',
+    amount: '20 CC',
+    cc: 20,
+    note: 'A cinematic heart burst with soft particles.',
+    effectKey: 'heart',
+  },
+  {
+    title: 'Diamond Flare',
+    amount: '25 CC',
+    cc: 25,
+    note: 'Cut-glass sparkles and crystalline glow.',
+    effectKey: 'diamond',
+  },
+  {
+    title: 'Rose Reveal',
+    amount: '25 CC',
+    cc: 25,
+    note: 'A blooming rose with a luxe shimmer.',
+    effectKey: 'rose',
+  },
+  {
+    title: 'Starfall',
+    amount: '20 CC',
+    cc: 20,
+    note: 'A premium star twinkle with soft trails.',
+    effectKey: 'star',
+  },
+  {
+    title: 'Orb Aura',
+    amount: '18 CC',
+    cc: 18,
+    note: 'Glowing orb energy and ambient sparkle.',
+    effectKey: 'orb',
+  },
+  {
+    title: 'Ring Radiance',
+    amount: '30 CC',
+    cc: 30,
+    note: 'A romantic ring bloom with reflective shine.',
+    effectKey: 'ring',
+  },
+  {
+    title: 'Candlelight',
+    amount: '22 CC',
+    cc: 22,
+    note: 'Soft candle glow with warm flicker.',
+    effectKey: 'candle',
+  },
+  {
+    title: 'Christmas Tree Glow',
+    amount: '28 CC',
+    cc: 28,
+    note: 'Festive tree shimmer with sparkling lights.',
+    effectKey: 'christmas_tree',
+  },
+  {
+    title: 'Crescent Moon',
+    amount: '24 CC',
+    cc: 24,
+    note: 'Moonlit glow with soft drifting haze.',
+    effectKey: 'crescent_moon',
+  },
+  {
+    title: 'Meteorite Trail',
+    amount: '26 CC',
+    cc: 26,
+    note: 'A meteor burst with a luminous trail.',
+    effectKey: 'meteorite',
+  },
+  {
+    title: 'Necklace Spark',
+    amount: '30 CC',
+    cc: 30,
+    note: 'Elegant necklace shimmer with luxe glow.',
+    effectKey: 'necklace',
+  },
 ]
 
 export const profileCreations = [
@@ -259,6 +350,7 @@ export const profileCreations = [
     occasion: 'Birthday',
     meta: '1.2k Views',
     likes: '950',
+    tier: 'special',
   },
   {
     id: 'profile-proposal-moment',
@@ -268,6 +360,7 @@ export const profileCreations = [
     occasion: 'Proposal',
     meta: '1.2k Views',
     likes: '850',
+    tier: 'special',
   },
   {
     id: 'profile-cinematic-anniversary',
@@ -277,6 +370,7 @@ export const profileCreations = [
     occasion: 'Anniversary',
     meta: '1.2k Views',
     likes: '950',
+    tier: 'signature',
   },
   {
     id: 'profile-interactive-puzzle',
@@ -287,6 +381,7 @@ export const profileCreations = [
     meta: '1.2k Views',
     likes: '950',
     tag: 'Scratch Mockup',
+    tier: 'special',
   },
   {
     id: 'profile-placeholder-canvas',
@@ -297,6 +392,7 @@ export const profileCreations = [
     meta: '0 Views',
     likes: '0',
     tag: 'Placeholder',
+    tier: 'simple',
   },
   {
     id: 'profile-placeholder-reel',
@@ -307,6 +403,7 @@ export const profileCreations = [
     meta: '0 Views',
     likes: '0',
     tag: 'Placeholder',
+    tier: 'simple',
   },
 ]
 

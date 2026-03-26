@@ -9,7 +9,7 @@ function Store() {
 
   return (
     <div className="page-body">
-      <ScreenHeader user={currentUser} onAuthOpen={openAuthModal} />
+      <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
       <div className="screen-body">
         <div className="balance-bar">
           <div>
