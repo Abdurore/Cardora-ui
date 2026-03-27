@@ -12,6 +12,7 @@ function Explore() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [activeTag, setActiveTag] = useState(searchParams.get('tag') || 'all')
+  const [tierFilter, setTierFilter] = useState('all')
 
   useEffect(() => {
     const params = {}
@@ -30,15 +31,23 @@ function Explore() {
         const matchesFavorites = activeTag === 'favorites' ? favorites.includes(card.id) : true
         const matchesTag =
           activeTag === 'all' || activeTag === 'favorites' ? true : card.category === activeTag
-        return matchesQuery && matchesTag && matchesFavorites
+        const matchesTier = tierFilter === 'all' ? true : card.tier === tierFilter
+        return matchesQuery && matchesTag && matchesFavorites && matchesTier
       })
       .filter((card) => (activeTag === 'favorites' ? favorites.includes(card.id) : true))
-  }, [activeTag, query, favorites])
+  }, [activeTag, favorites, query, tierFilter])
 
   return (
     <div className="page-body">
       <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
       <div className="screen-body">
+        <div className="marketplace-topbar">
+          <div>
+            <p className="eyebrow">Marketplace</p>
+            <h2 className="marketplace-title">Find a card that already feels like a memory.</h2>
+          </div>
+        </div>
+
         <div className="search">
           <img className="search-icon" src={searchIcon} alt="" aria-hidden="true" />
           <input
@@ -47,6 +56,38 @@ function Explore() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
+
+        <div className="marketplace-filters secondary">
+          <button
+            type="button"
+            className={`filter-chip ${tierFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setTierFilter('all')}
+          >
+            All Tiers
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${tierFilter === 'simple' ? 'active' : ''}`}
+            onClick={() => setTierFilter('simple')}
+          >
+            Basic
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${tierFilter === 'special' ? 'active' : ''}`}
+            onClick={() => setTierFilter('special')}
+          >
+            Premium
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${tierFilter === 'signature' ? 'active' : ''}`}
+            onClick={() => setTierFilter('signature')}
+          >
+            Premium+
+          </button>
+        </div>
+
         <div className="tag-list">
           <button
             className={`tag ${activeTag === 'favorites' ? 'active' : ''}`}
@@ -64,8 +105,9 @@ function Explore() {
             </button>
           ))}
         </div>
+
         {filteredCards.length ? (
-          <div className="card-grid compact">
+          <div className="card-grid compact marketplace-grid">
             {filteredCards.map((card, index) => (
               <CardItem
                 key={`${card.title}-${index}`}

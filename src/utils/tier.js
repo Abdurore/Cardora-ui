@@ -1,19 +1,19 @@
 export const TIER_INFO = {
   simple: {
     key: 'simple',
-    label: '\u{1F48C} Simple',
+    label: 'Basic',
     cost: 5,
     badgeClass: 'tier-simple',
   },
   special: {
     key: 'special',
-    label: '\u2728 Special',
+    label: 'Premium',
     cost: 15,
     badgeClass: 'tier-special',
   },
   signature: {
     key: 'signature',
-    label: '\u{1F381} Signature',
+    label: 'Premium+',
     cost: 30,
     badgeClass: 'tier-signature',
   },

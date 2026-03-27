@@ -4,6 +4,7 @@ import PremiumGiftReveal, { getGiftEffect } from './PremiumGiftReveal.jsx'
 
 function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false }) {
   const [showEffect, setShowEffect] = useState(autoPreview)
+  const [justPurchased, setJustPurchased] = useState(false)
   const effectConfig = useMemo(
     () => (gift?.effectKey ? getGiftEffect(gift.effectKey) : null),
     [gift],
@@ -11,6 +12,7 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
 
   useEffect(() => {
     setShowEffect(autoPreview)
+    setJustPurchased(false)
   }, [autoPreview, gift])
 
   if (!gift) return null
@@ -40,13 +42,24 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
           <div className="detail-meta">
             <span>{gift.amount}</span>
             <span className="dot" />
-            <span>Effect placeholder</span>
+            <span>{effectConfig?.price ? `$${effectConfig.price} tier` : 'Effect preview'}</span>
           </div>
           <div className="detail-actions">
             <button className="ghost" type="button" onClick={() => setShowEffect(true)}>
               Preview Effect
             </button>
-            <button className="primary" type="button" onClick={onBuy} disabled={disabled}>
+            <button
+              className="primary"
+              type="button"
+              onClick={() => {
+                onBuy?.()
+                if (!disabled) {
+                  setJustPurchased(true)
+                  setShowEffect(true)
+                }
+              }}
+              disabled={disabled}
+            >
               Buy Gift
             </button>
             <button className="ghost" type="button" onClick={onClose}>
@@ -58,7 +71,13 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
       {showEffect ? (
         <PremiumGiftReveal
           effect={gift.effectKey}
-          onComplete={() => setShowEffect(false)}
+          onComplete={() => {
+            setShowEffect(false)
+            if (justPurchased) {
+              setJustPurchased(false)
+              onClose?.()
+            }
+          }}
         />
       ) : null}
     </section>,

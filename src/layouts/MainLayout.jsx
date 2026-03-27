@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import AuthModal from '../components/AuthModal.jsx'
@@ -13,6 +13,7 @@ function MainLayout() {
   const [currentUserId, setCurrentUserId] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
 
   const currentUser = useMemo(
     () => users.find((user) => user.id === currentUserId) || null,
@@ -177,7 +178,7 @@ function MainLayout() {
   }
 
   return (
-    <div className="page">
+    <div className={`page ${location.pathname === '/studio' ? 'page-studio' : ''}`}>
       <Outlet
         context={{
           openCardDetails: setSelectedCard,

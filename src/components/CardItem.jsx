@@ -5,7 +5,6 @@ function CardItem({
   title,
   meta,
   likes,
-  tag,
   tier = 'simple',
   variant = 'one',
   onClick,
@@ -13,6 +12,9 @@ function CardItem({
   onToggleFavorite,
 }) {
   const tierInfo = getTierInfo(tier)
+  const audienceCount = String(meta || '')
+    .replace(/views?/i, '')
+    .trim()
 
   return (
     <div
@@ -36,15 +38,22 @@ function CardItem({
         {'\u2764'}
       </button>
       <span className={`tier-badge ${tierInfo.badgeClass}`}>{tierInfo.label}</span>
-      <span className="card-cost">{tierInfo.cost} CC</span>
-      {tag ? <span className={`badge ${tag.toLowerCase()}`}>{tag}</span> : null}
       <div className="card-thumb" />
       <div className="card-info">
         <h4>{title}</h4>
-        <div className="card-meta">
-          <span>{meta}</span>
-          <span className="dot" />
-          <span>{likes}</span>
+        <div className="card-stats">
+          <span className="card-stat">
+            <strong>{tierInfo.cost}</strong> CC
+          </span>
+          <span className="card-stat">
+            <strong>{likes}</strong> Likes
+          </span>
+          <span className="card-stat">
+            <strong>{audienceCount || '0'}</strong> Users
+          </span>
+          <span className={`card-stat tier-stat ${tierInfo.badgeClass}`}>
+            <strong>{tierInfo.label}</strong>
+          </span>
         </div>
       </div>
       <div className="card-overlay">
