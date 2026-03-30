@@ -7,6 +7,7 @@ import Profile from './pages/Profile.jsx'
 import StoreGifts from './pages/StoreGifts.jsx'
 import CardView from './pages/CardView.jsx'
 import CardStudio from './pages/CardStudio.jsx'
+import AdminDashboard from './pages/AdminDashboard.jsx'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/store/gifts" element={<StoreGifts />} />
         <Route path="/card/:id" element={<CardView />} />
         <Route path="/studio" element={<CardStudio />} />
+        <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

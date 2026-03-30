@@ -1,6 +1,21 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState } from 'react'
 import PremiumGiftReveal, { getGiftEffect } from './PremiumGiftReveal.jsx'
+import AnimatedShape from './AnimatedShape.jsx'
+
+const PREVIEW_HUE = {
+  heart: 340,
+  diamond: 200,
+  rose: 330,
+  star: 42,
+  orb: 170,
+  ring: 36,
+  candle: 30,
+  christmas_tree: 155,
+  crescent_moon: 48,
+  meteorite: 290,
+  necklace: 50,
+}
 
 function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false }) {
   const [showEffect, setShowEffect] = useState(autoPreview)
@@ -24,15 +39,17 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
         <div className="preview-hero">
           <div className="preview-glow" />
           {effectConfig ? (
-            <svg className="preview-icon" viewBox="0 0 200 200" aria-hidden="true">
-              <defs>
-                <linearGradient id="previewGradient" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor={effectConfig.gradient[0]} />
-                  <stop offset="100%" stopColor={effectConfig.gradient[1]} />
-                </linearGradient>
-              </defs>
-              <path d={effectConfig.path} fill="url(#previewGradient)" />
-            </svg>
+            <div className="preview-shape-wrap">
+              <AnimatedShape
+                shapeType={gift.effectKey}
+                hue={PREVIEW_HUE[gift.effectKey] ?? 340}
+                width={160}
+                height={140}
+                particleCount={200}
+                traceLength={8}
+                className="preview-shape-canvas"
+              />
+            </div>
           ) : null}
         </div>
         <div className="preview-body">

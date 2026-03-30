@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { getTierInfo } from '../utils/tier.js'
-import CardEditModal from './CardEditModal.jsx'
 
 function CardDetailModal({
   card,
@@ -18,8 +17,6 @@ function CardDetailModal({
   const [startY, setStartY] = useState(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
-  const [showEditor, setShowEditor] = useState(false)
-  const [hasEdited, setHasEdited] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -41,8 +38,6 @@ function CardDetailModal({
     setSent(false)
     setCopied(false)
     setError('')
-    setShowEditor(false)
-    setHasEdited(false)
   }, [card])
 
   if (!card) return null
@@ -131,6 +126,13 @@ function CardDetailModal({
               <span className={`tier-badge ${tierInfo.badgeClass}`}>{tierInfo.label}</span>
               <span className="tier-cost">{tierInfo.cost} CC</span>
             </div>
+            {tierInfo.features ? (
+              <ul className="tier-features">
+                {tierInfo.features.map((f) => (
+                  <li key={f}><span className="tier-check">✓</span> {f}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           <p className="detail-message">{card.message}</p>
           <div className="detail-meta">
@@ -144,11 +146,11 @@ function CardDetailModal({
                 className="primary"
                 type="button"
                 onClick={() => {
-                  setShowEditor(true)
-                  setError('')
+                  onClose()
+                  navigate('/studio', { state: { cardData: card } })
                 }}
               >
-                View Card
+                Edit in Studio
               </button>
               <button className="ghost" type="button" onClick={handleShare}>
                 {copied ? 'Copied!' : 'Copy Link'}
@@ -199,31 +201,10 @@ function CardDetailModal({
           )}
         </div>
       </div>
-      <CardEditModal
-        open={showEditor}
-        onClose={() => setShowEditor(false)}
-        onSave={() => {
-          setHasEdited(true)
-          setError('')
-        }}
-        onSend={() => {
-          if (!hasEdited) {
-            setError('Please save changes before sending.')
-            return
-          }
-          if (!currentUser) {
-            onRequireAuth?.()
-            return
-          }
-          setShowEditor(false)
-          setShowForm(true)
-        }}
-        inventory={inventory}
-        canSend={hasEdited}
-      />
     </section>,
     document.body,
   )
 }
 
 export default CardDetailModal
+

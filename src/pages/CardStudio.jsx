@@ -1,917 +1,1027 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import {
+  HiOutlineEnvelope, HiOutlinePaintBrush, HiOutlinePhoto,
+  HiOutlineSparkles, HiOutlineChatBubbleLeft, HiOutlineLockClosed,
+  HiOutlineDocumentText, HiOutlineMusicalNote, HiOutlineEye,
+  HiOutlineGift
+} from 'react-icons/hi2'
+import { IoColorPaletteOutline } from 'react-icons/io5'
 import logo from '../assets/icons/logo.png'
+import { defaultCardObject, resolveTemplateCardObject, musicPresets, fontOptions } from '../data/cardDefaults.js'
+import CardPreviewModal from '../components/CardPreviewModal.jsx'
+import { GiftIcon } from '../components/GiftCard.jsx'
 
-const steps = ['envelope', 'card', 'questions', 'preview', 'send']
+const steps = ['closed', 'card', 'questions', 'preview']
 
 const tools = [
-  { id: 'envelope', icon: 'EV', label: 'Envelope', hint: 'First impression and seal' },
-  { id: 'text', icon: 'TX', label: 'Text', hint: 'Heading, body, and tone' },
-  { id: 'media', icon: 'MD', label: 'Media', hint: 'Image, crop, and fit' },
-  { id: 'theme', icon: 'TH', label: 'Theme', hint: 'Palette and surface mood' },
-  { id: 'animation', icon: 'AN', label: 'Animations', hint: 'Entry and particles' },
-  { id: 'questions', icon: 'QS', label: 'Questions', hint: 'Receiver interaction flow' },
-  { id: 'gifts', icon: 'GF', label: 'Gifts', hint: 'Locked reward and claim state' },
+  { id: 'closedState', icon: HiOutlineEnvelope, label: 'Closed State', hint: 'First impression & button' },
+  { id: 'content', icon: HiOutlineDocumentText, label: 'Content', hint: 'Heading, body, extended' },
+  { id: 'media', icon: HiOutlinePhoto, label: 'Media', hint: 'Images & captions' },
+  { id: 'background', icon: HiOutlinePaintBrush, label: 'Background', hint: 'Colors, gradients, music' },
+  { id: 'theme', icon: IoColorPaletteOutline, label: 'Theme', hint: 'Fonts & palette' },
+  { id: 'cardStyle', icon: HiOutlineSparkles, label: 'Card Style', hint: 'Border, scrollbar, text FX' },
+  { id: 'animation', icon: HiOutlineSparkles, label: 'Animation', hint: 'Confetti & effects' },
+  { id: 'gifts', icon: HiOutlineGift, label: 'Gifts', hint: 'End-of-card gift reveal' },
+  { id: 'questions', icon: HiOutlineChatBubbleLeft, label: 'Questions', hint: 'Receiver interaction' },
+  { id: 'interaction', icon: HiOutlineLockClosed, label: 'Interaction', hint: 'Lock & reveal' },
 ]
 
-const themes = {
-  cardora: {
-    name: 'Cardora Glow',
-    accent: '#76efff',
-    accentSoft: 'rgba(118,239,255,0.18)',
-    cardBg: 'linear-gradient(180deg, rgba(11,28,36,0.96), rgba(5,14,20,0.98))',
-  },
-  minimal: {
-    name: 'Minimal Night',
-    accent: '#8cf2ff',
-    accentSoft: 'rgba(140,242,255,0.16)',
-    cardBg: 'linear-gradient(180deg, rgba(12,20,26,0.96), rgba(7,11,15,0.98))',
-  },
-  birthday: {
-    name: 'Birthday Glow',
-    accent: '#6fe6ff',
-    accentSoft: 'rgba(111,230,255,0.16)',
-    cardBg: 'linear-gradient(180deg, rgba(14,26,33,0.96), rgba(8,14,19,0.98))',
-  },
+// Deep merge helper
+function deepMerge(target, source) {
+  const result = { ...target }
+  for (const key of Object.keys(source)) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      result[key] = deepMerge(target[key] || {}, source[key])
+    } else {
+      result[key] = source[key]
+    }
+  }
+  return result
 }
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+function ColorInput({ value, onChange, label }) {
+  return (
+    <label className="cs-color-field">
+      <span>{label}</span>
+      <div className="cs-color-wrap">
+        <input type="color" value={value} onChange={onChange} />
+        <input
+          type="text"
+          value={value}
+          onChange={onChange}
+          className="cs-color-text"
+          maxLength={7}
+        />
+      </div>
+    </label>
+  )
+}
 
 function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { currentUser, inventory = [] } = useOutletContext() || {}
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
 
-  const [activeTool, setActiveTool] = useState('envelope')
-  const [activeStep, setActiveStep] = useState('envelope')
-  const [fullPreview, setFullPreview] = useState(false)
-  const [selectedElement, setSelectedElement] = useState('heading')
-  const [dragging, setDragging] = useState(null)
-  const [dragOrigin, setDragOrigin] = useState({ x: 0, y: 0 })
-  const [savedState, setSavedState] = useState('Draft saved 2 mins ago')
-  const [themeId, setThemeId] = useState('cardora')
-  const [envelope, setEnvelope] = useState({
-    color: '#123746',
-    seal: 'Heart',
-    recipient: 'Alex',
-    intro: 'A beautiful little moment is waiting inside.',
-    isOpen: false,
-  })
-  const [text, setText] = useState({
-    heading: cardData?.title || 'Happy Anniversary',
-    body: 'I love you more than words can say. Forever & always.',
-    font: 'Cinzel',
-    size: 34,
-    color: '#f1fbff',
-    align: 'center',
-    animation: 'Fade',
-  })
-  const [media, setMedia] = useState({
-    image:
-      'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=900&q=80',
-    fit: 'cover',
-    radius: 28,
-    shadow: true,
-  })
-  const [motion, setMotion] = useState({
-    entry: 'Float Up',
-    duration: 2.6,
-    particles: 'Sparkles',
-    enabled: true,
-  })
-  const [questions, setQuestions] = useState([
-    { id: 'q1', prompt: 'What should we relive first?', type: 'text' },
-  ])
-  const [gift, setGift] = useState({
-    type: 'Monetary',
-    value: '50 CC',
-    message: 'A little extra glow for your day.',
-    status: 'Pending',
-  })
-  const [sendInfo, setSendInfo] = useState({ recipient: 'alex@cardora.app', mode: 'Email' })
-  const [titlePos, setTitlePos] = useState({ x: 0, y: -10 })
-  const [bodyPos, setBodyPos] = useState({ x: 0, y: 14 })
-  const [imagePos, setImagePos] = useState({ x: 0, y: 6 })
-  const [sequenceStage, setSequenceStage] = useState('envelope')
-  const [questionIndex, setQuestionIndex] = useState(0)
-  const [autoplay, setAutoplay] = useState(false)
-  const [giftClaimed, setGiftClaimed] = useState(false)
+  const [cardObject, setCardObject] = useState(() => resolveTemplateCardObject(cardData))
+  const [activeTool, setActiveTool] = useState('closedState')
+  const [activeStep, setActiveStep] = useState('closed')
+  const [showPreview, setShowPreview] = useState(false)
+  const [savedState, setSavedState] = useState('Unsaved draft')
+  const [showPublish, setShowPublish] = useState(false)
+  const fileInputRef = useRef(null)
 
-  const activeTheme = themes[themeId]
-  const panelMode = activeStep === 'preview' || activeStep === 'send' ? activeStep : activeTool
-  const currentQuestion = questions[questionIndex] || null
+  const isArtist = currentUser?.role === 'Artist'
+
+  const c = cardObject
+
+  // Updater helpers
+  const update = (path, value) => {
+    setCardObject(prev => {
+      const keys = path.split('.')
+      const result = structuredClone(prev)
+      let current = result
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (current[keys[i]] == null || typeof current[keys[i]] !== 'object') {
+          current[keys[i]] = {}
+        }
+        current = current[keys[i]]
+      }
+      current[keys[keys.length - 1]] = value
+      return result
+    })
+  }
 
   const goToStep = (step) => {
     setActiveStep(step)
-    if (step === 'envelope') setActiveTool('envelope')
-    if (step === 'card') setActiveTool('text')
+    if (step === 'closed') setActiveTool('closedState')
+    if (step === 'card') setActiveTool('content')
     if (step === 'questions') setActiveTool('questions')
     if (step === 'preview') {
-      setFullPreview(true)
-      setSequenceStage('envelope')
-      setQuestionIndex(0)
-      setGiftClaimed(false)
-      setAutoplay(false)
+      setShowPreview(true)
     }
-    if (step !== 'preview') setFullPreview(false)
   }
 
-  const updateQuestion = (id, field, value) => {
-    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, [field]: value } : q)))
+  const enterPreview = () => {
+    setShowPreview(true)
+    setActiveStep('preview')
   }
 
-  const startDrag = (event, key) => {
-    if (fullPreview) return
-    setDragging(key)
-    setDragOrigin({ x: event.clientX, y: event.clientY })
-    setSelectedElement(key)
+  const handleSave = () => {
+    try {
+      localStorage.setItem('cardora:studioCard', JSON.stringify(cardObject))
+      setSavedState('Draft saved just now')
+    } catch {
+      setSavedState('Save failed')
+    }
   }
 
-  const moveDrag = (event) => {
-    if (!dragging) return
-    const dx = event.clientX - dragOrigin.x
-    const dy = event.clientY - dragOrigin.y
-    const next = (state) => ({
-      x: clamp(Math.round((state.x + dx) / 6) * 6, -54, 54),
-      y: clamp(Math.round((state.y + dy) / 6) * 6, -54, 72),
-    })
-    if (dragging === 'heading') setTitlePos((prev) => next(prev))
-    if (dragging === 'body') setBodyPos((prev) => next(prev))
-    if (dragging === 'image') setImagePos((prev) => next(prev))
-    setDragOrigin({ x: event.clientX, y: event.clientY })
-  }
-
-  const uploadMedia = (event) => {
-    const file = event.target.files?.[0]
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        setMedia((prev) => ({ ...prev, image: reader.result }))
+        const newImages = [...c.media.images, { url: reader.result, caption: '' }]
+        update('media.images', newImages)
       }
     }
     reader.readAsDataURL(file)
-    event.target.value = ''
+    e.target.value = ''
   }
 
-  const rewriteCopy = () => {
-    setText((prev) => ({
-      ...prev,
-      heading: 'For the memory we are still creating',
-      body: 'Tonight feels soft, bright, and completely ours. I wanted this card to hold that feeling for a little longer.',
-    }))
-    setSavedState('Copy refreshed')
+  const removeImage = (idx) => {
+    update('media.images', c.media.images.filter((_, i) => i !== idx))
   }
 
-  const nextSequence = () => {
-    if (sequenceStage === 'envelope') {
-      setEnvelope((prev) => ({ ...prev, isOpen: true }))
-      setSequenceStage('card')
-      return
-    }
-    if (sequenceStage === 'card') {
-      setSequenceStage(questions.length ? 'questions' : 'gift')
-      return
-    }
-    if (sequenceStage === 'questions') {
-      if (questionIndex < questions.length - 1) {
-        setQuestionIndex((prev) => prev + 1)
-        return
-      }
-      setSequenceStage('gift')
-      return
-    }
-    if (sequenceStage === 'gift') {
-      setGiftClaimed(true)
-      setGift((prev) => ({ ...prev, status: 'Opened' }))
-      setSequenceStage('end')
-    }
+  const updateImageCaption = (idx, caption) => {
+    const imgs = [...c.media.images]
+    imgs[idx] = { ...imgs[idx], caption }
+    update('media.images', imgs)
   }
 
-  const resetSequence = () => {
-    setAutoplay(false)
-    setSequenceStage('envelope')
-    setQuestionIndex(0)
-    setGiftClaimed(false)
-    setEnvelope((prev) => ({ ...prev, isOpen: false }))
-    setGift((prev) => ({ ...prev, status: 'Pending' }))
+  const addQuestion = () => {
+    const items = [...c.questions.items, { text: 'New question?' }]
+    update('questions.items', items)
   }
 
-  const enterPreview = () => {
-    goToStep('preview')
-    resetSequence()
-    setFullPreview(true)
+  const removeQuestion = (idx) => {
+    update('questions.items', c.questions.items.filter((_, i) => i !== idx))
   }
 
-  useEffect(() => {
-    if (!fullPreview || !autoplay) return
-    if (sequenceStage === 'end') {
-      setAutoplay(false)
-      return
-    }
-    const timer = setTimeout(() => {
-      nextSequence()
-    }, sequenceStage === 'questions' ? 1800 : 1400)
-    return () => clearTimeout(timer)
-  }, [autoplay, fullPreview, questionIndex, sequenceStage])
+  const updateQuestion = (idx, text) => {
+    const items = [...c.questions.items]
+    items[idx] = { ...items[idx], text }
+    update('questions.items', items)
+  }
 
+  const addConfettiColor = () => {
+    const colors = [...c.animation.confettiColors, '#ffffff']
+    update('animation.confettiColors', colors)
+  }
+
+  const removeConfettiColor = (idx) => {
+    update('animation.confettiColors', c.animation.confettiColors.filter((_, i) => i !== idx))
+  }
+
+  const addBorderColor = () => {
+    update('card.cardBorder.colors', [...c.card.cardBorder.colors, '#ffffff'])
+  }
+
+  const addBgColor = () => {
+    update('background.colors', [...c.background.colors, '#111111'])
+  }
+
+  // Tool panels
   const renderPanel = () => {
-    if (panelMode === 'envelope') {
+    // CLOSED STATE
+    if (activeTool === 'closedState') {
       return (
         <>
-          <p className="studio-v2-panel-eyebrow">Envelope Tool</p>
-          <h3>Set the first emotional cue.</h3>
-          <label className="studio-v2-field">
-            <span>Envelope color</span>
-            <input type="color" value={envelope.color} onChange={(e) => setEnvelope((p) => ({ ...p, color: e.target.value }))} />
+          <p className="cs-panel-eyebrow">Closed State</p>
+          <h3>First impression & sealed look</h3>
+          <ColorInput label="Background" value={c.closedState.backgroundColor} onChange={e => update('closedState.backgroundColor', e.target.value)} />
+          <ColorInput label="Border" value={c.closedState.borderColor} onChange={e => update('closedState.borderColor', e.target.value)} />
+          <ColorInput label="Text Color" value={c.closedState.textColor} onChange={e => update('closedState.textColor', e.target.value)} />
+          <ColorInput label="Heading Color" value={c.closedState.headingColor} onChange={e => update('closedState.headingColor', e.target.value)} />
+          <label className="cs-field">
+            <span>Heading Font</span>
+            <select value={c.closedState.headingFont} onChange={e => update('closedState.headingFont', e.target.value)}>
+              {fontOptions.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
           </label>
-          <div className="studio-v2-choice-row">
-            {['Heart', 'Wax', 'Minimal'].map((seal) => (
-              <button key={seal} type="button" className={`studio-v2-chip ${envelope.seal === seal ? 'active' : ''}`} onClick={() => setEnvelope((p) => ({ ...p, seal }))}>{seal}</button>
-            ))}
+          <label className="cs-field">
+            <span>Heading Text</span>
+            <input value={c.closedState.headingText} onChange={e => update('closedState.headingText', e.target.value)} />
+          </label>
+          <label className="cs-field">
+            <span>Body Text</span>
+            <textarea rows={3} value={c.closedState.bodyText} onChange={e => update('closedState.bodyText', e.target.value)} />
+          </label>
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Open Button</p>
+            <label className="cs-field">
+              <span>Button Text</span>
+              <input value={c.closedState.button.text} onChange={e => update('closedState.button.text', e.target.value)} />
+            </label>
+            <ColorInput label="Button BG" value={c.closedState.button.backgroundColor} onChange={e => update('closedState.button.backgroundColor', e.target.value)} />
+            <ColorInput label="Button Text" value={c.closedState.button.textColor} onChange={e => update('closedState.button.textColor', e.target.value)} />
+            <ColorInput label="Button Border" value={c.closedState.button.borderColor} onChange={e => update('closedState.button.borderColor', e.target.value)} />
+            <div className="cs-choice-row">
+              {['rounded', 'pill', 'square', 'sharp'].map(shape => (
+                <button
+                  key={shape}
+                  type="button"
+                  className={`cs-chip ${c.closedState.button.shape === shape ? 'active' : ''}`}
+                  onClick={() => update('closedState.button.shape', shape)}
+                >
+                  {shape}
+                </button>
+              ))}
+            </div>
           </div>
-          <label className="studio-v2-field">
-            <span>Recipient name</span>
-            <input value={envelope.recipient} onChange={(e) => setEnvelope((p) => ({ ...p, recipient: e.target.value }))} />
-          </label>
-          <label className="studio-v2-field">
-            <span>Intro text</span>
-            <textarea rows="3" value={envelope.intro} onChange={(e) => setEnvelope((p) => ({ ...p, intro: e.target.value }))} />
-          </label>
-          <button type="button" className="studio-v2-button" onClick={() => setEnvelope((p) => ({ ...p, isOpen: !p.isOpen }))}>
-            {envelope.isOpen ? 'Preview close animation' : 'Preview open animation'}
-          </button>
         </>
       )
     }
 
-    if (panelMode === 'text') {
+    // CONTENT
+    if (activeTool === 'content') {
       return (
         <>
-          <p className="studio-v2-panel-eyebrow">Text Tool</p>
-          <h3>Shape the voice of the card.</h3>
-          <div className="studio-v2-choice-row">
-            {['heading', 'body'].map((item) => (
-              <button key={item} type="button" className={`studio-v2-chip ${selectedElement === item ? 'active' : ''}`} onClick={() => setSelectedElement(item)}>
-                {item}
-              </button>
-            ))}
-          </div>
-          <label className="studio-v2-field">
+          <p className="cs-panel-eyebrow">Content</p>
+          <h3>Shape your card's message</h3>
+          <label className="cs-field">
             <span>Heading</span>
-            <input value={text.heading} onChange={(e) => setText((p) => ({ ...p, heading: e.target.value }))} />
+            <input value={c.content.heading} onChange={e => update('content.heading', e.target.value)} />
           </label>
-          <label className="studio-v2-field">
-            <span>Body text</span>
-            <textarea rows="4" value={text.body} onChange={(e) => setText((p) => ({ ...p, body: e.target.value }))} />
+          <label className="cs-field">
+            <span>Body</span>
+            <textarea rows={4} value={c.content.body} onChange={e => update('content.body', e.target.value)} />
           </label>
-          <label className="studio-v2-field">
-            <span>Font</span>
-            <select value={text.font} onChange={(e) => setText((p) => ({ ...p, font: e.target.value }))}>
-              <option>Cinzel</option>
-              <option>Manrope</option>
-              <option>Playfair</option>
-            </select>
+          <label className="cs-field">
+            <span>Extended Body</span>
+            <textarea rows={4} value={c.content.extendedBody} onChange={e => update('content.extendedBody', e.target.value)} placeholder="Additional text shown after the main body..." />
           </label>
-          <label className="studio-v2-field">
-            <span>Size</span>
-            <input type="range" min="22" max="48" value={text.size} onChange={(e) => setText((p) => ({ ...p, size: Number(e.target.value) }))} />
-          </label>
-          <label className="studio-v2-field">
-            <span>Color</span>
-            <input type="color" value={text.color} onChange={(e) => setText((p) => ({ ...p, color: e.target.value }))} />
-          </label>
-          <div className="studio-v2-choice-row">
-            {['left', 'center', 'right'].map((align) => (
-              <button key={align} type="button" className={`studio-v2-chip ${text.align === align ? 'active' : ''}`} onClick={() => setText((p) => ({ ...p, align }))}>{align}</button>
-            ))}
-          </div>
-          <label className="studio-v2-field">
-            <span>Animation</span>
-            <select value={text.animation} onChange={(e) => setText((p) => ({ ...p, animation: e.target.value }))}>
-              <option>Fade</option>
-              <option>Slide</option>
-              <option>Typewriter</option>
-            </select>
-          </label>
-          <button type="button" className="studio-v2-button" onClick={rewriteCopy}>Rewrite with AI</button>
         </>
       )
     }
 
-    if (panelMode === 'media') {
+    // MEDIA
+    if (activeTool === 'media') {
       return (
         <>
-          <p className="studio-v2-panel-eyebrow">Media Tool</p>
-          <h3>Control the visual centerpiece.</h3>
-          <label className="studio-v2-upload">
-            <span>Upload image</span>
-            <input type="file" accept="image/*" onChange={uploadMedia} />
-          </label>
-          <label className="studio-v2-field">
-            <span>Image fit</span>
-            <select value={media.fit} onChange={(e) => setMedia((p) => ({ ...p, fit: e.target.value }))}>
-              <option value="cover">Cover</option>
-              <option value="contain">Contain</option>
-            </select>
-          </label>
-          <label className="studio-v2-field">
-            <span>Border radius</span>
-            <input type="range" min="12" max="40" value={media.radius} onChange={(e) => setMedia((p) => ({ ...p, radius: Number(e.target.value) }))} />
-          </label>
-          <button type="button" className={`studio-v2-chip ${media.shadow ? 'active' : ''}`} onClick={() => setMedia((p) => ({ ...p, shadow: !p.shadow }))}>
-            {media.shadow ? 'Shadow enabled' : 'Shadow disabled'}
+          <p className="cs-panel-eyebrow">Media</p>
+          <h3>Add images to your card</h3>
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+          <button type="button" className="cs-button" onClick={() => fileInputRef.current?.click()}>
+            + Upload Image
           </button>
-        </>
-      )
-    }
-
-    if (panelMode === 'theme') {
-      return (
-        <>
-          <p className="studio-v2-panel-eyebrow">Theme Tool</p>
-          <h3>Keep the feeling premium and restrained.</h3>
-          <div className="studio-v2-theme-list">
-            {Object.entries(themes).map(([key, value]) => (
-              <button key={key} type="button" className={`studio-v2-theme-card ${themeId === key ? 'active' : ''}`} onClick={() => setThemeId(key)}>
-                <span className="studio-v2-theme-swatch" style={{ background: value.accent }} />
-                <span>{value.name}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )
-    }
-
-    if (panelMode === 'animation') {
-      return (
-        <>
-          <p className="studio-v2-panel-eyebrow">Animation Tool</p>
-          <h3>Let the motion stay soft and cinematic.</h3>
-          <label className="studio-v2-field">
-            <span>Entry animation</span>
-            <select value={motion.entry} onChange={(e) => setMotion((p) => ({ ...p, entry: e.target.value }))}>
-              <option>Float Up</option>
-              <option>Soft Fade</option>
-              <option>Slow Zoom</option>
-            </select>
-          </label>
-          <label className="studio-v2-field">
-            <span>Duration</span>
-            <input type="range" min="1.4" max="4" step="0.1" value={motion.duration} onChange={(e) => setMotion((p) => ({ ...p, duration: Number(e.target.value) }))} />
-          </label>
-          <div className="studio-v2-choice-row">
-            {['Sparkles', 'Hearts'].map((particles) => (
-              <button key={particles} type="button" className={`studio-v2-chip ${motion.particles === particles ? 'active' : ''}`} onClick={() => setMotion((p) => ({ ...p, particles }))}>{particles}</button>
-            ))}
-          </div>
-          <button type="button" className={`studio-v2-chip ${motion.enabled ? 'active' : ''}`} onClick={() => setMotion((p) => ({ ...p, enabled: !p.enabled }))}>
-            {motion.enabled ? 'Particles on' : 'Particles off'}
-          </button>
-        </>
-      )
-    }
-
-    if (panelMode === 'questions') {
-      return (
-        <>
-          <p className="studio-v2-panel-eyebrow">Questions Tool</p>
-          <h3>Build the interaction after the reveal.</h3>
-          {questions.map((question) => (
-            <div key={question.id} className="studio-v2-question-card">
-              <label className="studio-v2-field">
-                <span>Prompt</span>
-                <input value={question.prompt} onChange={(e) => updateQuestion(question.id, 'prompt', e.target.value)} />
+          {c.media.images.length === 0 && (
+            <p className="cs-empty">No images added yet.</p>
+          )}
+          {c.media.images.map((img, i) => (
+            <div key={i} className="cs-image-card">
+              <img src={img.url} alt="" className="cs-image-thumb" />
+              <label className="cs-field">
+                <span>Caption</span>
+                <input value={img.caption} onChange={e => updateImageCaption(i, e.target.value)} placeholder="Add a caption..." />
               </label>
-              <label className="studio-v2-field">
-                <span>Answer type</span>
-                <select value={question.type} onChange={(e) => updateQuestion(question.id, 'type', e.target.value)}>
-                  <option value="text">Text</option>
-                  <option value="multiple choice">Multiple choice</option>
-                  <option value="emoji reaction">Emoji reaction</option>
-                </select>
-              </label>
+              <button type="button" className="cs-remove-btn" onClick={() => removeImage(i)}>Remove</button>
             </div>
           ))}
-          <button type="button" className="studio-v2-button" onClick={() => setQuestions((prev) => [...prev, { id: `q${Date.now()}`, prompt: 'Add a new question', type: 'text' }])}>
-            Add new question
-          </button>
         </>
       )
     }
 
-    if (panelMode === 'gifts') {
+    // BACKGROUND
+    if (activeTool === 'background') {
       return (
         <>
-          <p className="studio-v2-panel-eyebrow">Gift Tool</p>
-          <h3>Embed a reward into the experience.</h3>
-          <div className="studio-v2-choice-row">
-            {['Monetary', 'Digital item'].map((type) => (
-              <button key={type} type="button" className={`studio-v2-chip ${gift.type === type ? 'active' : ''}`} onClick={() => setGift((p) => ({ ...p, type }))}>{type}</button>
-            ))}
-          </div>
-          <label className="studio-v2-field">
-            <span>Amount / value</span>
-            <input value={gift.value} onChange={(e) => setGift((p) => ({ ...p, value: e.target.value }))} />
-          </label>
-          <label className="studio-v2-field">
-            <span>Gift message</span>
-            <textarea rows="3" value={gift.message} onChange={(e) => setGift((p) => ({ ...p, message: e.target.value }))} />
-          </label>
-          <div className="studio-v2-stat-list">
-            <div className="studio-v2-stat"><span>Status</span><strong>{gift.status}</strong></div>
-            <div className="studio-v2-stat"><span>Receiver CTA</span><strong>{gift.type === 'Monetary' ? 'Claim Gift' : 'Redeem Item'}</strong></div>
-          </div>
-          <div className="studio-v2-choice-row">
-            {['Pending', 'Viewed', 'Opened'].map((status) => (
+          <p className="cs-panel-eyebrow">Background</p>
+          <h3>Set the stage</h3>
+          <div className="cs-choice-row">
+            {['color', 'gradient', 'image', 'video', 'animated'].map(type => (
               <button
-                key={status}
+                key={type}
                 type="button"
-                className={`studio-v2-chip ${gift.status === status ? 'active' : ''}`}
-                onClick={() => setGift((p) => ({ ...p, status }))}
+                className={`cs-chip ${c.background.type === type ? 'active' : ''}`}
+                onClick={() => update('background.type', type)}
               >
-                {status}
+                {type}
               </button>
             ))}
           </div>
-        </>
-      )
-    }
 
-    if (panelMode === 'preview') {
-      return (
-        <>
-          <p className="studio-v2-panel-eyebrow">Preview Mode</p>
-          <h3>Experience the card exactly like a receiver would.</h3>
-          <div className="studio-v2-stat-list">
-            {[`Stage: ${sequenceStage}`, `${questions.length} question flow`, 'Gift reveal sequence'].map((item) => (
-              <div key={item} className="studio-v2-stat"><span>Included</span><strong>{item}</strong></div>
-            ))}
-          </div>
-          <div className="studio-v2-choice-row">
-            <button type="button" className="studio-v2-button" onClick={resetSequence}>Reset</button>
-            <button type="button" className="studio-v2-button" onClick={nextSequence}>Next</button>
-            <button type="button" className="studio-v2-button primary" onClick={() => setAutoplay((prev) => !prev)}>
-              {autoplay ? 'Pause' : 'Play'}
-            </button>
-          </div>
-        </>
-      )
-    }
-
-    return (
-      <>
-        <p className="studio-v2-panel-eyebrow">Send Step</p>
-        <h3>Confirm delivery and handoff.</h3>
-        <label className="studio-v2-field">
-          <span>Recipient detail</span>
-          <input value={sendInfo.recipient} onChange={(e) => setSendInfo((p) => ({ ...p, recipient: e.target.value }))} />
-        </label>
-        <div className="studio-v2-choice-row">
-          {['Email', 'Username'].map((mode) => (
-            <button key={mode} type="button" className={`studio-v2-chip ${sendInfo.mode === mode ? 'active' : ''}`} onClick={() => setSendInfo((p) => ({ ...p, mode }))}>{mode}</button>
-          ))}
-        </div>
-        <div className="studio-v2-stat-list">
-          <div className="studio-v2-stat"><span>Delivered</span><strong>{sendInfo.recipient}</strong></div>
-          <div className="studio-v2-stat"><span>Gift claim</span><strong>{gift.status}</strong></div>
-        </div>
-        <button
-          type="button"
-          className="studio-v2-button primary"
-          onClick={() => {
-            setSavedState(`Experience queued for ${sendInfo.recipient}`)
-            setGift((prev) => ({ ...prev, status: 'Viewed' }))
-          }}
-        >
-          Confirm Send
-        </button>
-      </>
-    )
-  }
-
-  const renderMobileToolContent = () => {
-    if (activeTool === 'envelope') {
-      return (
-        <div className="studio-v2-mobile-panel">
-          <h3>Choose Envelope</h3>
-          <div className="studio-v2-choice-row compact">
-            {['Heart', 'Wax', 'Minimal'].map((seal) => (
-              <button
-                key={seal}
-                type="button"
-                className={`studio-v2-chip ${envelope.seal === seal ? 'active' : ''}`}
-                onClick={() => setEnvelope((p) => ({ ...p, seal }))}
-              >
-                {seal}
-              </button>
-            ))}
-          </div>
-          <label className="studio-v2-field">
-            <span>Recipient name</span>
-            <input
-              value={envelope.recipient}
-              onChange={(e) => setEnvelope((p) => ({ ...p, recipient: e.target.value }))}
-            />
-          </label>
-          <label className="studio-v2-field">
-            <span>Intro text</span>
-            <textarea
-              rows="3"
-              value={envelope.intro}
-              onChange={(e) => setEnvelope((p) => ({ ...p, intro: e.target.value }))}
-            />
-          </label>
-          <button type="button" className="studio-v2-button" onClick={rewriteCopy}>
-            Rewrite with AI
-          </button>
-        </div>
-      )
-    }
-
-    if (activeTool === 'text') {
-      return (
-        <div className="studio-v2-mobile-panel">
-          <h3>Add Heading</h3>
-          <label className="studio-v2-field">
-            <span>Heading</span>
-            <input value={text.heading} onChange={(e) => setText((p) => ({ ...p, heading: e.target.value }))} />
-          </label>
-          <label className="studio-v2-field">
-            <span>Add body</span>
-            <input value={text.body} onChange={(e) => setText((p) => ({ ...p, body: e.target.value }))} />
-          </label>
-          <label className="studio-v2-field">
-            <span>Font</span>
-            <div className="studio-v2-inline-control">
-              <select value={text.font} onChange={(e) => setText((p) => ({ ...p, font: e.target.value }))}>
-                <option>Cinzel</option>
-                <option>Manrope</option>
-                <option>Playfair</option>
-              </select>
-              <input type="range" min="22" max="48" value={text.size} onChange={(e) => setText((p) => ({ ...p, size: Number(e.target.value) }))} />
-              <span>{text.size}</span>
+          {(c.background.type === 'color' || c.background.type === 'gradient' || c.background.type === 'animated') && (
+            <div className="cs-sub-section">
+              <p className="cs-sub-label">Colors</p>
+              {c.background.colors.map((color, i) => (
+                <div key={i} className="cs-color-row">
+                  <ColorInput label={`Color ${i + 1}`} value={color} onChange={e => {
+                    const colors = [...c.background.colors]
+                    colors[i] = e.target.value
+                    update('background.colors', colors)
+                  }} />
+                  {c.background.colors.length > 1 && (
+                    <button type="button" className="cs-inline-remove" onClick={() => {
+                      update('background.colors', c.background.colors.filter((_, j) => j !== i))
+                    }}>×</button>
+                  )}
+                </div>
+              ))}
+              {c.background.type !== 'color' && (
+                <button type="button" className="cs-button small" onClick={addBgColor}>+ Add Color</button>
+              )}
             </div>
-          </label>
-          <div className="studio-v2-inline-control">
-            <input type="color" value={text.color} onChange={(e) => setText((p) => ({ ...p, color: e.target.value }))} />
-            {['left', 'center', 'right'].map((align) => (
-              <button key={align} type="button" className={`studio-v2-chip icon ${text.align === align ? 'active' : ''}`} onClick={() => setText((p) => ({ ...p, align }))}>
-                {align.charAt(0).toUpperCase()}
-              </button>
-            ))}
+          )}
+
+          {(c.background.type === 'animated' || c.background.type === 'gradient') && (
+            <label className="cs-field">
+              <span>Animation Duration (s)</span>
+              <input type="range" min="1" max="10" step="0.5" value={c.background.animationDuration} onChange={e => update('background.animationDuration', Number(e.target.value))} />
+              <span className="cs-range-val">{c.background.animationDuration}s</span>
+            </label>
+          )}
+
+          {c.background.type === 'image' && (
+            <label className="cs-field">
+              <span>Image URL</span>
+              <input type="url" value={c.background.imageUrl} onChange={e => update('background.imageUrl', e.target.value)} placeholder="https://..." />
+            </label>
+          )}
+
+          {c.background.type === 'video' && (
+            <label className="cs-field">
+              <span>Video URL</span>
+              <input type="url" value={c.background.videoUrl} onChange={e => update('background.videoUrl', e.target.value)} placeholder="https://..." />
+            </label>
+          )}
+
+          <div className="cs-sub-section">
+            <p className="cs-sub-label"><HiOutlineMusicalNote style={{ verticalAlign: 'middle' }} /> Background Music</p>
+            <label className="cs-field">
+              <span>Music URL</span>
+              <input type="url" value={c.background.music.url} onChange={e => update('background.music.url', e.target.value)} placeholder="paste audio URL or pick below" />
+            </label>
+            <div className="cs-preset-list">
+              {musicPresets.map(preset => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className={`cs-chip small ${c.background.music.url === preset.url ? 'active' : ''}`}
+                  onClick={() => update('background.music.url', preset.url)}
+                >
+                  ♫ {preset.label}
+                </button>
+              ))}
+            </div>
+            <label className="cs-field">
+              <span>Volume</span>
+              <input type="range" min="0" max="1" step="0.05" value={c.background.music.volume} onChange={e => update('background.music.volume', Number(e.target.value))} />
+              <span className="cs-range-val">{Math.round(c.background.music.volume * 100)}%</span>
+            </label>
           </div>
-          <label className="studio-v2-field">
-            <span>Animation</span>
-            <select value={text.animation} onChange={(e) => setText((p) => ({ ...p, animation: e.target.value }))}>
-              <option>Fade</option>
-              <option>Slide</option>
-              <option>Typewriter</option>
+        </>
+      )
+    }
+
+    // THEME
+    if (activeTool === 'theme') {
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Theme</p>
+          <h3>Global look & feel</h3>
+          <label className="cs-field">
+            <span>Font Family</span>
+            <select value={c.theme.fontFamily} onChange={e => update('theme.fontFamily', e.target.value)}>
+              {fontOptions.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </label>
-        </div>
+          <ColorInput label="Accent Color" value={c.theme.accentColor} onChange={e => update('theme.accentColor', e.target.value)} />
+          <ColorInput label="Text Color" value={c.theme.textColor} onChange={e => update('theme.textColor', e.target.value)} />
+          <ColorInput label="Heading Color" value={c.theme.headingColor} onChange={e => update('theme.headingColor', e.target.value)} />
+        </>
       )
     }
 
-    if (activeTool === 'gifts') {
+    // CARD STYLE
+    if (activeTool === 'cardStyle') {
       return (
-        <div className="studio-v2-mobile-panel">
-          <h3>Added Gifts</h3>
-          <div className="studio-v2-mobile-gift-list">
-            <button type="button" className="studio-v2-mobile-gift-card" onClick={() => setGift((p) => ({ ...p, type: 'Digital item', value: '$20', message: 'For coffee & treats' }))}>
-              <div className="studio-v2-mobile-gift-thumb">$20</div>
-              <div>
-                <strong>Gift card</strong>
-                <p>For coffee & treats</p>
-              </div>
-            </button>
-            <button type="button" className="studio-v2-mobile-gift-card" onClick={() => setGift((p) => ({ ...p, type: 'Monetary', value: 'N5,000', message: 'Little surprise for you' }))}>
-              <div className="studio-v2-mobile-gift-thumb">N</div>
-              <div>
-                <strong>N5,000</strong>
-                <p>Little surprise for you</p>
-              </div>
-            </button>
-          </div>
-          <button type="button" className="studio-v2-button">+ Add Gift</button>
-        </div>
-      )
-    }
+        <>
+          <p className="cs-panel-eyebrow">Card Style</p>
+          <h3>Surface, border & text animation</h3>
+          <ColorInput label="Card Background" value={c.card.backgroundColor} onChange={e => update('card.backgroundColor', e.target.value)} />
+          <ColorInput label="Card Text Color" value={c.card.textColor} onChange={e => update('card.textColor', e.target.value)} />
+          <ColorInput label="Card Heading Color" value={c.card.headingColor} onChange={e => update('card.headingColor', e.target.value)} />
+          <ColorInput label="Scrollbar Color" value={c.card.scrollbarColor} onChange={e => update('card.scrollbarColor', e.target.value)} />
 
-    return (
-      <div className="studio-v2-mobile-panel studio-v2-mobile-tool-list">
-        {tools.slice(0, 4).map((tool) => (
-          <button
-            key={tool.id}
-            type="button"
-            className="studio-v2-mobile-tool-card"
-            onClick={() => setActiveTool(tool.id)}
-          >
-            <span className="studio-v2-mobile-tool-icon">{tool.icon}</span>
-            <span className="studio-v2-mobile-tool-copy">
-              <strong>{tool.label}</strong>
-              <small>{tool.hint}</small>
-            </span>
-            <span className="studio-v2-mobile-arrow">›</span>
-          </button>
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <div className="page-body studio-v2-shell">
-      <div className="studio-v2-mobile-shell">
-        <div className="studio-v2-mobile-phone">
-          <div className="studio-v2-mobile-header">
-            <button type="button" className="studio-v2-mobile-back" onClick={() => navigate(-1)}>
-              ‹
-            </button>
-            <div className="studio-v2-mobile-title">
-              <span>{activeStep === 'envelope' ? 'Cardora Studio' : 'Cardora'}</span>
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Card Border</p>
+            <div className="cs-choice-row">
+              {['solid', 'gradient', 'animated'].map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`cs-chip ${c.card.cardBorder.type === type ? 'active' : ''}`}
+                  onClick={() => update('card.cardBorder.type', type)}
+                >
+                  {type}
+                </button>
+              ))}
             </div>
-            <button
-              type="button"
-              className="studio-v2-mobile-save"
-              onClick={() => (activeStep === 'send' ? goToStep('send') : setSavedState('Draft saved just now'))}
-            >
-              {activeStep === 'send' ? 'Send' : 'Save'}
-            </button>
-          </div>
-
-          <div className="studio-v2-mobile-preview">
-            {activeTool === 'envelope' && !fullPreview ? (
-              <div className="studio-v2-mobile-envelope-preview" style={{ '--envelope-color': envelope.color }}>
-                <div className="studio-v2-mobile-envelope-core" />
-                <div className={`studio-v2-mobile-envelope-seal seal-${envelope.seal.toLowerCase()}`} />
+            {c.card.cardBorder.colors.map((color, i) => (
+              <div key={i} className="cs-color-row">
+                <ColorInput label={`Border ${i + 1}`} value={color} onChange={e => {
+                  const colors = [...c.card.cardBorder.colors]
+                  colors[i] = e.target.value
+                  update('card.cardBorder.colors', colors)
+                }} />
+                {c.card.cardBorder.colors.length > 1 && (
+                  <button type="button" className="cs-inline-remove" onClick={() => {
+                    update('card.cardBorder.colors', c.card.cardBorder.colors.filter((_, j) => j !== i))
+                  }}>×</button>
+                )}
               </div>
-            ) : (
-              <img src={media.image} alt="" className="studio-v2-mobile-image-preview" />
+            ))}
+            {c.card.cardBorder.type !== 'solid' && (
+              <button type="button" className="cs-button small" onClick={addBorderColor}>+ Add Color</button>
+            )}
+            <label className="cs-field">
+              <span>Border Width</span>
+              <input type="range" min="0" max="6" value={c.card.cardBorder.width} onChange={e => update('card.cardBorder.width', Number(e.target.value))} />
+              <span className="cs-range-val">{c.card.cardBorder.width}px</span>
+            </label>
+            {c.card.cardBorder.type !== 'solid' && (
+              <label className="cs-field">
+                <span>Anim Duration</span>
+                <input type="range" min="1" max="8" step="0.5" value={c.card.cardBorder.animationDuration} onChange={e => update('card.cardBorder.animationDuration', Number(e.target.value))} />
+                <span className="cs-range-val">{c.card.cardBorder.animationDuration}s</span>
+              </label>
             )}
           </div>
 
-          <div className="studio-v2-mobile-stepnav">
-            {steps.map((step) => (
-              <button
-                key={step}
-                type="button"
-                className={`studio-v2-mobile-step ${activeStep === step ? 'active' : ''}`}
-                onClick={() => goToStep(step)}
-              >
-                {step}
-              </button>
-            ))}
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Text Body Animation</p>
+            <label className="cs-field">
+              <span>Fade-In Duration</span>
+              <select value={c.card.textBodyAnimation.fadeInDuration} onChange={e => update('card.textBodyAnimation.fadeInDuration', e.target.value)}>
+                <option value="none">None</option>
+                <option value="1">1s</option>
+                <option value="2">2s</option>
+                <option value="3">3s</option>
+                <option value="4">4s</option>
+              </select>
+            </label>
+            <label className="cs-field">
+              <span>Typewriter Speed</span>
+              <select value={c.card.textBodyAnimation.selfTypeSpeed} onChange={e => update('card.textBodyAnimation.selfTypeSpeed', e.target.value)}>
+                <option value="none">None</option>
+                <option value="1">Fast (1s)</option>
+                <option value="2">Normal (2s)</option>
+                <option value="3">Slow (3s)</option>
+                <option value="5">Very Slow (5s)</option>
+              </select>
+            </label>
+          </div>
+        </>
+      )
+    }
+
+    // ANIMATION
+    if (activeTool === 'animation') {
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Animation</p>
+          <h3>Open effect & background particles</h3>
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Open Effect</p>
+            <div className="cs-choice-row">
+              {['confetti', 'none'].map(eff => (
+                <button
+                  key={eff}
+                  type="button"
+                  className={`cs-chip ${c.animation.openEffect === eff ? 'active' : ''}`}
+                  onClick={() => update('animation.openEffect', eff)}
+                >
+                  {eff === 'confetti' ? '🎉 Confetti' : 'None'}
+                </button>
+              ))}
+            </div>
+            {c.animation.openEffect === 'confetti' && (
+              <>
+                <p className="cs-sub-label">Confetti Colors</p>
+                {c.animation.confettiColors.map((color, i) => (
+                  <div key={i} className="cs-color-row">
+                    <ColorInput label={`#${i + 1}`} value={color} onChange={e => {
+                      const colors = [...c.animation.confettiColors]
+                      colors[i] = e.target.value
+                      update('animation.confettiColors', colors)
+                    }} />
+                    <button type="button" className="cs-inline-remove" onClick={() => removeConfettiColor(i)}>×</button>
+                  </div>
+                ))}
+                <button type="button" className="cs-button small" onClick={addConfettiColor}>+ Add Color</button>
+              </>
+            )}
           </div>
 
-          {renderMobileToolContent()}
-
-          <div className="studio-v2-mobile-footer">
-            <button type="button" className="studio-v2-mobile-ghost" onClick={enterPreview}>
-              Preview
-            </button>
-            <button type="button" className="studio-v2-mobile-primary" onClick={() => goToStep('send')}>
-              Send
-            </button>
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Background Effect</p>
+            <div className="cs-choice-row">
+              {['floating', 'snow', 'reverse', 'sparkle', 'none'].map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`cs-chip ${c.animation.backgroundEffect.type === type ? 'active' : ''}`}
+                  onClick={() => update('animation.backgroundEffect.type', type)}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+            {c.animation.backgroundEffect.type !== 'none' && (
+              <label className="cs-field">
+                <span>Emojis (comma separated)</span>
+                <input
+                  value={c.animation.backgroundEffect.emojis.join(', ')}
+                  onChange={e => update('animation.backgroundEffect.emojis', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                  placeholder="❤️, ✨, 🌟"
+                />
+              </label>
+            )}
           </div>
-        </div>
-      </div>
+        </>
+      )
+    }
 
-      <div className="studio-v2-topbar">
-        <div className="studio-v2-top-left">
-          <button type="button" className="studio-v2-nav-btn" onClick={() => navigate(-1)}>Back</button>
-          <div className="studio-v2-status">{savedState}</div>
+    // QUESTIONS
+    if (activeTool === 'questions') {
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Questions</p>
+          <h3>Receiver interaction flow</h3>
+          {c.questions.items.map((q, i) => (
+            <div key={i} className="cs-question-card">
+              <label className="cs-field">
+                <span>Question {i + 1}</span>
+                <input value={q.text} onChange={e => updateQuestion(i, e.target.value)} />
+              </label>
+              <button type="button" className="cs-remove-btn" onClick={() => removeQuestion(i)}>Remove</button>
+            </div>
+          ))}
+          <button type="button" className="cs-button" onClick={addQuestion}>+ Add Question</button>
+
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Button Style</p>
+            <ColorInput label="Text Color" value={c.questions.button.textColor} onChange={e => update('questions.button.textColor', e.target.value)} />
+            <ColorInput label="Border Color" value={c.questions.button.borderColor} onChange={e => update('questions.button.borderColor', e.target.value)} />
+            <ColorInput label="Background" value={c.questions.button.backgroundColor} onChange={e => update('questions.button.backgroundColor', e.target.value)} />
+          </div>
+
+          <label className="cs-field">
+            <span>Deny Behavior</span>
+            <select value={c.questions.denyBehavior} onChange={e => update('questions.denyBehavior', e.target.value)}>
+              <option value="none">Normal</option>
+              <option value="switch">Dodge (button moves away)</option>
+            </select>
+          </label>
+        </>
+      )
+    }
+
+    // INTERACTION
+    if (activeTool === 'interaction') {
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Interaction</p>
+          <h3>Lock & reveal settings</h3>
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Lock</p>
+            <div className="cs-choice-row">
+              {['none', 'time', 'password'].map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`cs-chip ${c.interaction.lock.type === type ? 'active' : ''}`}
+                  onClick={() => update('interaction.lock.type', type)}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+            {c.interaction.lock.type !== 'none' && (
+              <label className="cs-field">
+                <span>{c.interaction.lock.type === 'time' ? 'Unlock Date/Time' : 'Password'}</span>
+                <input
+                  type={c.interaction.lock.type === 'time' ? 'datetime-local' : 'text'}
+                  value={c.interaction.lock.value}
+                  onChange={e => update('interaction.lock.value', e.target.value)}
+                />
+              </label>
+            )}
+          </div>
+
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Reveal Type</p>
+            <div className="cs-choice-row">
+              {['tap', 'password', 'zip'].map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`cs-chip ${c.interaction.reveal.type === type ? 'active' : ''}`}
+                  onClick={() => update('interaction.reveal.type', type)}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+            {c.interaction.reveal.type !== 'tap' && (
+              <label className="cs-field">
+                <span>Hint</span>
+                <input value={c.interaction.reveal.hint} onChange={e => update('interaction.reveal.hint', e.target.value)} placeholder="Hint for the receiver..." />
+              </label>
+            )}
+          </div>
+        </>
+      )
+    }
+
+    // GIFTS
+    if (activeTool === 'gifts') {
+      const selectedKey = c.giftEffect?.effectKey || 'none'
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Gifts</p>
+          <h3>End-of-card gift reveal</h3>
+          <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.7, lineHeight: 1.55 }}>
+            Attach a purchased gift animation that plays after the card reveal. The recipient will see a special moment before receiving it.
+          </p>
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Select a Gift</p>
+            <button
+              type="button"
+              className={`cs-gift-option ${selectedKey === 'none' ? 'active' : ''}`}
+              onClick={() => {
+                update('giftEffect.enabled', false)
+                update('giftEffect.effectKey', 'none')
+                update('giftEffect.giftTitle', '')
+                update('giftEffect.giftAmount', '')
+              }}
+            >
+              <span className="cs-gift-none-icon">✕</span>
+              <span>No Gift</span>
+            </button>
+            {inventory.length > 0 ? (
+              <div className="cs-gift-grid">
+                {inventory.map((gift, idx) => (
+                  <button
+                    key={gift.id || idx}
+                    type="button"
+                    className={`cs-gift-option ${selectedKey === (gift.effectKey || gift.title) ? 'active' : ''}`}
+                    onClick={() => {
+                      update('giftEffect.enabled', true)
+                      update('giftEffect.effectKey', gift.effectKey || gift.title)
+                      update('giftEffect.giftTitle', gift.title)
+                      update('giftEffect.giftAmount', gift.amount || '')
+                    }}
+                  >
+                    <GiftIcon effectKey={gift.effectKey} size={36} />
+                    <span>{gift.title}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.5 }}>
+                No gifts in your inventory yet. Purchase gifts from the Store to attach them here.
+              </p>
+            )}
+          </div>
+          {c.giftEffect?.enabled && (
+            <div className="cs-sub-section">
+              <p className="cs-sub-label">Selected Gift</p>
+              <div className="cs-gift-selected">
+                <GiftIcon effectKey={c.giftEffect.effectKey} size={44} />
+                <div>
+                  <strong>{c.giftEffect.giftTitle}</strong>
+                  {c.giftEffect.giftAmount && <span className="cs-gift-amount">{c.giftEffect.giftAmount}</span>}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )
+    }
+
+    return null
+  }
+
+  // Build preview card background
+  const previewBg = useMemo(() => {
+    if (c.background.type === 'color') return c.background.colors[0] || '#0a0a0a'
+    if (c.background.type === 'gradient' || c.background.type === 'animated') {
+      return `linear-gradient(135deg, ${c.background.colors.join(', ')})`
+    }
+    return '#0a0a0a'
+  }, [c.background])
+
+  // Button shape map
+  const shapeMap = { rounded: '14px', pill: '999px', square: '6px', sharp: '0px' }
+  const btnShape = shapeMap[c.closedState.button.shape] || '999px'
+
+  // Card border for preview
+  const cardBorderCss = useMemo(() => {
+    if (c.card.cardBorder.type === 'solid') {
+      return { border: `${c.card.cardBorder.width}px solid ${c.card.cardBorder.colors[0] || '#333'}` }
+    }
+    return {}
+  }, [c.card.cardBorder])
+
+  return (
+    <div className="page-body cs-shell">
+      {/* TOPBAR */}
+      <div className="cs-topbar">
+        <div className="cs-top-left">
+          <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
+          <div className="cs-status">{savedState}</div>
         </div>
-        <div className="studio-v2-progress">
-          <div className="studio-v2-wordmark">
-            <img src={logo} alt="Cardora logo" className="studio-v2-top-logo" />
+        <div className="cs-progress">
+          <div className="cs-wordmark">
+            <img src={logo} alt="Cardora" className="cs-top-logo" />
             <span>Cardora Studio</span>
           </div>
-          <div className="studio-v2-steps">
-            {steps.map((step, index) => {
-              const activeIndex = steps.indexOf(activeStep)
-              const state = index === activeIndex ? 'active' : index < activeIndex ? 'done' : ''
+          <div className="cs-steps">
+            {steps.map((step, i) => {
+              const ai = steps.indexOf(activeStep)
+              const state = i === ai ? 'active' : i < ai ? 'done' : ''
               return (
-                <button key={step} type="button" className={`studio-v2-step ${state}`} onClick={() => goToStep(step)}>
-                  <span>{step}</span>
+                <button key={step} type="button" className={`cs-step ${state}`} onClick={() => goToStep(step)}>
+                  <span>{step === 'closed' ? 'Closed State' : step}</span>
                 </button>
               )
             })}
           </div>
         </div>
-        <div className="studio-v2-top-actions">
-          <button type="button" className="studio-v2-nav-btn" onClick={() => setSavedState('Draft saved just now')}>Save</button>
-          <button type="button" className="studio-v2-nav-btn" onClick={enterPreview}>Preview</button>
-          <button type="button" className="studio-v2-nav-btn primary" onClick={() => goToStep('send')}>Send</button>
+        <div className="cs-top-actions">
+          <button type="button" className="cs-nav-btn" onClick={handleSave}>Save</button>
+          {isArtist && (
+            <button type="button" className="cs-nav-btn publish" onClick={() => setShowPublish(true)}>
+              Publish Template
+            </button>
+          )}
+          <button type="button" className="cs-nav-btn accent" onClick={enterPreview}>
+            <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
+          </button>
+          <button type="button" className="cs-nav-btn disabled" disabled>Send</button>
         </div>
       </div>
 
-      <div className="studio-v2-layout">
-        <aside className="studio-v2-toolrail">
-          {tools.map((tool) => (
-            <button
-              key={tool.id}
-              type="button"
-              className={`studio-v2-tool ${activeTool === tool.id ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTool(tool.id)
-                if (tool.id === 'envelope') setActiveStep('envelope')
-                if (tool.id === 'questions') setActiveStep('questions')
-                if (tool.id === 'gifts') setActiveStep('card')
-                if (['text', 'media', 'theme', 'animation'].includes(tool.id)) setActiveStep('card')
-              }}
-              title={tool.label}
-            >
-              <span className="studio-v2-tool-icon">{tool.icon}</span>
-              <span className="studio-v2-tool-meta">
-                <span className="studio-v2-tool-label">{tool.label}</span>
-                <small>{tool.hint}</small>
-              </span>
-            </button>
-          ))}
+      {/* LAYOUT */}
+      <div className="cs-layout">
+        {/* TOOL RAIL */}
+        <aside className="cs-toolrail">
+          {tools.map(tool => {
+            const Icon = tool.icon
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                className={`cs-tool ${activeTool === tool.id ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTool(tool.id)
+                  if (tool.id === 'closedState') setActiveStep('closed')
+                  else if (tool.id === 'questions') setActiveStep('questions')
+                  else setActiveStep('card')
+                }}
+                title={tool.label}
+              >
+                <span className="cs-tool-icon"><Icon size={20} /></span>
+                <span className="cs-tool-meta">
+                  <span className="cs-tool-label">{tool.label}</span>
+                  <small>{tool.hint}</small>
+                </span>
+              </button>
+            )
+          })}
         </aside>
 
-        <main className="studio-v2-canvas-wrap">
-          <div
-            className={`studio-v2-canvas ${fullPreview ? 'previewing' : ''}`}
-            style={{ '--studio-accent': activeTheme.accent, '--studio-accent-soft': activeTheme.accentSoft }}
-            onPointerMove={moveDrag}
-            onPointerUp={() => setDragging(null)}
-            onPointerLeave={() => setDragging(null)}
-          >
-            <div className="studio-v2-canvas-head">
+        {/* CANVAS */}
+        <main className="cs-canvas-wrap">
+          <div className="cs-canvas">
+            <div className="cs-canvas-head">
               <div>
                 <p className="eyebrow">Live Preview</p>
-                <h2>{fullPreview ? 'Receiver experience flow' : 'Editable mobile experience'}</h2>
+                <h2>Editable card preview</h2>
               </div>
-              <button
-                type="button"
-                className={`studio-v2-preview-toggle ${fullPreview ? 'active' : ''}`}
-                onClick={() => {
-                  if (fullPreview) {
-                    setFullPreview(false)
-                    setActiveStep('card')
-                    setAutoplay(false)
-                  } else {
-                    enterPreview()
-                  }
-                }}
-              >
-                {fullPreview ? 'Editing' : 'Full Preview'}
+              <button type="button" className="cs-preview-toggle" onClick={enterPreview}>
+                <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 6 }} /> Full Preview
               </button>
             </div>
-            {motion.enabled ? (
-              <div className={`studio-v2-particles ${motion.particles === 'Hearts' ? 'hearts' : 'sparkles'}`}>
-                {Array.from({ length: 12 }).map((_, index) => (
-                  <span key={`particle-${index}`} className={`studio-v2-particle p${(index % 6) + 1}`}>{motion.particles === 'Hearts' ? 'o' : '*'}</span>
-                ))}
-              </div>
-            ) : null}
-            <div className="studio-v2-phone-frame">
-              <div className="studio-v2-phone-notch" />
-              <div className="studio-v2-phone-screen">
-                {fullPreview ? (
-                  <div className="studio-v2-sequence">
-                    <div className={`studio-v2-envelope-stage ${sequenceStage !== 'envelope' ? 'open' : ''}`} style={{ '--envelope-color': envelope.color }}>
-                      <div className="studio-v2-envelope-letter"><span>To: {envelope.recipient}</span><span>{envelope.intro}</span></div>
-                      <div className={`studio-v2-envelope-seal seal-${envelope.seal.toLowerCase()}`}>{envelope.seal}</div>
-                      <div className="studio-v2-envelope-back" />
-                      <div className="studio-v2-envelope-flap" />
-                    </div>
-                    {sequenceStage === 'envelope' ? (
-                      <button type="button" className="studio-v2-sequence-btn" onClick={nextSequence}>Open Envelope</button>
-                    ) : null}
-                    {sequenceStage === 'card' ? (
-                      <article className="studio-v2-sequence-card" style={{ background: activeTheme.cardBg }}>
-                        <img src={media.image} alt="" />
-                        <h3>{text.heading}</h3>
-                        <p>{text.body}</p>
-                        <button type="button" className="studio-v2-sequence-btn" onClick={nextSequence}>
-                          {questions.length ? 'Continue to Questions' : 'Continue to Gift'}
-                        </button>
-                      </article>
-                    ) : null}
-                    {sequenceStage === 'questions' && currentQuestion ? (
-                      <div className="studio-v2-sequence-card question" style={{ background: activeTheme.cardBg }}>
-                        <p className="studio-v2-flow-label">Question {questionIndex + 1}</p>
-                        <h3>{currentQuestion.prompt}</h3>
-                        <div className="studio-v2-sequence-actions">
-                          {currentQuestion.type === 'text' ? (
-                            <input value="Type your answer..." readOnly />
-                          ) : currentQuestion.type === 'multiple choice' ? (
-                            <>
-                              <button type="button" className="studio-v2-chip" onClick={nextSequence}>Yes</button>
-                              <button type="button" className="studio-v2-chip" onClick={nextSequence}>Absolutely</button>
-                            </>
-                          ) : (
-                            <>
-                              <button type="button" className="studio-v2-chip" onClick={nextSequence}>Love</button>
-                              <button type="button" className="studio-v2-chip" onClick={nextSequence}>Wow</button>
-                            </>
-                          )}
-                        </div>
-                        {currentQuestion.type === 'text' ? (
-                          <button type="button" className="studio-v2-sequence-btn" onClick={nextSequence}>Submit Answer</button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {sequenceStage === 'gift' ? (
-                      <div className="studio-v2-sequence-card gift" style={{ background: activeTheme.cardBg }}>
-                        <p className="studio-v2-flow-label">Gift Reveal</p>
-                        <h3>A gift has been sent to you</h3>
-                        <strong>{gift.type}</strong>
-                        <span>{gift.value}</span>
-                        <p>{gift.message}</p>
-                        <div className="studio-v2-sequence-actions">
-                          <button type="button" className="studio-v2-sequence-btn" onClick={nextSequence}>
-                            {gift.type === 'Monetary' ? 'Claim Gift' : 'Redeem'}
-                          </button>
-                          <button type="button" className="studio-v2-nav-btn" onClick={nextSequence}>View Instructions</button>
-                        </div>
-                      </div>
-                    ) : null}
-                    {sequenceStage === 'end' ? (
-                      <div className="studio-v2-sequence-card end" style={{ background: activeTheme.cardBg }}>
-                        <p className="studio-v2-flow-label">End Screen</p>
-                        <h3>{giftClaimed ? 'Gift revealed successfully' : 'Card complete'}</h3>
-                        <p>Envelope, message, questions, and gift flow all played in sequence.</p>
-                        <div className="studio-v2-sequence-actions">
-                          <button type="button" className="studio-v2-nav-btn" onClick={resetSequence}>Replay</button>
-                          <button type="button" className="studio-v2-sequence-btn" onClick={() => goToStep('send')}>Create Yours</button>
-                        </div>
-                      </div>
-                    ) : null}
+
+            {/* Phone frame */}
+            <div className="cs-phone-frame">
+              <div className="cs-phone-notch" />
+              <div className="cs-phone-screen" style={{ background: previewBg }}>
+                {/* Closed State Preview */}
+                {activeStep === 'closed' && (
+                  <div className="cs-preview-closed" style={{
+                    backgroundColor: c.closedState.backgroundColor,
+                    border: `2px solid ${c.closedState.borderColor}`,
+                  }}>
+                    <h3 style={{
+                      color: c.closedState.headingColor,
+                      fontFamily: `'${c.closedState.headingFont}', serif`,
+                    }}>
+                      {c.closedState.headingText}
+                    </h3>
+                    <p style={{ color: c.closedState.textColor }}>
+                      {c.closedState.bodyText}
+                    </p>
+                    <button
+                      type="button"
+                      className="cs-preview-btn"
+                      style={{
+                        backgroundColor: c.closedState.button.backgroundColor,
+                        color: c.closedState.button.textColor,
+                        border: `1.5px solid ${c.closedState.button.borderColor}`,
+                        borderRadius: btnShape,
+                      }}
+                    >
+                      {c.closedState.button.text}
+                    </button>
                   </div>
-                ) : (
-                  <>
-                    <div className={`studio-v2-envelope-stage ${envelope.isOpen ? 'open' : ''}`} style={{ '--envelope-color': envelope.color }}>
-                      <div className="studio-v2-envelope-letter"><span>To: {envelope.recipient}</span><span>{envelope.intro}</span></div>
-                      <div className={`studio-v2-envelope-seal seal-${envelope.seal.toLowerCase()}`}>{envelope.seal}</div>
-                      <div className="studio-v2-envelope-back" />
-                      <div className="studio-v2-envelope-flap" />
-                    </div>
+                )}
 
-                    <article className="studio-v2-card-surface" style={{ background: activeTheme.cardBg }}>
-                      <button
-                        type="button"
-                        className={`studio-v2-media ${selectedElement === 'image' ? 'active' : ''}`}
-                        style={{ transform: `translate(${imagePos.x}px, ${imagePos.y}px)`, borderRadius: `${media.radius}px`, boxShadow: media.shadow ? '0 20px 40px rgba(0,0,0,0.28)' : 'none' }}
-                        onPointerDown={(event) => startDrag(event, 'image')}
-                        onClick={() => { setSelectedElement('image'); setActiveTool('media') }}
-                      >
-                        <img src={media.image} alt="" style={{ objectFit: media.fit }} />
-                      </button>
-
-                      <div
-                        className={`studio-v2-heading ${selectedElement === 'heading' ? 'active' : ''}`}
-                        style={{ transform: `translate(${titlePos.x}px, ${titlePos.y}px)`, color: text.color, textAlign: text.align, fontSize: `${text.size}px`, fontFamily: text.font === 'Cinzel' ? "'Cinzel', serif" : "'Manrope', sans-serif" }}
-                        onPointerDown={(event) => startDrag(event, 'heading')}
-                        onClick={() => { setSelectedElement('heading'); setActiveTool('text') }}
-                      >
-                        {selectedElement === 'heading' ? <input value={text.heading} onChange={(e) => setText((p) => ({ ...p, heading: e.target.value }))} /> : <span>{text.heading}</span>}
+                {/* Card Content Preview */}
+                {(activeStep === 'card' || activeStep === 'questions') && (
+                  <div className="cs-preview-card" style={{
+                    backgroundColor: c.card.backgroundColor,
+                    ...cardBorderCss,
+                  }}>
+                    {c.media.images.length > 0 && (
+                      <div className="cs-preview-media">
+                        <img src={c.media.images[0].url} alt="" />
                       </div>
+                    )}
+                    <h3 style={{
+                      color: c.card.headingColor,
+                      fontFamily: `'${c.theme.fontFamily}', serif`,
+                    }}>
+                      {c.content.heading}
+                    </h3>
+                    <p style={{ color: c.card.textColor }}>{c.content.body}</p>
+                    {c.content.extendedBody && (
+                      <p className="cs-extended" style={{ color: c.card.textColor }}>
+                        {c.content.extendedBody}
+                      </p>
+                    )}
 
-                      <div
-                        className={`studio-v2-bodycopy ${selectedElement === 'body' ? 'active' : ''}`}
-                        style={{ transform: `translate(${bodyPos.x}px, ${bodyPos.y}px)`, color: text.color, textAlign: text.align }}
-                        onPointerDown={(event) => startDrag(event, 'body')}
-                        onClick={() => { setSelectedElement('body'); setActiveTool('text') }}
-                      >
-                        {selectedElement === 'body' ? <textarea rows="3" value={text.body} onChange={(e) => setText((p) => ({ ...p, body: e.target.value }))} /> : <p>{text.body}</p>}
-                      </div>
-
-                      <div className="studio-v2-flow-block">
-                        <p className="studio-v2-flow-label">Questions</p>
-                        {questions.map((question) => (
-                          <div key={question.id} className="studio-v2-question-preview">
-                            <span>{question.prompt}</span>
-                            <small>{question.type}</small>
+                    {/* Questions preview */}
+                    {c.questions.items.length > 0 && (
+                      <div className="cs-preview-questions">
+                        <p className="cs-q-label">Questions ({c.questions.items.length})</p>
+                        {c.questions.items.map((q, i) => (
+                          <div key={i} className="cs-q-preview-item">
+                            <span>{q.text}</span>
                           </div>
                         ))}
                       </div>
-
-                      <div className="studio-v2-flow-block gift">
-                        <p className="studio-v2-flow-label">Gift Locked</p>
-                        <div className="studio-v2-gift-preview">
-                          <strong>{gift.type}</strong>
-                          <span>{gift.value}</span>
-                          <p>{gift.message}</p>
-                          <button type="button" onClick={() => setActiveTool('gifts')}>
-                            Edit Gift
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  </>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
           </div>
         </main>
 
-        <aside className="studio-v2-settings">
+        {/* SETTINGS PANEL */}
+        <aside className="cs-settings">
           {renderPanel()}
         </aside>
       </div>
+
+      {/* Mobile layout */}
+      <div className="cs-mobile-shell">
+        <div className="cs-mobile-header">
+          <button type="button" className="cs-mobile-back" onClick={() => navigate(-1)}>‹</button>
+          <div className="cs-mobile-title">Cardora Studio</div>
+          <button type="button" className="cs-mobile-save" onClick={handleSave}>Save</button>
+        </div>
+
+        <div className="cs-mobile-preview" style={{ background: previewBg }}>
+          {activeStep === 'closed' ? (
+            <div className="cs-preview-closed compact" style={{
+              backgroundColor: c.closedState.backgroundColor,
+              border: `2px solid ${c.closedState.borderColor}`,
+            }}>
+              <h3 style={{ color: c.closedState.headingColor, fontFamily: `'${c.closedState.headingFont}', serif` }}>
+                {c.closedState.headingText}
+              </h3>
+              <p style={{ color: c.closedState.textColor }}>{c.closedState.bodyText}</p>
+            </div>
+          ) : c.media.images.length > 0 ? (
+            <img src={c.media.images[0].url} alt="" className="cs-mobile-img" />
+          ) : (
+            <div className="cs-mobile-card-hint" style={{ backgroundColor: c.card.backgroundColor }}>
+              <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: '1rem' }}>
+                {c.content.heading}
+              </h3>
+            </div>
+          )}
+        </div>
+
+        <div className="cs-mobile-stepnav">
+          {steps.map(step => (
+            <button
+              key={step}
+              type="button"
+              className={`cs-mobile-step ${activeStep === step ? 'active' : ''}`}
+              onClick={() => goToStep(step)}
+            >
+              {step === 'closed' ? 'Closed' : step}
+            </button>
+          ))}
+        </div>
+
+        {/* Mobile tool selector */}
+        <div className="cs-mobile-tools">
+          {tools.map(tool => {
+            const Icon = tool.icon
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                className={`cs-mobile-tool-chip ${activeTool === tool.id ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTool(tool.id)
+                  if (tool.id === 'closedState') setActiveStep('closed')
+                  else if (tool.id === 'questions') setActiveStep('questions')
+                  else setActiveStep('card')
+                }}
+              >
+                <Icon size={16} />
+                <span>{tool.label}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Mobile panel */}
+        <div className="cs-mobile-panel">
+          {renderPanel()}
+        </div>
+
+        <div className="cs-mobile-footer">
+          <button type="button" className="cs-mobile-ghost" onClick={enterPreview}>
+            <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
+          </button>
+          {isArtist ? (
+            <button type="button" className="cs-mobile-primary" onClick={() => setShowPublish(true)}>Publish</button>
+          ) : (
+            <button type="button" className="cs-mobile-primary disabled" disabled>Send</button>
+          )}
+        </div>
+      </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <CardPreviewModal
+          cardObject={cardObject}
+          onClose={() => {
+            setShowPreview(false)
+            if (activeStep === 'preview') setActiveStep('card')
+          }}
+        />
+      )}
+
+      {/* Publish Template Modal (Artists only) */}
+      {showPublish && (
+        <div className="cs-publish-overlay">
+          <div className="cs-publish-backdrop" onClick={() => setShowPublish(false)} />
+          <div className="cs-publish-modal">
+            <h3>Publish Template</h3>
+            <p>Your card will be submitted for review and added to the marketplace once approved.</p>
+            <label className="cs-field">
+              <span>Category</span>
+              <select defaultValue="proposal">
+                <option value="proposal">Proposal</option>
+                <option value="anniversary">Anniversary</option>
+                <option value="birthday">Birthday</option>
+                <option value="scratch">General / Other</option>
+              </select>
+            </label>
+            <label className="cs-field">
+              <span>Template Name</span>
+              <input defaultValue={c.content.heading} placeholder="Give your template a name" />
+            </label>
+            <div className="cs-publish-actions">
+              <button
+                type="button"
+                className="cs-nav-btn publish"
+                onClick={() => {
+                  const published = JSON.parse(localStorage.getItem('cardora:publishedTemplates') || '[]')
+                  published.unshift({
+                    id: `tmpl-${Date.now()}`,
+                    title: c.content.heading,
+                    cardObject: structuredClone(cardObject),
+                    publishedAt: new Date().toISOString(),
+                    artist: currentUser?.name || 'Artist',
+                    status: 'pending',
+                  })
+                  localStorage.setItem('cardora:publishedTemplates', JSON.stringify(published))
+                  setShowPublish(false)
+                  setSavedState('Template submitted!')
+                }}
+              >
+                Submit for Review
+              </button>
+              <button type="button" className="cs-nav-btn" onClick={() => setShowPublish(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

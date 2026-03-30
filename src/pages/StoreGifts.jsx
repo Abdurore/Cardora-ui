@@ -68,7 +68,6 @@ function StoreGifts() {
           setActiveGift(null)
         }}
         disabled={activeGift ? activeGift.cc > balance : false}
-        autoPreview
       />
     </div>
   )

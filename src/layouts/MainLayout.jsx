@@ -23,42 +23,72 @@ function MainLayout() {
   useEffect(() => {
     const storedUsers = localStorage.getItem('cardora:users')
     const storedSession = localStorage.getItem('cardora:currentUserId')
-    if (storedUsers) {
+    const SEED_VERSION = '2'
+    const storedVersion = localStorage.getItem('cardora:seedVersion')
+
+    const seedUsers = [
+      {
+        id: 'u1',
+        name: 'The Creator',
+        username: 'creator',
+        email: 'creator@cardora.com',
+        password: 'cardora',
+        role: 'Artist',
+        balance: 50,
+        favorites: [],
+        inventory: [],
+        avatarColor: 'linear-gradient(135deg, #62ffa2, #7ef7ff)',
+      },
+      {
+        id: 'u2',
+        name: 'Sunset Muse',
+        username: 'sunsetmuse',
+        email: 'muse@cardora.com',
+        password: 'cardora',
+        role: 'Creator',
+        balance: 50,
+        favorites: [],
+        inventory: [],
+        avatarColor: 'linear-gradient(135deg, #ff9bd2, #7ef7ff)',
+      },
+      {
+        id: 'u3',
+        name: 'Admin',
+        username: 'admin',
+        email: 'admin@cardora.com',
+        password: 'cardora',
+        role: 'Admin',
+        balance: 500,
+        favorites: [],
+        inventory: [],
+        avatarColor: 'linear-gradient(135deg, #ffd700, #ff6b35)',
+      },
+    ]
+
+    if (!storedUsers || storedVersion !== SEED_VERSION) {
+      // Re-seed: merge any existing user data (avatar, inventory) with updated seed
+      let merged = seedUsers
+      if (storedUsers) {
+        try {
+          const old = JSON.parse(storedUsers)
+          if (Array.isArray(old)) {
+            merged = seedUsers.map(seed => {
+              const existing = old.find(u => u.id === seed.id)
+              return existing ? { ...seed, favorites: existing.favorites || [], inventory: existing.inventory || [], avatarUrl: existing.avatarUrl, balance: existing.balance } : seed
+            })
+          }
+        } catch { /* use fresh seeds */ }
+      }
+      setUsers(merged)
+      localStorage.setItem('cardora:users', JSON.stringify(merged))
+      localStorage.setItem('cardora:seedVersion', SEED_VERSION)
+    } else {
       try {
         const parsed = JSON.parse(storedUsers)
         if (Array.isArray(parsed) && parsed.length) setUsers(parsed)
       } catch (error) {
         console.error('Failed to load users', error)
       }
-    } else {
-      const seedUsers = [
-        {
-          id: 'u1',
-          name: 'The Creator',
-          username: 'creator',
-          email: 'creator@cardora.com',
-          password: 'cardora',
-          role: 'Artist',
-          balance: 50,
-          favorites: [],
-          inventory: [],
-          avatarColor: 'linear-gradient(135deg, #62ffa2, #7ef7ff)',
-        },
-        {
-          id: 'u2',
-          name: 'Sunset Muse',
-          username: 'sunsetmuse',
-          email: 'muse@cardora.com',
-          password: 'cardora',
-          role: 'Collector',
-          balance: 50,
-          favorites: [],
-          inventory: [],
-          avatarColor: 'linear-gradient(135deg, #ff9bd2, #7ef7ff)',
-        },
-      ]
-      setUsers(seedUsers)
-      localStorage.setItem('cardora:users', JSON.stringify(seedUsers))
     }
     if (storedSession) setCurrentUserId(storedSession)
   }, [])
