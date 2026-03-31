@@ -196,7 +196,9 @@ export const templateCardObjects = {
         emojis: ['💍', '✨', '💖'],
       },
     },
-    media: { images: [] },
+    media: {
+      images: [],
+    },
     interaction: {
       lock: { type: 'none', value: '' },
       reveal: { type: 'tap', hint: '' },
@@ -276,7 +278,9 @@ export const templateCardObjects = {
         emojis: ['💛', '✨', '🌟'],
       },
     },
-    media: { images: [] },
+    media: {
+      images: [],
+    },
     interaction: {
       lock: { type: 'none', value: '' },
       reveal: { type: 'tap', hint: '' },
@@ -356,7 +360,9 @@ export const templateCardObjects = {
         emojis: ['🎂', '🎈', '🎉', '🎁', '⭐'],
       },
     },
-    media: { images: [] },
+    media: {
+      images: [],
+    },
     interaction: {
       lock: { type: 'none', value: '' },
       reveal: { type: 'tap', hint: '' },
@@ -436,7 +442,9 @@ export const templateCardObjects = {
         emojis: ['✨'],
       },
     },
-    media: { images: [] },
+    media: {
+      images: [],
+    },
     interaction: {
       lock: { type: 'none', value: '' },
       reveal: { type: 'tap', hint: '' },

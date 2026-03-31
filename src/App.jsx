@@ -8,6 +8,8 @@ import StoreGifts from './pages/StoreGifts.jsx'
 import CardView from './pages/CardView.jsx'
 import CardStudio from './pages/CardStudio.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
+import AuthPage from './pages/AuthPage.jsx'
+import LegalPage from './pages/LegalPage.jsx'
 
 function App() {
   return (
@@ -21,6 +23,9 @@ function App() {
         <Route path="/studio" element={<CardStudio />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/signup" element={<AuthPage mode="signup" />} />
+        <Route path="/legal/:doc" element={<LegalPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

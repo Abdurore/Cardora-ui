@@ -25,6 +25,7 @@ function CardPreviewModal({ cardObject, onClose }) {
   const [questionIdx, setQuestionIdx] = useState(0)
   const [fadeBody, setFadeBody] = useState(false)
   const [bodyVisible, setBodyVisible] = useState(false)
+  const [revealStep, setRevealStep] = useState(0)
   const audioRef = useRef(null)
   const containerRef = useRef(null)
 
@@ -35,18 +36,28 @@ function CardPreviewModal({ cardObject, onClose }) {
   const hasTypewriter = c.card.textBodyAnimation.selfTypeSpeed !== 'none'
   const typeSpeed = hasTypewriter ? parseFloat(c.card.textBodyAnimation.selfTypeSpeed) || 2 : 2
   const fadeSpeed = hasFadeIn ? parseFloat(c.card.textBodyAnimation.fadeInDuration) || 2 : 0
+  const primaryImage = c.media.images[0] || null
 
   const typedBody = useTypewriter(c.content.body, typeSpeed, stage === 'open' && hasTypewriter)
   const typedExtended = useTypewriter(c.content.extendedBody, typeSpeed, stage === 'open' && hasTypewriter && typedBody === c.content.body)
 
   // Music
   useEffect(() => {
-    if (c.background.music.url && audioRef.current) {
-      audioRef.current.volume = c.background.music.volume
+    if (!audioRef.current || !c.background.music.url) return undefined
+
+    audioRef.current.volume = c.background.music.volume
+
+    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive') {
       audioRef.current.play().catch(() => {})
+    } else {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
     }
-    return () => { if (audioRef.current) audioRef.current.pause() }
-  }, [c.background.music.url, c.background.music.volume])
+
+    return () => {
+      if (audioRef.current) audioRef.current.pause()
+    }
+  }, [c.background.music.url, c.background.music.volume, stage])
 
   // Confetti
   const fireConfetti = useCallback(() => {
@@ -83,6 +94,7 @@ function CardPreviewModal({ cardObject, onClose }) {
     setTimeout(() => {
       setStage('open')
       setBodyVisible(false)
+      setRevealStep(0)
       if (hasFadeIn) {
         setTimeout(() => setFadeBody(true), 200)
         setTimeout(() => setBodyVisible(true), 300)
@@ -115,6 +127,7 @@ function CardPreviewModal({ cardObject, onClose }) {
     setQuestionIdx(0)
     setFadeBody(false)
     setBodyVisible(false)
+    setRevealStep(0)
   }
 
   const handleEndDone = () => {
@@ -213,9 +226,34 @@ function CardPreviewModal({ cardObject, onClose }) {
     return children
   }
 
+  const previewImageStyle = primaryImage
+    ? {
+        objectFit: primaryImage.fit || 'cover',
+        objectPosition: `${primaryImage.positionX ?? 50}% ${primaryImage.positionY ?? 50}%`,
+      }
+    : {}
+
+  useEffect(() => {
+    if (stage !== 'open') return undefined
+
+    const sequence = [
+      setTimeout(() => setRevealStep(1), 220),
+      setTimeout(() => setRevealStep(2), 820),
+      setTimeout(() => setRevealStep(3), 1420),
+      setTimeout(() => setRevealStep(4), 2060),
+    ]
+
+    return () => {
+      sequence.forEach(clearTimeout)
+    }
+  }, [stage, primaryImage])
+
   return createPortal(
     <section className="cp-overlay" ref={containerRef}>
       <div className="cp-backdrop" style={bgStyle}>
+        {c.background.type === 'video' && c.background.videoUrl ? (
+          <video className="cp-backdrop-video" src={c.background.videoUrl} autoPlay muted loop playsInline />
+        ) : null}
         {stage !== 'closed' && renderBgEffect()}
       </div>
 
@@ -281,32 +319,20 @@ function CardPreviewModal({ cardObject, onClose }) {
 
       {/* OPEN CARD */}
       {stage === 'open' && (
-        <div className="cp-card-wrap">
+        <div className="cp-card-wrap cp-card-wrap-full">
           {renderGradientBorder(
             <article
-              className="cp-card"
+              className="cp-card cp-card-full"
               style={{
                 backgroundColor: c.card.backgroundColor,
                 ...borderStyle,
                 '--scrollbar-color': c.card.scrollbarColor,
               }}
             >
-              <div className="cp-card-inner" style={{ '--scrollbar-color': c.card.scrollbarColor }}>
-                {/* Media */}
-                {c.media.images.length > 0 && (
-                  <div className="cp-media-section">
-                    {c.media.images.map((img, i) => (
-                      <div key={i} className="cp-media-item">
-                        <img src={img.url} alt={img.caption || ''} />
-                        {img.caption && <p className="cp-caption">{img.caption}</p>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
+              <div className="cp-card-inner cp-card-inner-full" style={{ '--scrollbar-color': c.card.scrollbarColor }}>
                 {/* Heading */}
                 <h2
-                  className="cp-heading"
+                  className={`cp-heading cp-reveal-element ${revealStep >= 1 ? 'visible' : ''}`}
                   style={{
                     color: c.card.headingColor,
                     fontFamily: `'${c.theme.fontFamily}', serif`,
@@ -315,9 +341,24 @@ function CardPreviewModal({ cardObject, onClose }) {
                   {c.content.heading}
                 </h2>
 
+                {/* Media */}
+                {primaryImage && (
+                  <div
+                    className={`cp-media-section cp-media-section-full cp-reveal-element ${revealStep >= 2 ? 'visible' : ''} ${revealStep >= 4 ? 'settled' : ''}`}
+                    style={{
+                      transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s',
+                    }}
+                  >
+                    <div className="cp-media-item cp-media-item-full">
+                      <img src={primaryImage.url} alt={primaryImage.caption || ''} style={previewImageStyle} />
+                    </div>
+                    {primaryImage.caption && <p className="cp-caption cp-caption-full">{primaryImage.caption}</p>}
+                  </div>
+                )}
+
                 {/* Body */}
                 <div
-                  className={`cp-body ${fadeBody ? 'visible' : ''}`}
+                  className={`cp-body cp-reveal-element ${fadeBody && revealStep >= 3 ? 'visible' : ''}`}
                   style={{
                     color: c.card.textColor,
                     transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s',
@@ -333,7 +374,7 @@ function CardPreviewModal({ cardObject, onClose }) {
 
                 {/* Continue */}
                 <button
-                  className="cp-continue-btn"
+                  className={`cp-continue-btn cp-reveal-element ${revealStep >= 4 ? 'visible' : ''}`}
                   style={{
                     backgroundColor: c.theme.accentColor,
                     color: c.card.backgroundColor,
@@ -343,71 +384,75 @@ function CardPreviewModal({ cardObject, onClose }) {
                   {hasQuestions ? 'Continue' : 'Done'}
                 </button>
               </div>
-            </article>
+            </article>,
+            'cp-gradient-border-full'
           )}
         </div>
       )}
 
       {/* QUESTIONS */}
       {stage === 'questions' && c.questions.items[questionIdx] && (
-        <div className="cp-card-wrap">
-          <article
-            className="cp-card cp-question-card"
-            style={{
-              backgroundColor: c.card.backgroundColor,
-              ...borderStyle,
-            }}
-          >
-            <p className="cp-q-label" style={{ color: c.theme.accentColor }}>
-              Question {questionIdx + 1} of {c.questions.items.length}
-            </p>
-            <h3
-              className="cp-q-text"
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article
+              className="cp-card cp-card-full cp-question-card"
               style={{
-                color: c.card.headingColor,
-                fontFamily: `'${c.theme.fontFamily}', serif`,
+                backgroundColor: c.card.backgroundColor,
+                ...borderStyle,
               }}
             >
-              {c.questions.items[questionIdx].text}
-            </h3>
-            <div className="cp-q-actions">
-              <button
-                className="cp-q-btn yes"
+              <p className="cp-q-label" style={{ color: c.theme.accentColor }}>
+                Question {questionIdx + 1} of {c.questions.items.length}
+              </p>
+              <h3
+                className="cp-q-text"
                 style={{
-                  backgroundColor: c.questions.button.backgroundColor,
-                  color: c.questions.button.textColor,
-                  border: `1.5px solid ${c.questions.button.borderColor}`,
+                  color: c.card.headingColor,
+                  fontFamily: `'${c.theme.fontFamily}', serif`,
                 }}
-                onClick={handleNextQ}
               >
-                Yes
-              </button>
-              <button
-                className={`cp-q-btn no ${c.questions.denyBehavior === 'switch' ? 'deny-switch' : ''}`}
-                style={{
-                  backgroundColor: 'transparent',
-                  color: c.questions.button.textColor,
-                  border: `1.5px solid ${c.questions.button.borderColor}40`,
-                }}
-                onClick={c.questions.denyBehavior === 'switch' ? undefined : handleNextQ}
-                onMouseEnter={c.questions.denyBehavior === 'switch' ? (e) => {
-                  const x = Math.floor(Math.random() * 120) - 60
-                  const y = Math.floor(Math.random() * 80) - 40
-                  e.currentTarget.style.transform = `translate(${x}px, ${y}px)`
-                } : undefined}
-              >
-                No
-              </button>
-            </div>
-          </article>
+                {c.questions.items[questionIdx].text}
+              </h3>
+              <div className="cp-q-actions">
+                <button
+                  className="cp-q-btn yes"
+                  style={{
+                    backgroundColor: c.questions.button.backgroundColor,
+                    color: c.questions.button.textColor,
+                    border: `1.5px solid ${c.questions.button.borderColor}`,
+                  }}
+                  onClick={handleNextQ}
+                >
+                  Yes
+                </button>
+                <button
+                  className={`cp-q-btn no ${c.questions.denyBehavior === 'switch' ? 'deny-switch' : ''}`}
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: c.questions.button.textColor,
+                    border: `1.5px solid ${c.questions.button.borderColor}40`,
+                  }}
+                  onClick={c.questions.denyBehavior === 'switch' ? undefined : handleNextQ}
+                  onMouseEnter={c.questions.denyBehavior === 'switch' ? (e) => {
+                    const x = Math.floor(Math.random() * 120) - 60
+                    const y = Math.floor(Math.random() * 80) - 40
+                    e.currentTarget.style.transform = `translate(${x}px, ${y}px)`
+                  } : undefined}
+                >
+                  No
+                </button>
+              </div>
+            </article>,
+            'cp-gradient-border-full'
+          )}
         </div>
       )}
 
       {/* END */}
       {stage === 'end' && (
-        <div className="cp-card-wrap">
+        <div className="cp-card-wrap cp-card-wrap-full">
           <article
-            className="cp-card cp-end-card"
+            className="cp-card cp-card-full cp-end-card"
             style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
           >
             <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>✓</div>
@@ -436,8 +481,8 @@ function CardPreviewModal({ cardObject, onClose }) {
 
       {/* GIFT INTRO — suspenseful text */}
       {stage === 'giftIntro' && (
-        <div className="cp-card-wrap">
-          <article className="cp-card cp-gift-intro" style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}>
+        <div className="cp-card-wrap cp-card-wrap-full">
+          <article className="cp-card cp-card-full cp-gift-intro" style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}>
             <div className="cp-gift-sparkle">🎁</div>
             <h3 className="cp-gift-intro-heading" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               Wait... there's more
@@ -469,8 +514,8 @@ function CardPreviewModal({ cardObject, onClose }) {
 
       {/* GIFT RECEIVE — claim option (dummy) */}
       {stage === 'giftReceive' && (
-        <div className="cp-card-wrap">
-          <article className="cp-card cp-gift-receive" style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}>
+        <div className="cp-card-wrap cp-card-wrap-full">
+          <article className="cp-card cp-card-full cp-gift-receive" style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}>
             <div className="cp-gift-received-icon">🎉</div>
             <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               You received a gift!

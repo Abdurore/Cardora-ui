@@ -108,6 +108,10 @@ function MainLayout() {
     setCart([])
   }, [currentUser])
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname, location.search, location.hash])
+
   const updateUser = (userId, updater) => {
     setUsers((prev) =>
       prev.map((user) => (user.id === userId ? updater(user) : user)),
@@ -116,7 +120,7 @@ function MainLayout() {
 
   const toggleFavorite = (cardId) => {
     if (!currentUser) {
-      setShowAuth(true)
+      navigate('/login')
       return
     }
     updateUser(currentUser.id, (user) => {
@@ -129,7 +133,7 @@ function MainLayout() {
 
   const addToCart = (pack) => {
     if (!currentUser) {
-      setShowAuth(true)
+      navigate('/login')
       return
     }
     setCart((prev) => [...prev, pack])
@@ -138,7 +142,7 @@ function MainLayout() {
 
   const deductCC = (amount) => {
     if (!currentUser) {
-      setShowAuth(true)
+      navigate('/login')
       return false
     }
     if (currentUser.balance < amount) return false
@@ -148,7 +152,7 @@ function MainLayout() {
 
   const addGift = (gift) => {
     if (!currentUser) {
-      setShowAuth(true)
+      navigate('/login')
       return { ok: false, reason: 'auth' }
     }
     if (currentUser.balance < gift.cc) return { ok: false, reason: 'balance' }
@@ -170,14 +174,14 @@ function MainLayout() {
     return true
   }
 
-  const handleSignup = ({ name, username, email, password }) => {
+  const handleSignup = ({ username, email, password, referralCode = '' }) => {
     const exists =
       users.some((user) => user.email.toLowerCase() === email.toLowerCase()) ||
       users.some((user) => user.username?.toLowerCase() === username.toLowerCase())
     if (exists) return false
     const newUser = {
       id: `u${Date.now()}`,
-      name,
+      name: username,
       username,
       email,
       password,
@@ -186,6 +190,7 @@ function MainLayout() {
       favorites: [],
       inventory: [],
       avatarColor: 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
+      referralCode,
     }
     setUsers((prev) => [...prev, newUser])
     setCurrentUserId(newUser.id)
@@ -218,12 +223,22 @@ function MainLayout() {
           cart,
           addToCart,
           currentUser,
-          openAuthModal: () => setShowAuth(true),
+          openAuthModal: () => {
+            if (currentUser) {
+              setShowAuth(true)
+            } else {
+              navigate('/login')
+            }
+          },
           updateAvatar,
           deductCC,
           addGift,
+          onLogin: handleLogin,
+          onSignup: handleSignup,
+          onLogout: handleLogout,
           inventory: currentUser?.inventory || [],
           openEditor: (data) => {
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
             navigate('/studio', { state: { cardData: data || null } })
           },
         }}
@@ -234,7 +249,7 @@ function MainLayout() {
         onClose={() => setSelectedCard(null)}
         balance={balance}
         currentUser={currentUser}
-        onRequireAuth={() => setShowAuth(true)}
+        onRequireAuth={() => navigate('/login')}
         onDeductCC={deductCC}
         inventory={currentUser?.inventory || []}
       />

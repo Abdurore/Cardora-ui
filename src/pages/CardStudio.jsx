@@ -58,6 +58,82 @@ function ColorInput({ value, onChange, label }) {
   )
 }
 
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds)) return '0:00'
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${String(secs).padStart(2, '0')}`
+}
+
+function StudioAudioPlayer({ src, volume = 0.8 }) {
+  const audioRef = useRef(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [duration, setDuration] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+
+  useEffect(() => {
+    if (!audioRef.current) return
+    audioRef.current.volume = volume
+  }, [volume, src])
+
+  useEffect(() => {
+    setIsPlaying(false)
+    setCurrentTime(0)
+  }, [src])
+
+  const togglePlayback = async () => {
+    if (!audioRef.current) return
+    if (isPlaying) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+      return
+    }
+    try {
+      await audioRef.current.play()
+      setIsPlaying(true)
+    } catch {
+      setIsPlaying(false)
+    }
+  }
+
+  return (
+    <div className="cs-audio-player">
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
+        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime || 0)}
+        onEnded={() => {
+          setIsPlaying(false)
+          setCurrentTime(0)
+        }}
+      />
+      <button type="button" className="cs-audio-toggle" onClick={togglePlayback}>
+        {isPlaying ? 'Pause' : 'Play'}
+      </button>
+      <div className="cs-audio-track">
+        <input
+          type="range"
+          min="0"
+          max={duration || 0}
+          step="0.01"
+          value={Math.min(currentTime, duration || 0)}
+          onChange={(event) => {
+            const nextTime = Number(event.target.value)
+            setCurrentTime(nextTime)
+            if (audioRef.current) audioRef.current.currentTime = nextTime
+          }}
+        />
+        <div className="cs-audio-meta">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -71,6 +147,9 @@ function CardStudio() {
   const [savedState, setSavedState] = useState('Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
   const fileInputRef = useRef(null)
+  const bgImageInputRef = useRef(null)
+  const bgVideoInputRef = useRef(null)
+  const musicInputRef = useRef(null)
 
   const isArtist = currentUser?.role === 'Artist'
 
@@ -123,12 +202,57 @@ function CardStudio() {
     const reader = new FileReader()
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        const newImages = [...c.media.images, { url: reader.result, caption: '' }]
+        const newImages = [
+          ...c.media.images,
+          {
+            url: reader.result,
+            caption: '',
+            fit: 'cover',
+            positionX: 50,
+            positionY: 50,
+          },
+        ]
         update('media.images', newImages)
       }
     }
     reader.readAsDataURL(file)
     e.target.value = ''
+  }
+
+  const readFileAsDataUrl = (file, onLoad) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') onLoad(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleBackgroundImageUpload = (event) => {
+    const file = event.target.files?.[0]
+    readFileAsDataUrl(file, (result) => {
+      update('background.type', 'image')
+      update('background.imageUrl', result)
+    })
+    event.target.value = ''
+  }
+
+  const handleBackgroundVideoUpload = (event) => {
+    const file = event.target.files?.[0]
+    readFileAsDataUrl(file, (result) => {
+      update('background.type', 'video')
+      update('background.videoUrl', result)
+    })
+    event.target.value = ''
+  }
+
+  const handleMusicUpload = (event) => {
+    const file = event.target.files?.[0]
+    readFileAsDataUrl(file, (result) => {
+      update('background.music.url', result)
+      update('background.music.isUploaded', true)
+    })
+    event.target.value = ''
   }
 
   const removeImage = (idx) => {
@@ -138,6 +262,12 @@ function CardStudio() {
   const updateImageCaption = (idx, caption) => {
     const imgs = [...c.media.images]
     imgs[idx] = { ...imgs[idx], caption }
+    update('media.images', imgs)
+  }
+
+  const updateImageSetting = (idx, key, value) => {
+    const imgs = [...c.media.images]
+    imgs[idx] = { ...imgs[idx], [key]: value }
     update('media.images', imgs)
   }
 
@@ -262,10 +392,50 @@ function CardStudio() {
           )}
           {c.media.images.map((img, i) => (
             <div key={i} className="cs-image-card">
-              <img src={img.url} alt="" className="cs-image-thumb" />
+              <img
+                src={img.url}
+                alt=""
+                className="cs-image-thumb"
+                style={{
+                  objectFit: img.fit || 'cover',
+                  objectPosition: `${img.positionX ?? 50}% ${img.positionY ?? 50}%`,
+                }}
+              />
               <label className="cs-field">
                 <span>Caption</span>
                 <input value={img.caption} onChange={e => updateImageCaption(i, e.target.value)} placeholder="Add a caption..." />
+              </label>
+              <label className="cs-field">
+                <span>Image Fit</span>
+                <select
+                  value={img.fit || 'cover'}
+                  onChange={e => updateImageSetting(i, 'fit', e.target.value)}
+                >
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                </select>
+              </label>
+              <label className="cs-field">
+                <span>Horizontal Focus</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={img.positionX ?? 50}
+                  onChange={e => updateImageSetting(i, 'positionX', Number(e.target.value))}
+                />
+                <span className="cs-range-val">{img.positionX ?? 50}%</span>
+              </label>
+              <label className="cs-field">
+                <span>Vertical Focus</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={img.positionY ?? 50}
+                  onChange={e => updateImageSetting(i, 'positionY', Number(e.target.value))}
+                />
+                <span className="cs-range-val">{img.positionY ?? 50}%</span>
               </label>
               <button type="button" className="cs-remove-btn" onClick={() => removeImage(i)}>Remove</button>
             </div>
@@ -325,37 +495,77 @@ function CardStudio() {
           )}
 
           {c.background.type === 'image' && (
-            <label className="cs-field">
-              <span>Image URL</span>
-              <input type="url" value={c.background.imageUrl} onChange={e => update('background.imageUrl', e.target.value)} placeholder="https://..." />
-            </label>
+            <div className="cs-sub-section">
+              <p className="cs-sub-label">Background Image Upload</p>
+              <input
+                ref={bgImageInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleBackgroundImageUpload}
+              />
+              <button type="button" className="cs-button" onClick={() => bgImageInputRef.current?.click()}>
+                Upload Image From Device
+              </button>
+              {c.background.imageUrl ? (
+                <div className="cs-background-thumb">
+                  <img src={c.background.imageUrl} alt="" />
+                </div>
+              ) : null}
+            </div>
           )}
 
           {c.background.type === 'video' && (
-            <label className="cs-field">
-              <span>Video URL</span>
-              <input type="url" value={c.background.videoUrl} onChange={e => update('background.videoUrl', e.target.value)} placeholder="https://..." />
-            </label>
+            <div className="cs-sub-section">
+              <p className="cs-sub-label">Background Video Upload</p>
+              <input
+                ref={bgVideoInputRef}
+                type="file"
+                accept="video/*"
+                style={{ display: 'none' }}
+                onChange={handleBackgroundVideoUpload}
+              />
+              <button type="button" className="cs-button" onClick={() => bgVideoInputRef.current?.click()}>
+                Upload Video From Device
+              </button>
+              {c.background.videoUrl ? (
+                <div className="cs-background-thumb video">
+                  <video src={c.background.videoUrl} muted autoPlay loop playsInline />
+                </div>
+              ) : null}
+            </div>
           )}
 
           <div className="cs-sub-section">
             <p className="cs-sub-label"><HiOutlineMusicalNote style={{ verticalAlign: 'middle' }} /> Background Music</p>
-            <label className="cs-field">
-              <span>Music URL</span>
-              <input type="url" value={c.background.music.url} onChange={e => update('background.music.url', e.target.value)} placeholder="paste audio URL or pick below" />
-            </label>
+            <input
+              ref={musicInputRef}
+              type="file"
+              accept="audio/*"
+              style={{ display: 'none' }}
+              onChange={handleMusicUpload}
+            />
+            <button type="button" className="cs-button" onClick={() => musicInputRef.current?.click()}>
+              Upload Music From Device
+            </button>
             <div className="cs-preset-list">
               {musicPresets.map(preset => (
                 <button
                   key={preset.label}
                   type="button"
                   className={`cs-chip small ${c.background.music.url === preset.url ? 'active' : ''}`}
-                  onClick={() => update('background.music.url', preset.url)}
+                  onClick={() => {
+                    update('background.music.url', preset.url)
+                    update('background.music.isUploaded', false)
+                  }}
                 >
                   ♫ {preset.label}
                 </button>
               ))}
             </div>
+            {c.background.music.url ? (
+              <StudioAudioPlayer src={c.background.music.url} volume={c.background.music.volume} />
+            ) : null}
             <label className="cs-field">
               <span>Volume</span>
               <input type="range" min="0" max="1" step="0.05" value={c.background.music.volume} onChange={e => update('background.music.volume', Number(e.target.value))} />
@@ -802,6 +1012,12 @@ function CardStudio() {
             <div className="cs-phone-frame">
               <div className="cs-phone-notch" />
               <div className="cs-phone-screen" style={{ background: previewBg }}>
+                {c.background.type === 'image' && c.background.imageUrl ? (
+                  <img className="cs-screen-background" src={c.background.imageUrl} alt="" />
+                ) : null}
+                {c.background.type === 'video' && c.background.videoUrl ? (
+                  <video className="cs-screen-background video" src={c.background.videoUrl} autoPlay muted loop playsInline />
+                ) : null}
                 {/* Closed State Preview */}
                 {activeStep === 'closed' && (
                   <div className="cs-preview-closed" style={{
@@ -840,7 +1056,14 @@ function CardStudio() {
                   }}>
                     {c.media.images.length > 0 && (
                       <div className="cs-preview-media">
-                        <img src={c.media.images[0].url} alt="" />
+                        <img
+                          src={c.media.images[0].url}
+                          alt=""
+                          style={{
+                            objectFit: c.media.images[0].fit || 'cover',
+                            objectPosition: `${c.media.images[0].positionX ?? 50}% ${c.media.images[0].positionY ?? 50}%`,
+                          }}
+                        />
                       </div>
                     )}
                     <h3 style={{
@@ -889,6 +1112,12 @@ function CardStudio() {
         </div>
 
         <div className="cs-mobile-preview" style={{ background: previewBg }}>
+          {c.background.type === 'image' && c.background.imageUrl ? (
+            <img className="cs-mobile-background" src={c.background.imageUrl} alt="" />
+          ) : null}
+          {c.background.type === 'video' && c.background.videoUrl ? (
+            <video className="cs-mobile-background video" src={c.background.videoUrl} autoPlay muted loop playsInline />
+          ) : null}
           {activeStep === 'closed' ? (
             <div className="cs-preview-closed compact" style={{
               backgroundColor: c.closedState.backgroundColor,
@@ -900,7 +1129,15 @@ function CardStudio() {
               <p style={{ color: c.closedState.textColor }}>{c.closedState.bodyText}</p>
             </div>
           ) : c.media.images.length > 0 ? (
-            <img src={c.media.images[0].url} alt="" className="cs-mobile-img" />
+            <img
+              src={c.media.images[0].url}
+              alt=""
+              className="cs-mobile-img"
+              style={{
+                objectFit: c.media.images[0].fit || 'cover',
+                objectPosition: `${c.media.images[0].positionX ?? 50}% ${c.media.images[0].positionY ?? 50}%`,
+              }}
+            />
           ) : (
             <div className="cs-mobile-card-hint" style={{ backgroundColor: c.card.backgroundColor }}>
               <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: '1rem' }}>

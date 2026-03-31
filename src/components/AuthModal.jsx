@@ -92,7 +92,14 @@ function AuthModal({ open, onClose, onLogin, onSignup, currentUser, onLogout }) 
               <p className="auth-name">{currentUser.name}</p>
               <p className="auth-email">{currentUser.email}</p>
             </div>
-            <button className="primary" type="button" onClick={onLogout}>
+            <button
+              className="primary"
+              type="button"
+              onClick={() => {
+                onLogout()
+                onClose()
+              }}
+            >
               Log out
             </button>
           </div>
