@@ -315,6 +315,12 @@
   color: #ff9bd2;
 }
 
+.auth-status {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #9ef6cf;
+}
+
 .auth-profile {
   display: grid;
   gap: 12px;

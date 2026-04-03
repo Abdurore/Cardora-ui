@@ -137,7 +137,7 @@ function StudioAudioPlayer({ src, volume = 0.8 }) {
 function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentUser, inventory = [] } = useOutletContext() || {}
+  const { currentUser, inventory = [], publishTemplate } = useOutletContext() || {}
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
 
   const [cardObject, setCardObject] = useState(() => resolveTemplateCardObject(cardData))
@@ -146,6 +146,12 @@ function CardStudio() {
   const [showPreview, setShowPreview] = useState(false)
   const [savedState, setSavedState] = useState('Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
+  const [publishForm, setPublishForm] = useState({
+    category: cardData?.category || 'proposal',
+    name: cardData?.title || resolveTemplateCardObject(cardData).content.heading,
+  })
+  const [publishError, setPublishError] = useState('')
+  const [isPublishing, setIsPublishing] = useState(false)
   const fileInputRef = useRef(null)
   const bgImageInputRef = useRef(null)
   const bgVideoInputRef = useRef(null)
@@ -194,6 +200,29 @@ function CardStudio() {
     } catch {
       setSavedState('Save failed')
     }
+  }
+
+  const handlePublish = async () => {
+    if (!publishForm.name.trim()) {
+      setPublishError('Template name is required.')
+      return
+    }
+    setPublishError('')
+    setIsPublishing(true)
+    const previewImage = c.media.images?.[0]?.url || c.background.imageUrl || ''
+    const result = await publishTemplate?.({
+      name: publishForm.name.trim(),
+      category: publishForm.category,
+      previewImage,
+      layoutConfig: structuredClone(cardObject),
+    })
+    setIsPublishing(false)
+    if (!result?.ok) {
+      setPublishError(result?.message || 'Could not submit the template.')
+      return
+    }
+    setShowPublish(false)
+    setSavedState('Template submitted to backend')
   }
 
   const handleImageUpload = (e) => {
@@ -1214,13 +1243,24 @@ function CardStudio() {
       {/* Publish Template Modal (Artists only) */}
       {showPublish && (
         <div className="cs-publish-overlay">
-          <div className="cs-publish-backdrop" onClick={() => setShowPublish(false)} />
+          <div
+            className="cs-publish-backdrop"
+            onClick={() => {
+              setShowPublish(false)
+              setPublishError('')
+            }}
+          />
           <div className="cs-publish-modal">
             <h3>Publish Template</h3>
             <p>Your card will be submitted for review and added to the marketplace once approved.</p>
             <label className="cs-field">
               <span>Category</span>
-              <select defaultValue="proposal">
+              <select
+                value={publishForm.category}
+                onChange={(event) =>
+                  setPublishForm((prev) => ({ ...prev, category: event.target.value }))
+                }
+              >
                 <option value="proposal">Proposal</option>
                 <option value="anniversary">Anniversary</option>
                 <option value="birthday">Birthday</option>
@@ -1229,30 +1269,32 @@ function CardStudio() {
             </label>
             <label className="cs-field">
               <span>Template Name</span>
-              <input defaultValue={c.content.heading} placeholder="Give your template a name" />
+              <input
+                value={publishForm.name}
+                onChange={(event) =>
+                  setPublishForm((prev) => ({ ...prev, name: event.target.value }))
+                }
+                placeholder="Give your template a name"
+              />
             </label>
+            {publishError ? <p className="form-error">{publishError}</p> : null}
             <div className="cs-publish-actions">
               <button
                 type="button"
                 className="cs-nav-btn publish"
+                onClick={handlePublish}
+                disabled={isPublishing}
+              >
+                {isPublishing ? 'Submitting...' : 'Submit for Review'}
+              </button>
+              <button
+                type="button"
+                className="cs-nav-btn"
                 onClick={() => {
-                  const published = JSON.parse(localStorage.getItem('cardora:publishedTemplates') || '[]')
-                  published.unshift({
-                    id: `tmpl-${Date.now()}`,
-                    title: c.content.heading,
-                    cardObject: structuredClone(cardObject),
-                    publishedAt: new Date().toISOString(),
-                    artist: currentUser?.name || 'Artist',
-                    status: 'pending',
-                  })
-                  localStorage.setItem('cardora:publishedTemplates', JSON.stringify(published))
                   setShowPublish(false)
-                  setSavedState('Template submitted!')
+                  setPublishError('')
                 }}
               >
-                Submit for Review
-              </button>
-              <button type="button" className="cs-nav-btn" onClick={() => setShowPublish(false)}>
                 Cancel
               </button>
             </div>

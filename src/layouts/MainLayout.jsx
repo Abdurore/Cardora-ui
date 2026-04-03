@@ -3,213 +3,351 @@ import { useEffect, useMemo, useState } from 'react'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import AuthModal from '../components/AuthModal.jsx'
 import '../App.css'
+import {
+  clearStoredToken,
+  createCouponCheckout,
+  createPaystackCheckout,
+  createTemplate,
+  extractToken,
+  getCouponPackages,
+  getCurrentUser,
+  getStoredToken,
+  getTemplates,
+  getUserCoupons,
+  likeTemplate,
+  login,
+  logout,
+  requestOtp,
+  setStoredToken,
+  signup,
+  updateProfile,
+  verifyEmail,
+} from '../lib/api.js'
+import {
+  extractCheckoutUrl,
+  mapCouponPackage,
+  mapTemplateToCard,
+  normalizeUser,
+} from '../lib/backendMappers.js'
+
+const USER_META_PREFIX = 'cardora:userMeta:'
+
+function readUserMeta(userId) {
+  if (!userId) return { favorites: [], inventory: [], avatarUrl: '', avatarColor: '' }
+  try {
+    return JSON.parse(localStorage.getItem(`${USER_META_PREFIX}${userId}`) || '{}')
+  } catch {
+    return { favorites: [], inventory: [], avatarUrl: '', avatarColor: '' }
+  }
+}
 
 function MainLayout() {
   const [selectedCard, setSelectedCard] = useState(null)
   const [favorites, setFavorites] = useState([])
-  const [balance, setBalance] = useState(50)
+  const [balance, setBalance] = useState(0)
   const [cart, setCart] = useState([])
-  const [users, setUsers] = useState([])
-  const [currentUserId, setCurrentUserId] = useState(null)
+  const [inventory, setInventory] = useState([])
+  const [currentUser, setCurrentUser] = useState(null)
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [avatarColor, setAvatarColor] = useState('linear-gradient(135deg, #7ef7ff, #62ffa2)')
   const [showAuth, setShowAuth] = useState(false)
+  const [couponPackages, setCouponPackages] = useState([])
+  const [marketplaceTemplates, setMarketplaceTemplates] = useState([])
+  const [authReady, setAuthReady] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
-  const currentUser = useMemo(
-    () => users.find((user) => user.id === currentUserId) || null,
-    [currentUserId, users],
+  const hydratedUser = useMemo(
+    () =>
+      currentUser
+        ? {
+            ...currentUser,
+            balance,
+            favorites,
+            inventory,
+            avatarUrl,
+            avatarColor,
+          }
+        : null,
+    [avatarColor, avatarUrl, balance, currentUser, favorites, inventory],
   )
 
-  useEffect(() => {
-    const storedUsers = localStorage.getItem('cardora:users')
-    const storedSession = localStorage.getItem('cardora:currentUserId')
-    const SEED_VERSION = '2'
-    const storedVersion = localStorage.getItem('cardora:seedVersion')
-
-    const seedUsers = [
-      {
-        id: 'u1',
-        name: 'The Creator',
-        username: 'creator',
-        email: 'creator@cardora.com',
-        password: 'cardora',
-        role: 'Artist',
-        balance: 50,
-        favorites: [],
-        inventory: [],
-        avatarColor: 'linear-gradient(135deg, #62ffa2, #7ef7ff)',
-      },
-      {
-        id: 'u2',
-        name: 'Sunset Muse',
-        username: 'sunsetmuse',
-        email: 'muse@cardora.com',
-        password: 'cardora',
-        role: 'Creator',
-        balance: 50,
-        favorites: [],
-        inventory: [],
-        avatarColor: 'linear-gradient(135deg, #ff9bd2, #7ef7ff)',
-      },
-      {
-        id: 'u3',
-        name: 'Admin',
-        username: 'admin',
-        email: 'admin@cardora.com',
-        password: 'cardora',
-        role: 'Admin',
-        balance: 500,
-        favorites: [],
-        inventory: [],
-        avatarColor: 'linear-gradient(135deg, #ffd700, #ff6b35)',
-      },
-    ]
-
-    if (!storedUsers || storedVersion !== SEED_VERSION) {
-      // Re-seed: merge any existing user data (avatar, inventory) with updated seed
-      let merged = seedUsers
-      if (storedUsers) {
-        try {
-          const old = JSON.parse(storedUsers)
-          if (Array.isArray(old)) {
-            merged = seedUsers.map(seed => {
-              const existing = old.find(u => u.id === seed.id)
-              return existing ? { ...seed, favorites: existing.favorites || [], inventory: existing.inventory || [], avatarUrl: existing.avatarUrl, balance: existing.balance } : seed
-            })
-          }
-        } catch { /* use fresh seeds */ }
-      }
-      setUsers(merged)
-      localStorage.setItem('cardora:users', JSON.stringify(merged))
-      localStorage.setItem('cardora:seedVersion', SEED_VERSION)
-    } else {
-      try {
-        const parsed = JSON.parse(storedUsers)
-        if (Array.isArray(parsed) && parsed.length) setUsers(parsed)
-      } catch (error) {
-        console.error('Failed to load users', error)
-      }
-    }
-    if (storedSession) setCurrentUserId(storedSession)
-  }, [])
-
-  useEffect(() => {
-    if (users.length) localStorage.setItem('cardora:users', JSON.stringify(users))
-  }, [users])
-
-  useEffect(() => {
-    if (currentUser) {
-      setFavorites(currentUser.favorites || [])
-      setBalance(currentUser.balance || 0)
-    } else {
-      setFavorites([])
+  const hydrateSession = async () => {
+    const token = getStoredToken()
+    if (!token) {
+      setCurrentUser(null)
       setBalance(0)
+      setFavorites([])
+      setInventory([])
+      setAvatarUrl('')
+      setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
+      return null
     }
-    setCart([])
-  }, [currentUser])
+
+    try {
+      const [userPayload, couponPayload] = await Promise.allSettled([getCurrentUser(), getUserCoupons()])
+      const userData = userPayload.status === 'fulfilled' ? userPayload.value : null
+      const couponsData = couponPayload.status === 'fulfilled' ? couponPayload.value : null
+      const rawUser = userData?.user || userData?.data?.user || userData?.data || userData
+      const meta = readUserMeta(rawUser?._id || rawUser?.id || rawUser?.userId || rawUser?.email)
+      const normalized = normalizeUser(userData, meta, couponsData)
+      setCurrentUser(normalized)
+      setBalance(normalized.balance)
+      setFavorites(meta.favorites || [])
+      setInventory(meta.inventory || [])
+      setAvatarUrl(meta.avatarUrl || '')
+      setAvatarColor(meta.avatarColor || normalized.avatarColor)
+      return normalized
+    } catch (error) {
+      console.error('Session hydration failed', error)
+      clearStoredToken()
+      setCurrentUser(null)
+      setBalance(0)
+      setFavorites([])
+      setInventory([])
+      setAvatarUrl('')
+      setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
+      return null
+    }
+  }
+
+  const loadPublicData = async () => {
+    try {
+      const [packagePayload, templatePayload] = await Promise.allSettled([
+        getCouponPackages('activeOnly=true&page=1&limit=20'),
+        getTemplates('page=1&limit=24'),
+      ])
+
+      if (packagePayload.status === 'fulfilled') {
+        const packs = packagePayload.value?.packages || packagePayload.value?.data?.packages || []
+        setCouponPackages(packs.map(mapCouponPackage))
+      }
+
+      if (templatePayload.status === 'fulfilled') {
+        const templates =
+          templatePayload.value?.templates || templatePayload.value?.data?.templates || []
+        setMarketplaceTemplates(templates.map(mapTemplateToCard))
+      }
+    } catch (error) {
+      console.error('Public data load failed', error)
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      await Promise.allSettled([loadPublicData(), hydrateSession()])
+      if (mounted) setAuthReady(true)
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [location.pathname, location.search, location.hash])
 
-  const updateUser = (userId, updater) => {
-    setUsers((prev) =>
-      prev.map((user) => (user.id === userId ? updater(user) : user)),
-    )
-  }
+  useEffect(() => {
+    if (!hydratedUser?.id) return
+    const payload = {
+      favorites,
+      inventory,
+      avatarUrl,
+      avatarColor,
+    }
+    localStorage.setItem(`${USER_META_PREFIX}${hydratedUser.id}`, JSON.stringify(payload))
+  }, [avatarColor, avatarUrl, favorites, hydratedUser?.id, inventory])
 
-  const toggleFavorite = (cardId) => {
-    if (!currentUser) {
+  const toggleFavorite = async (cardId) => {
+    if (!hydratedUser) {
       navigate('/login')
       return
     }
-    updateUser(currentUser.id, (user) => {
-      const nextFavorites = user.favorites.includes(cardId)
-        ? user.favorites.filter((id) => id !== cardId)
-        : [...user.favorites, cardId]
-      return { ...user, favorites: nextFavorites }
+
+    setFavorites((prev) => {
+      const nextFavorites = prev.includes(cardId)
+        ? prev.filter((id) => id !== cardId)
+        : [...prev, cardId]
+      return nextFavorites
     })
+
+    const backendTemplate = marketplaceTemplates.find((item) => item.id === cardId)?.backendTemplate
+    const templateId = backendTemplate?.templateId || backendTemplate?._id || cardId
+    try {
+      await likeTemplate(templateId)
+    } catch (error) {
+      console.error('Like sync failed', error)
+    }
   }
 
-  const addToCart = (pack) => {
-    if (!currentUser) {
+  const addToCart = async (pack) => {
+    if (!hydratedUser) {
       navigate('/login')
-      return
+      return { ok: false, reason: 'auth' }
     }
     setCart((prev) => [...prev, pack])
-    updateUser(currentUser.id, (user) => ({ ...user, balance: user.balance + pack.cc }))
+    try {
+      let response = null
+      try {
+        response = await createPaystackCheckout({ packageId: pack.packageId || pack.id })
+      } catch {
+        response = await createCouponCheckout({ packageId: pack.packageId || pack.id })
+      }
+      const checkoutUrl = extractCheckoutUrl(response)
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl
+        return { ok: true, checkout: true }
+      }
+      await hydrateSession()
+      return { ok: true, checkout: false }
+    } catch (error) {
+      console.error('Checkout start failed', error)
+      return { ok: false, reason: error.message || 'checkout' }
+    }
   }
 
   const deductCC = (amount) => {
-    if (!currentUser) {
+    if (!hydratedUser) {
       navigate('/login')
       return false
     }
-    if (currentUser.balance < amount) return false
-    updateUser(currentUser.id, (user) => ({ ...user, balance: user.balance - amount }))
+    if (balance < amount) return false
+    setBalance((prev) => prev - amount)
     return true
   }
 
   const addGift = (gift) => {
-    if (!currentUser) {
+    if (!hydratedUser) {
       navigate('/login')
       return { ok: false, reason: 'auth' }
     }
-    if (currentUser.balance < gift.cc) return { ok: false, reason: 'balance' }
-    updateUser(currentUser.id, (user) => ({
-      ...user,
-      balance: user.balance - gift.cc,
-      inventory: [...(user.inventory || []), { ...gift, id: `gift-${Date.now()}` }],
-    }))
+    if (balance < gift.cc) return { ok: false, reason: 'balance' }
+    setBalance((prev) => prev - gift.cc)
+    setInventory((prev) => [...prev, { ...gift, id: `gift-${Date.now()}` }])
     return { ok: true }
   }
 
-  const handleLogin = (email, password) => {
-    const match = users.find(
-      (user) => user.email.toLowerCase() === email.toLowerCase() && user.password === password,
-    )
-    if (!match) return false
-    setCurrentUserId(match.id)
-    localStorage.setItem('cardora:currentUserId', match.id)
-    return true
-  }
-
-  const handleSignup = ({ username, email, password, referralCode = '' }) => {
-    const exists =
-      users.some((user) => user.email.toLowerCase() === email.toLowerCase()) ||
-      users.some((user) => user.username?.toLowerCase() === username.toLowerCase())
-    if (exists) return false
-    const newUser = {
-      id: `u${Date.now()}`,
-      name: username,
-      username,
-      email,
-      password,
-      role: 'Creator',
-      balance: 50,
-      favorites: [],
-      inventory: [],
-      avatarColor: 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
-      referralCode,
+  const handleLogin = async (email, password) => {
+    try {
+      const response = await login({ email, password })
+      const token = extractToken(response)
+      if (!token) {
+        return { ok: false, message: response?.message || 'Login succeeded but no session token was returned.' }
+      }
+      setStoredToken(token)
+      await hydrateSession()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Invalid email or password.' }
     }
-    setUsers((prev) => [...prev, newUser])
-    setCurrentUserId(newUser.id)
-    localStorage.setItem('cardora:currentUserId', newUser.id)
-    return true
   }
 
-  const handleLogout = () => {
-    setCurrentUserId(null)
-    localStorage.removeItem('cardora:currentUserId')
+  const handleSignup = async ({
+    username,
+    email,
+    password,
+    referralCode = '',
+    currency = 'NGN',
+    termsAccepted = true,
+    privacyAccepted = true,
+  }) => {
+    try {
+      const response = await signup({
+        username,
+        email,
+        password,
+        referralCode,
+        currency,
+        termsAccepted,
+        privacyAccepted,
+      })
+      const token = extractToken(response)
+      if (token) {
+        setStoredToken(token)
+        await hydrateSession()
+        return { ok: true, verified: true }
+      }
+      return {
+        ok: true,
+        verified: false,
+        message: response?.message || 'Signup successful. Check your email for the verification code.',
+      }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Signup failed.' }
+    }
+  }
+
+  const handleVerifyEmail = async (email, otp) => {
+    try {
+      const response = await verifyEmail({ email, otp })
+      const token = extractToken(response)
+      if (token) {
+        setStoredToken(token)
+        await hydrateSession()
+        return { ok: true, session: true, message: response?.message || 'Email verified successfully.' }
+      }
+      return {
+        ok: true,
+        session: false,
+        message: response?.message || 'Email verified. Please log in to continue.',
+      }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Verification failed.' }
+    }
+  }
+
+  const handleRequestOtp = async (email) => {
+    try {
+      const response = await requestOtp({ email })
+      return { ok: true, message: response?.message || 'A new code has been sent.' }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Could not resend the code.' }
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Logout request failed', error)
+    } finally {
+      clearStoredToken()
+      setCurrentUser(null)
+      setBalance(0)
+      setFavorites([])
+      setInventory([])
+      setAvatarUrl('')
+      setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
+      setCart([])
+    }
   }
 
   const updateAvatar = (nextAvatar) => {
-    if (!currentUser) return
-    updateUser(currentUser.id, (user) => ({
-      ...user,
-      avatarUrl: nextAvatar,
-      avatarColor: '',
-    }))
+    setAvatarUrl(nextAvatar)
+    setAvatarColor('')
+  }
+
+  const handleProfileUpdate = async (payload) => {
+    if (!hydratedUser) return { ok: false, message: 'Please log in.' }
+    try {
+      await updateProfile(payload)
+      await hydrateSession()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Profile update failed.' }
+    }
+  }
+
+  const publishTemplate = async ({ name, category, previewImage, layoutConfig }) => {
+    try {
+      const response = await createTemplate({ name, category, previewImage, layoutConfig })
+      await loadPublicData()
+      return { ok: true, message: response?.message || 'Template submitted successfully.' }
+    } catch (error) {
+      console.error('Template publish failed', error)
+      return { ok: false, message: error.message || 'Could not publish template.' }
+    }
   }
 
   return (
@@ -222,21 +360,29 @@ function MainLayout() {
           balance,
           cart,
           addToCart,
-          currentUser,
+          currentUser: hydratedUser,
+          authReady,
+          couponPackages,
+          marketplaceTemplates,
+          refreshMarketplaceTemplates: loadPublicData,
           openAuthModal: () => {
-            if (currentUser) {
+            if (hydratedUser) {
               setShowAuth(true)
             } else {
               navigate('/login')
             }
           },
           updateAvatar,
+          updateProfile: handleProfileUpdate,
           deductCC,
           addGift,
           onLogin: handleLogin,
           onSignup: handleSignup,
+          onVerifyEmail: handleVerifyEmail,
+          onRequestOtp: handleRequestOtp,
           onLogout: handleLogout,
-          inventory: currentUser?.inventory || [],
+          inventory,
+          publishTemplate,
           openEditor: (data) => {
             window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
             navigate('/studio', { state: { cardData: data || null } })
@@ -248,17 +394,17 @@ function MainLayout() {
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
         balance={balance}
-        currentUser={currentUser}
+        currentUser={hydratedUser}
         onRequireAuth={() => navigate('/login')}
         onDeductCC={deductCC}
-        inventory={currentUser?.inventory || []}
+        inventory={inventory}
       />
       <AuthModal
         open={showAuth}
         onClose={() => setShowAuth(false)}
         onLogin={handleLogin}
         onSignup={handleSignup}
-        currentUser={currentUser}
+        currentUser={hydratedUser}
         onLogout={handleLogout}
       />
     </div>

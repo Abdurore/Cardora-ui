@@ -7,12 +7,20 @@ import searchIcon from '../assets/icons/search.png'
 import { exploreCards, exploreTags } from '../data/catalog.js'
 
 function Explore() {
-  const { openCardDetails, favorites, toggleFavorite, currentUser, openAuthModal, balance } =
-    useOutletContext()
+  const {
+    openCardDetails,
+    favorites,
+    toggleFavorite,
+    currentUser,
+    openAuthModal,
+    balance,
+    marketplaceTemplates,
+  } = useOutletContext()
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [activeTag, setActiveTag] = useState(searchParams.get('tag') || 'all')
   const [tierFilter, setTierFilter] = useState('all')
+  const cardSource = marketplaceTemplates?.length ? marketplaceTemplates : exploreCards
 
   useEffect(() => {
     const params = {}
@@ -23,7 +31,7 @@ function Explore() {
 
   const filteredCards = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
-    return exploreCards
+    return cardSource
       .filter((card) => {
         const matchesQuery = normalizedQuery
           ? card.title.toLowerCase().includes(normalizedQuery)
@@ -35,7 +43,7 @@ function Explore() {
         return matchesQuery && matchesTag && matchesFavorites && matchesTier
       })
       .filter((card) => (activeTag === 'favorites' ? favorites.includes(card.id) : true))
-  }, [activeTag, favorites, query, tierFilter])
+  }, [activeTag, cardSource, favorites, query, tierFilter])
 
   return (
     <div className="page-body">

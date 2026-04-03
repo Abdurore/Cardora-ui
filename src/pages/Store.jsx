@@ -1,11 +1,22 @@
 import { Link, useOutletContext } from 'react-router-dom'
+import { useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import PackCard from '../components/PackCard.jsx'
 import { storePacks } from '../data/catalog.js'
 
 function Store() {
-  const { balance, cart, addToCart, currentUser, openAuthModal } = useOutletContext()
+  const { balance, cart, addToCart, currentUser, openAuthModal, couponPackages } = useOutletContext()
+  const [checkoutMessage, setCheckoutMessage] = useState('')
+  const packs = couponPackages?.length ? couponPackages : storePacks
+
+  const handleSelect = async (pack) => {
+    const result = await addToCart(pack)
+    if (!result?.ok && result?.reason) {
+      setCheckoutMessage(result.reason === 'auth' ? 'Please sign in to continue.' : result.reason)
+      setTimeout(() => setCheckoutMessage(''), 2200)
+    }
+  }
 
   return (
     <div className="page-body">
@@ -43,18 +54,18 @@ function Store() {
         </div>
 
         <div className="wallet-package-note">
-          <span>500 CC</span>
-          <span>1000 CC</span>
-          <span>2000 CC</span>
-          <span>Bonus bundles</span>
+          {packs.slice(0, 4).map((pack) => (
+            <span key={pack.id || pack.title}>{pack.amount}</span>
+          ))}
         </div>
+        {checkoutMessage ? <p className="form-error">{checkoutMessage}</p> : null}
 
         <div className="pack-grid">
-          {storePacks.map((pack, index) => (
+          {packs.map((pack, index) => (
             <PackCard
-              key={`${pack.title}-${index}`}
+              key={pack.id || `${pack.title}-${index}`}
               {...pack}
-              onSelect={() => addToCart(pack)}
+              onSelect={() => handleSelect(pack)}
             />
           ))}
         </div>
