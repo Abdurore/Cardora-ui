@@ -117,7 +117,11 @@ function AuthPage({ mode = 'login' }) {
       })
 
       if (!result.ok) {
-        setError(result.message || 'Account could not be created.')
+        setError(
+          result.message === 'Invalid referral code'
+            ? 'That referral code is not valid. Use a valid code or leave the field empty.'
+            : result.message || 'Account could not be created.',
+        )
         setDebugInfo(result.debug || null)
         return
       }
@@ -181,7 +185,7 @@ function AuthPage({ mode = 'login' }) {
                 </label>
                 <label className="detail-field">
                   Referral Code
-                  <small className="detail-hint">Optional. Add one if someone invited you.</small>
+                  <small className="detail-hint">Optional. Add one only if you have a valid Cardora referral code.</small>
                   <input
                     name="referralCode"
                     type="text"
