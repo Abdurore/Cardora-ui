@@ -239,7 +239,12 @@ function MainLayout() {
       await hydrateSession()
       return { ok: true }
     } catch (error) {
-      return { ok: false, message: error.message || 'Invalid email or password.' }
+      return {
+        ok: false,
+        message: error.message || 'Invalid email or password.',
+        status: error.status,
+        debug: error.debug,
+      }
     }
   }
 
@@ -274,7 +279,12 @@ function MainLayout() {
         message: response?.message || 'Signup successful. Check your email for the verification code.',
       }
     } catch (error) {
-      return { ok: false, message: error.message || 'Signup failed.' }
+      return {
+        ok: false,
+        message: error.message || 'Signup failed.',
+        status: error.status,
+        debug: error.debug,
+      }
     }
   }
 
@@ -293,7 +303,12 @@ function MainLayout() {
         message: response?.message || 'Email verified. Please log in to continue.',
       }
     } catch (error) {
-      return { ok: false, message: error.message || 'Verification failed.' }
+      return {
+        ok: false,
+        message: error.message || 'Verification failed.',
+        status: error.status,
+        debug: error.debug,
+      }
     }
   }
 
@@ -302,7 +317,12 @@ function MainLayout() {
       const response = await requestOtp({ email })
       return { ok: true, message: response?.message || 'A new code has been sent.' }
     } catch (error) {
-      return { ok: false, message: error.message || 'Could not resend the code.' }
+      return {
+        ok: false,
+        message: error.message || 'Could not resend the code.',
+        status: error.status,
+        debug: error.debug,
+      }
     }
   }
 

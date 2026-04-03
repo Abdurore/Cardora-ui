@@ -16,6 +16,7 @@ function AuthPage({ mode = 'login' }) {
   })
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
+  const [debugInfo, setDebugInfo] = useState(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -58,6 +59,7 @@ function AuthPage({ mode = 'login' }) {
     event.preventDefault()
     setError('')
     setStatus('')
+    setDebugInfo(null)
     setIsSubmitting(true)
 
     try {
@@ -69,6 +71,7 @@ function AuthPage({ mode = 'login' }) {
         const result = await onLogin(form.email, form.password)
         if (!result.ok) {
           setError(result.message || 'Invalid email or password.')
+          setDebugInfo(result.debug || null)
           return
         }
         navigate('/profile')
@@ -83,6 +86,7 @@ function AuthPage({ mode = 'login' }) {
         const result = await onVerifyEmail(pendingVerification.email, form.otp.trim())
         if (!result.ok) {
           setError(result.message || 'Verification failed.')
+          setDebugInfo(result.debug || null)
           return
         }
         if (result.session) {
@@ -114,6 +118,7 @@ function AuthPage({ mode = 'login' }) {
 
       if (!result.ok) {
         setError(result.message || 'Account could not be created.')
+        setDebugInfo(result.debug || null)
         return
       }
 
@@ -160,7 +165,7 @@ function AuthPage({ mode = 'login' }) {
             </p>
           </div>
 
-          <form className="auth-form" onSubmit={handleSubmit}>
+          <form className="auth-form" onSubmit={handleSubmit} action="" noValidate>
             {mode === 'signup' && !pendingVerification ? (
               <>
                 <label className="detail-field">
@@ -297,6 +302,27 @@ function AuthPage({ mode = 'login' }) {
 
             {status ? <p className="auth-status">{status}</p> : null}
             {error ? <p className="auth-error">{error}</p> : null}
+            {debugInfo ? (
+              <div className="auth-debug">
+                <p className="auth-debug-title">Backend Debug</p>
+                <p className="auth-debug-line">
+                  <strong>URL:</strong> {debugInfo.url}
+                </p>
+                <p className="auth-debug-line">
+                  <strong>Method:</strong> {debugInfo.method}
+                </p>
+                <pre className="auth-debug-pre">
+                  {JSON.stringify(
+                    {
+                      requestBody: debugInfo.requestBody,
+                      responseBody: debugInfo.responseBody,
+                    },
+                    null,
+                    2,
+                  )}
+                </pre>
+              </div>
+            ) : null}
 
             <button className="primary" type="submit" disabled={isSubmitting}>
               {isSubmitting

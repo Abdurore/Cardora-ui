@@ -321,6 +321,46 @@
   color: #9ef6cf;
 }
 
+.auth-debug {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(126, 247, 255, 0.12);
+  background: rgba(6, 13, 16, 0.72);
+}
+
+.auth-debug-title,
+.auth-debug-line {
+  margin: 0;
+}
+
+.auth-debug-title {
+  color: #eafcff;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.auth-debug-line {
+  color: rgba(220, 242, 247, 0.68);
+  font-size: 0.8rem;
+}
+
+.auth-debug-pre {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(3, 8, 10, 0.88);
+  border: 1px solid rgba(126, 247, 255, 0.08);
+  color: #bff8ff;
+  overflow: auto;
+  font-size: 0.74rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .auth-profile {
   display: grid;
   gap: 12px;

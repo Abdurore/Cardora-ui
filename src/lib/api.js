@@ -25,6 +25,14 @@ function getErrorMessage(payload, fallback) {
   )
 }
 
+function sanitizeBody(body) {
+  if (!body || typeof body !== 'object') return body
+  const clone = { ...body }
+  if ('password' in clone) clone.password = '[REDACTED]'
+  if ('otp' in clone) clone.otp = '[REDACTED]'
+  return clone
+}
+
 export function getStoredToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -52,8 +60,9 @@ export function extractToken(payload) {
 }
 
 async function request(path, { method = 'GET', body, auth = false, headers = {} } = {}) {
+  const url = buildUrl(path)
   const token = getStoredToken()
-  const response = await fetch(buildUrl(path), {
+  const response = await fetch(url, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -70,6 +79,12 @@ async function request(path, { method = 'GET', body, auth = false, headers = {} 
     const error = new Error(getErrorMessage(payload, 'Request failed.'))
     error.status = response.status
     error.payload = payload
+    error.debug = {
+      url,
+      method,
+      requestBody: sanitizeBody(body),
+      responseBody: payload,
+    }
     throw error
   }
 
