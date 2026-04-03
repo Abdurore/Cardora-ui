@@ -252,21 +252,24 @@ function MainLayout() {
     username,
     email,
     password,
-    referralCode = '',
+    referralCode,
     currency = 'NGN',
     termsAccepted = true,
     privacyAccepted = true,
   }) => {
     try {
-      const response = await signup({
+      const signupPayload = {
         username,
         email,
         password,
-        referralCode,
         currency,
         termsAccepted,
         privacyAccepted,
-      })
+      }
+      if (referralCode) {
+        signupPayload.referralCode = referralCode
+      }
+      const response = await signup(signupPayload)
       const token = extractToken(response)
       if (token) {
         setStoredToken(token)
