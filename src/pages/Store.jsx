@@ -6,15 +6,31 @@ import PackCard from '../components/PackCard.jsx'
 import { storePacks } from '../data/catalog.js'
 
 function Store() {
-  const { balance, cart, addToCart, currentUser, openAuthModal, couponPackages } = useOutletContext()
+  const { balance, addToCart, currentUser, openAuthModal, couponPackages } = useOutletContext()
   const [checkoutMessage, setCheckoutMessage] = useState('')
+  const [activePack, setActivePack] = useState(null)
+  const [isLaunchingCheckout, setIsLaunchingCheckout] = useState(false)
   const packs = couponPackages?.length ? couponPackages : storePacks
 
-  const handleSelect = async (pack) => {
-    const result = await addToCart(pack)
+  const handleSelect = (pack) => {
+    setActivePack(pack)
+  }
+
+  const handleCheckoutStart = async () => {
+    if (!activePack) return
+    setIsLaunchingCheckout(true)
+    const result = await addToCart(activePack)
     if (!result?.ok && result?.reason) {
       setCheckoutMessage(result.reason === 'auth' ? 'Please sign in to continue.' : result.reason)
       setTimeout(() => setCheckoutMessage(''), 2200)
+    }
+    if (!result?.ok) {
+      setIsLaunchingCheckout(false)
+      return
+    }
+    if (!result.checkout) {
+      setIsLaunchingCheckout(false)
+      setActivePack(null)
     }
   }
 
@@ -31,33 +47,13 @@ function Store() {
               leaving the experience.
             </p>
           </div>
-          <button className="primary" type="button">
-            Add CC
-          </button>
-        </div>
-
-        <div className="balance-bar wallet-balance">
-          <div>
-            <p className="balance-label">Current Balance</p>
-            <p className="balance-value">{balance} CC</p>
-          </div>
-          <div className="cart-chip">
-            {cart.length} item{cart.length === 1 ? '' : 's'} added
-          </div>
         </div>
 
         <div className="tabs">
           <span className="tab active">Get CC</span>
-          <Link className="tab" to="/store/gifts">
-            Buy Gifts
-          </Link>
+          <span className="tab">Gifts Coming Soon</span>
         </div>
 
-        <div className="wallet-package-note">
-          {packs.slice(0, 4).map((pack) => (
-            <span key={pack.id || pack.title}>{pack.amount}</span>
-          ))}
-        </div>
         {checkoutMessage ? <p className="form-error">{checkoutMessage}</p> : null}
 
         <div className="pack-grid">
@@ -71,6 +67,51 @@ function Store() {
         </div>
       </div>
       <ScreenNav />
+
+      {activePack ? (
+        <section className="detail-modal" role="dialog" aria-modal="true">
+          <div className="detail-backdrop" onClick={() => setActivePack(null)} />
+          <div className="detail-card store-pay-modal">
+            <div className="store-pay-hero">
+              <p className="eyebrow">CC Payment</p>
+              <h3>Confirm your credit purchase</h3>
+              <p className="detail-subtitle">
+                You’re about to continue to secure payment for this CC package.
+              </p>
+            </div>
+
+            <div className="store-pay-summary">
+              <div className="store-pay-row">
+                <span>Package</span>
+                <strong>{activePack.title}</strong>
+              </div>
+              <div className="store-pay-row">
+                <span>Credits</span>
+                <strong>{activePack.amount}</strong>
+              </div>
+              <div className="store-pay-row">
+                <span>Price</span>
+                <strong>{activePack.price}</strong>
+              </div>
+              {activePack.bonus ? (
+                <div className="store-pay-row">
+                  <span>Bonus</span>
+                  <strong>{activePack.bonus}</strong>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="detail-actions">
+              <button className="primary" type="button" onClick={handleCheckoutStart} disabled={isLaunchingCheckout}>
+                {isLaunchingCheckout ? 'Redirecting...' : 'Continue to Paystack'}
+              </button>
+              <button className="ghost" type="button" onClick={() => setActivePack(null)} disabled={isLaunchingCheckout}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }

@@ -22,6 +22,21 @@ function Explore() {
   const [tierFilter, setTierFilter] = useState('all')
   const cardSource = marketplaceTemplates?.length ? marketplaceTemplates : exploreCards
 
+  const dynamicTags = useMemo(() => {
+    const counts = cardSource.reduce((acc, card) => {
+      const key = card.category || 'scratch'
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {})
+
+    return exploreTags.map((tag) => {
+      if (tag.value === 'all') {
+        return { ...tag, count: cardSource.length }
+      }
+      return { ...tag, count: counts[tag.value] || 0 }
+    })
+  }, [cardSource])
+
   useEffect(() => {
     const params = {}
     if (query) params.q = query
@@ -42,7 +57,6 @@ function Explore() {
         const matchesTier = tierFilter === 'all' ? true : card.tier === tierFilter
         return matchesQuery && matchesTag && matchesFavorites && matchesTier
       })
-      .filter((card) => (activeTag === 'favorites' ? favorites.includes(card.id) : true))
   }, [activeTag, cardSource, favorites, query, tierFilter])
 
   return (
@@ -103,7 +117,7 @@ function Explore() {
           >
             Favorites <span>({favorites.length})</span>
           </button>
-          {exploreTags.map((tag) => (
+          {dynamicTags.map((tag) => (
             <button
               key={tag.label}
               className={`tag ${activeTag === tag.value ? 'active' : ''}`}

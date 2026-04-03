@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { getTierInfo } from '../utils/tier.js'
 import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
-import PremiumGiftReveal from '../components/PremiumGiftReveal.jsx'
 
 const fallbackMusic =
   'data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA='
@@ -14,8 +13,6 @@ function CardView() {
   const [card, setCard] = useState(null)
   const [isOpen, setIsOpen] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
-  const [showGiftReveal, setShowGiftReveal] = useState(false)
-  const [giftStatus, setGiftStatus] = useState('pending')
   const audioRef = useRef(null)
 
   useEffect(() => {
@@ -53,11 +50,6 @@ function CardView() {
       setCard(null)
     }
   }, [id])
-
-  useEffect(() => {
-    setGiftStatus('pending')
-    setShowGiftReveal(false)
-  }, [card?.id])
 
   useEffect(() => {
     if (!isOpen || card?.tier !== 'signature') return
@@ -207,31 +199,22 @@ function CardView() {
               </div>
               {giftConfig ? (
                 <div className="experience-gift-card">
-                  <p className="eyebrow">Gift Handoff</p>
-                  <h4>A gift has been sent to you</h4>
+                  <p className="eyebrow">Gift Feature</p>
+                  <h4>Gift reveals are coming soon</h4>
                   <p className="detail-message">
-                    Reach the end of the card, then choose when you want the reveal to happen.
+                    This part of the experience is temporarily disabled while the gift system is
+                    being stabilized.
                   </p>
                   <div className="experience-gift-meta">
-                    <span>{giftConfig.title}</span>
+                    <span>Coming Soon</span>
                     <span className="dot" />
-                    <span>{giftConfig.amount}</span>
+                    <span>Gift Store</span>
                     <span className="dot" />
-                    <span>{giftStatus === 'pending' ? 'Locked' : 'Opened'}</span>
+                    <span>Temporarily Unavailable</span>
                   </div>
                   <div className="experience-end">
-                    <button
-                      className="primary"
-                      type="button"
-                      onClick={() => {
-                        setGiftStatus('opened')
-                        setShowGiftReveal(true)
-                      }}
-                    >
-                      {giftConfig.actionLabel || 'Claim Gift'}
-                    </button>
-                    <button className="ghost" type="button">
-                      {giftConfig.secondaryAction || 'View Instructions'}
+                    <button className="primary" type="button" disabled>
+                      Coming Soon
                     </button>
                   </div>
                 </div>
@@ -248,12 +231,6 @@ function CardView() {
           </motion.section>
         )}
       </AnimatePresence>
-      {showGiftReveal && giftConfig ? (
-        <PremiumGiftReveal
-          effect={giftConfig.effectKey}
-          onComplete={() => setShowGiftReveal(false)}
-        />
-      ) : null}
     </div>
   )
 }

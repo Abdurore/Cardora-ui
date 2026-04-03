@@ -72,21 +72,41 @@ function MainLayout() {
     [avatarColor, avatarUrl, balance, currentUser, favorites, inventory],
   )
 
+  const resetSession = () => {
+    clearStoredToken()
+    setCurrentUser(null)
+    setBalance(0)
+    setFavorites([])
+    setInventory([])
+    setAvatarUrl('')
+    setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
+  }
+
   const hydrateSession = async () => {
     const token = getStoredToken()
     if (!token) {
-      setCurrentUser(null)
-      setBalance(0)
-      setFavorites([])
-      setInventory([])
-      setAvatarUrl('')
-      setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
+      resetSession()
       return null
     }
 
     try {
       const [userPayload, couponPayload] = await Promise.allSettled([getCurrentUser(), getUserCoupons()])
+
+      // Handle expired / invalid tokens
+      if (userPayload.status === 'rejected') {
+        const status = userPayload.reason?.status
+        if (status === 401 || status === 403) {
+          resetSession()
+          return null
+        }
+      }
+
       const userData = userPayload.status === 'fulfilled' ? userPayload.value : null
+      if (!userData) {
+        resetSession()
+        return null
+      }
+
       const couponsData = couponPayload.status === 'fulfilled' ? couponPayload.value : null
       const rawUser = userData?.user || userData?.data?.user || userData?.data || userData
       const meta = readUserMeta(rawUser?._id || rawUser?.id || rawUser?.userId || rawUser?.email)
@@ -100,13 +120,7 @@ function MainLayout() {
       return normalized
     } catch (error) {
       console.error('Session hydration failed', error)
-      clearStoredToken()
-      setCurrentUser(null)
-      setBalance(0)
-      setFavorites([])
-      setInventory([])
-      setAvatarUrl('')
-      setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
+      resetSession()
       return null
     }
   }
@@ -172,8 +186,11 @@ function MainLayout() {
       return nextFavorites
     })
 
+    // Only call the backend for marketplace templates that have a real backend ID
     const backendTemplate = marketplaceTemplates.find((item) => item.id === cardId)?.backendTemplate
-    const templateId = backendTemplate?.templateId || backendTemplate?._id || cardId
+    if (!backendTemplate) return
+    const templateId = backendTemplate.templateId || backendTemplate._id
+    if (!templateId) return
     try {
       await likeTemplate(templateId)
     } catch (error) {
@@ -191,8 +208,14 @@ function MainLayout() {
       let response = null
       try {
         response = await createPaystackCheckout({ packageId: pack.packageId || pack.id })
-      } catch {
-        response = await createCouponCheckout({ packageId: pack.packageId || pack.id })
+      } catch (paystackError) {
+        // Only fall back to coupon checkout if the endpoint itself is unsupported (404)
+        // — not on network errors or server failures, which could cause double-charges
+        if (paystackError.status === 404) {
+          response = await createCouponCheckout({ packageId: pack.packageId || pack.id })
+        } else {
+          throw paystackError
+        }
       }
       const checkoutUrl = extractCheckoutUrl(response)
       if (checkoutUrl) {

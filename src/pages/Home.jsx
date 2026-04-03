@@ -3,13 +3,12 @@ import { useMemo, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
-import { exploreTags, homeCards } from '../data/catalog.js'
+import { homeCards } from '../data/catalog.js'
 
 function Home() {
   const { openCardDetails, favorites, toggleFavorite, currentUser, openAuthModal, balance } =
     useOutletContext()
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
-  const [activeSuggestion, setActiveSuggestion] = useState('all')
 
   const howItWorks = [
     {
@@ -87,13 +86,9 @@ function Home() {
   ]
 
   const visibleCards = useMemo(() => {
-    let cards = homeCards
-    if (activeSuggestion !== 'all') {
-      cards = cards.filter((card) => card.category === activeSuggestion)
-    }
-    if (!showFavoritesOnly) return cards
-    return cards.filter((card) => favorites.includes(card.id))
-  }, [activeSuggestion, favorites, showFavoritesOnly])
+    if (!showFavoritesOnly) return homeCards
+    return homeCards.filter((card) => favorites.includes(card.id))
+  }, [favorites, showFavoritesOnly])
 
   return (
     <div className="page-section">
@@ -129,15 +124,19 @@ function Home() {
           <div className="hero-preview-orbit orbit-one" />
           <div className="hero-preview-orbit orbit-two" />
           <div className="hero-phone">
-            <div className="hero-envelope-scene">
-              <div className="hero-envelope-flap" />
-              <div className="hero-envelope-base" />
-              <div className="hero-reveal-glow" />
-              <div className="hero-reveal-card">
-                <span className="hero-reveal-label">Open to feel it</span>
-                <span className="hero-reveal-line long" />
-                <span className="hero-reveal-line short" />
+            <div className="hero-cinema-scene">
+              <div className="hero-aurora" />
+              <div className="hero-card-halo" />
+              <div className="hero-floating-card">
+                <span className="hero-fc-eyebrow">Cardora</span>
+                <span className="hero-fc-title">A moment,<br />not a message.</span>
+                <span className="hero-card-shimmer" />
+                <span className="hero-fc-line long" />
+                <span className="hero-fc-line short" />
               </div>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <span key={`dust-${i}`} className={`hero-dust d${i + 1}`} />
+              ))}
             </div>
           </div>
         </div>
@@ -204,28 +203,6 @@ function Home() {
         </Link>
       </section>
 
-      <div className="pill-row marketplace-pills">
-        <button
-          type="button"
-          className={`pill ${activeSuggestion === 'all' ? 'active' : ''}`}
-          onClick={() => setActiveSuggestion('all')}
-        >
-          All
-        </button>
-        {exploreTags
-          .filter((tag) => tag.value !== 'all')
-          .map((tag) => (
-            <button
-              key={tag.value}
-              type="button"
-              className={`pill ${activeSuggestion === tag.value ? 'active' : ''}`}
-              onClick={() => setActiveSuggestion(tag.value)}
-            >
-              {tag.label}
-            </button>
-          ))}
-      </div>
-
       <div className="page-body">
         <div className="screen-body">
           <div className="section-heading inline">
@@ -251,6 +228,7 @@ function Home() {
                 <CardItem
                   key={`${card.title}-${index}`}
                   {...card}
+                  showOccasion={false}
                   variant={`v${(index % 4) + 1}`}
                   isFavorite={favorites.includes(card.id)}
                   onToggleFavorite={toggleFavorite}

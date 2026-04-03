@@ -3,10 +3,13 @@ import { getTierInfo } from '../utils/tier.js'
 function CardItem({
   id,
   title,
+  subtitle,
+  occasion,
   meta,
   likes,
   tier = 'simple',
   variant = 'one',
+  showOccasion = true,
   onClick,
   isFavorite,
   onToggleFavorite,
@@ -37,10 +40,14 @@ function CardItem({
       >
         {'\u2764'}
       </button>
-      <span className={`tier-badge ${tierInfo.badgeClass}`}>{tierInfo.label}</span>
-      <div className="card-thumb" />
+      <div className="card-thumb">
+        <div className="card-thumb-glow" />
+        <div className="card-thumb-aura" />
+      </div>
       <div className="card-info">
+        {showOccasion && occasion ? <p className="card-eyebrow">{occasion}</p> : null}
         <h4>{title}</h4>
+        {subtitle ? <p className="card-subtitle">{subtitle}</p> : null}
         <div className="card-stats">
           <span className="card-stat">
             <strong>{tierInfo.cost}</strong> CC
@@ -57,26 +64,10 @@ function CardItem({
         </div>
       </div>
       <div className="card-overlay">
-        <button
-          type="button"
-          className="overlay-btn"
-          onClick={(event) => {
-            event.stopPropagation()
-            onClick?.()
-          }}
-        >
-          Preview
-        </button>
-        <button
-          type="button"
-          className="overlay-btn primary"
-          onClick={(event) => {
-            event.stopPropagation()
-            onClick?.()
-          }}
-        >
-          Use Template
-        </button>
+        <div className="card-overlay-copy">
+          <p>Open Template</p>
+          <span>Preview the full Cardora experience</span>
+        </div>
       </div>
     </div>
   )

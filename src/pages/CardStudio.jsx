@@ -10,7 +10,6 @@ import { IoColorPaletteOutline } from 'react-icons/io5'
 import logo from '../assets/icons/logo.png'
 import { defaultCardObject, resolveTemplateCardObject, musicPresets, fontOptions } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
-import { GiftIcon } from '../components/GiftCard.jsx'
 
 const steps = ['closed', 'card', 'questions', 'preview']
 
@@ -137,7 +136,7 @@ function StudioAudioPlayer({ src, volume = 0.8 }) {
 function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentUser, inventory = [], publishTemplate } = useOutletContext() || {}
+  const { currentUser, publishTemplate } = useOutletContext() || {}
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
 
   const [cardObject, setCardObject] = useState(() => resolveTemplateCardObject(cardData))
@@ -152,6 +151,7 @@ function CardStudio() {
   })
   const [publishError, setPublishError] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
+  const [emojiInput, setEmojiInput] = useState('')
   const fileInputRef = useRef(null)
   const bgImageInputRef = useRef(null)
   const bgVideoInputRef = useRef(null)
@@ -322,6 +322,20 @@ function CardStudio() {
 
   const removeConfettiColor = (idx) => {
     update('animation.confettiColors', c.animation.confettiColors.filter((_, i) => i !== idx))
+  }
+
+  const addBackgroundEmoji = () => {
+    const nextEmoji = emojiInput.trim()
+    if (!nextEmoji) return
+    update('animation.backgroundEffect.emojis', [...c.animation.backgroundEffect.emojis, nextEmoji])
+    setEmojiInput('')
+  }
+
+  const removeBackgroundEmoji = (idx) => {
+    update(
+      'animation.backgroundEffect.emojis',
+      c.animation.backgroundEffect.emojis.filter((_, i) => i !== idx),
+    )
   }
 
   const addBorderColor = () => {
@@ -760,14 +774,45 @@ function CardStudio() {
               ))}
             </div>
             {c.animation.backgroundEffect.type !== 'none' && (
-              <label className="cs-field">
-                <span>Emojis (comma separated)</span>
-                <input
-                  value={c.animation.backgroundEffect.emojis.join(', ')}
-                  onChange={e => update('animation.backgroundEffect.emojis', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                  placeholder="❤️, ✨, 🌟"
-                />
-              </label>
+              <div className="cs-sub-section">
+                <p className="cs-sub-label">Background Emojis</p>
+                <div className="cs-emoji-builder">
+                  <input
+                    value={emojiInput}
+                    onChange={(event) => setEmojiInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        addBackgroundEmoji()
+                      }
+                    }}
+                    placeholder="Type or paste an emoji"
+                  />
+                  <button type="button" className="cs-button small" onClick={addBackgroundEmoji}>
+                    Add
+                  </button>
+                </div>
+                {c.animation.backgroundEffect.emojis.length ? (
+                  <div className="cs-emoji-list">
+                    {c.animation.backgroundEffect.emojis.map((emoji, index) => (
+                      <button
+                        key={`${emoji}-${index}`}
+                        type="button"
+                        className="cs-emoji-chip"
+                        onClick={() => removeBackgroundEmoji(index)}
+                        title="Remove emoji"
+                      >
+                        <span>{emoji}</span>
+                        <small>Remove</small>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.55 }}>
+                    No emojis added yet.
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </>
@@ -868,66 +913,23 @@ function CardStudio() {
 
     // GIFTS
     if (activeTool === 'gifts') {
-      const selectedKey = c.giftEffect?.effectKey || 'none'
       return (
         <>
           <p className="cs-panel-eyebrow">Gifts</p>
           <h3>End-of-card gift reveal</h3>
           <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.7, lineHeight: 1.55 }}>
-            Attach a purchased gift animation that plays after the card reveal. The recipient will see a special moment before receiving it.
+            Gift attachments are coming soon. This section is temporarily disabled while the gift
+            store is being stabilized.
           </p>
           <div className="cs-sub-section">
-            <p className="cs-sub-label">Select a Gift</p>
-            <button
-              type="button"
-              className={`cs-gift-option ${selectedKey === 'none' ? 'active' : ''}`}
-              onClick={() => {
-                update('giftEffect.enabled', false)
-                update('giftEffect.effectKey', 'none')
-                update('giftEffect.giftTitle', '')
-                update('giftEffect.giftAmount', '')
-              }}
-            >
-              <span className="cs-gift-none-icon">✕</span>
-              <span>No Gift</span>
-            </button>
-            {inventory.length > 0 ? (
-              <div className="cs-gift-grid">
-                {inventory.map((gift, idx) => (
-                  <button
-                    key={gift.id || idx}
-                    type="button"
-                    className={`cs-gift-option ${selectedKey === (gift.effectKey || gift.title) ? 'active' : ''}`}
-                    onClick={() => {
-                      update('giftEffect.enabled', true)
-                      update('giftEffect.effectKey', gift.effectKey || gift.title)
-                      update('giftEffect.giftTitle', gift.title)
-                      update('giftEffect.giftAmount', gift.amount || '')
-                    }}
-                  >
-                    <GiftIcon effectKey={gift.effectKey} size={36} />
-                    <span>{gift.title}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.5 }}>
-                No gifts in your inventory yet. Purchase gifts from the Store to attach them here.
-              </p>
-            )}
-          </div>
-          {c.giftEffect?.enabled && (
-            <div className="cs-sub-section">
-              <p className="cs-sub-label">Selected Gift</p>
-              <div className="cs-gift-selected">
-                <GiftIcon effectKey={c.giftEffect.effectKey} size={44} />
-                <div>
-                  <strong>{c.giftEffect.giftTitle}</strong>
-                  {c.giftEffect.giftAmount && <span className="cs-gift-amount">{c.giftEffect.giftAmount}</span>}
-                </div>
+            <p className="cs-sub-label">Status</p>
+            <div className="cs-gift-selected">
+              <div>
+                <strong>Coming Soon</strong>
+                <span className="cs-gift-amount">Gift selection will return in a later update.</span>
               </div>
             </div>
-          )}
+          </div>
         </>
       )
     }

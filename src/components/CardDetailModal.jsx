@@ -10,7 +10,6 @@ function CardDetailModal({
   currentUser,
   onRequireAuth,
   onDeductCC,
-  inventory = [],
 }) {
   const [showForm, setShowForm] = useState(false)
   const [sent, setSent] = useState(false)
@@ -53,9 +52,7 @@ function CardDetailModal({
   const handleTouchMove = (event) => {
     if (startY === null) return
     const deltaY = event.touches[0].clientY - startY
-    if (deltaY > 120) {
-      onClose()
-    }
+    if (deltaY > 120) onClose()
   }
 
   const handleSubmit = (event) => {
@@ -101,45 +98,49 @@ function CardDetailModal({
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 1400)
-    } catch (error) {
-      console.error('Copy failed', error)
+    } catch (shareError) {
+      console.error('Copy failed', shareError)
     }
   }
 
   return createPortal(
     <section className="detail-modal" role="dialog" aria-modal="true">
       <div className="detail-backdrop" onClick={onClose} />
-      <div
-        className="detail-card"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-      >
+      <div className="detail-card" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
         <div className={`detail-thumb ${card.variant || ''}`}>
+          <div className="detail-thumb-overlay">
+            <div className="detail-thumb-top">
+              <p className="detail-eyebrow">{card.occasion}</p>
+              <span className={`tier-badge ${tierInfo.badgeClass}`}>{tierInfo.label}</span>
+            </div>
+            <div className="detail-thumb-copy">
+              <h3>{card.title}</h3>
+              <p>{card.subtitle}</p>
+            </div>
+          </div>
           {isPremium ? <span className="detail-upgrade">Unlock full experience</span> : null}
         </div>
+
         <div className="detail-body">
-          <div>
-            <p className="detail-eyebrow">{card.occasion}</p>
-            <h3>{card.title}</h3>
-            <p className="detail-subtitle">{card.subtitle}</p>
+          <div className="detail-summary">
             <div className="detail-tier">
-              <span className={`tier-badge ${tierInfo.badgeClass}`}>{tierInfo.label}</span>
               <span className="tier-cost">{tierInfo.cost} CC</span>
+              {card.likes ? <span className="tier-cost">{card.likes} Likes</span> : null}
+              {card.meta ? <span className="tier-cost">{card.meta}</span> : null}
             </div>
             {tierInfo.features ? (
               <ul className="tier-features">
-                {tierInfo.features.map((f) => (
-                  <li key={f}><span className="tier-check">✓</span> {f}</li>
+                {tierInfo.features.map((feature) => (
+                  <li key={feature}>
+                    <span className="tier-check">+</span> {feature}
+                  </li>
                 ))}
               </ul>
             ) : null}
           </div>
+
           <p className="detail-message">{card.message}</p>
-          <div className="detail-meta">
-            <span>{card.meta}</span>
-            <span className="dot" />
-            <span>{card.likes}</span>
-          </div>
+
           {!showForm ? (
             <div className="detail-actions">
               <button
@@ -150,7 +151,10 @@ function CardDetailModal({
                   navigate('/studio', { state: { cardData: card } })
                 }}
               >
-                Edit in Studio
+                Use Template
+              </button>
+              <button className="ghost detail-strong" type="button" onClick={() => setShowForm(true)}>
+                Send Card
               </button>
               <button className="ghost" type="button" onClick={handleShare}>
                 {copied ? 'Copied!' : 'Copy Link'}
@@ -184,9 +188,7 @@ function CardDetailModal({
                       Back
                     </button>
                   </div>
-                  {isLocked ? (
-                    <p className="form-error">Top up your CC balance to send this card.</p>
-                  ) : null}
+                  {isLocked ? <p className="form-error">Top up your CC balance to send this card.</p> : null}
                   {error ? <p className="form-error">{error}</p> : null}
                 </>
               ) : (
@@ -207,4 +209,3 @@ function CardDetailModal({
 }
 
 export default CardDetailModal
-
