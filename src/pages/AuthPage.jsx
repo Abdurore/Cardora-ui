@@ -110,7 +110,7 @@ function AuthPage({ mode = 'login' }) {
         username: form.username,
         email: form.email,
         password: form.password,
-        referralCode: form.referralCode.trim(),
+        referralCode: form.referralCode.trim() || undefined,
         currency: form.currency,
         termsAccepted,
         privacyAccepted,
