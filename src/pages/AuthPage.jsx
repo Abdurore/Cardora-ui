@@ -1,6 +1,8 @@
 import { Link, Navigate, useNavigate, useOutletContext } from 'react-router-dom'
 import { useMemo, useState } from 'react'
 
+const currencyOptions = ['NGN', 'USD', 'EUR', 'GBP']
+
 function AuthPage({ mode = 'login' }) {
   const navigate = useNavigate()
   const { currentUser, onLogin, onSignup, onVerifyEmail, onRequestOtp } = useOutletContext()
@@ -8,15 +10,17 @@ function AuthPage({ mode = 'login' }) {
     username: '',
     email: '',
     password: '',
-    confirmPassword: '',
     referralCode: '',
+    currency: 'NGN',
     otp: '',
   })
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
-  const [acceptedLegal, setAcceptedLegal] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [privacyAccepted, setPrivacyAccepted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [pendingVerification, setPendingVerification] = useState(null)
+  const [showCurrencyMenu, setShowCurrencyMenu] = useState(false)
 
   const pageCopy = useMemo(
     () =>
@@ -28,7 +32,7 @@ function AuthPage({ mode = 'login' }) {
             switchTo: '/login',
             switchCta: 'Log in',
             intro:
-              'Choose a username, connect your Gmail, and step into Cardora with your account, credits, and saved experiences aligned from day one.',
+              'Choose a username, connect your email, and step into Cardora with your account, credits, and saved experiences aligned from day one.',
           }
         : {
             title: 'Welcome back to Cardora',
@@ -89,20 +93,12 @@ function AuthPage({ mode = 'login' }) {
         return
       }
 
-      if (!form.username || !form.email || !form.password || !form.confirmPassword) {
-        setError('Username, email, and passwords are required.')
+      if (!form.username || !form.email || !form.password) {
+        setError('Username, email, and password are required.')
         return
       }
-      if (!form.email.toLowerCase().endsWith('@gmail.com')) {
-        setError('Please use a Gmail address.')
-        return
-      }
-      if (form.password !== form.confirmPassword) {
-        setError('Passwords do not match.')
-        return
-      }
-      if (!acceptedLegal) {
-        setError('You need to accept the Terms and Privacy Policy before creating an account.')
+      if (!termsAccepted || !privacyAccepted) {
+        setError('You need to accept both the Terms and Conditions and Privacy Policy before creating an account.')
         return
       }
 
@@ -111,9 +107,9 @@ function AuthPage({ mode = 'login' }) {
         email: form.email,
         password: form.password,
         referralCode: form.referralCode.trim(),
-        currency: 'NGN',
-        termsAccepted: true,
-        privacyAccepted: true,
+        currency: form.currency,
+        termsAccepted,
+        privacyAccepted,
       })
 
       if (!result.ok) {
@@ -169,6 +165,7 @@ function AuthPage({ mode = 'login' }) {
               <>
                 <label className="detail-field">
                   Username
+                  <small className="detail-hint">This is your unique Cardora identity.</small>
                   <input
                     name="username"
                     type="text"
@@ -179,6 +176,7 @@ function AuthPage({ mode = 'login' }) {
                 </label>
                 <label className="detail-field">
                   Referral Code
+                  <small className="detail-hint">Optional. Add one if someone invited you.</small>
                   <input
                     name="referralCode"
                     type="text"
@@ -187,24 +185,62 @@ function AuthPage({ mode = 'login' }) {
                     placeholder="Optional referral code"
                   />
                 </label>
+                <label className="detail-field">
+                  Currency
+                  <small className="detail-hint">Used for pricing and CC purchase displays.</small>
+                  <div className="auth-select">
+                    <button
+                      type="button"
+                      className={`auth-select-trigger ${showCurrencyMenu ? 'open' : ''}`}
+                      onClick={() => setShowCurrencyMenu((prev) => !prev)}
+                      aria-haspopup="listbox"
+                      aria-expanded={showCurrencyMenu}
+                    >
+                      <span>{form.currency}</span>
+                    </button>
+                    {showCurrencyMenu ? (
+                      <div className="auth-select-menu" role="listbox" aria-label="Currency">
+                        {currencyOptions.map((currency) => (
+                          <button
+                            key={currency}
+                            type="button"
+                            role="option"
+                            aria-selected={form.currency === currency}
+                            className={`auth-select-option ${
+                              form.currency === currency ? 'active' : ''
+                            }`}
+                            onClick={() => {
+                              setForm((prev) => ({ ...prev, currency }))
+                              setShowCurrencyMenu(false)
+                            }}
+                          >
+                            {currency}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </label>
               </>
             ) : null}
 
             {!pendingVerification ? (
               <>
                 <label className="detail-field">
-                  Gmail
+                  Email
+                  <small className="detail-hint">Your account email and verification destination.</small>
                   <input
                     name="email"
                     type="email"
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="you@gmail.com"
+                    placeholder="you@example.com"
                   />
                 </label>
 
                 <label className="detail-field">
                   Password
+                  <small className="detail-hint">Create the password that will be used for login.</small>
                   <input
                     name="password"
                     type="password"
@@ -213,23 +249,11 @@ function AuthPage({ mode = 'login' }) {
                     placeholder="********"
                   />
                 </label>
-
-                {mode === 'signup' ? (
-                  <label className="detail-field">
-                    Confirm Password
-                    <input
-                      name="confirmPassword"
-                      type="password"
-                      value={form.confirmPassword}
-                      onChange={handleChange}
-                      placeholder="********"
-                    />
-                  </label>
-                ) : null}
               </>
             ) : (
               <label className="detail-field">
                 OTP Code
+                <small className="detail-hint">Enter the verification code sent to your email.</small>
                 <input
                   name="otp"
                   type="text"
@@ -241,17 +265,28 @@ function AuthPage({ mode = 'login' }) {
             )}
 
             {mode === 'signup' && !pendingVerification ? (
-              <label className="auth-consent">
-                <input
-                  type="checkbox"
-                  checked={acceptedLegal}
-                  onChange={(event) => setAcceptedLegal(event.target.checked)}
-                />
-                <span>
-                  I agree to the <Link to="/legal/terms">Terms and Conditions</Link> and{' '}
-                  <Link to="/legal/privacy">Privacy Policy</Link>.
-                </span>
-              </label>
+              <div className="auth-consents">
+                <label className="auth-consent">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(event) => setTermsAccepted(event.target.checked)}
+                  />
+                  <span>
+                    I accept the <Link to="/legal/terms">Terms and Conditions</Link>.
+                  </span>
+                </label>
+                <label className="auth-consent">
+                  <input
+                    type="checkbox"
+                    checked={privacyAccepted}
+                    onChange={(event) => setPrivacyAccepted(event.target.checked)}
+                  />
+                  <span>
+                    I accept the <Link to="/legal/privacy">Privacy Policy</Link>.
+                  </span>
+                </label>
+              </div>
             ) : !pendingVerification ? (
               <p className="auth-legal-note">
                 By continuing, you acknowledge Cardora&apos;s{' '}
