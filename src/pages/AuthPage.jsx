@@ -1,27 +1,37 @@
 import { Link, Navigate, useNavigate, useOutletContext } from 'react-router-dom'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 
 const currencyOptions = ['NGN', 'USD', 'EUR', 'GBP']
 
 function AuthPage({ mode = 'login' }) {
   const navigate = useNavigate()
-  const { currentUser, onLogin, onSignup, onVerifyEmail, onRequestOtp } = useOutletContext()
+  const { currentUser, onLogin, onSignup, onVerifyEmail, onRequestOtp, onForgotPassword, onResetPassword } = useOutletContext()
   const [form, setForm] = useState({
     username: '',
     email: '',
     password: '',
+    confirmPassword: '',
     referralCode: '',
     currency: 'NGN',
     otp: '',
+    newPassword: '',
   })
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
   const [debugInfo, setDebugInfo] = useState(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [slowHint, setSlowHint] = useState(false)
   const [pendingVerification, setPendingVerification] = useState(null)
   const [showCurrencyMenu, setShowCurrencyMenu] = useState(false)
+  const [forgotFlow, setForgotFlow] = useState(null) // null | 'email' | 'reset'
+  const [verifyFlow, setVerifyFlow] = useState(null) // null | 'email' | 'otp'
+  const slowTimerRef = useRef(null)
+
+  // Clear slow timer on unmount
+  useEffect(() => () => clearTimeout(slowTimerRef.current), [])
 
   const pageCopy = useMemo(
     () =>
@@ -61,8 +71,83 @@ function AuthPage({ mode = 'login' }) {
     setStatus('')
     setDebugInfo(null)
     setIsSubmitting(true)
+    setSlowHint(false)
+    slowTimerRef.current = setTimeout(() => setSlowHint(true), 5000)
 
     try {
+      // Verify email flow — step 1: request OTP
+      if (verifyFlow === 'email') {
+        if (!form.email) {
+          setError('Enter the email you signed up with.')
+          return
+        }
+        const result = await onRequestOtp(form.email)
+        if (!result.ok) {
+          setError(result.message || 'Could not send verification code.')
+          return
+        }
+        setStatus(result.message || 'Verification code sent to your email.')
+        setVerifyFlow('otp')
+        return
+      }
+
+      // Verify email flow — step 2: submit OTP
+      if (verifyFlow === 'otp') {
+        if (!form.otp.trim()) {
+          setError('Enter the verification code sent to your email.')
+          return
+        }
+        const result = await onVerifyEmail(form.email, form.otp.trim())
+        if (!result.ok) {
+          setError(result.message || 'Verification failed.')
+          setDebugInfo(result.debug || null)
+          return
+        }
+        if (result.session) {
+          navigate('/profile')
+        } else {
+          setStatus('Email verified! You can now log in.')
+          setVerifyFlow(null)
+          navigate('/login')
+        }
+        return
+      }
+      // Forgot password — step 1: send OTP
+      if (forgotFlow === 'email') {
+        if (!form.email) {
+          setError('Enter the email for your account.')
+          return
+        }
+        const result = await onForgotPassword(form.email)
+        if (!result.ok) {
+          setError(result.message)
+          return
+        }
+        setStatus(result.message)
+        setForgotFlow('reset')
+        return
+      }
+
+      // Forgot password — step 2: reset with OTP + new password
+      if (forgotFlow === 'reset') {
+        if (!form.otp.trim() || !form.newPassword) {
+          setError('OTP and new password are required.')
+          return
+        }
+        if (form.newPassword.length < 8) {
+          setError('New password must be at least 8 characters.')
+          return
+        }
+        const result = await onResetPassword(form.email, form.otp.trim(), form.newPassword)
+        if (!result.ok) {
+          setError(result.message)
+          return
+        }
+        setStatus(result.message || 'Password reset! You can now log in.')
+        setForgotFlow(null)
+        return
+      }
+
       if (mode === 'login') {
         if (!form.email || !form.password) {
           setError('Email and password are required.')
@@ -101,6 +186,14 @@ function AuthPage({ mode = 'login' }) {
         setError('Username, email, and password are required.')
         return
       }
+      if (form.password.length < 8) {
+        setError('Password must be at least 8 characters.')
+        return
+      }
+      if (form.password !== form.confirmPassword) {
+        setError('Passwords do not match.')
+        return
+      }
       if (!termsAccepted || !privacyAccepted) {
         setError('You need to accept both the Terms and Conditions and Privacy Policy before creating an account.')
         return
@@ -135,6 +228,8 @@ function AuthPage({ mode = 'login' }) {
       setStatus(result.message || 'Account created. Enter the verification code sent to your email.')
     } finally {
       setIsSubmitting(false)
+      setSlowHint(false)
+      clearTimeout(slowTimerRef.current)
     }
   }
 
@@ -149,6 +244,32 @@ function AuthPage({ mode = 'login' }) {
     setIsSubmitting(false)
   }
 
+  // Determine the heading/copy
+  const getHeading = () => {
+    if (verifyFlow === 'email') return 'Verify your email'
+    if (verifyFlow === 'otp') return 'Enter verification code'
+    if (forgotFlow === 'email') return 'Forgot your password?'
+    if (forgotFlow === 'reset') return 'Reset your password'
+    if (pendingVerification) return 'Verify your email'
+    return pageCopy.title
+  }
+
+  const getCopy = () => {
+    if (verifyFlow === 'email') return 'Enter the email you used when signing up. We\'ll send a verification code to confirm your account.'
+    if (verifyFlow === 'otp') return `Enter the code sent to ${form.email} to verify your account.`
+    if (forgotFlow === 'email') return 'Enter the email address associated with your Cardora account. We\'ll send you a code to reset your password.'
+    if (forgotFlow === 'reset') return `Enter the code sent to ${form.email} and choose a new password.`
+    if (pendingVerification) return `We sent a one-time code to ${pendingVerification.email}. Enter it below to activate your Cardora account.`
+    return pageCopy.intro
+  }
+
+  const getEyebrow = () => {
+    if (verifyFlow) return 'Verify Email'
+    if (forgotFlow) return 'Password Reset'
+    if (pendingVerification) return 'Verify Email'
+    return mode === 'signup' ? 'Sign Up' : 'Login'
+  }
+
   return (
     <section className="auth-page">
       <div className="auth-page-bg" aria-hidden="true" />
@@ -158,19 +279,89 @@ function AuthPage({ mode = 'login' }) {
             <Link className="auth-page-back" to="/">
               Back Home
             </Link>
-            <p className="eyebrow">
-              {pendingVerification ? 'Verify Email' : mode === 'signup' ? 'Sign Up' : 'Login'}
-            </p>
-            <h1>{pendingVerification ? 'Verify your email' : pageCopy.title}</h1>
-            <p className="auth-page-copy">
-              {pendingVerification
-                ? `We sent a one-time code to ${pendingVerification.email}. Enter it below to activate your Cardora account.`
-                : pageCopy.intro}
-            </p>
+            <p className="eyebrow">{getEyebrow()}</p>
+            <h1>{getHeading()}</h1>
+            <p className="auth-page-copy">{getCopy()}</p>
           </div>
 
           <form className="auth-form" onSubmit={handleSubmit} action="" noValidate>
-            {mode === 'signup' && !pendingVerification ? (
+            {/* Verify Email — Step 1: email */}
+            {verifyFlow === 'email' && (
+              <label className="detail-field">
+                Email
+                <small className="detail-hint">The email you used when creating your account.</small>
+                <input
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  placeholder="you@example.com"
+                />
+              </label>
+            )}
+
+            {/* Verify Email — Step 2: OTP */}
+            {verifyFlow === 'otp' && (
+              <label className="detail-field">
+                Verification Code
+                <small className="detail-hint">Enter the 6-digit code sent to your email.</small>
+                <input
+                  name="otp"
+                  type="text"
+                  value={form.otp}
+                  onChange={handleChange}
+                  placeholder="123456"
+                  inputMode="numeric"
+                  maxLength={6}
+                />
+              </label>
+            )}
+
+            {/* Forgot Password — Step 1: email */}
+            {forgotFlow === 'email' && (
+              <label className="detail-field">
+                Email
+                <small className="detail-hint">The email used for your Cardora account.</small>
+                <input
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  placeholder="you@example.com"
+                />
+              </label>
+            )}
+
+            {/* Forgot Password — Step 2: OTP + new password */}
+            {forgotFlow === 'reset' && (
+              <>
+                <label className="detail-field">
+                  Reset Code
+                  <small className="detail-hint">Enter the 6-digit code sent to your email.</small>
+                  <input
+                    name="otp"
+                    type="text"
+                    value={form.otp}
+                    onChange={handleChange}
+                    placeholder="123456"
+                  />
+                </label>
+                <label className="detail-field">
+                  New Password
+                  <small className="detail-hint">At least 8 characters.</small>
+                  <input
+                    name="newPassword"
+                    type="password"
+                    value={form.newPassword}
+                    onChange={handleChange}
+                    placeholder="********"
+                  />
+                </label>
+              </>
+            )}
+
+            {/* Normal signup fields */}
+            {!forgotFlow && !verifyFlow && mode === 'signup' && !pendingVerification ? (
               <>
                 <label className="detail-field">
                   Username
@@ -233,7 +424,8 @@ function AuthPage({ mode = 'login' }) {
               </>
             ) : null}
 
-            {!pendingVerification ? (
+            {/* Email + Password (login or signup, not forgot flow) */}
+            {!forgotFlow && !verifyFlow && !pendingVerification ? (
               <>
                 <label className="detail-field">
                   Email
@@ -249,17 +441,50 @@ function AuthPage({ mode = 'login' }) {
 
                 <label className="detail-field">
                   Password
-                  <small className="detail-hint">Create the password that will be used for login.</small>
-                  <input
-                    name="password"
-                    type="password"
-                    value={form.password}
-                    onChange={handleChange}
-                    placeholder="********"
-                  />
+                  <small className="detail-hint">{mode === 'signup' ? 'At least 8 characters.' : 'Your account password.'}</small>
+                  <div className="auth-password-wrap">
+                    <input
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={form.password}
+                      onChange={handleChange}
+                      placeholder="********"
+                    />
+                    <button
+                      type="button"
+                      className="auth-password-toggle"
+                      onClick={() => setShowPassword(p => !p)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
+                    </button>
+                  </div>
                 </label>
+
+                {mode === 'signup' && (
+                  <label className="detail-field">
+                    Confirm Password
+                    <small className="detail-hint">Re-enter your password to confirm.</small>
+                    <div className="auth-password-wrap">
+                      <input
+                        name="confirmPassword"
+                        type={showPassword ? 'text' : 'password'}
+                        value={form.confirmPassword}
+                        onChange={handleChange}
+                        placeholder="********"
+                      />
+                    </div>
+                    {form.confirmPassword && form.password !== form.confirmPassword && (
+                      <small className="auth-field-error">Passwords do not match</small>
+                    )}
+                  </label>
+                )}
               </>
-            ) : (
+            ) : !forgotFlow && pendingVerification ? (
               <label className="detail-field">
                 OTP Code
                 <small className="detail-hint">Enter the verification code sent to your email.</small>
@@ -271,9 +496,10 @@ function AuthPage({ mode = 'login' }) {
                   placeholder="123456"
                 />
               </label>
-            )}
+            ) : null}
 
-            {mode === 'signup' && !pendingVerification ? (
+            {/* Terms/Privacy */}
+            {!forgotFlow && mode === 'signup' && !pendingVerification ? (
               <div className="auth-consents">
                 <label className="auth-consent">
                   <input
@@ -296,7 +522,7 @@ function AuthPage({ mode = 'login' }) {
                   </span>
                 </label>
               </div>
-            ) : !pendingVerification ? (
+            ) : !forgotFlow && !pendingVerification ? (
               <p className="auth-legal-note">
                 By continuing, you acknowledge Cardora&apos;s{' '}
                 <Link to="/legal/terms">Terms and Conditions</Link> and{' '}
@@ -306,44 +532,97 @@ function AuthPage({ mode = 'login' }) {
 
             {status ? <p className="auth-status">{status}</p> : null}
             {error ? <p className="auth-error">{error}</p> : null}
-            {debugInfo ? (
-              <div className="auth-debug">
-                <p className="auth-debug-title">Backend Debug</p>
-                <p className="auth-debug-line">
-                  <strong>URL:</strong> {debugInfo.url}
-                </p>
-                <p className="auth-debug-line">
-                  <strong>Method:</strong> {debugInfo.method}
-                </p>
-                <pre className="auth-debug-pre">
-                  {JSON.stringify(
-                    {
-                      requestBody: debugInfo.requestBody,
-                      responseBody: debugInfo.responseBody,
-                    },
-                    null,
-                    2,
-                  )}
-                </pre>
-              </div>
-            ) : null}
 
             <button className="primary" type="submit" disabled={isSubmitting}>
               {isSubmitting
-                ? 'Please wait...'
-                : pendingVerification
-                  ? 'Verify email'
-                  : pageCopy.submit}
+                ? (slowHint ? 'Server is waking up... almost there' : 'Please wait...')
+                : verifyFlow === 'email'
+                  ? 'Send Code'
+                  : verifyFlow === 'otp'
+                    ? 'Verify Email'
+                    : forgotFlow === 'email'
+                      ? 'Send Reset Code'
+                      : forgotFlow === 'reset'
+                        ? 'Reset Password'
+                        : pendingVerification
+                          ? 'Verify email'
+                          : pageCopy.submit}
             </button>
 
-            {pendingVerification ? (
+            {isSubmitting && slowHint && (
+              <p className="auth-slow-hint">
+                The server is starting up after being idle. This can take 30–60 seconds on first use. Hang tight!
+              </p>
+            )}
+
+            {pendingVerification && !forgotFlow ? (
               <button className="ghost" type="button" onClick={resendOtp} disabled={isSubmitting}>
                 Resend code
               </button>
             ) : null}
+
+            {/* Forgot Password link on login */}
+            {mode === 'login' && !forgotFlow && !pendingVerification ? (
+              <button
+                className="ghost"
+                type="button"
+                onClick={() => {
+                  setForgotFlow('email')
+                  setError('')
+                  setStatus('')
+                }}
+              >
+                Forgot password?
+              </button>
+            ) : null}
+
+            {/* Back to login from forgot flow */}
+            {forgotFlow ? (
+              <button
+                className="ghost"
+                type="button"
+                onClick={() => {
+                  setForgotFlow(null)
+                  setError('')
+                  setStatus('')
+                }}
+              >
+                ← Back to login
+              </button>
+            ) : null}
+
+            {/* Verify email link on signup page */}
+            {mode === 'signup' && !forgotFlow && !pendingVerification && !verifyFlow ? (
+              <button
+                className="ghost"
+                type="button"
+                onClick={() => {
+                  setVerifyFlow('email')
+                  setError('')
+                  setStatus('')
+                }}
+              >
+                Already signed up? Verify email
+              </button>
+            ) : null}
+
+            {/* Back to signup from verify flow */}
+            {verifyFlow ? (
+              <button
+                className="ghost"
+                type="button"
+                onClick={() => {
+                  setVerifyFlow(null)
+                  setError('')
+                  setStatus('')
+                }}
+              >
+                ← Back to sign up
+              </button>
+            ) : null}
           </form>
 
-          {!pendingVerification ? (
+          {!pendingVerification && !forgotFlow && !verifyFlow ? (
             <p className="auth-page-switch">
               {pageCopy.switchLabel} <Link to={pageCopy.switchTo}>{pageCopy.switchCta}</Link>
             </p>

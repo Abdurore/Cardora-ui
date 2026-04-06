@@ -136,7 +136,7 @@ function StudioAudioPlayer({ src, volume = 0.8 }) {
 function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentUser, publishTemplate } = useOutletContext() || {}
+  const { currentUser, publishTemplate, createCardOnBackend } = useOutletContext() || {}
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
 
   const [cardObject, setCardObject] = useState(() => resolveTemplateCardObject(cardData))
@@ -152,6 +152,8 @@ function CardStudio() {
   const [publishError, setPublishError] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
   const [emojiInput, setEmojiInput] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [sendResult, setSendResult] = useState(null) // { ok, slug?, message }
   const fileInputRef = useRef(null)
   const bgImageInputRef = useRef(null)
   const bgVideoInputRef = useRef(null)
@@ -993,7 +995,28 @@ function CardStudio() {
           <button type="button" className="cs-nav-btn accent" onClick={enterPreview}>
             <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
           </button>
-          <button type="button" className="cs-nav-btn disabled" disabled>Send</button>
+          <button
+            type="button"
+            className="cs-nav-btn send"
+            disabled={isSending}
+            onClick={async () => {
+              if (!currentUser) return
+              setIsSending(true)
+              const result = await createCardOnBackend?.(cardObject, {
+                title: c.content?.heading || 'Untitled Card',
+                templateId: cardData?.id || 'custom',
+              })
+              setIsSending(false)
+              if (result?.ok) {
+                const slug = result.data?.card?.slug || result.data?.slug || result.data?.data?.slug || ''
+                setSendResult({ ok: true, slug, message: result.message })
+              } else {
+                setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
+              }
+            }}
+          >
+            {isSending ? 'Sending...' : 'Send'}
+          </button>
         </div>
       </div>
 
@@ -1298,6 +1321,37 @@ function CardStudio() {
                 }}
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Result Modal */}
+      {sendResult && (
+        <div className="cs-publish-overlay">
+          <div className="cs-publish-modal">
+            <h3>{sendResult.ok ? '🎉 Card Sent!' : '❌ Could not send'}</h3>
+            <p>{sendResult.message}</p>
+            {sendResult.ok && sendResult.slug && (
+              <div className="cs-send-link-wrap">
+                <p className="cs-send-link-label">Share this link:</p>
+                <code className="cs-send-link">{`${window.location.origin}/card/${sendResult.slug}`}</code>
+                <button
+                  type="button"
+                  className="cs-nav-btn accent"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`${window.location.origin}/card/${sendResult.slug}`)
+                    setSendResult(prev => ({ ...prev, message: 'Link copied!' }))
+                  }}
+                >
+                  Copy Link
+                </button>
+              </div>
+            )}
+            <div className="cs-publish-actions">
+              <button type="button" className="cs-nav-btn" onClick={() => setSendResult(null)}>
+                Close
               </button>
             </div>
           </div>

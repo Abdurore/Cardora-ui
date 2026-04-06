@@ -63,7 +63,7 @@ function Home() {
 
   const tiers = [
     {
-      name: 'Basic',
+      name: 'Classic',
       label: 'Simple animation',
       note: 'A clean animated reveal for smaller moments.',
       details: 'No music',
@@ -77,7 +77,7 @@ function Home() {
       className: 'premium',
     },
     {
-      name: 'Premium Plus',
+      name: 'Elite',
       label: 'Full animations + effects',
       note: 'The complete Cardora experience with gifts and premium music.',
       details: 'Premium music',
@@ -247,3 +247,4 @@ function Home() {
 }
 
 export default Home
+

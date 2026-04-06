@@ -22,12 +22,23 @@ import {
   signup,
   updateProfile,
   verifyEmail,
+  createCard,
+  deleteCard as apiDeleteCard,
+  getUserCards,
+  claimDailyFreeCoupon,
+  redeemCode,
+  artistApply,
+  forgotPassword,
+  resetPassword,
+  deleteAccount,
 } from '../lib/api.js'
 import {
   extractCheckoutUrl,
   mapCouponPackage,
   mapTemplateToCard,
   normalizeUser,
+  cardObjectToLayoutData,
+  mapBackendCard,
 } from '../lib/backendMappers.js'
 
 const USER_META_PREFIX = 'cardora:userMeta:'
@@ -285,6 +296,7 @@ function MainLayout() {
         username,
         email,
         password,
+        profilePictureUrl: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(username) + '&background=0D8ABC&color=fff',
         currency,
         termsAccepted,
         privacyAccepted,
@@ -396,6 +408,107 @@ function MainLayout() {
     }
   }
 
+  const handleCreateCard = async (cardObject, { title, templateId, type, couponType, useCoupons, poll, chain, trivia } = {}) => {
+    try {
+      const layoutdata = cardObjectToLayoutData(cardObject)
+      const payload = {
+        title: title || cardObject.content?.heading || 'Untitled Card',
+        layoutdata,
+        templateId: templateId || 'custom',
+        type: type || 'standard',
+      }
+      if (couponType) payload.couponType = couponType
+      if (useCoupons) payload.useCoupons = useCoupons
+      if (poll) payload.poll = poll
+      if (chain) payload.chain = chain
+      if (trivia) payload.trivia = trivia
+      const response = await createCard(payload)
+      return { ok: true, data: response, message: response?.message || 'Card created!' }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Card creation failed.' }
+    }
+  }
+
+  const handleGetUserCards = async (query) => {
+    try {
+      const response = await getUserCards(query)
+      const cards = response?.cards || response?.data?.cards || []
+      return { ok: true, cards: cards.map(mapBackendCard) }
+    } catch (error) {
+      return { ok: false, cards: [], message: error.message }
+    }
+  }
+
+  const handleDeleteCard = async (cardId) => {
+    try {
+      await apiDeleteCard({ cardId })
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Could not delete card.' }
+    }
+  }
+
+  const handleClaimDailyCoupon = async () => {
+    try {
+      const response = await claimDailyFreeCoupon()
+      await hydrateSession()
+      return { ok: true, message: response?.message || 'Daily coupon claimed!' }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Could not claim daily coupon.' }
+    }
+  }
+
+  const handleRedeemCode = async (code) => {
+    try {
+      const response = await redeemCode({ code })
+      await hydrateSession()
+      return { ok: true, message: response?.message || 'Code redeemed!' }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Invalid or expired code.' }
+    }
+  }
+
+  const handleArtistApply = async (payload) => {
+    try {
+      const response = await artistApply(payload)
+      return { ok: true, message: response?.message || 'Application submitted!' }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Artist application failed.' }
+    }
+  }
+
+  const handleForgotPassword = async (email) => {
+    try {
+      const response = await forgotPassword({ email })
+      return { ok: true, message: response?.message || 'Reset code sent to your email.' }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Could not send reset code.' }
+    }
+  }
+
+  const handleResetPassword = async (email, otp, newPassword) => {
+    try {
+      const response = await resetPassword({ email, otp, newPassword })
+      return { ok: true, message: response?.message || 'Password reset successfully.' }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Password reset failed.' }
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    try {
+      await deleteAccount()
+      resetSession()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Could not delete account.' }
+    }
+  }
+
+  const refreshBalance = async () => {
+    await hydrateSession()
+  }
+
   return (
     <div className={`page ${location.pathname === '/studio' ? 'page-studio' : ''}`}>
       <Outlet
@@ -429,6 +542,16 @@ function MainLayout() {
           onLogout: handleLogout,
           inventory,
           publishTemplate,
+          createCardOnBackend: handleCreateCard,
+          getUserCardsFromBackend: handleGetUserCards,
+          deleteCardOnBackend: handleDeleteCard,
+          claimDailyCoupon: handleClaimDailyCoupon,
+          redeemCodeAction: handleRedeemCode,
+          artistApplyAction: handleArtistApply,
+          onForgotPassword: handleForgotPassword,
+          onResetPassword: handleResetPassword,
+          onDeleteAccount: handleDeleteAccount,
+          refreshBalance,
           openEditor: (data) => {
             window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
             navigate('/studio', { state: { cardData: data || null } })

@@ -1,8 +1,8 @@
 const ROLE_MAP = {
   admin: 'Admin',
   artist: 'Artist',
-  creator: 'Creator',
-  user: 'Creator',
+  creator: 'User',
+  user: 'User',
 }
 
 function capitalize(value = '') {
@@ -44,7 +44,7 @@ export function resolveBalance(...sources) {
 
 export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
   const user = userPayload?.user || userPayload?.data?.user || userPayload?.data || userPayload || {}
-  const roleValue = String(user.role || user.accountType || 'creator').toLowerCase()
+  const roleValue = String(user.role || user.accountType || 'user').toLowerCase()
   const userId = user._id || user.id || user.userId || user.email || `u-${Date.now()}`
 
   return {
@@ -55,8 +55,15 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     role: ROLE_MAP[roleValue] || capitalize(roleValue),
     currency: user.currency || couponPayload?.currency || 'NGN',
     balance: resolveBalance(user, couponPayload),
+    bio: user.bio || '',
+    referralCode: user.referralCode || '',
+    referralLink: user.referralLink || '',
+    referralsCount: user.referralsCount || 0,
+    ccIncomeHistory: user.ccIncomeHistory || [],
+    isVerified: user.isVerified ?? true,
+    createdAt: user.createdAt || '',
     avatarColor: extras.avatarColor || 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
-    avatarUrl: extras.avatarUrl || '',
+    avatarUrl: extras.avatarUrl || user.profilePictureUrl || '',
     favorites: extras.favorites || [],
     inventory: extras.inventory || [],
   }
@@ -125,4 +132,115 @@ export function extractCheckoutUrl(payload) {
     payload?.data?.url ||
     null
   )
+}
+
+/* ═══════════════════════════════════════════════
+   CARD MAPPERS — Transform frontend cardObject
+   to/from backend layoutdata format
+   ═══════════════════════════════════════════════ */
+
+/**
+ * Transform frontend cardObject → backend layoutdata
+ * Backend expects media.images as string[], frontend uses object[]
+ */
+export function cardObjectToLayoutData(cardObject) {
+  if (!cardObject) return {}
+  const layout = structuredClone(cardObject)
+
+  // Transform media.images from [{url, caption, fit}] → string[]
+  if (layout.media?.images && Array.isArray(layout.media.images)) {
+    layout.media.images = layout.media.images
+      .map(img => typeof img === 'string' ? img : img?.url)
+      .filter(Boolean)
+  }
+
+  // Ensure numbers where backend expects numbers
+  if (layout.card?.textBodyAnimation) {
+    const fade = layout.card.textBodyAnimation.fadeInDuration
+    if (fade !== 'none' && fade !== undefined) {
+      layout.card.textBodyAnimation.fadeInDuration = Number(fade) || 0
+    }
+  }
+
+  return layout
+}
+
+/**
+ * Transform backend layoutdata → frontend cardObject
+ * Backend sends media.images as string[], frontend expects object[]
+ */
+export function layoutDataToCardObject(layoutdata) {
+  if (!layoutdata) return {}
+  const obj = structuredClone(layoutdata)
+
+  // Transform media.images from string[] → [{url, caption, fit}]
+  if (obj.media?.images && Array.isArray(obj.media.images)) {
+    obj.media.images = obj.media.images.map(img =>
+      typeof img === 'string'
+        ? { url: img, caption: '', fit: 'cover', positionX: 50, positionY: 50 }
+        : img
+    )
+  }
+
+  return obj
+}
+
+/**
+ * Map a backend card (from /usercards or /cards/:slug) to a frontend-usable shape
+ */
+export function mapBackendCard(card) {
+  const slug = card.slug || card._id || card.cardId || ''
+  const layout = card.layoutdata || card.layoutData || {}
+  const content = layout.content || {}
+
+  return {
+    id: card.cardId || card._id || slug,
+    slug,
+    title: card.title || content.heading || 'Untitled Card',
+    subtitle: content.body || '',
+    message: content.body || '',
+    type: card.type || 'standard',
+    templateId: card.templateId || '',
+    tier: (card.couponType || layout.couponType || 'simple').toLowerCase(),
+    createdAt: card.createdAt || '',
+    poll: card.poll || null,
+    chain: card.chain || null,
+    trivia: card.trivia || null,
+    layoutdata: layout,
+    cardObject: layoutDataToCardObject(layout),
+    tag: card.type === 'standard' ? '' : capitalize(card.type || ''),
+    interaction: layout.interaction || {},
+    locked: layout.interaction?.lock?.type === 'password' || layout.interaction?.lock?.type === 'time',
+    lockType: layout.interaction?.lock?.type || 'none',
+  }
+}
+
+/**
+ * Map a chat message for the frontend
+ */
+export function mapChatMessage(msg) {
+  return {
+    id: msg.id || msg._id || `msg-${Date.now()}-${Math.random()}`,
+    userId: msg.userId || '',
+    username: msg.username || 'Anonymous',
+    content: msg.content || '',
+    profilePictureUrl: msg.profilePictureUrl || null,
+    createdAt: msg.createdAt || new Date().toISOString(),
+  }
+}
+
+/**
+ * Map an admin user row
+ */
+export function mapAdminUser(user) {
+  return {
+    id: user._id || user.id || user.userId,
+    username: user.username || user.name || 'Unknown',
+    email: user.email || '',
+    role: capitalize(user.role || 'user'),
+    cc: user.cc ?? user.balance ?? 0,
+    isVerified: user.isVerified ?? false,
+    isBanned: user.isBanned ?? false,
+    createdAt: user.createdAt || '',
+  }
 }

@@ -76,7 +76,7 @@ function CardDetailModal({
       subtitle: card.subtitle,
       message: note || card.message,
       recipient,
-      sender: currentUser?.name || currentUser?.username || 'Cardora Creator',
+      sender: currentUser?.name || currentUser?.username || 'Cardora User',
       tier: tierInfo.key,
       createdAt: new Date().toISOString(),
       previewVariant: card.variant,
@@ -209,3 +209,4 @@ function CardDetailModal({
 }
 
 export default CardDetailModal
+

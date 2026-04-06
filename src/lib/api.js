@@ -16,10 +16,13 @@ function readJsonSafely(text) {
 }
 
 function getErrorMessage(payload, fallback) {
+  // Backend validation errors come as { message: "Validation error", details: ["..."] }
+  if (Array.isArray(payload?.details) && payload.details.length > 0) {
+    return payload.details.join('. ')
+  }
   return (
     payload?.message ||
     payload?.error ||
-    payload?.details ||
     payload?.errors?.[0]?.message ||
     fallback
   )
@@ -59,18 +62,35 @@ export function extractToken(payload) {
   )
 }
 
-async function request(path, { method = 'GET', body, auth = false, headers = {} } = {}) {
+async function request(path, { method = 'GET', body, auth = false, headers = {}, timeout = 30000 } = {}) {
   const url = buildUrl(path)
   const token = getStoredToken()
-  const response = await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(auth && token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeout)
+  if (method !== 'GET') console.log('[API Request]', method, url, body)
+  let response
+  try {
+    response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(auth && token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    })
+  } catch (fetchErr) {
+    clearTimeout(timer)
+    if (fetchErr.name === 'AbortError') {
+      const err = new Error('The server is taking too long to respond. It may be waking up — please try again in a moment.')
+      err.status = 0
+      err.debug = { url, method, timeout: true }
+      throw err
+    }
+    throw fetchErr
+  }
+  clearTimeout(timer)
 
   const text = await response.text()
   const payload = readJsonSafely(text)
@@ -85,58 +105,120 @@ async function request(path, { method = 'GET', body, auth = false, headers = {} 
       requestBody: sanitizeBody(body),
       responseBody: payload,
     }
+    console.error('[API Error]', method, url, response.status, JSON.stringify(payload, null, 2))
     throw error
   }
 
   return payload
 }
 
+/* ═══════════════════════════════════════════════
+   AUTH
+   ═══════════════════════════════════════════════ */
 export async function signup(payload) {
-  return request('/signup', { method: 'POST', body: payload })
+  return request('/signup', { method: 'POST', body: payload, timeout: 150000 })
 }
 
 export async function verifyEmail(payload) {
-  return request('/verify-email', { method: 'POST', body: payload })
+  return request('/verify-email', { method: 'POST', body: payload, timeout: 150000 })
 }
 
 export async function requestOtp(payload) {
-  return request('/request-otp', { method: 'POST', body: payload })
+  return request('/request-otp', { method: 'POST', body: payload, timeout: 150000 })
 }
 
 export async function login(payload) {
-  return request('/login', { method: 'POST', body: payload })
+  return request('/login', { method: 'POST', body: payload, timeout: 150000 })
 }
 
 export async function logout() {
   return request('/logout', { method: 'POST', auth: true })
 }
 
-export async function getCurrentUser() {
-  return request('/current-user', { auth: true })
+export async function forgotPassword(payload) {
+  return request('/forgot-password', { method: 'POST', body: payload, timeout: 150000 })
 }
 
-export async function getUserCoupons() {
-  return request('/user/coupons', { auth: true })
+export async function resetPassword(payload) {
+  return request('/reset-password', { method: 'POST', body: payload, timeout: 150000 })
+}
+
+export async function getSignupBonusAvailability() {
+  return request('/signup-bonus/availability')
+}
+
+/* ═══════════════════════════════════════════════
+   USERS
+   ═══════════════════════════════════════════════ */
+export async function getCurrentUser() {
+  return request('/current-user', { auth: true })
 }
 
 export async function updateProfile(payload) {
   return request('/update-profile', { method: 'PUT', auth: true, body: payload })
 }
 
+export async function deleteAccount() {
+  return request('/delete-account', { method: 'DELETE', auth: true })
+}
+
+export async function getUserCards(query = 'page=1&limit=20') {
+  return request(`/usercards?${query}`, { auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   CARDS
+   ═══════════════════════════════════════════════ */
+export async function createCard(payload) {
+  return request('/create-card', { method: 'POST', auth: true, body: payload })
+}
+
+export async function updateCard(payload) {
+  return request('/update-card', { method: 'PUT', auth: true, body: payload })
+}
+
+export async function deleteCard(payload) {
+  return request('/delete-card', { method: 'DELETE', auth: true, body: payload })
+}
+
+export async function getCardBySlug(slug, password) {
+  const qs = password ? `?password=${encodeURIComponent(password)}` : ''
+  return request(`/cards/${slug}${qs}`)
+}
+
+export async function submitCardResponse(slug, body) {
+  return request(`/cards/${slug}/response`, { method: 'POST', body })
+}
+
+export async function submitPollVote(slug, body) {
+  return request(`/cards/${slug}/poll-vote`, { method: 'POST', auth: true, body })
+}
+
+export async function submitChainReply(slug, body) {
+  return request(`/cards/${slug}/chain-reply`, { method: 'POST', auth: true, body })
+}
+
+export async function submitTriviaAnswer(slug, body) {
+  return request(`/cards/${slug}/trivia-submit`, { method: 'POST', auth: true, body })
+}
+
+/* ═══════════════════════════════════════════════
+   COUPONS & STORE
+   ═══════════════════════════════════════════════ */
+export async function getUserCoupons() {
+  return request('/user/coupons', { auth: true })
+}
+
+export async function claimDailyFreeCoupon() {
+  return request('/claim-daily-free-coupon', { method: 'POST', auth: true })
+}
+
+export async function redeemCode(payload) {
+  return request('/redeem-code', { method: 'POST', auth: true, body: payload })
+}
+
 export async function getCouponPackages(query = 'activeOnly=true') {
   return request(`/coupon-packages?${query}`)
-}
-
-export async function getTemplates(query = 'page=1&limit=24') {
-  return request(`/templates?${query}`)
-}
-
-export async function likeTemplate(templateId) {
-  return request(`/templates/${templateId}/like`, { method: 'POST', auth: true })
-}
-
-export async function createTemplate(payload) {
-  return request('/create-template', { method: 'POST', auth: true, body: payload })
 }
 
 export async function createPaystackCheckout(payload) {
@@ -147,8 +229,193 @@ export async function createCouponCheckout(payload) {
   return request('/create-coupon-checkout', { method: 'POST', auth: true, body: payload })
 }
 
-export async function getSignupBonusAvailability() {
-  return request('/signup-bonus/availability')
+/* ═══════════════════════════════════════════════
+   REWARDED ADS
+   ═══════════════════════════════════════════════ */
+export async function getRewardedAd() {
+  return request('/ads/rewarded', { auth: true })
+}
+
+export async function completeAd(payload) {
+  return request('/ads/complete', { method: 'POST', auth: true, body: payload })
+}
+
+export async function getAdStats() {
+  return request('/ads/stats', { auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   WORLD CHAT
+   ═══════════════════════════════════════════════ */
+export async function getWorldChat(query = 'page=1&limit=50') {
+  return request(`/chats?${query}`, { auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   TEMPLATES
+   ═══════════════════════════════════════════════ */
+export async function getTemplates(query = 'page=1&limit=24') {
+  return request(`/templates?${query}`)
+}
+
+export async function getPopularTemplates(query = 'days=7&page=1&limit=10') {
+  return request(`/templates/popular?${query}`)
+}
+
+export async function getTemplateById(id) {
+  return request(`/templates/${id}`)
+}
+
+export async function likeTemplate(templateId) {
+  return request(`/templates/${templateId}/like`, { method: 'POST', auth: true })
+}
+
+export async function createTemplate(payload) {
+  return request('/create-template', { method: 'POST', auth: true, body: payload })
+}
+
+export async function updateTemplate(payload) {
+  return request('/update-template', { method: 'PUT', auth: true, body: payload })
+}
+
+export async function deleteTemplate(payload) {
+  return request('/delete-template', { method: 'DELETE', auth: true, body: payload })
+}
+
+/* ═══════════════════════════════════════════════
+   ARTIST
+   ═══════════════════════════════════════════════ */
+export async function artistApply(payload) {
+  return request('/artistapply', { method: 'POST', auth: true, body: payload })
+}
+
+/* ═══════════════════════════════════════════════
+   ANALYTICS
+   ═══════════════════════════════════════════════ */
+export async function getUserAnalytics() {
+  return request('/user-analytics', { auth: true })
+}
+
+export async function getCardAnalytics(slug) {
+  return request(`/card-analytics/${slug}`, { auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   CURRENCY
+   ═══════════════════════════════════════════════ */
+export async function getCurrencies() {
+  return request('/api/currencies')
+}
+
+export async function getCurrencyRates(from, to) {
+  return request(`/api/currency/rates/${from}/${to}`)
+}
+
+export async function getPrices(currency) {
+  return request(`/api/prices/${currency}`)
+}
+
+export async function updateCurrency(payload) {
+  return request('/update-currency', { method: 'PUT', auth: true, body: payload })
+}
+
+export async function getUserCurrency() {
+  return request('/api/user-currency', { auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   ADMIN
+   ═══════════════════════════════════════════════ */
+export async function getAdminDashboard() {
+  return request('/admin/dashboard', { auth: true })
+}
+
+export async function getAdminUsers(query = 'page=1&limit=100') {
+  return request(`/admin/users?${query}`, { auth: true })
+}
+
+export async function getAdminArtistApplications(query = 'page=1&limit=50') {
+  return request(`/admin/artist-applications?${query}`, { auth: true })
+}
+
+export async function acceptArtistApplication(applicationId) {
+  return request(`/admin/artist-applications/${applicationId}/accept`, { method: 'POST', auth: true })
+}
+
+export async function getAdminCoupons(query = 'page=1&limit=20') {
+  return request(`/admin/coupons?${query}`, { auth: true })
+}
+
+export async function getAdminActionLogs(query = 'page=1&limit=100') {
+  return request(`/admin/action-logs?${query}`, { auth: true })
+}
+
+export async function banUser(payload) {
+  return request('/admin/ban-user', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createAdminPackage(payload) {
+  return request('/admin/packages', { method: 'POST', auth: true, body: payload })
+}
+
+export async function getAdminPackages(query = 'page=1&limit=50') {
+  return request(`/admin/packages?${query}`, { auth: true })
+}
+
+export async function updateAdminPackage(packageId, payload) {
+  return request(`/admin/packages/${packageId}`, { method: 'PUT', auth: true, body: payload })
+}
+
+export async function deleteAdminPackage(packageId) {
+  return request(`/admin/packages/${packageId}`, { method: 'DELETE', auth: true })
+}
+
+export async function createAdminRedeemCode(payload) {
+  return request('/admin/redeem-codes', { method: 'POST', auth: true, body: payload })
+}
+
+export async function getAdminRedeemCodes(query = 'page=1&limit=50') {
+  return request(`/admin/redeem-codes?${query}`, { auth: true })
+}
+
+export async function sendSeasonalReminder(payload) {
+  return request('/admin/send-seasonal-reminder', { method: 'POST', auth: true, body: payload })
+}
+
+export async function getAdminStatsOverview() {
+  return request('/admin/stats/overview', { auth: true })
+}
+
+export async function getAdminStatsUsers() {
+  return request('/admin/stats/users', { auth: true })
+}
+
+export async function getAdminStatsCards() {
+  return request('/admin/stats/cards', { auth: true })
+}
+
+export async function getAdminStatsTemplates() {
+  return request('/admin/stats/templates', { auth: true })
+}
+
+export async function getAdminStatsReferrals() {
+  return request('/admin/stats/referrals', { auth: true })
+}
+
+export async function createAdminAd(payload) {
+  return request('/admin/ads', { method: 'POST', auth: true, body: payload })
+}
+
+export async function updateAdminAd(adId, payload) {
+  return request(`/admin/ads/${adId}`, { method: 'PATCH', auth: true, body: payload })
+}
+
+export async function getAdminAds() {
+  return request('/admin/ads', { auth: true })
+}
+
+export async function getAdminAdsAnalytics() {
+  return request('/admin/ads/analytics', { auth: true })
 }
 
 export { API_BASE }

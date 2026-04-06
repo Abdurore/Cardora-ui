@@ -1,14 +1,14 @@
 export const TIER_INFO = {
   simple: {
     key: 'simple',
-    label: 'Basic',
+    label: 'Classic',
     cost: 5,
     badgeClass: 'tier-simple',
     features: [
       'Simple card animation',
       'Standard border',
       'No background music',
-      'Basic text reveal',
+      'Classic text reveal',
     ],
   },
   special: {
@@ -26,7 +26,7 @@ export const TIER_INFO = {
   },
   signature: {
     key: 'signature',
-    label: 'Premium+',
+    label: 'Elite',
     cost: 30,
     badgeClass: 'tier-signature',
     features: [
@@ -43,3 +43,4 @@ export const TIER_INFO = {
 export const getTierInfo = (tier = 'simple') => TIER_INFO[tier] || TIER_INFO.simple
 
 export const getTierCost = (tier) => getTierInfo(tier).cost
+

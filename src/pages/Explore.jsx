@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { HiOutlineMagnifyingGlass } from 'react-icons/hi2'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
@@ -71,7 +72,7 @@ function Explore() {
         </div>
 
         <div className="search">
-          <img className="search-icon" src={searchIcon} alt="" aria-hidden="true" />
+          <HiOutlineMagnifyingGlass className="search-icon" aria-hidden="true" />
           <input
             placeholder="Search templates, music, effects"
             value={query}
@@ -92,7 +93,7 @@ function Explore() {
             className={`filter-chip ${tierFilter === 'simple' ? 'active' : ''}`}
             onClick={() => setTierFilter('simple')}
           >
-            Basic
+            Classic
           </button>
           <button
             type="button"
@@ -106,7 +107,7 @@ function Explore() {
             className={`filter-chip ${tierFilter === 'signature' ? 'active' : ''}`}
             onClick={() => setTierFilter('signature')}
           >
-            Premium+
+            Elite
           </button>
         </div>
 
@@ -151,3 +152,5 @@ function Explore() {
 }
 
 export default Explore
+
+
