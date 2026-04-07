@@ -1,5 +1,5 @@
 import { useOutletContext, Link, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
@@ -7,11 +7,46 @@ import InventoryCard from '../components/InventoryCard.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
 import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
 
+const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
+
 const ROLE_CONFIG = {
   Artist: { badge: 'role-artist', icon: '🎨', desc: 'Create and publish templates to the marketplace' },
   User: { badge: 'role-user', icon: '✨', desc: 'Build and send personalized card experiences' },
   Admin: { badge: 'role-admin', icon: '⚡', desc: 'Monitor platform activity and manage content' },
   Visitor: { badge: 'role-visitor', icon: '👤', desc: 'Sign in to start creating' },
+}
+
+
+function prepareAvatarData(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Unable to read image.'))
+        return
+      }
+
+      const image = new Image()
+      image.onload = () => {
+        const maxEdge = 320
+        const scale = Math.min(1, maxEdge / Math.max(image.width, image.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(image.width * scale))
+        canvas.height = Math.max(1, Math.round(image.height * scale))
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          resolve(reader.result)
+          return
+        }
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', 0.82))
+      }
+      image.onerror = () => reject(new Error('Unable to load image.'))
+      image.src = reader.result
+    }
+    reader.onerror = () => reject(new Error('Unable to read image.'))
+    reader.readAsDataURL(file)
+  })
 }
 
 function Profile() {
@@ -30,8 +65,10 @@ function Profile() {
     artistApplyAction,
   } = useOutletContext()
   const navigate = useNavigate()
+  const avatarInputRef = useRef(null)
   const [cropSrc, setCropSrc] = useState(null)
   const [userCards, setUserCards] = useState([])
+  const [savedDrafts, setSavedDrafts] = useState([])
   const [loadingCards, setLoadingCards] = useState(false)
   const [showArtistForm, setShowArtistForm] = useState(false)
   const [artistForm, setArtistForm] = useState({ portfolio: '', bio: '', contact: '' })
@@ -44,9 +81,24 @@ function Profile() {
   const favoriteCards = allCards.filter((card) => favorites.includes(card.id))
   const giftInventory = currentUser?.inventory || []
   const roleName = currentUser?.role || 'Visitor'
+  const totalCardCount = userCards.length + savedDrafts.length
   const roleInfo = ROLE_CONFIG[roleName] || ROLE_CONFIG.Visitor
   const isAdmin = roleName === 'Admin'
   const isArtist = roleName === 'Artist'
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      setSavedDrafts(JSON.parse(localStorage.getItem(`${STUDIO_DRAFT_PREFIX}${currentUser.id}`) || '[]'))
+    } else {
+      setSavedDrafts([])
+    }
+  }, [currentUser])
+
+
+  useEffect(() => {
+    if (!cropSrc || !cropSrc.startsWith('blob:')) return undefined
+    return () => URL.revokeObjectURL(cropSrc)
+  }, [cropSrc])
 
   // Load user cards from backend
   useEffect(() => {
@@ -99,27 +151,32 @@ function Profile() {
       <div className="screen-body">
         {/* Profile Card */}
         <div className="profile profile-enhanced">
-          <label className="avatar upload-avatar">
+          <button
+            className="avatar upload-avatar"
+            type="button"
+            onClick={() => currentUser && avatarInputRef.current?.click()}
+          >
             {currentUser?.avatarUrl ? (
-              <img src={currentUser.avatarUrl} alt="" />
+              <img src={currentUser.avatarUrl} alt="" draggable="false" />
             ) : (
               <span>{currentUser ? currentUser.name.charAt(0) : '?'}</span>
             )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (!file || !currentUser) return
-                const reader = new FileReader()
-                reader.onload = () => {
-                  if (typeof reader.result === 'string') setCropSrc(reader.result)
-                }
-                reader.readAsDataURL(file)
-                event.target.value = ''
-              }}
-            />
-          </label>
+          </button>
+          <input
+            ref={avatarInputRef}
+            className="upload-avatar-input"
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              if (!file || !currentUser) return
+              if (cropSrc && cropSrc.startsWith('blob:')) {
+                URL.revokeObjectURL(cropSrc)
+              }
+              setCropSrc(URL.createObjectURL(file))
+              event.target.value = ''
+            }}
+          />
           <h3>{currentUser ? currentUser.name : 'Guest'}</h3>
           {currentUser?.username ? <p className="profile-handle">@{currentUser.username}</p> : null}
 
@@ -156,7 +213,7 @@ function Profile() {
               <span>Gifts</span>
             </div>
             <div className="profile-stat">
-              <strong>{userCards.length}</strong>
+              <strong>{totalCardCount}</strong>
               <span>Cards</span>
             </div>
             {currentUser?.referralsCount > 0 && (
@@ -188,6 +245,64 @@ function Profile() {
 
         {!currentUser ? (
           <p className="empty-state">Sign in to personalize your profile.</p>
+        ) : null}
+
+        {currentUser && savedDrafts.length > 0 ? (
+          <div>
+            <h4 className="section-title">Drafts</h4>
+            <div className="card-grid compact">
+              {savedDrafts.map((draft, index) => (
+                <div key={draft.id} className="profile-card-wrap">
+                  <CardItem
+                    {...draft}
+                    variant={`v${(index % 4) + 1}`}
+                    isFavorite={false}
+                    onToggleFavorite={() => {}}
+                    onClick={() =>
+                      navigate('/studio', {
+                        state: {
+                          cardData: draft,
+                          draftId: draft.id,
+                          draftCardObject: draft.cardObject,
+                        },
+                      })
+                    }
+                  />
+                  <div className="profile-card-actions">
+                    <button
+                      className="profile-card-action-btn profile-card-action-pill edit"
+                      type="button"
+                      onClick={() =>
+                        navigate('/studio', {
+                          state: {
+                            cardData: draft,
+                            draftId: draft.id,
+                            draftCardObject: draft.cardObject,
+                          },
+                        })
+                      }
+                      title="Edit draft"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="profile-card-action-btn profile-card-action-pill delete"
+                      type="button"
+                      onClick={() => {
+                        if (!currentUser?.id) return
+                        const nextDrafts = savedDrafts.filter((item) => item.id !== draft.id)
+                        localStorage.setItem(`${STUDIO_DRAFT_PREFIX}${currentUser.id}`, JSON.stringify(nextDrafts))
+                        setSavedDrafts(nextDrafts)
+                      }}
+                      title="Delete draft"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : null}
 
         {/* My Cards (from backend) */}
@@ -324,6 +439,7 @@ function Profile() {
         }}
       />
 
+
       {/* Artist Application Modal */}
       {showArtistForm && (
         <section className="detail-modal" role="dialog" aria-modal="true">
@@ -359,8 +475,8 @@ function Profile() {
                 placeholder="artist@example.com"
               />
             </label>
-            {artistMsg.text && <p className={`store-earn-msg ${artistMsg.ok ? 'success' : 'error'}`}>{artistMsg.text}</p>}
-            <div className="detail-actions">
+            {artistMsg.text && <p className={`store-earn-msg artist-apply-msg ${artistMsg.ok ? 'success' : 'error'}`}>{artistMsg.text}</p>}
+            <div className="detail-actions artist-apply-actions">
               <button className="primary" type="button" onClick={handleArtistSubmit} disabled={isApplying}>
                 {isApplying ? 'Submitting...' : 'Submit Application'}
               </button>
@@ -378,7 +494,7 @@ function Profile() {
             <span className="delete-confirm-icon">⚠️</span>
             <h3>Delete your account?</h3>
             <p className="detail-subtitle">This action is permanent. All your cards, CC balance, and data will be lost.</p>
-            <div className="detail-actions">
+            <div className="detail-actions artist-apply-actions">
               <button
                 className="profile-delete-btn"
                 type="button"
@@ -397,3 +513,16 @@ function Profile() {
 }
 
 export default Profile
+
+
+
+
+
+
+
+
+
+
+
+
+

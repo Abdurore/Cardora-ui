@@ -175,13 +175,32 @@ function MainLayout() {
 
   useEffect(() => {
     if (!hydratedUser?.id) return
+    const storageKey = `${USER_META_PREFIX}${hydratedUser.id}`
     const payload = {
       favorites,
       inventory,
       avatarUrl,
       avatarColor,
     }
-    localStorage.setItem(`${USER_META_PREFIX}${hydratedUser.id}`, JSON.stringify(payload))
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(payload))
+    } catch (error) {
+      console.warn('Failed to persist user meta, retrying without avatar image.', error)
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            favorites,
+            inventory,
+            avatarUrl: '',
+            avatarColor,
+          }),
+        )
+      } catch (fallbackError) {
+        console.warn('Failed to persist fallback user meta.', fallbackError)
+      }
+    }
   }, [avatarColor, avatarUrl, favorites, hydratedUser?.id, inventory])
 
   const toggleFavorite = async (cardId) => {
@@ -581,3 +600,4 @@ function MainLayout() {
 }
 
 export default MainLayout
+

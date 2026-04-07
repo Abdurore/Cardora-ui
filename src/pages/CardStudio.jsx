@@ -11,6 +11,8 @@ import logo from '../assets/icons/logo.png'
 import { defaultCardObject, resolveTemplateCardObject, musicPresets, fontOptions } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 
+const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
+
 const steps = ['closed', 'card', 'questions', 'preview']
 
 const tools = [
@@ -138,8 +140,14 @@ function CardStudio() {
   const location = useLocation()
   const { currentUser, publishTemplate, createCardOnBackend } = useOutletContext() || {}
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
-
-  const [cardObject, setCardObject] = useState(() => resolveTemplateCardObject(cardData))
+  const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
+  const draftIdRef = useRef(location.state?.draftId || cardData?.draftId || `draft-${Date.now()}`)
+  const draftStorageKey = currentUser?.id
+    ? `${STUDIO_DRAFT_PREFIX}${currentUser.id}`
+    : `${STUDIO_DRAFT_PREFIX}guest`
+  const [cardObject, setCardObject] = useState(() =>
+    existingDraftObject ? structuredClone(existingDraftObject) : resolveTemplateCardObject(cardData),
+  )
   const [activeTool, setActiveTool] = useState('closedState')
   const [activeStep, setActiveStep] = useState('closed')
   const [showPreview, setShowPreview] = useState(false)
@@ -147,7 +155,7 @@ function CardStudio() {
   const [showPublish, setShowPublish] = useState(false)
   const [publishForm, setPublishForm] = useState({
     category: cardData?.category || 'proposal',
-    name: cardData?.title || resolveTemplateCardObject(cardData).content.heading,
+    name: cardData?.title || existingDraftObject?.content?.heading || resolveTemplateCardObject(cardData).content.heading,
   })
   const [publishError, setPublishError] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
@@ -197,7 +205,24 @@ function CardStudio() {
 
   const handleSave = () => {
     try {
+      const draftEntry = {
+        id: draftIdRef.current,
+        draftId: draftIdRef.current,
+        title: c.content?.heading || cardData?.title || 'Untitled Draft',
+        subtitle: c.closedState?.bodyText || c.content?.body || 'Card draft',
+        message: c.content?.body || '',
+        occasion: publishForm.category,
+        category: publishForm.category,
+        tier: cardData?.tier || 'simple',
+        likes: '0',
+        meta: 'Draft',
+        updatedAt: new Date().toISOString(),
+        cardObject: structuredClone(cardObject),
+      }
       localStorage.setItem('cardora:studioCard', JSON.stringify(cardObject))
+      const existingDrafts = JSON.parse(localStorage.getItem(draftStorageKey) || '[]')
+      const nextDrafts = [draftEntry, ...existingDrafts.filter((draft) => draft.id !== draftEntry.id)]
+      localStorage.setItem(draftStorageKey, JSON.stringify(nextDrafts))
       setSavedState('Draft saved just now')
     } catch {
       setSavedState('Save failed')
@@ -1362,3 +1387,10 @@ function CardStudio() {
 }
 
 export default CardStudio
+
+
+
+
+
+
+

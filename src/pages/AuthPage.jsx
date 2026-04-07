@@ -535,7 +535,11 @@ function AuthPage({ mode = 'login' }) {
 
             <button className="primary" type="submit" disabled={isSubmitting}>
               {isSubmitting
-                ? (slowHint ? 'Server is waking up... almost there' : 'Please wait...')
+                ? (slowHint
+                    ? (verifyFlow || pendingVerification || forgotFlow
+                      ? 'Sending email... this may take a moment'
+                      : 'Server is waking up... almost there')
+                    : 'Please wait...')
                 : verifyFlow === 'email'
                   ? 'Send Code'
                   : verifyFlow === 'otp'
@@ -551,7 +555,9 @@ function AuthPage({ mode = 'login' }) {
 
             {isSubmitting && slowHint && (
               <p className="auth-slow-hint">
-                The server is starting up after being idle. This can take 30–60 seconds on first use. Hang tight!
+                {verifyFlow || pendingVerification || forgotFlow
+                  ? 'Sending the verification email can take a little while. Please don\'t close this page.'
+                  : 'The server is starting up after being idle. This can take 30–60 seconds on first use. Hang tight!'}
               </p>
             )}
 

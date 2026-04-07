@@ -120,30 +120,42 @@ function AvatarCropModal({ open, src, onCancel, onSave }) {
 
   const handleSave = () => {
     const img = imgRef.current
-    if (!img) return
-    const rect = wrapRef.current.getBoundingClientRect()
+    const wrap = wrapRef.current
+    if (!img || !wrap) return
+
+    const rect = wrap.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+
     const scaleX = img.naturalWidth / rect.width
     const scaleY = img.naturalHeight / rect.height
     const cropRect =
       crop && crop.w > 8 && crop.h > 8
         ? crop
         : { x: 0, y: 0, w: rect.width, h: rect.height }
+
+    const sourceWidth = Math.max(1, Math.round(cropRect.w * scaleX))
+    const sourceHeight = Math.max(1, Math.round(cropRect.h * scaleY))
+    const maxEdge = 320
+    const outputScale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight))
+
     const canvas = document.createElement('canvas')
-    canvas.width = Math.round(cropRect.w * scaleX)
-    canvas.height = Math.round(cropRect.h * scaleY)
+    canvas.width = Math.max(1, Math.round(sourceWidth * outputScale))
+    canvas.height = Math.max(1, Math.round(sourceHeight * outputScale))
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
     ctx.drawImage(
       img,
       cropRect.x * scaleX,
       cropRect.y * scaleY,
-      cropRect.w * scaleX,
-      cropRect.h * scaleY,
+      sourceWidth,
+      sourceHeight,
       0,
       0,
       canvas.width,
       canvas.height,
     )
-    onSave(canvas.toDataURL('image/png'))
+    onSave(canvas.toDataURL('image/jpeg', 0.84))
   }
 
   return createPortal(
@@ -197,3 +209,4 @@ function AvatarCropModal({ open, src, onCancel, onSave }) {
 }
 
 export default AvatarCropModal
+

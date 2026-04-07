@@ -3,6 +3,10 @@ import { useEffect, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import {
+  getAdminDashboard,
+  getAdminStatsUsers,
+  getAdminStatsCards,
+  getAdminStatsTemplates,
   getAdminStatsOverview,
   getAdminUsers,
   getAdminArtistApplications,
@@ -21,6 +25,74 @@ import {
 } from '../lib/api.js'
 
 const TABS = ['Overview', 'Users', 'Templates', 'Packages', 'Codes', 'Ads', 'Logs']
+
+function pickStatValue(...values) {
+  for (const value of values) {
+    if (value === 0) return 0
+    if (value !== undefined && value !== null && value !== '') return value
+  }
+  return '-'
+}
+
+function normalizeOverviewStats(overview, dashboard, usersStats, cardsStats, templatesStats) {
+  const overviewData = overview?.data || overview || {}
+  const dashboardData = dashboard?.data || dashboard || {}
+  const dashboardStats = dashboardData?.stats || dashboardData?.overview || dashboardData?.metrics || {}
+  const userStats = usersStats?.data || usersStats || {}
+  const cardStats = cardsStats?.data || cardsStats || {}
+  const templateStats = templatesStats?.data || templatesStats || {}
+
+  return {
+    totalUsers: pickStatValue(
+      overviewData.totalUsers,
+      overviewData.users,
+      overviewData.total_users,
+      dashboardStats.totalUsers,
+      dashboardStats.users,
+      dashboardData.totalUsers,
+      dashboardData.users,
+      userStats.totalUsers,
+      userStats.users,
+      userStats.total,
+      userStats.count,
+    ),
+    totalCards: pickStatValue(
+      overviewData.totalCards,
+      overviewData.cards,
+      overviewData.total_cards,
+      dashboardStats.totalCards,
+      dashboardStats.cards,
+      dashboardData.totalCards,
+      dashboardData.cards,
+      cardStats.totalCards,
+      cardStats.cards,
+      cardStats.total,
+      cardStats.count,
+    ),
+    totalTemplates: pickStatValue(
+      overviewData.totalTemplates,
+      overviewData.templates,
+      overviewData.total_templates,
+      dashboardStats.totalTemplates,
+      dashboardStats.templates,
+      dashboardData.totalTemplates,
+      dashboardData.templates,
+      templateStats.totalTemplates,
+      templateStats.templates,
+      templateStats.total,
+      templateStats.count,
+    ),
+    totalRevenue: pickStatValue(
+      overviewData.totalRevenue,
+      overviewData.revenue,
+      overviewData.total_revenue,
+      dashboardStats.totalRevenue,
+      dashboardStats.revenue,
+      dashboardData.totalRevenue,
+      dashboardData.revenue,
+    ),
+  }
+}
 
 function AdminDashboard() {
   const { currentUser, balance, openAuthModal } = useOutletContext()
@@ -75,8 +147,23 @@ function AdminDashboard() {
     try {
       switch (tab) {
         case 'Overview': {
-          const res = await getAdminStatsOverview()
-          setStats(res?.data || res || {})
+          const [overviewRes, dashboardRes, usersStatsRes, cardsStatsRes, templatesStatsRes] = await Promise.allSettled([
+            getAdminStatsOverview(),
+            getAdminDashboard(),
+            getAdminStatsUsers(),
+            getAdminStatsCards(),
+            getAdminStatsTemplates(),
+          ])
+
+          setStats(
+            normalizeOverviewStats(
+              overviewRes.status === 'fulfilled' ? overviewRes.value : null,
+              dashboardRes.status === 'fulfilled' ? dashboardRes.value : null,
+              usersStatsRes.status === 'fulfilled' ? usersStatsRes.value : null,
+              cardsStatsRes.status === 'fulfilled' ? cardsStatsRes.value : null,
+              templatesStatsRes.status === 'fulfilled' ? templatesStatsRes.value : null,
+            ),
+          )
           break
         }
         case 'Users': {
@@ -235,23 +322,23 @@ function AdminDashboard() {
           <div className="admin-section">
             <div className="admin-stats-grid">
               <div className="admin-stat-card">
-                <span className="admin-stat-icon">👥</span>
-                <div className="admin-stat-value">{stats?.totalUsers ?? stats?.users ?? '—'}</div>
+                <span className="admin-stat-icon">{"\u{1F465}"}</span>
+                <div className="admin-stat-value">{stats?.totalUsers ?? '-'}</div>
                 <div className="admin-stat-label">Total Users</div>
               </div>
               <div className="admin-stat-card">
-                <span className="admin-stat-icon">🎴</span>
-                <div className="admin-stat-value">{stats?.totalCards ?? stats?.cards ?? '—'}</div>
+                <span className="admin-stat-icon">{"\u{1F3B4}"}</span>
+                <div className="admin-stat-value">{stats?.totalCards ?? '-'}</div>
                 <div className="admin-stat-label">Total Cards</div>
               </div>
               <div className="admin-stat-card">
-                <span className="admin-stat-icon">📋</span>
-                <div className="admin-stat-value">{stats?.totalTemplates ?? stats?.templates ?? '—'}</div>
+                <span className="admin-stat-icon">{"\u{1F4CB}"}</span>
+                <div className="admin-stat-value">{stats?.totalTemplates ?? '-'}</div>
                 <div className="admin-stat-label">Templates</div>
               </div>
               <div className="admin-stat-card">
-                <span className="admin-stat-icon">💰</span>
-                <div className="admin-stat-value">{stats?.totalRevenue ?? stats?.revenue ?? '—'}</div>
+                <span className="admin-stat-icon">{"\u{1F4B0}"}</span>
+                <div className="admin-stat-value">{stats?.totalRevenue ?? '-'}</div>
                 <div className="admin-stat-label">Revenue</div>
               </div>
             </div>
@@ -307,7 +394,7 @@ function AdminDashboard() {
                       <td>{user.email}</td>
                       <td><span className={`admin-role-chip ${(user.role || 'user').toLowerCase()}`}>{user.role || 'User'}</span></td>
                       <td>{user.cc ?? user.balance ?? 0}</td>
-                      <td>{user.isVerified ? '✅' : '❌'}</td>
+                      <td>{user.isVerified ? 'Yes' : 'No'}</td>
                     </tr>
                   ))}
                   {users.length === 0 && <tr><td colSpan={5}>No users found.</td></tr>}
@@ -336,9 +423,9 @@ function AdminDashboard() {
                   <tbody>
                     {applications.map(app => (
                       <tr key={app._id || app.id}>
-                        <td>{app.username || app.user?.username || '—'}</td>
-                        <td><a href={app.portfolio} target="_blank" rel="noopener noreferrer">{app.portfolio ? 'View' : '—'}</a></td>
-                        <td>{app.bio || '—'}</td>
+                        <td>{app.username || app.user?.username || '-'}</td>
+                        <td><a href={app.portfolio} target="_blank" rel="noopener noreferrer">{app.portfolio ? 'View' : '-'}</a></td>
+                        <td>{app.bio || '-'}</td>
                         <td><span className={`admin-template-status ${app.status || 'pending'}`}>{app.status || 'pending'}</span></td>
                         <td>
                           <button type="button" className="admin-action-btn approve" onClick={() => handleAcceptApplication(app._id || app.id)}>Accept</button>
@@ -350,7 +437,7 @@ function AdminDashboard() {
               </div>
             ) : (
               <div className="admin-empty">
-                <span className="admin-empty-icon">📋</span>
+                <span className="admin-empty-icon">{"\u{1F4CB}"}</span>
                 <p>No artist applications pending.</p>
               </div>
             )}
@@ -383,7 +470,7 @@ function AdminDashboard() {
                       <td>{pkg.name}</td>
                       <td>{pkg.numberOfCC}</td>
                       <td>{pkg.price}</td>
-                      <td>{pkg.featured ? '⭐' : '—'}</td>
+                      <td>{pkg.featured ? 'Starred' : '-'}</td>
                       <td><button type="button" className="admin-action-btn reject" onClick={() => handleDeletePackage(pkg.packageId || pkg._id)}>Delete</button></td>
                     </tr>
                   ))}
@@ -416,8 +503,8 @@ function AdminDashboard() {
                     <tr key={code._id || code.code}>
                       <td><code>{code.code}</code></td>
                       <td>{code.numberOfCC}</td>
-                      <td>{code.usedCount ?? 0}/{code.maxUses ?? '∞'}</td>
-                      <td>{code.isActive ? '✅' : '❌'}</td>
+                      <td>{code.usedCount ?? 0}/{code.maxUses ?? 'Unlimited'}</td>
+                      <td>{code.isActive ? 'Yes' : 'No'}</td>
                     </tr>
                   ))}
                   {redeemCodes.length === 0 && <tr><td colSpan={4}>No codes.</td></tr>}
@@ -456,7 +543,7 @@ function AdminDashboard() {
                       <td>{ad.type}</td>
                       <td>{ad.rewardCC} CC</td>
                       <td>{ad.duration}s</td>
-                      <td>{ad.isActive ? '✅' : '❌'}</td>
+                      <td>{ad.isActive ? 'Yes' : 'No'}</td>
                     </tr>
                   ))}
                   {ads.length === 0 && <tr><td colSpan={4}>No ads.</td></tr>}
@@ -478,10 +565,10 @@ function AdminDashboard() {
                 <tbody>
                   {logs.map((log, i) => (
                     <tr key={log._id || i}>
-                      <td>{log.adminId || log.admin || '—'}</td>
-                      <td>{log.action || log.type || '—'}</td>
-                      <td>{log.targetId || log.target || '—'}</td>
-                      <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : '—'}</td>
+                      <td>{log.adminId || log.admin || '-'}</td>
+                      <td>{log.action || log.type || '-'}</td>
+                      <td>{log.targetId || log.target || '-'}</td>
+                      <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : '-'}</td>
                     </tr>
                   ))}
                   {logs.length === 0 && <tr><td colSpan={4}>No logs yet.</td></tr>}
@@ -497,3 +584,5 @@ function AdminDashboard() {
 }
 
 export default AdminDashboard
+
+
