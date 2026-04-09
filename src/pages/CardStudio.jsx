@@ -10,6 +10,7 @@ import { IoColorPaletteOutline } from 'react-icons/io5'
 import logo from '../assets/icons/logo.png'
 import { defaultCardObject, resolveTemplateCardObject, musicPresets, fontOptions } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
+import { uploadToCloudinary } from '../lib/cloudinary.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
@@ -166,6 +167,8 @@ function CardStudio() {
   const bgImageInputRef = useRef(null)
   const bgVideoInputRef = useRef(null)
   const musicInputRef = useRef(null)
+  const [isUploading, setIsUploading] = useState(false)
+
 
   const isArtist = currentUser?.role === 'Artist'
 
@@ -252,63 +255,78 @@ function CardStudio() {
     setSavedState('Template submitted to backend')
   }
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        const newImages = [
-          ...c.media.images,
-          {
-            url: reader.result,
-            caption: '',
-            fit: 'cover',
-            positionX: 50,
-            positionY: 50,
-          },
-        ]
-        update('media.images', newImages)
-      }
+    setIsUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'image')
+      const newImages = [
+        ...c.media.images,
+        {
+          url,
+          caption: '',
+          fit: 'cover',
+          positionX: 50,
+          positionY: 50,
+        },
+      ]
+      update('media.images', newImages)
+    } catch (err) {
+      alert('Upload failed: ' + err.message)
+    } finally {
+      setIsUploading(false)
+      e.target.value = ''
     }
-    reader.readAsDataURL(file)
-    e.target.value = ''
   }
 
-  const readFileAsDataUrl = (file, onLoad) => {
+  const handleBackgroundImageUpload = async (event) => {
+    const file = event.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') onLoad(reader.result)
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const handleBackgroundImageUpload = (event) => {
-    const file = event.target.files?.[0]
-    readFileAsDataUrl(file, (result) => {
+    setIsUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'image')
       update('background.type', 'image')
-      update('background.imageUrl', result)
-    })
-    event.target.value = ''
+      update('background.imageUrl', url)
+    } catch (err) {
+      alert('Upload failed: ' + err.message)
+    } finally {
+      setIsUploading(false)
+      event.target.value = ''
+    }
   }
 
-  const handleBackgroundVideoUpload = (event) => {
+  const handleBackgroundVideoUpload = async (event) => {
     const file = event.target.files?.[0]
-    readFileAsDataUrl(file, (result) => {
+    if (!file) return
+    setIsUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'video')
       update('background.type', 'video')
-      update('background.videoUrl', result)
-    })
-    event.target.value = ''
+      update('background.videoUrl', url)
+    } catch (err) {
+      alert('Upload failed: ' + err.message)
+    } finally {
+      setIsUploading(false)
+      event.target.value = ''
+    }
   }
 
-  const handleMusicUpload = (event) => {
+  const handleMusicUpload = async (event) => {
     const file = event.target.files?.[0]
-    readFileAsDataUrl(file, (result) => {
-      update('background.music.url', result)
+    if (!file) return
+    setIsUploading(true)
+    try {
+      // Cloudinary handles audio as 'video' or 'raw'. 'video' is better for streaming optimization.
+      const url = await uploadToCloudinary(file, 'video')
+      update('background.music.url', url)
       update('background.music.isUploaded', true)
-    })
-    event.target.value = ''
+    } catch (err) {
+      alert('Upload failed: ' + err.message)
+    } finally {
+      setIsUploading(false)
+      event.target.value = ''
+    }
   }
 
   const removeImage = (idx) => {
@@ -454,8 +472,13 @@ function CardStudio() {
           <p className="cs-panel-eyebrow">Media</p>
           <h3>Add images to your card</h3>
           <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
-          <button type="button" className="cs-button" onClick={() => fileInputRef.current?.click()}>
-            + Upload Image
+          <button 
+            type="button" 
+            className={`cs-button ${isUploading ? 'loading' : ''}`} 
+            onClick={() => !isUploading && fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
+            {isUploading ? 'Uploading...' : '+ Upload Image'}
           </button>
           {c.media.images.length === 0 && (
             <p className="cs-empty">No images added yet.</p>
@@ -574,8 +597,13 @@ function CardStudio() {
                 style={{ display: 'none' }}
                 onChange={handleBackgroundImageUpload}
               />
-              <button type="button" className="cs-button" onClick={() => bgImageInputRef.current?.click()}>
-                Upload Image From Device
+              <button 
+                type="button" 
+                className={`cs-button ${isUploading ? 'loading' : ''}`} 
+                onClick={() => !isUploading && bgImageInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? 'Uploading...' : 'Upload Image From Device'}
               </button>
               {c.background.imageUrl ? (
                 <div className="cs-background-thumb">
@@ -595,8 +623,13 @@ function CardStudio() {
                 style={{ display: 'none' }}
                 onChange={handleBackgroundVideoUpload}
               />
-              <button type="button" className="cs-button" onClick={() => bgVideoInputRef.current?.click()}>
-                Upload Video From Device
+              <button 
+                type="button" 
+                className={`cs-button ${isUploading ? 'loading' : ''}`} 
+                onClick={() => !isUploading && bgVideoInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? 'Uploading...' : 'Upload Video From Device'}
               </button>
               {c.background.videoUrl ? (
                 <div className="cs-background-thumb video">
@@ -615,8 +648,13 @@ function CardStudio() {
               style={{ display: 'none' }}
               onChange={handleMusicUpload}
             />
-            <button type="button" className="cs-button" onClick={() => musicInputRef.current?.click()}>
-              Upload Music From Device
+            <button 
+              type="button" 
+              className={`cs-button ${isUploading ? 'loading' : ''}`} 
+              onClick={() => !isUploading && musicInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              {isUploading ? 'Uploading...' : 'Upload Music From Device'}
             </button>
             <div className="cs-preset-list">
               {musicPresets.map(preset => (

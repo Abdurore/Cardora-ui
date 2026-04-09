@@ -10077,3 +10077,267 @@ a {
   }
 }
 
+
+.store-rewards-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.store-reward-tabs {
+  align-self: flex-start;
+}
+
+.store-referral-section,
+.store-coming-shell {
+  display: grid;
+}
+
+.store-referral-card,
+.store-coming-card {
+  padding: 24px;
+  border-radius: 26px;
+  border: 1px solid rgba(126, 247, 255, 0.12);
+  background: linear-gradient(180deg, rgba(10, 18, 24, 0.9), rgba(8, 14, 19, 0.96));
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.24);
+}
+
+.store-referral-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.store-referral-head h4,
+.store-coming-card h4 {
+  margin: 8px 0 0;
+  font-size: 1.1rem;
+  color: #effcff;
+}
+
+.store-referral-count {
+  min-width: 96px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 247, 255, 0.12);
+  background: rgba(7, 16, 22, 0.82);
+  text-align: center;
+}
+
+.store-referral-count strong {
+  display: block;
+  font-size: 1.35rem;
+  color: #7ef7ff;
+}
+
+.store-referral-count span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(220, 242, 247, 0.58);
+}
+
+.store-referral-copy,
+.store-coming-card p {
+  margin: 16px 0 0;
+  color: rgba(220, 242, 247, 0.72);
+  line-height: 1.7;
+}
+
+.store-referral-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.store-referral-item {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(126, 247, 255, 0.08);
+  background: rgba(8, 16, 20, 0.78);
+}
+
+.store-referral-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(220, 242, 247, 0.52);
+}
+
+.store-referral-item strong {
+  color: #eefcff;
+  font-size: 0.96rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.store-referral-link {
+  font-size: 0.84rem;
+}
+
+.store-inline-copy {
+  justify-self: flex-start;
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+
+.store-referral-history {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.store-referral-history-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.store-referral-history-head h5 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #effcff;
+}
+
+.store-referral-history-head span {
+  color: rgba(220, 242, 247, 0.62);
+  font-size: 0.8rem;
+}
+
+.store-referral-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.store-referral-history-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 247, 255, 0.08);
+  background: rgba(7, 14, 18, 0.74);
+}
+
+.store-referral-history-item strong {
+  color: #7ef7ff;
+}
+
+.store-referral-history-item p,
+.store-referral-empty p,
+.store-referral-empty span {
+  margin: 4px 0 0;
+  color: rgba(220, 242, 247, 0.68);
+}
+
+.store-referral-history-item > span {
+  color: rgba(220, 242, 247, 0.48);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.store-referral-empty {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px dashed rgba(126, 247, 255, 0.14);
+  background: rgba(6, 12, 16, 0.62);
+}
+
+.store-coming-card {
+  text-align: center;
+  place-items: center;
+}
+
+.store-coming-icon {
+  display: inline-grid;
+  place-items: center;
+  min-width: 82px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 192, 100, 0.24);
+  background: rgba(255, 192, 100, 0.1);
+  color: #ffc064;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 720px) {
+  .store-referral-head,
+  .store-referral-history-item {
+    flex-direction: column;
+  }
+
+  .store-referral-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .store-referral-count {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+.store-reward-tabs {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px;
+  border-radius: 24px;
+  border: 1px solid rgba(126, 247, 255, 0.1);
+  background: linear-gradient(180deg, rgba(8, 15, 20, 0.88), rgba(6, 11, 15, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.store-reward-tabs .tab {
+  min-height: 54px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(220, 242, 247, 0.72);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.25;
+  box-shadow: none;
+}
+
+.store-reward-tabs .tab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(126, 247, 255, 0.12);
+  background: rgba(126, 247, 255, 0.05);
+  color: #effcff;
+}
+
+.store-reward-tabs .tab.active {
+  border-color: rgba(126, 247, 255, 0.24);
+  background: linear-gradient(135deg, rgba(13, 36, 44, 0.92), rgba(8, 22, 29, 0.96));
+  color: #effcff;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(126, 247, 255, 0.06);
+}
+
+@media (max-width: 720px) {
+  .store-reward-tabs {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 20px;
+  }
+
+  .store-reward-tabs .tab {
+    min-height: 48px;
+    justify-content: flex-start;
+    text-align: left;
+    padding: 12px 14px;
+    font-size: 0.76rem;
+  }
+}

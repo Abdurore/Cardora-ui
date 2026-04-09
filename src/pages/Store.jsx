@@ -1,11 +1,12 @@
+import { useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import PackCard from '../components/PackCard.jsx'
 import RewardedAds from '../components/RewardedAds.jsx'
 import { storePacks } from '../data/catalog.js'
-import { extractCheckoutUrl } from '../lib/backendMappers.js'
+
+const REWARD_TABS = ['earn', 'redeem', 'referral']
 
 function Store() {
   const {
@@ -18,16 +19,31 @@ function Store() {
     redeemCodeAction,
     refreshBalance,
   } = useOutletContext()
+
   const [checkoutMessage, setCheckoutMessage] = useState('')
   const [activePack, setActivePack] = useState(null)
   const [isLaunchingCheckout, setIsLaunchingCheckout] = useState(false)
-  const [activeSection, setActiveSection] = useState('packs') // packs, earn, redeem
+  const [activeSection, setActiveSection] = useState('buy')
+  const [activeRewardTab, setActiveRewardTab] = useState('earn')
   const [redeemInput, setRedeemInput] = useState('')
   const [redeemMsg, setRedeemMsg] = useState({ text: '', ok: false })
   const [claimMsg, setClaimMsg] = useState({ text: '', ok: false })
   const [isClaiming, setIsClaiming] = useState(false)
   const [isRedeeming, setIsRedeeming] = useState(false)
+  const [copiedField, setCopiedField] = useState('')
+
   const packs = couponPackages?.length ? couponPackages : storePacks
+  const referralRewards = (currentUser?.ccIncomeHistory || []).filter(
+    (entry) => (entry.type || entry.source) === 'referral_milestone',
+  )
+  const referralStats = useMemo(
+    () => ({
+      referralsCount: currentUser?.referralsCount ?? 0,
+      referralCode: currentUser?.referralCode || '',
+      referralLink: currentUser?.referralLink || '',
+    }),
+    [currentUser],
+  )
 
   const handleSelect = (pack) => {
     setActivePack(pack)
@@ -52,7 +68,10 @@ function Store() {
   }
 
   const handleClaimDaily = async () => {
-    if (!currentUser) { openAuthModal(); return }
+    if (!currentUser) {
+      openAuthModal()
+      return
+    }
     setIsClaiming(true)
     setClaimMsg({ text: '', ok: false })
     const result = await claimDailyCoupon()
@@ -61,14 +80,31 @@ function Store() {
   }
 
   const handleRedeem = async () => {
-    if (!currentUser) { openAuthModal(); return }
-    if (!redeemInput.trim()) { setRedeemMsg({ text: 'Enter a code.', ok: false }); return }
+    if (!currentUser) {
+      openAuthModal()
+      return
+    }
+    if (!redeemInput.trim()) {
+      setRedeemMsg({ text: 'Enter a code.', ok: false })
+      return
+    }
     setIsRedeeming(true)
     setRedeemMsg({ text: '', ok: false })
     const result = await redeemCodeAction(redeemInput.trim())
     setRedeemMsg({ text: result.message, ok: result.ok })
     if (result.ok) setRedeemInput('')
     setIsRedeeming(false)
+  }
+
+  const handleCopy = async (value, field) => {
+    if (!value) return
+    try {
+      await navigator.clipboard?.writeText(value)
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(''), 1800)
+    } catch {
+      setCopiedField('')
+    }
   }
 
   return (
@@ -80,28 +116,39 @@ function Store() {
             <p className="eyebrow">Wallet</p>
             <h2 className="wallet-title">Keep your next surprise ready to send.</h2>
             <p className="subtext">
-              Add credits, unlock premium templates, and power interactive gifts without
-              leaving the experience.
+              Add credits, earn more through activity, redeem rewards, and keep an eye on the gift
+              lane as it gets ready.
             </p>
           </div>
         </div>
 
         <div className="tabs store-tabs">
-          <button type="button" className={`tab ${activeSection === 'packs' ? 'active' : ''}`} onClick={() => setActiveSection('packs')}>
+          <button
+            type="button"
+            className={`tab ${activeSection === 'buy' ? 'active' : ''}`}
+            onClick={() => setActiveSection('buy')}
+          >
             Buy CC
           </button>
-          <button type="button" className={`tab ${activeSection === 'earn' ? 'active' : ''}`} onClick={() => setActiveSection('earn')}>
-            Earn CC
+          <button
+            type="button"
+            className={`tab ${activeSection === 'rewards' ? 'active' : ''}`}
+            onClick={() => setActiveSection('rewards')}
+          >
+            Rewards Hub
           </button>
-          <button type="button" className={`tab ${activeSection === 'redeem' ? 'active' : ''}`} onClick={() => setActiveSection('redeem')}>
-            Redeem
+          <button
+            type="button"
+            className={`tab ${activeSection === 'gifts' ? 'active' : ''}`}
+            onClick={() => setActiveSection('gifts')}
+          >
+            Gifts Coming Soon
           </button>
         </div>
 
         {checkoutMessage ? <p className="form-error">{checkoutMessage}</p> : null}
 
-        {/* BUY CC TAB */}
-        {activeSection === 'packs' && (
+        {activeSection === 'buy' && (
           <div className="pack-grid">
             {packs.map((pack, index) => (
               <PackCard
@@ -113,58 +160,175 @@ function Store() {
           </div>
         )}
 
-        {/* EARN CC TAB */}
-        {activeSection === 'earn' && (
-          <div className="store-earn-section">
-            {/* Daily Free Coupon */}
-            <div className="store-earn-card">
-              <div className="store-earn-icon">🎁</div>
-              <div className="store-earn-info">
-                <h4>Daily Free Coupon</h4>
-                <p>Claim one free coupon every day just for being active.</p>
-                {claimMsg.text && <p className={`store-earn-msg ${claimMsg.ok ? 'success' : 'error'}`}>{claimMsg.text}</p>}
-              </div>
+        {activeSection === 'rewards' && (
+          <div className="store-rewards-shell">
+            <div className="tabs store-reward-tabs">
               <button
-                className="primary store-earn-btn"
                 type="button"
-                onClick={handleClaimDaily}
-                disabled={isClaiming}
+                className={`tab ${activeRewardTab === 'earn' ? 'active' : ''}`}
+                onClick={() => setActiveRewardTab('earn')}
               >
-                {isClaiming ? 'Claiming...' : 'Claim Now'}
+                Earn CC
+              </button>
+              <button
+                type="button"
+                className={`tab ${activeRewardTab === 'redeem' ? 'active' : ''}`}
+                onClick={() => setActiveRewardTab('redeem')}
+              >
+                Redeem
+              </button>
+              <button
+                type="button"
+                className={`tab ${activeRewardTab === 'referral' ? 'active' : ''}`}
+                onClick={() => setActiveRewardTab('referral')}
+              >
+                Referral Milestone
               </button>
             </div>
 
-            {/* Rewarded Ads */}
-            <RewardedAds onBalanceUpdate={refreshBalance} />
+            {activeRewardTab === 'earn' && (
+              <div className="store-earn-section">
+                <div className="store-earn-card">
+                  <div className="store-earn-icon">Gift</div>
+                  <div className="store-earn-info">
+                    <h4>Daily Free Coupon</h4>
+                    <p>Claim one free coupon every day just for being active.</p>
+                    {claimMsg.text && (
+                      <p className={`store-earn-msg ${claimMsg.ok ? 'success' : 'error'}`}>{claimMsg.text}</p>
+                    )}
+                  </div>
+                  <button
+                    className="primary store-earn-btn"
+                    type="button"
+                    onClick={handleClaimDaily}
+                    disabled={isClaiming}
+                  >
+                    {isClaiming ? 'Claiming...' : 'Claim Now'}
+                  </button>
+                </div>
+
+                <RewardedAds onBalanceUpdate={refreshBalance} />
+              </div>
+            )}
+
+            {activeRewardTab === 'redeem' && (
+              <div className="store-redeem-section">
+                <div className="store-redeem-card">
+                  <span className="store-redeem-icon">Code</span>
+                  <h4>Redeem a Code</h4>
+                  <p>Enter a promo code or gift code to add CC to your balance.</p>
+                  <div className="store-redeem-input-wrap">
+                    <input
+                      type="text"
+                      value={redeemInput}
+                      onChange={(event) => setRedeemInput(event.target.value)}
+                      placeholder="Enter code..."
+                      maxLength={30}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') handleRedeem()
+                      }}
+                    />
+                    <button className="primary" type="button" onClick={handleRedeem} disabled={isRedeeming}>
+                      {isRedeeming ? '...' : 'Redeem'}
+                    </button>
+                  </div>
+                  {redeemMsg.text && (
+                    <p className={`store-earn-msg ${redeemMsg.ok ? 'success' : 'error'}`}>{redeemMsg.text}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeRewardTab === 'referral' && (
+              <div className="store-referral-section">
+                <div className="store-referral-card">
+                  <div className="store-referral-head">
+                    <div>
+                      <p className="eyebrow">Referral Milestone</p>
+                      <h4>Share Cardora and unlock CC milestone rewards.</h4>
+                    </div>
+                    <div className="store-referral-count">
+                      <strong>{referralStats.referralsCount}</strong>
+                      <span>Referrals</span>
+                    </div>
+                  </div>
+
+                  <p className="store-referral-copy">
+                    Your referral activity is powered by your account data. Share your code or link,
+                    bring new users in, and milestone rewards will show up in your CC income history.
+                  </p>
+
+                  <div className="store-referral-grid">
+                    <div className="store-referral-item">
+                      <span className="store-referral-label">Referral Code</span>
+                      <strong>{referralStats.referralCode || 'No code yet'}</strong>
+                      <button
+                        type="button"
+                        className="ghost store-inline-copy"
+                        onClick={() => handleCopy(referralStats.referralCode, 'code')}
+                        disabled={!referralStats.referralCode}
+                      >
+                        {copiedField === 'code' ? 'Copied' : 'Copy Code'}
+                      </button>
+                    </div>
+                    <div className="store-referral-item">
+                      <span className="store-referral-label">Referral Link</span>
+                      <strong className="store-referral-link">{referralStats.referralLink || 'No link available yet'}</strong>
+                      <button
+                        type="button"
+                        className="ghost store-inline-copy"
+                        onClick={() => handleCopy(referralStats.referralLink, 'link')}
+                        disabled={!referralStats.referralLink}
+                      >
+                        {copiedField === 'link' ? 'Copied' : 'Copy Link'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="store-referral-history">
+                    <div className="store-referral-history-head">
+                      <h5>Milestone Reward History</h5>
+                      <span>{referralRewards.length} unlocked</span>
+                    </div>
+                    {referralRewards.length ? (
+                      <div className="store-referral-history-list">
+                        {referralRewards.map((entry, index) => (
+                          <div key={`referral-reward-${index}`} className="store-referral-history-item">
+                            <div>
+                              <strong>+{entry.amount || entry.cc || 0} CC</strong>
+                              <p>{entry.description || 'Referral milestone reward received.'}</p>
+                            </div>
+                            <span>
+                              {entry.date || entry.createdAt
+                                ? new Date(entry.date || entry.createdAt).toLocaleDateString()
+                                : 'Recently'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="store-referral-empty">
+                        <p>No referral milestone rewards yet.</p>
+                        <span>Your future milestone rewards will appear here automatically.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* REDEEM TAB */}
-        {activeSection === 'redeem' && (
-          <div className="store-redeem-section">
-            <div className="store-redeem-card">
-              <span className="store-redeem-icon">🎫</span>
-              <h4>Redeem a Code</h4>
-              <p>Enter a promo code or gift code to add CC to your balance.</p>
-              <div className="store-redeem-input-wrap">
-                <input
-                  type="text"
-                  value={redeemInput}
-                  onChange={(e) => setRedeemInput(e.target.value)}
-                  placeholder="Enter code..."
-                  maxLength={30}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleRedeem() }}
-                />
-                <button
-                  className="primary"
-                  type="button"
-                  onClick={handleRedeem}
-                  disabled={isRedeeming}
-                >
-                  {isRedeeming ? '...' : 'Redeem'}
-                </button>
-              </div>
-              {redeemMsg.text && <p className={`store-earn-msg ${redeemMsg.ok ? 'success' : 'error'}`}>{redeemMsg.text}</p>}
+        {activeSection === 'gifts' && (
+          <div className="store-coming-shell">
+            <div className="store-coming-card">
+              <span className="store-coming-icon">Soon</span>
+              <h4>Gift purchases are coming soon.</h4>
+              <p>
+                The gifting lane is temporarily paused while we complete the technical work behind
+                it. CC purchases and rewards are still live while we finish this part of the
+                experience.
+              </p>
             </div>
           </div>
         )}
@@ -220,3 +384,4 @@ function Store() {
 }
 
 export default Store
+
