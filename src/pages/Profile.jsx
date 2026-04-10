@@ -6,6 +6,7 @@ import CardItem from '../components/CardItem.jsx'
 import InventoryCard from '../components/InventoryCard.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
 import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
+import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
@@ -17,37 +18,6 @@ const ROLE_CONFIG = {
 }
 
 
-function prepareAvatarData(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('Unable to read image.'))
-        return
-      }
-
-      const image = new Image()
-      image.onload = () => {
-        const maxEdge = 320
-        const scale = Math.min(1, maxEdge / Math.max(image.width, image.height))
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.max(1, Math.round(image.width * scale))
-        canvas.height = Math.max(1, Math.round(image.height * scale))
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          resolve(reader.result)
-          return
-        }
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.82))
-      }
-      image.onerror = () => reject(new Error('Unable to load image.'))
-      image.src = reader.result
-    }
-    reader.onerror = () => reject(new Error('Unable to read image.'))
-    reader.readAsDataURL(file)
-  })
-}
 
 function Profile() {
   const {
@@ -58,6 +28,7 @@ function Profile() {
     currentUser,
     openAuthModal,
     updateAvatar,
+    updateProfile,
     getUserCardsFromBackend,
     deleteCardOnBackend,
     onDeleteAccount,
@@ -67,6 +38,8 @@ function Profile() {
   const navigate = useNavigate()
   const avatarInputRef = useRef(null)
   const [cropSrc, setCropSrc] = useState(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [avatarUploadError, setAvatarUploadError] = useState('')
   const [userCards, setUserCards] = useState([])
   const [savedDrafts, setSavedDrafts] = useState([])
   const [loadingCards, setLoadingCards] = useState(false)
@@ -152,11 +125,15 @@ function Profile() {
         {/* Profile Card */}
         <div className="profile profile-enhanced">
           <button
-            className="avatar upload-avatar"
+            className={`avatar upload-avatar${isUploadingAvatar ? ' uploading' : ''}`}
             type="button"
-            onClick={() => currentUser && avatarInputRef.current?.click()}
+            onClick={() => !isUploadingAvatar && currentUser && avatarInputRef.current?.click()}
+            disabled={isUploadingAvatar}
+            title={isUploadingAvatar ? 'Uploading avatar...' : 'Change avatar'}
           >
-            {currentUser?.avatarUrl ? (
+            {isUploadingAvatar ? (
+              <span className="avatar-uploading-spinner" />
+            ) : currentUser?.avatarUrl ? (
               <img src={currentUser.avatarUrl} alt="" draggable="false" />
             ) : (
               <span>{currentUser ? currentUser.name.charAt(0) : '?'}</span>
@@ -177,6 +154,9 @@ function Profile() {
               event.target.value = ''
             }}
           />
+          {avatarUploadError && (
+            <p className="store-earn-msg error" style={{ marginBottom: 4 }}>{avatarUploadError}</p>
+          )}
           <h3>{currentUser ? currentUser.name : 'Guest'}</h3>
           {currentUser?.username ? <p className="profile-handle">@{currentUser.username}</p> : null}
 
@@ -433,9 +413,21 @@ function Profile() {
         open={Boolean(cropSrc)}
         src={cropSrc}
         onCancel={() => setCropSrc(null)}
-        onSave={(dataUrl) => {
-          updateAvatar(dataUrl)
+        onSave={async (dataUrl) => {
           setCropSrc(null)
+          setIsUploadingAvatar(true)
+          setAvatarUploadError('')
+          try {
+            const blob = dataUrlToBlob(dataUrl)
+            const cloudUrl = await uploadToCloudinary(blob, 'image')
+            updateAvatar(cloudUrl)
+            updateProfile({ avatarUrl: cloudUrl })
+          } catch (err) {
+            setAvatarUploadError('Avatar upload failed. Please try again.')
+            console.error('Avatar upload error:', err)
+          } finally {
+            setIsUploadingAvatar(false)
+          }
         }}
       />
 

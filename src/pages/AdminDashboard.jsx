@@ -1,5 +1,6 @@
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { uploadToCloudinary } from '../lib/cloudinary.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import {
@@ -115,6 +116,9 @@ function AdminDashboard() {
   const [newCode, setNewCode] = useState({ numberOfCC: 10, maxUses: 200, isActive: true })
   // New ad form
   const [newAd, setNewAd] = useState({ type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+  const [adVideoUploading, setAdVideoUploading] = useState(false)
+  const [adVideoDragOver, setAdVideoDragOver] = useState(false)
+  const adVideoInputRef = useRef(null)
   // Ban form
   const [banForm, setBanForm] = useState({ userId: '', durationDays: 7, reason: '' })
   // Seasonal reminder
@@ -262,12 +266,31 @@ function AdminDashboard() {
     }
   }
 
+  const handleAdVideoFile = async (file) => {
+    if (!file) return
+    if (!file.type.startsWith('video/')) {
+      showMsg('Please select a video file.', false)
+      return
+    }
+    setAdVideoUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'video')
+      setNewAd(p => ({ ...p, videoUrl: url }))
+      showMsg('Video uploaded successfully!')
+    } catch (err) {
+      showMsg(err.message || 'Video upload failed.', false)
+    } finally {
+      setAdVideoUploading(false)
+    }
+  }
+
   const handleCreateAd = async () => {
-    if (!newAd.videoUrl) { showMsg('Video URL required', false); return }
+    if (!newAd.videoUrl) { showMsg('Video URL required — please upload a video.', false); return }
     try {
       await createAdminAd(newAd)
       showMsg('Ad created!')
       setNewAd({ type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+      if (adVideoInputRef.current) adVideoInputRef.current.value = ''
       loadTabData('Ads')
     } catch (err) {
       showMsg(err.message || 'Failed', false)
@@ -525,11 +548,56 @@ function AdminDashboard() {
                   <option value="external">External</option>
                   <option value="internal">Internal</option>
                 </select>
-                <input placeholder="Video URL" value={newAd.videoUrl} onChange={e => setNewAd(p => ({ ...p, videoUrl: e.target.value }))} />
+
+                {/* Video drag-and-drop upload */}
+                <div
+                  className={`admin-video-drop${adVideoDragOver ? ' dragging' : ''}${newAd.videoUrl ? ' has-video' : ''}`}
+                  onDragOver={e => { e.preventDefault(); setAdVideoDragOver(true) }}
+                  onDragLeave={() => setAdVideoDragOver(false)}
+                  onDrop={e => {
+                    e.preventDefault()
+                    setAdVideoDragOver(false)
+                    handleAdVideoFile(e.dataTransfer.files?.[0])
+                  }}
+                  onClick={() => !adVideoUploading && adVideoInputRef.current?.click()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => e.key === 'Enter' && adVideoInputRef.current?.click()}
+                >
+                  <input
+                    ref={adVideoInputRef}
+                    type="file"
+                    accept="video/*"
+                    style={{ display: 'none' }}
+                    onChange={e => handleAdVideoFile(e.target.files?.[0])}
+                  />
+                  {adVideoUploading ? (
+                    <div className="admin-video-drop-info">
+                      <div className="chat-loading-spinner" style={{ width: 22, height: 22 }} />
+                      <span>Uploading to cloud...</span>
+                    </div>
+                  ) : newAd.videoUrl ? (
+                    <div className="admin-video-drop-info">
+                      <span className="admin-video-drop-check">&#10003;</span>
+                      <span className="admin-video-drop-label">Video uploaded</span>
+                      <span className="admin-video-preview-url">{newAd.videoUrl}</span>
+                      <span className="admin-video-drop-hint">Click or drop to replace</span>
+                    </div>
+                  ) : (
+                    <div className="admin-video-drop-info">
+                      <span className="admin-video-drop-icon">&#127909;</span>
+                      <span className="admin-video-drop-label">Drag & drop video here</span>
+                      <span className="admin-video-drop-hint">or click to browse</span>
+                    </div>
+                  )}
+                </div>
+
                 <input type="number" placeholder="Reward CC" value={newAd.rewardCC} onChange={e => setNewAd(p => ({ ...p, rewardCC: Number(e.target.value) }))} />
                 <input type="number" placeholder="Duration (s)" value={newAd.duration} onChange={e => setNewAd(p => ({ ...p, duration: Number(e.target.value) }))} />
                 <input type="number" placeholder="Priority" value={newAd.priority} onChange={e => setNewAd(p => ({ ...p, priority: Number(e.target.value) }))} />
-                <button className="primary" type="button" onClick={handleCreateAd}>Create</button>
+                <button className="primary" type="button" onClick={handleCreateAd} disabled={adVideoUploading}>
+                  {adVideoUploading ? 'Uploading...' : 'Create'}
+                </button>
               </div>
             </div>
             <div className="admin-table-wrap">

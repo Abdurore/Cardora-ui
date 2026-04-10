@@ -1606,6 +1606,28 @@
   opacity: 1;
 }
 
+.upload-avatar.uploading {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.upload-avatar.uploading::after {
+  content: '';
+  opacity: 1;
+  background: rgba(6, 12, 14, 0.6);
+}
+
+.avatar-uploading-spinner {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(126, 247, 255, 0.25);
+  border-top-color: #7ef7ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: auto;
+}
+
 .crop-modal {
   position: fixed;
   inset: 0;
@@ -9345,6 +9367,79 @@ a {
 
 .admin-check input {
   accent-color: #7ef7ff;
+}
+
+/* Admin — video drag-and-drop upload zone */
+.admin-video-drop {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 110px;
+  border: 2px dashed rgba(126, 247, 255, 0.3);
+  border-radius: 14px;
+  background: rgba(126, 247, 255, 0.04);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  outline: none;
+  padding: 16px;
+  user-select: none;
+}
+
+.admin-video-drop:hover,
+.admin-video-drop:focus {
+  border-color: rgba(126, 247, 255, 0.6);
+  background: rgba(126, 247, 255, 0.08);
+}
+
+.admin-video-drop.dragging {
+  border-color: #7ef7ff;
+  background: rgba(126, 247, 255, 0.14);
+}
+
+.admin-video-drop.has-video {
+  border-style: solid;
+  border-color: rgba(98, 255, 162, 0.5);
+  background: rgba(98, 255, 162, 0.05);
+}
+
+.admin-video-drop-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.admin-video-drop-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.admin-video-drop-check {
+  font-size: 1.6rem;
+  color: #62ffa2;
+  line-height: 1;
+}
+
+.admin-video-drop-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(220, 242, 247, 0.9);
+}
+
+.admin-video-drop-hint {
+  font-size: 0.72rem;
+  color: rgba(220, 242, 247, 0.45);
+}
+
+.admin-video-preview-url {
+  font-size: 0.65rem;
+  color: #7ef7ff;
+  word-break: break-all;
+  max-width: 280px;
+  opacity: 0.75;
+  margin: 2px 0;
 }
 
 /* ═══════════════════════════════════════════════════
