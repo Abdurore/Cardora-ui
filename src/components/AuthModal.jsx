@@ -17,7 +17,13 @@ function AuthModal({ open, onClose, currentUser, onLogout }) {
 
         {currentUser ? (
           <div className="auth-profile">
-            <div className="auth-avatar" style={{ background: currentUser.avatarColor }} />
+            <div className="auth-avatar" style={{ background: currentUser.avatarColor }}>
+              {currentUser.avatarUrl ? (
+                <img src={currentUser.avatarUrl} alt={currentUser.username || currentUser.name} />
+              ) : (
+                <span>{(currentUser.username || currentUser.name || '?').charAt(0).toUpperCase()}</span>
+              )}
+            </div>
             <div>
               <p className="auth-name">{currentUser.username || currentUser.name}</p>
               <p className="auth-email">{currentUser.email}</p>

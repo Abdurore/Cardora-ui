@@ -162,34 +162,39 @@ function Store() {
 
         {activeSection === 'rewards' && (
           <div className="store-rewards-shell">
-            <div className="tabs store-reward-tabs">
+            <div className="store-reward-tabs">
               <button
                 type="button"
-                className={`tab ${activeRewardTab === 'earn' ? 'active' : ''}`}
+                className={`store-reward-tab ${activeRewardTab === 'earn' ? 'active' : ''}`}
                 onClick={() => setActiveRewardTab('earn')}
               >
+                <span className="store-reward-tab-icon">&#x2728;</span>
                 Earn CC
               </button>
               <button
                 type="button"
-                className={`tab ${activeRewardTab === 'redeem' ? 'active' : ''}`}
+                className={`store-reward-tab ${activeRewardTab === 'redeem' ? 'active' : ''}`}
                 onClick={() => setActiveRewardTab('redeem')}
               >
+                <span className="store-reward-tab-icon">&#x1F3AB;</span>
                 Redeem
               </button>
               <button
                 type="button"
-                className={`tab ${activeRewardTab === 'referral' ? 'active' : ''}`}
+                className={`store-reward-tab ${activeRewardTab === 'referral' ? 'active' : ''}`}
                 onClick={() => setActiveRewardTab('referral')}
               >
-                Referral Milestone
+                <span className="store-reward-tab-icon">&#x1F91D;</span>
+                Referrals
               </button>
             </div>
 
             {activeRewardTab === 'earn' && (
               <div className="store-earn-section">
                 <div className="store-earn-card">
-                  <div className="store-earn-icon">Gift</div>
+                  <div className="store-earn-badge">
+                    <span className="store-earn-badge-icon">&#x1F381;</span>
+                  </div>
                   <div className="store-earn-info">
                     <h4>Daily Free Coupon</h4>
                     <p>Claim one free coupon every day just for being active.</p>
@@ -214,15 +219,17 @@ function Store() {
             {activeRewardTab === 'redeem' && (
               <div className="store-redeem-section">
                 <div className="store-redeem-card">
-                  <span className="store-redeem-icon">Code</span>
+                  <div className="store-redeem-badge">
+                    <span>&#x1F3AB;</span>
+                  </div>
                   <h4>Redeem a Code</h4>
-                  <p>Enter a promo code or gift code to add CC to your balance.</p>
+                  <p>Enter a promo or gift code to add CC to your wallet.</p>
                   <div className="store-redeem-input-wrap">
                     <input
                       type="text"
                       value={redeemInput}
                       onChange={(event) => setRedeemInput(event.target.value)}
-                      placeholder="Enter code..."
+                      placeholder="XXXX-XXXX-XXXX"
                       maxLength={30}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') handleRedeem()
@@ -244,8 +251,8 @@ function Store() {
                 <div className="store-referral-card">
                   <div className="store-referral-head">
                     <div>
-                      <p className="eyebrow">Referral Milestone</p>
-                      <h4>Share Cardora and unlock CC milestone rewards.</h4>
+                      <p className="eyebrow">Referral Program</p>
+                      <h4>Share Cardora, earn milestone rewards.</h4>
                     </div>
                     <div className="store-referral-count">
                       <strong>{referralStats.referralsCount}</strong>
@@ -254,41 +261,41 @@ function Store() {
                   </div>
 
                   <p className="store-referral-copy">
-                    Your referral activity is powered by your account data. Share your code or link,
-                    bring new users in, and milestone rewards will show up in your CC income history.
+                    Share your code or link, bring new users in, and milestone rewards
+                    will show up in your CC income history.
                   </p>
 
                   <div className="store-referral-grid">
                     <div className="store-referral-item">
-                      <span className="store-referral-label">Referral Code</span>
+                      <span className="store-referral-label">Your Code</span>
                       <strong>{referralStats.referralCode || 'No code yet'}</strong>
                       <button
                         type="button"
-                        className="ghost store-inline-copy"
+                        className="store-inline-copy"
                         onClick={() => handleCopy(referralStats.referralCode, 'code')}
                         disabled={!referralStats.referralCode}
                       >
-                        {copiedField === 'code' ? 'Copied' : 'Copy Code'}
+                        {copiedField === 'code' ? 'Copied!' : 'Copy Code'}
                       </button>
                     </div>
                     <div className="store-referral-item">
-                      <span className="store-referral-label">Referral Link</span>
+                      <span className="store-referral-label">Invite Link</span>
                       <strong className="store-referral-link">{referralStats.referralLink || 'No link available yet'}</strong>
                       <button
                         type="button"
-                        className="ghost store-inline-copy"
+                        className="store-inline-copy"
                         onClick={() => handleCopy(referralStats.referralLink, 'link')}
                         disabled={!referralStats.referralLink}
                       >
-                        {copiedField === 'link' ? 'Copied' : 'Copy Link'}
+                        {copiedField === 'link' ? 'Copied!' : 'Copy Link'}
                       </button>
                     </div>
                   </div>
 
                   <div className="store-referral-history">
                     <div className="store-referral-history-head">
-                      <h5>Milestone Reward History</h5>
-                      <span>{referralRewards.length} unlocked</span>
+                      <h5>Milestone Rewards</h5>
+                      <span className="store-referral-unlocked">{referralRewards.length} unlocked</span>
                     </div>
                     {referralRewards.length ? (
                       <div className="store-referral-history-list">
@@ -308,8 +315,9 @@ function Store() {
                       </div>
                     ) : (
                       <div className="store-referral-empty">
-                        <p>No referral milestone rewards yet.</p>
-                        <span>Your future milestone rewards will appear here automatically.</span>
+                        <span className="store-referral-empty-icon">&#x1F3C6;</span>
+                        <p>No milestone rewards yet.</p>
+                        <span>Invite friends and milestone rewards appear here automatically.</span>
                       </div>
                     )}
                   </div>

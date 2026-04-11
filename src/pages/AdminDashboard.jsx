@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
+import Dropdown from '../components/Dropdown.jsx'
 import {
   getAdminDashboard,
   getAdminStatsUsers,
@@ -20,12 +21,16 @@ import {
   createAdminRedeemCode,
   getAdminAds,
   createAdminAd,
+  updateAdminAd,
   getAdminAdsAnalytics,
   getAdminActionLogs,
   sendSeasonalReminder,
+  updateAdminPackage,
+  getAdminStatsReferrals,
+  getAdminCoupons,
 } from '../lib/api.js'
 
-const TABS = ['Overview', 'Users', 'Templates', 'Packages', 'Codes', 'Ads', 'Logs']
+const TABS = ['Overview', 'Users', 'Templates', 'Packages', 'Codes', 'Ads', 'Coupons', 'Logs']
 
 function pickStatValue(...values) {
   for (const value of values) {
@@ -107,6 +112,8 @@ function AdminDashboard() {
   const [ads, setAds] = useState([])
   const [adsAnalytics, setAdsAnalytics] = useState(null)
   const [logs, setLogs] = useState([])
+  const [coupons, setCoupons] = useState([])
+  const [referralStats, setReferralStats] = useState(null)
   const [loading, setLoading] = useState(false)
   const [actionMsg, setActionMsg] = useState({ text: '', ok: false })
 
@@ -151,12 +158,13 @@ function AdminDashboard() {
     try {
       switch (tab) {
         case 'Overview': {
-          const [overviewRes, dashboardRes, usersStatsRes, cardsStatsRes, templatesStatsRes] = await Promise.allSettled([
+          const [overviewRes, dashboardRes, usersStatsRes, cardsStatsRes, templatesStatsRes, referralRes] = await Promise.allSettled([
             getAdminStatsOverview(),
             getAdminDashboard(),
             getAdminStatsUsers(),
             getAdminStatsCards(),
             getAdminStatsTemplates(),
+            getAdminStatsReferrals(),
           ])
 
           setStats(
@@ -168,6 +176,14 @@ function AdminDashboard() {
               templatesStatsRes.status === 'fulfilled' ? templatesStatsRes.value : null,
             ),
           )
+          if (referralRes.status === 'fulfilled') {
+            setReferralStats(referralRes.value?.data || referralRes.value || null)
+          }
+          break
+        }
+        case 'Coupons': {
+          const res = await getAdminCoupons()
+          setCoupons(res?.data?.coupons || res?.coupons || [])
           break
         }
         case 'Users': {
@@ -243,6 +259,28 @@ function AdminDashboard() {
       loadTabData('Packages')
     } catch (err) {
       showMsg(err.message || 'Failed', false)
+    }
+  }
+
+  const handleTogglePackage = async (pkg) => {
+    const id = pkg.packageId || pkg._id
+    try {
+      await updateAdminPackage(id, { isActive: !pkg.isActive })
+      showMsg(pkg.isActive ? 'Package deactivated.' : 'Package activated.')
+      loadTabData('Packages')
+    } catch (err) {
+      showMsg(err.message || 'Update failed', false)
+    }
+  }
+
+  const handleToggleAd = async (ad) => {
+    const id = ad._id || ad.id
+    try {
+      await updateAdminAd(id, { isActive: !ad.isActive })
+      showMsg(ad.isActive ? 'Ad deactivated.' : 'Ad activated.')
+      loadTabData('Ads')
+    } catch (err) {
+      showMsg(err.message || 'Update failed', false)
     }
   }
 
@@ -366,17 +404,45 @@ function AdminDashboard() {
               </div>
             </div>
 
+            {/* Referral Stats */}
+            {referralStats && (
+              <div className="admin-sub-section">
+                <h4>Referral Program</h4>
+                <div className="admin-stats-grid">
+                  <div className="admin-stat-card">
+                    <span className="admin-stat-icon">{"\u{1F91D}"}</span>
+                    <div className="admin-stat-value">{referralStats.totalReferrals ?? referralStats.total ?? 0}</div>
+                    <div className="admin-stat-label">Total Referrals</div>
+                  </div>
+                  <div className="admin-stat-card">
+                    <span className="admin-stat-icon">{"\u{1F4B8}"}</span>
+                    <div className="admin-stat-value">{referralStats.totalRewarded ?? referralStats.ccRewarded ?? 0}</div>
+                    <div className="admin-stat-label">CC Rewarded</div>
+                  </div>
+                  <div className="admin-stat-card">
+                    <span className="admin-stat-icon">{"\u{1F31F}"}</span>
+                    <div className="admin-stat-value">{referralStats.topReferrers?.length ?? 0}</div>
+                    <div className="admin-stat-label">Top Referrers</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Seasonal Reminder */}
             <div className="admin-sub-section">
               <h4>Send Seasonal Reminder</h4>
               <div className="admin-inline-form">
-                <select value={season} onChange={e => setSeason(e.target.value)}>
-                  <option value="valentines">Valentine's Day</option>
-                  <option value="christmas">Christmas</option>
-                  <option value="mothers_day">Mother's Day</option>
-                  <option value="fathers_day">Father's Day</option>
-                  <option value="independence_day">Independence Day</option>
-                </select>
+                <Dropdown
+                  value={season}
+                  onChange={setSeason}
+                  options={[
+                    { value: 'valentines', label: "Valentine's Day" },
+                    { value: 'christmas', label: 'Christmas' },
+                    { value: 'mothers_day', label: "Mother's Day" },
+                    { value: 'fathers_day', label: "Father's Day" },
+                    { value: 'independence_day', label: 'Independence Day' },
+                  ]}
+                />
                 <button className="primary" type="button" onClick={handleSeasonalReminder}>Send</button>
               </div>
             </div>
@@ -392,9 +458,18 @@ function AdminDashboard() {
             <div className="admin-sub-section">
               <h4>Ban User</h4>
               <div className="admin-inline-form">
-                <input placeholder="User ID" value={banForm.userId} onChange={e => setBanForm(p => ({ ...p, userId: e.target.value }))} />
-                <input type="number" placeholder="Days" value={banForm.durationDays} onChange={e => setBanForm(p => ({ ...p, durationDays: Number(e.target.value) }))} style={{ width: 80 }} />
-                <input placeholder="Reason" value={banForm.reason} onChange={e => setBanForm(p => ({ ...p, reason: e.target.value }))} />
+                <label className="admin-field">
+                  <span>User ID</span>
+                  <input placeholder="e.g. 65f3a2..." value={banForm.userId} onChange={e => setBanForm(p => ({ ...p, userId: e.target.value }))} />
+                </label>
+                <label className="admin-field">
+                  <span>Ban Duration (days)</span>
+                  <input type="number" placeholder="7" value={banForm.durationDays} onChange={e => setBanForm(p => ({ ...p, durationDays: Number(e.target.value) }))} />
+                </label>
+                <label className="admin-field">
+                  <span>Reason</span>
+                  <input placeholder="Why are they being banned?" value={banForm.reason} onChange={e => setBanForm(p => ({ ...p, reason: e.target.value }))} />
+                </label>
                 <button className="primary" type="button" onClick={handleBanUser}>Ban</button>
               </div>
             </div>
@@ -474,10 +549,22 @@ function AdminDashboard() {
             <div className="admin-sub-section">
               <h4>Create Package</h4>
               <div className="admin-form-grid">
-                <input placeholder="Name" value={newPkg.name} onChange={e => setNewPkg(p => ({ ...p, name: e.target.value }))} />
-                <input placeholder="Description" value={newPkg.description} onChange={e => setNewPkg(p => ({ ...p, description: e.target.value }))} />
-                <input type="number" placeholder="CC Amount" value={newPkg.numberOfCC} onChange={e => setNewPkg(p => ({ ...p, numberOfCC: Number(e.target.value) }))} />
-                <input type="number" placeholder="Price" value={newPkg.price} onChange={e => setNewPkg(p => ({ ...p, price: Number(e.target.value) }))} step="0.01" />
+                <label className="admin-field">
+                  <span>Package Name</span>
+                  <input placeholder="e.g. Starter Pack" value={newPkg.name} onChange={e => setNewPkg(p => ({ ...p, name: e.target.value }))} />
+                </label>
+                <label className="admin-field">
+                  <span>Description</span>
+                  <input placeholder="Short description shown to users" value={newPkg.description} onChange={e => setNewPkg(p => ({ ...p, description: e.target.value }))} />
+                </label>
+                <label className="admin-field">
+                  <span>CC Granted</span>
+                  <input type="number" placeholder="20" value={newPkg.numberOfCC} onChange={e => setNewPkg(p => ({ ...p, numberOfCC: Number(e.target.value) }))} />
+                </label>
+                <label className="admin-field">
+                  <span>Price (USD)</span>
+                  <input type="number" placeholder="9.99" value={newPkg.price} onChange={e => setNewPkg(p => ({ ...p, price: Number(e.target.value) }))} step="0.01" />
+                </label>
                 <label className="admin-check"><input type="checkbox" checked={newPkg.featured} onChange={e => setNewPkg(p => ({ ...p, featured: e.target.checked }))} /> Featured</label>
                 <button className="primary" type="button" onClick={handleCreatePackage}>Create</button>
               </div>
@@ -494,7 +581,12 @@ function AdminDashboard() {
                       <td>{pkg.numberOfCC}</td>
                       <td>{pkg.price}</td>
                       <td>{pkg.featured ? 'Starred' : '-'}</td>
-                      <td><button type="button" className="admin-action-btn reject" onClick={() => handleDeletePackage(pkg.packageId || pkg._id)}>Delete</button></td>
+                      <td>
+                        <button type="button" className="admin-action-btn approve" onClick={() => handleTogglePackage(pkg)}>
+                          {pkg.isActive ? 'Disable' : 'Enable'}
+                        </button>
+                        <button type="button" className="admin-action-btn reject" onClick={() => handleDeletePackage(pkg.packageId || pkg._id)}>Delete</button>
+                      </td>
                     </tr>
                   ))}
                   {packages.length === 0 && <tr><td colSpan={5}>No packages.</td></tr>}
@@ -511,8 +603,14 @@ function AdminDashboard() {
             <div className="admin-sub-section">
               <h4>Generate Code</h4>
               <div className="admin-inline-form">
-                <input type="number" placeholder="CC Amount" value={newCode.numberOfCC} onChange={e => setNewCode(p => ({ ...p, numberOfCC: Number(e.target.value) }))} />
-                <input type="number" placeholder="Max Uses" value={newCode.maxUses} onChange={e => setNewCode(p => ({ ...p, maxUses: Number(e.target.value) }))} />
+                <label className="admin-field">
+                  <span>CC per Redemption</span>
+                  <input type="number" placeholder="10" value={newCode.numberOfCC} onChange={e => setNewCode(p => ({ ...p, numberOfCC: Number(e.target.value) }))} />
+                </label>
+                <label className="admin-field">
+                  <span>Max Total Uses</span>
+                  <input type="number" placeholder="200" value={newCode.maxUses} onChange={e => setNewCode(p => ({ ...p, maxUses: Number(e.target.value) }))} />
+                </label>
                 <button className="primary" type="button" onClick={handleCreateCode}>Generate</button>
               </div>
             </div>
@@ -544,10 +642,14 @@ function AdminDashboard() {
             <div className="admin-sub-section">
               <h4>Create Ad</h4>
               <div className="admin-form-grid">
-                <select value={newAd.type} onChange={e => setNewAd(p => ({ ...p, type: e.target.value }))}>
-                  <option value="external">External</option>
-                  <option value="internal">Internal</option>
-                </select>
+                <Dropdown
+                  value={newAd.type}
+                  onChange={(v) => setNewAd(p => ({ ...p, type: v }))}
+                  options={[
+                    { value: 'external', label: 'External' },
+                    { value: 'internal', label: 'Internal' },
+                  ]}
+                />
 
                 {/* Video drag-and-drop upload */}
                 <div
@@ -592,18 +694,46 @@ function AdminDashboard() {
                   )}
                 </div>
 
-                <input type="number" placeholder="Reward CC" value={newAd.rewardCC} onChange={e => setNewAd(p => ({ ...p, rewardCC: Number(e.target.value) }))} />
-                <input type="number" placeholder="Duration (s)" value={newAd.duration} onChange={e => setNewAd(p => ({ ...p, duration: Number(e.target.value) }))} />
-                <input type="number" placeholder="Priority" value={newAd.priority} onChange={e => setNewAd(p => ({ ...p, priority: Number(e.target.value) }))} />
+                <label className="admin-field">
+                  <span>CC Reward per View</span>
+                  <input type="number" placeholder="2" value={newAd.rewardCC} onChange={e => setNewAd(p => ({ ...p, rewardCC: Number(e.target.value) }))} />
+                </label>
+                <label className="admin-field">
+                  <span>Watch Duration (seconds)</span>
+                  <input type="number" placeholder="30" value={newAd.duration} onChange={e => setNewAd(p => ({ ...p, duration: Number(e.target.value) }))} />
+                </label>
+                <label className="admin-field">
+                  <span>Display Priority (higher = shown first)</span>
+                  <input type="number" placeholder="1" value={newAd.priority} onChange={e => setNewAd(p => ({ ...p, priority: Number(e.target.value) }))} />
+                </label>
                 <button className="primary" type="button" onClick={handleCreateAd} disabled={adVideoUploading}>
                   {adVideoUploading ? 'Uploading...' : 'Create'}
                 </button>
               </div>
             </div>
+            {adsAnalytics && (
+              <div className="admin-stats-grid" style={{ marginBottom: 16 }}>
+                <div className="admin-stat-card">
+                  <span className="admin-stat-icon">{"\u{1F3AC}"}</span>
+                  <div className="admin-stat-value">{adsAnalytics.totalViews ?? adsAnalytics.views ?? 0}</div>
+                  <div className="admin-stat-label">Total Views</div>
+                </div>
+                <div className="admin-stat-card">
+                  <span className="admin-stat-icon">{"\u{1F4B0}"}</span>
+                  <div className="admin-stat-value">{adsAnalytics.totalCCPaid ?? adsAnalytics.ccPaid ?? 0}</div>
+                  <div className="admin-stat-label">CC Paid Out</div>
+                </div>
+                <div className="admin-stat-card">
+                  <span className="admin-stat-icon">{"\u{1F465}"}</span>
+                  <div className="admin-stat-value">{adsAnalytics.uniqueUsers ?? 0}</div>
+                  <div className="admin-stat-label">Unique Users</div>
+                </div>
+              </div>
+            )}
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Type</th><th>Reward</th><th>Duration</th><th>Active</th></tr>
+                  <tr><th>Type</th><th>Reward</th><th>Duration</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {ads.map(ad => (
@@ -612,9 +742,40 @@ function AdminDashboard() {
                       <td>{ad.rewardCC} CC</td>
                       <td>{ad.duration}s</td>
                       <td>{ad.isActive ? 'Yes' : 'No'}</td>
+                      <td>
+                        <button type="button" className="admin-action-btn approve" onClick={() => handleToggleAd(ad)}>
+                          {ad.isActive ? 'Disable' : 'Enable'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
-                  {ads.length === 0 && <tr><td colSpan={4}>No ads.</td></tr>}
+                  {ads.length === 0 && <tr><td colSpan={5}>No ads.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* COUPONS */}
+        {activeTab === 'Coupons' && !loading && (
+          <div className="admin-section">
+            <h3 className="admin-section-title">Coupon Management</h3>
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Code</th><th>Type</th><th>Value</th><th>Used</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {coupons.map((c, i) => (
+                    <tr key={c._id || c.code || i}>
+                      <td><code>{c.code || '-'}</code></td>
+                      <td>{c.type || c.kind || '-'}</td>
+                      <td>{c.value ?? c.amount ?? c.numberOfCC ?? '-'}</td>
+                      <td>{c.usedCount ?? c.uses ?? 0}</td>
+                      <td>{c.isActive !== false ? 'Active' : 'Inactive'}</td>
+                    </tr>
+                  ))}
+                  {coupons.length === 0 && <tr><td colSpan={5}>No coupons.</td></tr>}
                 </tbody>
               </table>
             </div>

@@ -16,6 +16,7 @@ function CardDetailModal({
   const [startY, setStartY] = useState(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
+  const [isSending, setIsSending] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -37,6 +38,7 @@ function CardDetailModal({
     setSent(false)
     setCopied(false)
     setError('')
+    setIsSending(false)
   }, [card])
 
   if (!card) return null
@@ -65,8 +67,10 @@ function CardDetailModal({
       setError('Not enough CC to send this card yet.')
       return
     }
+    setIsSending(true)
     const formData = new FormData(event.currentTarget)
     const recipient = (formData.get('recipient') || '').toString()
+    const recipientEmail = (formData.get('email') || '').toString()
     const note = (formData.get('note') || '').toString()
     const stored = JSON.parse(localStorage.getItem('cardora:sentCards') || '[]')
     const newCard = {
@@ -76,6 +80,7 @@ function CardDetailModal({
       subtitle: card.subtitle,
       message: note || card.message,
       recipient,
+      recipientEmail,
       sender: currentUser?.name || currentUser?.username || 'Cardora User',
       tier: tierInfo.key,
       createdAt: new Date().toISOString(),
@@ -87,6 +92,7 @@ function CardDetailModal({
     setTimeout(() => {
       setShowForm(false)
       setSent(false)
+      setIsSending(false)
       onClose()
       navigate(`/card/${newCard.id}`)
     }, 900)
@@ -181,8 +187,8 @@ function CardDetailModal({
                     <textarea name="note" rows="3" placeholder="Write something sweet..." />
                   </label>
                   <div className="detail-actions">
-                    <button className="primary" type="submit" disabled={isLocked}>
-                      Send Now ({tierInfo.cost} CC)
+                    <button className="primary" type="submit" disabled={isLocked || isSending}>
+                      {isSending ? 'Sending...' : `Send Now (${tierInfo.cost} CC)`}
                     </button>
                     <button className="ghost" type="button" onClick={() => setShowForm(false)}>
                       Back

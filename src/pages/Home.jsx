@@ -6,8 +6,15 @@ import CardItem from '../components/CardItem.jsx'
 import { homeCards } from '../data/catalog.js'
 
 function Home() {
-  const { openCardDetails, favorites, toggleFavorite, currentUser, openAuthModal, balance } =
-    useOutletContext()
+  const {
+    openCardDetails,
+    favorites,
+    toggleFavorite,
+    currentUser,
+    openAuthModal,
+    balance,
+    marketplaceTemplates,
+  } = useOutletContext()
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
 
   const howItWorks = [
@@ -85,10 +92,17 @@ function Home() {
     },
   ]
 
+  const highlightCards = useMemo(() => {
+    if (marketplaceTemplates?.length) {
+      return marketplaceTemplates.slice(0, 8)
+    }
+    return homeCards
+  }, [marketplaceTemplates])
+
   const visibleCards = useMemo(() => {
-    if (!showFavoritesOnly) return homeCards
-    return homeCards.filter((card) => favorites.includes(card.id))
-  }, [favorites, showFavoritesOnly])
+    if (!showFavoritesOnly) return highlightCards
+    return highlightCards.filter((card) => favorites.includes(card.id))
+  }, [favorites, showFavoritesOnly, highlightCards])
 
   return (
     <div className="page-section">

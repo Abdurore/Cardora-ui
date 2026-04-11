@@ -10,6 +10,7 @@ import { IoColorPaletteOutline } from 'react-icons/io5'
 import logo from '../assets/icons/logo.png'
 import { defaultCardObject, resolveTemplateCardObject, musicPresets, fontOptions } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
+import Dropdown from '../components/Dropdown.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
@@ -405,9 +406,11 @@ function CardStudio() {
           <ColorInput label="Heading Color" value={c.closedState.headingColor} onChange={e => update('closedState.headingColor', e.target.value)} />
           <label className="cs-field">
             <span>Heading Font</span>
-            <select value={c.closedState.headingFont} onChange={e => update('closedState.headingFont', e.target.value)}>
-              {fontOptions.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
+            <Dropdown
+              value={c.closedState.headingFont}
+              onChange={(v) => update('closedState.headingFont', v)}
+              options={fontOptions.map(f => ({ value: f, label: f }))}
+            />
           </label>
           <label className="cs-field">
             <span>Heading Text</span>
@@ -500,13 +503,14 @@ function CardStudio() {
               </label>
               <label className="cs-field">
                 <span>Image Fit</span>
-                <select
+                <Dropdown
                   value={img.fit || 'cover'}
-                  onChange={e => updateImageSetting(i, 'fit', e.target.value)}
-                >
-                  <option value="cover">Cover</option>
-                  <option value="contain">Contain</option>
-                </select>
+                  onChange={(v) => updateImageSetting(i, 'fit', v)}
+                  options={[
+                    { value: 'cover', label: 'Cover' },
+                    { value: 'contain', label: 'Contain' },
+                  ]}
+                />
               </label>
               <label className="cs-field">
                 <span>Horizontal Focus</span>
@@ -692,9 +696,11 @@ function CardStudio() {
           <h3>Global look & feel</h3>
           <label className="cs-field">
             <span>Font Family</span>
-            <select value={c.theme.fontFamily} onChange={e => update('theme.fontFamily', e.target.value)}>
-              {fontOptions.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
+            <Dropdown
+              value={c.theme.fontFamily}
+              onChange={(v) => update('theme.fontFamily', v)}
+              options={fontOptions.map(f => ({ value: f, label: f }))}
+            />
           </label>
           <ColorInput label="Accent Color" value={c.theme.accentColor} onChange={e => update('theme.accentColor', e.target.value)} />
           <ColorInput label="Text Color" value={c.theme.textColor} onChange={e => update('theme.textColor', e.target.value)} />
@@ -763,23 +769,31 @@ function CardStudio() {
             <p className="cs-sub-label">Text Body Animation</p>
             <label className="cs-field">
               <span>Fade-In Duration</span>
-              <select value={c.card.textBodyAnimation.fadeInDuration} onChange={e => update('card.textBodyAnimation.fadeInDuration', e.target.value)}>
-                <option value="none">None</option>
-                <option value="1">1s</option>
-                <option value="2">2s</option>
-                <option value="3">3s</option>
-                <option value="4">4s</option>
-              </select>
+              <Dropdown
+                value={c.card.textBodyAnimation.fadeInDuration}
+                onChange={(v) => update('card.textBodyAnimation.fadeInDuration', v)}
+                options={[
+                  { value: 'none', label: 'None' },
+                  { value: '1', label: '1s' },
+                  { value: '2', label: '2s' },
+                  { value: '3', label: '3s' },
+                  { value: '4', label: '4s' },
+                ]}
+              />
             </label>
             <label className="cs-field">
               <span>Typewriter Speed</span>
-              <select value={c.card.textBodyAnimation.selfTypeSpeed} onChange={e => update('card.textBodyAnimation.selfTypeSpeed', e.target.value)}>
-                <option value="none">None</option>
-                <option value="1">Fast (1s)</option>
-                <option value="2">Normal (2s)</option>
-                <option value="3">Slow (3s)</option>
-                <option value="5">Very Slow (5s)</option>
-              </select>
+              <Dropdown
+                value={c.card.textBodyAnimation.selfTypeSpeed}
+                onChange={(v) => update('card.textBodyAnimation.selfTypeSpeed', v)}
+                options={[
+                  { value: 'none', label: 'None' },
+                  { value: '1', label: 'Fast (1s)' },
+                  { value: '2', label: 'Normal (2s)' },
+                  { value: '3', label: 'Slow (3s)' },
+                  { value: '5', label: 'Very Slow (5s)' },
+                ]}
+              />
             </label>
           </div>
         </>
@@ -910,10 +924,14 @@ function CardStudio() {
 
           <label className="cs-field">
             <span>Deny Behavior</span>
-            <select value={c.questions.denyBehavior} onChange={e => update('questions.denyBehavior', e.target.value)}>
-              <option value="none">Normal</option>
-              <option value="switch">Dodge (button moves away)</option>
-            </select>
+            <Dropdown
+              value={c.questions.denyBehavior}
+              onChange={(v) => update('questions.denyBehavior', v)}
+              options={[
+                { value: 'none', label: 'Normal' },
+                { value: 'switch', label: 'Dodge (button moves away)' },
+              ]}
+            />
           </label>
         </>
       )
@@ -1343,17 +1361,16 @@ function CardStudio() {
             <p>Your card will be submitted for review and added to the marketplace once approved.</p>
             <label className="cs-field">
               <span>Category</span>
-              <select
+              <Dropdown
                 value={publishForm.category}
-                onChange={(event) =>
-                  setPublishForm((prev) => ({ ...prev, category: event.target.value }))
-                }
-              >
-                <option value="proposal">Proposal</option>
-                <option value="anniversary">Anniversary</option>
-                <option value="birthday">Birthday</option>
-                <option value="scratch">General / Other</option>
-              </select>
+                onChange={(v) => setPublishForm((prev) => ({ ...prev, category: v }))}
+                options={[
+                  { value: 'proposal', label: 'Proposal' },
+                  { value: 'anniversary', label: 'Anniversary' },
+                  { value: 'birthday', label: 'Birthday' },
+                  { value: 'scratch', label: 'General / Other' },
+                ]}
+              />
             </label>
             <label className="cs-field">
               <span>Template Name</span>

@@ -21,6 +21,8 @@ function Explore() {
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [activeTag, setActiveTag] = useState(searchParams.get('tag') || 'all')
   const [tierFilter, setTierFilter] = useState('all')
+  const [visibleCount, setVisibleCount] = useState(12)
+  const CARDS_PER_PAGE = 12
   const cardSource = marketplaceTemplates?.length ? marketplaceTemplates : exploreCards
 
   const dynamicTags = useMemo(() => {
@@ -59,6 +61,13 @@ function Explore() {
         return matchesQuery && matchesTag && matchesFavorites && matchesTier
       })
   }, [activeTag, cardSource, favorites, query, tierFilter])
+
+  useEffect(() => {
+    setVisibleCount(CARDS_PER_PAGE)
+  }, [activeTag, query, tierFilter])
+
+  const pagedCards = filteredCards.slice(0, visibleCount)
+  const hasMore = filteredCards.length > visibleCount
 
   return (
     <div className="page-body">
@@ -130,18 +139,31 @@ function Explore() {
         </div>
 
         {filteredCards.length ? (
-          <div className="card-grid compact marketplace-grid">
-            {filteredCards.map((card, index) => (
-              <CardItem
-                key={`${card.title}-${index}`}
-                {...card}
-                variant={`v${(index % 4) + 1}`}
-                isFavorite={favorites.includes(card.id)}
-                onToggleFavorite={toggleFavorite}
-                onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
-              />
-            ))}
-          </div>
+          <>
+            <div className="card-grid compact marketplace-grid">
+              {pagedCards.map((card, index) => (
+                <CardItem
+                  key={`${card.title}-${index}`}
+                  {...card}
+                  variant={`v${(index % 4) + 1}`}
+                  isFavorite={favorites.includes(card.id)}
+                  onToggleFavorite={toggleFavorite}
+                  onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
+                />
+              ))}
+            </div>
+            {hasMore ? (
+              <div className="explore-load-more">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setVisibleCount((prev) => prev + CARDS_PER_PAGE)}
+                >
+                  Load More ({filteredCards.length - visibleCount} remaining)
+                </button>
+              </div>
+            ) : null}
+          </>
         ) : (
           <p className="empty-state">No cards match that search yet.</p>
         )}

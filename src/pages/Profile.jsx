@@ -4,9 +4,11 @@ import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
 import InventoryCard from '../components/InventoryCard.jsx'
+import Dropdown from '../components/Dropdown.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
 import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
+import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency } from '../lib/api.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
@@ -49,6 +51,14 @@ function Profile() {
   const [isApplying, setIsApplying] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', username: '', bio: '' })
+  const [editMsg, setEditMsg] = useState({ text: '', ok: false })
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [analytics, setAnalytics] = useState(null)
+  const [currencies, setCurrencies] = useState([])
+  const [userCurrency, setUserCurrency] = useState('')
+  const [isSavingCurrency, setIsSavingCurrency] = useState(false)
 
   const allCards = [...homeCards, ...exploreCards, ...profileCreations]
   const favoriteCards = allCards.filter((card) => favorites.includes(card.id))
@@ -72,6 +82,56 @@ function Profile() {
     if (!cropSrc || !cropSrc.startsWith('blob:')) return undefined
     return () => URL.revokeObjectURL(cropSrc)
   }, [cropSrc])
+
+  // Load analytics, currencies, user currency
+  useEffect(() => {
+    if (!currentUser) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [a, c, uc] = await Promise.all([
+          getUserAnalytics().catch(() => null),
+          getCurrencies().catch(() => null),
+          getUserCurrency().catch(() => null),
+        ])
+        if (cancelled) return
+        if (a) setAnalytics(a.analytics || a.data || a)
+        if (c) setCurrencies(c.currencies || c.data || c || [])
+        if (uc) setUserCurrency(uc.currency || uc.code || uc.data?.currency || '')
+      } catch { /* silent */ }
+    })()
+    return () => { cancelled = true }
+  }, [currentUser])
+
+  const handleSaveProfile = async () => {
+    if (!editForm.name.trim()) {
+      setEditMsg({ text: 'Name is required.', ok: false })
+      return
+    }
+    setIsSavingProfile(true)
+    try {
+      await updateProfile({
+        name: editForm.name.trim(),
+        username: editForm.username.trim(),
+        bio: editForm.bio.trim(),
+      })
+      setEditMsg({ text: 'Profile updated!', ok: true })
+      setTimeout(() => { setShowEditProfile(false); setEditMsg({ text: '', ok: false }) }, 900)
+    } catch {
+      setEditMsg({ text: 'Could not update profile.', ok: false })
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
+
+  const handleCurrencyChange = async (code) => {
+    setUserCurrency(code)
+    setIsSavingCurrency(true)
+    try {
+      await updateCurrency({ currency: code })
+    } catch { /* ignore */ }
+    setIsSavingCurrency(false)
+  }
 
   // Load user cards from backend
   useEffect(() => {
@@ -178,11 +238,27 @@ function Profile() {
             </div>
           )}
 
-          {/* Stats Row */}
+          {/* Stats Row — unified profile + analytics */}
           <div className="profile-stats">
             <div className="profile-stat">
               <strong>{balance}</strong>
               <span>CC Balance</span>
+            </div>
+            <div className="profile-stat">
+              <strong>{totalCardCount}</strong>
+              <span>Cards</span>
+            </div>
+            <div className="profile-stat">
+              <strong>{analytics?.totalViews ?? analytics?.views ?? 0}</strong>
+              <span>Views</span>
+            </div>
+            <div className="profile-stat">
+              <strong>{analytics?.totalLikes ?? analytics?.likes ?? 0}</strong>
+              <span>Likes</span>
+            </div>
+            <div className="profile-stat">
+              <strong>{analytics?.totalEarned ?? analytics?.ccEarned ?? 0}</strong>
+              <span>CC Earned</span>
             </div>
             <div className="profile-stat">
               <strong>{favoriteCards.length}</strong>
@@ -192,10 +268,6 @@ function Profile() {
               <strong>{giftInventory.length}</strong>
               <span>Gifts</span>
             </div>
-            <div className="profile-stat">
-              <strong>{totalCardCount}</strong>
-              <span>Cards</span>
-            </div>
             {currentUser?.referralsCount > 0 && (
               <div className="profile-stat">
                 <strong>{currentUser.referralsCount}</strong>
@@ -203,6 +275,25 @@ function Profile() {
               </div>
             )}
           </div>
+
+          {/* Edit profile */}
+          {currentUser && (
+            <button
+              className="profile-edit-btn"
+              type="button"
+              onClick={() => {
+                setEditForm({
+                  name: currentUser.name || '',
+                  username: currentUser.username || '',
+                  bio: currentUser.bio || '',
+                })
+                setEditMsg({ text: '', ok: false })
+                setShowEditProfile(true)
+              }}
+            >
+              Edit Profile
+            </button>
+          )}
 
           {/* Admin quick link */}
           {isAdmin && (
@@ -226,6 +317,26 @@ function Profile() {
         {!currentUser ? (
           <p className="empty-state">Sign in to personalize your profile.</p>
         ) : null}
+
+        {/* Currency preference */}
+        {currentUser && currencies.length > 0 && (
+          <div className="profile-currency">
+            <h4 className="section-title">Display Currency</h4>
+            <div className="profile-currency-row">
+              <Dropdown
+                value={userCurrency}
+                onChange={handleCurrencyChange}
+                disabled={isSavingCurrency}
+                placeholder="Select currency"
+                options={currencies.map((c) => ({
+                  value: c.code || c,
+                  label: `${c.code || c}${c.name ? ` — ${c.name}` : ''}`,
+                }))}
+              />
+              {isSavingCurrency && <span className="profile-currency-saving">Saving...</span>}
+            </div>
+          </div>
+        )}
 
         {currentUser && savedDrafts.length > 0 ? (
           <div>
@@ -431,6 +542,51 @@ function Profile() {
         }}
       />
 
+
+      {/* Edit Profile Modal */}
+      {showEditProfile && (
+        <section className="detail-modal" role="dialog" aria-modal="true">
+          <div className="detail-backdrop" onClick={() => setShowEditProfile(false)} />
+          <div className="detail-card artist-apply-modal">
+            <p className="eyebrow">Profile</p>
+            <h3>Edit your profile</h3>
+            <label className="detail-field">
+              Name
+              <input
+                type="text"
+                value={editForm.name}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Your name"
+              />
+            </label>
+            <label className="detail-field">
+              Username
+              <input
+                type="text"
+                value={editForm.username}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, username: e.target.value }))}
+                placeholder="@username"
+              />
+            </label>
+            <label className="detail-field">
+              Bio
+              <textarea
+                rows={3}
+                value={editForm.bio}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, bio: e.target.value }))}
+                placeholder="A short bio..."
+              />
+            </label>
+            {editMsg.text && <p className={`store-earn-msg artist-apply-msg ${editMsg.ok ? 'success' : 'error'}`}>{editMsg.text}</p>}
+            <div className="detail-actions artist-apply-actions">
+              <button className="primary" type="button" onClick={handleSaveProfile} disabled={isSavingProfile}>
+                {isSavingProfile ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button className="ghost" type="button" onClick={() => setShowEditProfile(false)}>Cancel</button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Artist Application Modal */}
       {showArtistForm && (
