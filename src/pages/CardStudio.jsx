@@ -11,6 +11,7 @@ import logo from '../assets/icons/logo.png'
 import { defaultCardObject, resolveTemplateCardObject, musicPresets, fontOptions } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import ColorPicker from '../components/ColorPicker.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
@@ -48,7 +49,7 @@ function ColorInput({ value, onChange, label }) {
     <label className="cs-color-field">
       <span>{label}</span>
       <div className="cs-color-wrap">
-        <input type="color" value={value} onChange={onChange} />
+        <ColorPicker value={value} onChange={onChange} />
         <input
           type="text"
           value={value}
