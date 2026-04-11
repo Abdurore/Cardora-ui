@@ -52,6 +52,16 @@ export const defaultCardObject = {
       borderColor: '#76efff',
       shape: 'pill',
     },
+    envelope: {
+      paperTexture: 'smooth',
+      bodyColor: '#1a1f2c',
+      flapColor: '#242a38',
+      sealColor: '#b03030',
+      sealIcon: 'monogram',
+      showMonogram: true,
+      recipientCaption: '',
+      pacing: 'normal',
+    },
   },
 
   animation: {
@@ -467,18 +477,30 @@ export const templateCardObjects = {
 }
 
 // Resolves a template card object from catalog card data
+export function backfillEnvelope(card) {
+  if (!card?.closedState) return card
+  if (!card.closedState.envelope) {
+    card.closedState.envelope = structuredClone(defaultCardObject.closedState.envelope)
+  } else {
+    card.closedState.envelope = {
+      ...structuredClone(defaultCardObject.closedState.envelope),
+      ...card.closedState.envelope,
+    }
+  }
+  return card
+}
+
 export function resolveTemplateCardObject(cardData) {
-  if (!cardData) return { ...structuredClone(defaultCardObject) }
+  if (!cardData) return backfillEnvelope(structuredClone(defaultCardObject))
 
   const category = cardData.category || 'scratch'
   const base = templateCardObjects[category]
     ? structuredClone(templateCardObjects[category])
     : structuredClone(defaultCardObject)
 
-  // Override with template-specific content
   if (cardData.title) base.content.heading = cardData.title
   if (cardData.message) base.content.body = cardData.message
   if (cardData.subtitle) base.closedState.bodyText = cardData.subtitle
 
-  return base
+  return backfillEnvelope(base)
 }

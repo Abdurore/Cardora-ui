@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import confetti from 'canvas-confetti'
 import PremiumGiftReveal from './PremiumGiftReveal.jsx'
+import Envelope from './Envelope.jsx'
+import AmbientParticles from './AmbientParticles.jsx'
+import { fireOpenEffect } from '../lib/studioEffects.js'
+
+const LEGACY_EMOJI_AMBIENTS = new Set(['floating', 'reverse'])
 
 // Typewriter hook
 function useTypewriter(text, speed, active) {
@@ -20,7 +24,7 @@ function useTypewriter(text, speed, active) {
   return displayed
 }
 
-function CardPreviewModal({ cardObject, onClose }) {
+function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail = '' }) {
   const [stage, setStage] = useState('closed') // closed, opening, open, questions, end, giftIntro, giftReveal, giftReceive
   const [questionIdx, setQuestionIdx] = useState(0)
   const [fadeBody, setFadeBody] = useState(false)
@@ -59,50 +63,24 @@ function CardPreviewModal({ cardObject, onClose }) {
     }
   }, [c.background.music.url, c.background.music.volume, stage])
 
-  // Confetti
-  const fireConfetti = useCallback(() => {
-    if (c.animation.openEffect !== 'confetti') return
-    const colors = c.animation.confettiColors.length > 0
-      ? c.animation.confettiColors
-      : ['#76efff', '#62ffa2', '#ff9bd2']
-    const end = Date.now() + 1800
-    const frame = () => {
-      confetti({
-        particleCount: 3,
-        angle: 60,
-        spread: 55,
-        origin: { x: 0, y: 0.7 },
-        colors,
-        zIndex: 100001,
-      })
-      confetti({
-        particleCount: 3,
-        angle: 120,
-        spread: 55,
-        origin: { x: 1, y: 0.7 },
-        colors,
-        zIndex: 100001,
-      })
-      if (Date.now() < end) requestAnimationFrame(frame)
-    }
-    frame()
+  // Open effect dispatcher (confetti / fireworks / hearts / stars / balloons / emoji rain)
+  const triggerOpenEffect = useCallback(() => {
+    if (!c.animation.openEffect || c.animation.openEffect === 'none') return
+    fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
   }, [c.animation.openEffect, c.animation.confettiColors])
 
   const handleOpen = () => {
-    setStage('opening')
-    fireConfetti()
-    setTimeout(() => {
-      setStage('open')
-      setBodyVisible(false)
-      setRevealStep(0)
-      if (hasFadeIn) {
-        setTimeout(() => setFadeBody(true), 200)
-        setTimeout(() => setBodyVisible(true), 300)
-      } else {
-        setFadeBody(true)
-        setBodyVisible(true)
-      }
-    }, 600)
+    triggerOpenEffect()
+    setStage('open')
+    setBodyVisible(false)
+    setRevealStep(0)
+    if (hasFadeIn) {
+      setTimeout(() => setFadeBody(true), 200)
+      setTimeout(() => setBodyVisible(true), 300)
+    } else {
+      setFadeBody(true)
+      setBodyVisible(true)
+    }
   }
 
   const handleContinue = () => {
@@ -166,10 +144,6 @@ function CardPreviewModal({ cardObject, onClose }) {
     borderStyle.backgroundClip = 'padding-box'
   }
 
-  // Closed-state button shape
-  const shapeMap = { rounded: '14px', pill: '999px', square: '6px', sharp: '0px' }
-  const btnRadius = shapeMap[c.closedState.button.shape] || '999px'
-
   // Memoize particle positions
   const particlePositions = useMemo(() =>
     Array.from({ length: 18 }).map(() => ({
@@ -180,29 +154,32 @@ function CardPreviewModal({ cardObject, onClose }) {
     })),
   [])
 
-  // Background effect emojis
+  // Background effect — legacy emoji loops OR tsparticles ambient presets
   const renderBgEffect = () => {
     const eff = c.animation.backgroundEffect
-    if (eff.type === 'none') return null
-    const emojis = eff.emojis.length > 0 ? eff.emojis : ['✨']
-    return (
-      <div className={`cp-bg-effect cp-bg-${eff.type}`}>
-        {particlePositions.map((pos, i) => (
-          <span
-            key={i}
-            className={`cp-bg-particle cp-p-${(i % 6) + 1}`}
-            style={{
-              left: pos.left,
-              top: pos.top,
-              animationDelay: pos.delay,
-              fontSize: pos.size,
-            }}
-          >
-            {emojis[i % emojis.length]}
-          </span>
-        ))}
-      </div>
-    )
+    if (!eff || eff.type === 'none') return null
+    if (LEGACY_EMOJI_AMBIENTS.has(eff.type)) {
+      const emojis = eff.emojis.length > 0 ? eff.emojis : ['✨']
+      return (
+        <div className={`cp-bg-effect cp-bg-${eff.type}`}>
+          {particlePositions.map((pos, i) => (
+            <span
+              key={i}
+              className={`cp-bg-particle cp-p-${(i % 6) + 1}`}
+              style={{
+                left: pos.left,
+                top: pos.top,
+                animationDelay: pos.delay,
+                fontSize: pos.size,
+              }}
+            >
+              {emojis[i % emojis.length]}
+            </span>
+          ))}
+        </div>
+      )
+    }
+    return <AmbientParticles type={eff.type} colors={c.animation.confettiColors} />
   }
 
   const renderGradientBorder = (children, className = '') => {
@@ -274,47 +251,14 @@ function CardPreviewModal({ cardObject, onClose }) {
         </button>
       )}
 
-      {/* CLOSED STATE */}
+      {/* ENVELOPE (closed state) */}
       {stage === 'closed' && (
-        <div
-          className="cp-closed-card"
-          style={{
-            backgroundColor: c.closedState.backgroundColor,
-            border: `2px solid ${c.closedState.borderColor}`,
-          }}
-        >
-          <h2
-            style={{
-              color: c.closedState.headingColor,
-              fontFamily: `'${c.closedState.headingFont}', serif`,
-            }}
-          >
-            {c.closedState.headingText}
-          </h2>
-          <p style={{ color: c.closedState.textColor }}>
-            {c.closedState.bodyText}
-          </p>
-          <button
-            className="cp-open-btn"
-            style={{
-              backgroundColor: c.closedState.button.backgroundColor,
-              color: c.closedState.button.textColor,
-              border: `1.5px solid ${c.closedState.button.borderColor}`,
-              borderRadius: btnRadius,
-            }}
-            onClick={handleOpen}
-          >
-            {c.closedState.button.text}
-          </button>
-        </div>
-      )}
-
-      {/* OPENING ANIMATION */}
-      {stage === 'opening' && (
-        <div className="cp-opening">
-          <div className="cp-opening-ring" style={{ borderColor: c.theme.accentColor }} />
-          <div className="cp-opening-ring r2" style={{ borderColor: c.theme.accentColor }} />
-        </div>
+        <Envelope
+          cardObject={c}
+          tier={tier}
+          recipientEmail={recipientEmail}
+          onOpenComplete={handleOpen}
+        />
       )}
 
       {/* OPEN CARD */}

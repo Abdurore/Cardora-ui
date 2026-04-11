@@ -36,6 +36,7 @@ function Profile() {
     onDeleteAccount,
     onLogout,
     artistApplyAction,
+    marketplaceTemplates,
   } = useOutletContext()
   const navigate = useNavigate()
   const avatarInputRef = useRef(null)
@@ -68,6 +69,11 @@ function Profile() {
   const roleInfo = ROLE_CONFIG[roleName] || ROLE_CONFIG.Visitor
   const isAdmin = roleName === 'Admin'
   const isArtist = roleName === 'Artist'
+
+  const publishedTemplates = (marketplaceTemplates || []).filter((t) => {
+    if (!isArtist || !currentUser?.id) return false
+    return t.ownerId && String(t.ownerId) === String(currentUser.id)
+  })
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -395,6 +401,34 @@ function Profile() {
             </div>
           </div>
         ) : null}
+
+        {/* Published Templates (artists only, read-only — deletion is admin-only) */}
+        {isArtist && (
+          <div>
+            <h4 className="section-title">
+              Published Templates
+              {publishedTemplates.length > 0 && <span className="section-count"> ({publishedTemplates.length})</span>}
+            </h4>
+            {publishedTemplates.length > 0 ? (
+              <div className="card-grid compact">
+                {publishedTemplates.map((card, index) => (
+                  <CardItem
+                    key={card.id}
+                    {...card}
+                    variant={`v${(index % 4) + 1}`}
+                    isFavorite={favorites.includes(card.id)}
+                    onToggleFavorite={toggleFavorite}
+                    onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="empty-state">
+                You haven't published any templates yet. Create one in the Studio and click Publish.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* My Cards (from backend) */}
         {currentUser && (

@@ -12,14 +12,17 @@ import { defaultCardObject, resolveTemplateCardObject, musicPresets, fontOptions
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
-import { uploadToCloudinary } from '../lib/cloudinary.js'
+import { dataUrlToBlob, uploadToCloudinary } from '../lib/cloudinary.js'
+import html2canvas from 'html2canvas'
+import TemplatePreviewSnapshot from '../components/TemplatePreviewSnapshot.jsx'
+import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
 const steps = ['closed', 'card', 'questions', 'preview']
 
 const tools = [
-  { id: 'closedState', icon: HiOutlineEnvelope, label: 'Closed State', hint: 'First impression & button' },
+  { id: 'closedState', icon: HiOutlineEnvelope, label: 'Envelope', hint: 'Sealed reveal & first impression' },
   { id: 'content', icon: HiOutlineDocumentText, label: 'Content', hint: 'Heading, body, extended' },
   { id: 'media', icon: HiOutlinePhoto, label: 'Media', hint: 'Images & captions' },
   { id: 'background', icon: HiOutlinePaintBrush, label: 'Background', hint: 'Colors, gradients, music' },
@@ -68,6 +71,119 @@ function formatTime(seconds) {
   const secs = Math.floor(seconds % 60)
   return `${mins}:${String(secs).padStart(2, '0')}`
 }
+
+function drawRoundedRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.lineTo(x + width - radius, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
+  ctx.lineTo(x + width, y + height - radius)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+  ctx.lineTo(x + radius, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
+  ctx.lineTo(x, y + radius)
+  ctx.quadraticCurveTo(x, y, x + radius, y)
+  ctx.closePath()
+}
+
+function wrapCanvasText(ctx, text, centerX, startY, maxWidth, lineHeight) {
+  const words = String(text || '').split(/\s+/).filter(Boolean)
+  if (!words.length) return
+  let line = ''
+  let currentY = startY
+
+  for (const word of words) {
+    const nextLine = line ? `${line} ${word}` : word
+    if (ctx.measureText(nextLine).width > maxWidth && line) {
+      ctx.fillText(line, centerX, currentY)
+      line = word
+      currentY += lineHeight
+    } else {
+      line = nextLine
+    }
+  }
+
+  if (line) ctx.fillText(line, centerX, currentY)
+}
+
+function generateTemplatePreviewDataUrl(cardObject) {
+  const canvas = document.createElement('canvas')
+  canvas.width = 900
+  canvas.height = 1200
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Could not create preview canvas.')
+
+  const palette = Array.isArray(cardObject.background?.colors) && cardObject.background.colors.length
+    ? cardObject.background.colors.slice(0, 3)
+    : ['#0d1b22', '#163543', '#091116']
+
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+  gradient.addColorStop(0, palette[0] || '#0d1b22')
+  gradient.addColorStop(0.55, palette[1] || palette[0] || '#163543')
+  gradient.addColorStop(1, palette[2] || palette[1] || palette[0] || '#091116')
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  const glow = ctx.createRadialGradient(canvas.width * 0.76, canvas.height * 0.18, 16, canvas.width * 0.76, canvas.height * 0.18, 320)
+  glow.addColorStop(0, 'rgba(255,255,255,0.22)')
+  glow.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  const cardX = 78
+  const cardY = 124
+  const cardW = canvas.width - 156
+  const cardH = canvas.height - 248
+  drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 44)
+  ctx.fillStyle = 'rgba(7, 14, 18, 0.72)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+
+  const accent = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH)
+  accent.addColorStop(0, 'rgba(126, 247, 255, 0.22)')
+  accent.addColorStop(1, 'rgba(255, 255, 255, 0.04)')
+  ctx.fillStyle = accent
+  drawRoundedRect(ctx, cardX + 18, cardY + 18, cardW - 36, cardH - 36, 34)
+  ctx.fill()
+
+  ctx.fillStyle = 'rgba(239, 252, 255, 0.88)'
+  ctx.font = '700 64px Georgia, serif'
+  ctx.textAlign = 'center'
+  const heading = cardObject.closedState?.headingText || cardObject.content?.heading || 'A beautiful moment is waiting.'
+  wrapCanvasText(ctx, heading, canvas.width / 2, 300, 520, 74)
+
+  ctx.fillStyle = 'rgba(220, 242, 247, 0.74)'
+  ctx.font = '400 32px Arial'
+  const body = cardObject.closedState?.bodyText || cardObject.content?.body || 'Tap to open a personalized Cardora experience.'
+  wrapCanvasText(ctx, body, canvas.width / 2, 520, 560, 44)
+
+  const buttonText = cardObject.closedState?.button?.text || 'Open'
+  const buttonShape = cardObject.closedState?.button?.shape || 'pill'
+  const buttonWidth = 320
+  const buttonHeight = 88
+  const buttonX = (canvas.width - buttonWidth) / 2
+  const buttonY = 880
+  const buttonRadius = buttonShape === 'square' ? 18 : buttonShape === 'sharp' ? 8 : 999
+  drawRoundedRect(ctx, buttonX, buttonY, buttonWidth, buttonHeight, buttonRadius)
+  ctx.fillStyle = 'rgba(126, 247, 255, 0.18)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(126, 247, 255, 0.35)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+
+  ctx.fillStyle = '#f4fdff'
+  ctx.font = '700 30px Arial'
+  ctx.fillText(buttonText, canvas.width / 2, buttonY + 54)
+
+  ctx.fillStyle = 'rgba(220, 242, 247, 0.38)'
+  ctx.font = '600 20px Arial'
+  ctx.fillText('Cardora Template Preview', canvas.width / 2, canvas.height - 90)
+
+  return canvas.toDataURL('image/jpeg', 0.88)
+}
+
 
 function StudioAudioPlayer({ src, volume = 0.8 }) {
   const audioRef = useRef(null)
@@ -169,12 +285,69 @@ function CardStudio() {
   const bgImageInputRef = useRef(null)
   const bgVideoInputRef = useRef(null)
   const musicInputRef = useRef(null)
+  const previewSnapshotRef = useRef(null)
   const [isUploading, setIsUploading] = useState(false)
-
 
   const isArtist = currentUser?.role === 'Artist'
 
   const c = cardObject
+
+  const handlePublish = async () => {
+    if (!publishForm.name.trim()) {
+      setPublishError('Template name is required.')
+      return
+    }
+
+    setPublishError('')
+    setIsPublishing(true)
+
+    try {
+      let previewDataUrl
+      if (previewSnapshotRef.current) {
+        await new Promise((resolve) => requestAnimationFrame(() => resolve()))
+        const canvas = await html2canvas(previewSnapshotRef.current, {
+          backgroundColor: null,
+          scale: 1,
+          useCORS: true,
+          logging: false,
+        })
+        previewDataUrl = canvas.toDataURL('image/jpeg', 0.88)
+      } else {
+        previewDataUrl = generateTemplatePreviewDataUrl(cardObject)
+      }
+      const previewBlob = dataUrlToBlob(previewDataUrl)
+      const uploadedPreviewImage = await uploadToCloudinary(previewBlob, 'image')
+      const previewImage = uploadedPreviewImage || c.media.images?.[0]?.url || c.background.imageUrl || ''
+
+      if (!previewImage) {
+        throw new Error('Could not generate a preview image for this template.')
+      }
+
+      const result = await publishTemplate?.({
+        name: publishForm.name.trim(),
+        category: publishForm.category,
+        previewImage,
+        layoutConfig: structuredClone({
+          ...cardObject,
+          previewImage,
+          previewUrl: previewImage,
+        }),
+      })
+
+      if (!result?.ok) {
+        setPublishError(result?.message || 'Could not submit the template.')
+        return
+      }
+
+      setShowPublish(false)
+      setSavedState('Template submitted to backend')
+    } catch (error) {
+      setPublishError(error.message || 'Could not submit the template.')
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
 
   // Updater helpers
   const update = (path, value) => {
@@ -234,28 +407,6 @@ function CardStudio() {
     }
   }
 
-  const handlePublish = async () => {
-    if (!publishForm.name.trim()) {
-      setPublishError('Template name is required.')
-      return
-    }
-    setPublishError('')
-    setIsPublishing(true)
-    const previewImage = c.media.images?.[0]?.url || c.background.imageUrl || ''
-    const result = await publishTemplate?.({
-      name: publishForm.name.trim(),
-      category: publishForm.category,
-      previewImage,
-      layoutConfig: structuredClone(cardObject),
-    })
-    setIsPublishing(false)
-    if (!result?.ok) {
-      setPublishError(result?.message || 'Could not submit the template.')
-      return
-    }
-    setShowPublish(false)
-    setSavedState('Template submitted to backend')
-  }
 
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0]
@@ -397,12 +548,66 @@ function CardStudio() {
   const renderPanel = () => {
     // CLOSED STATE
     if (activeTool === 'closedState') {
+      const env = c.closedState.envelope || {}
       return (
         <>
-          <p className="cs-panel-eyebrow">Closed State</p>
-          <h3>First impression & sealed look</h3>
-          <ColorInput label="Background" value={c.closedState.backgroundColor} onChange={e => update('closedState.backgroundColor', e.target.value)} />
-          <ColorInput label="Border" value={c.closedState.borderColor} onChange={e => update('closedState.borderColor', e.target.value)} />
+          <p className="cs-panel-eyebrow">Envelope</p>
+          <h3>Sealed reveal & first impression</h3>
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Envelope</p>
+            <ColorInput label="Body Color" value={env.bodyColor || '#1a1f2c'} onChange={e => update('closedState.envelope.bodyColor', e.target.value)} />
+            <ColorInput label="Flap Color" value={env.flapColor || '#242a38'} onChange={e => update('closedState.envelope.flapColor', e.target.value)} />
+            <ColorInput label="Seal Color" value={env.sealColor || '#b03030'} onChange={e => update('closedState.envelope.sealColor', e.target.value)} />
+            <label className="cs-field">
+              <span>Paper Texture</span>
+              <Dropdown
+                value={env.paperTexture || 'smooth'}
+                onChange={(v) => update('closedState.envelope.paperTexture', v)}
+                options={[
+                  { value: 'smooth', label: 'Smooth' },
+                  { value: 'linen', label: 'Linen' },
+                  { value: 'parchment', label: 'Parchment' },
+                ]}
+              />
+            </label>
+            <label className="cs-field">
+              <span>Seal Icon</span>
+              <Dropdown
+                value={env.sealIcon || 'monogram'}
+                onChange={(v) => update('closedState.envelope.sealIcon', v)}
+                options={[
+                  { value: 'monogram', label: 'Monogram (recipient initial)' },
+                  { value: 'heart', label: 'Heart' },
+                  { value: 'star', label: 'Star' },
+                  { value: 'wax', label: 'Plain wax' },
+                ]}
+              />
+            </label>
+            <label className="cs-field">
+              <span>Recipient Caption</span>
+              <input
+                value={env.recipientCaption || ''}
+                placeholder="Auto from recipient email"
+                onChange={e => update('closedState.envelope.recipientCaption', e.target.value)}
+              />
+            </label>
+            <label className="cs-field">
+              <span>Pacing</span>
+              <Dropdown
+                value={env.pacing || 'normal'}
+                onChange={(v) => update('closedState.envelope.pacing', v)}
+                options={[
+                  { value: 'quick', label: 'Quick' },
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'cinematic', label: 'Cinematic' },
+                ]}
+              />
+            </label>
+          </div>
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Inner Letter Peek</p>
+            <ColorInput label="Background" value={c.closedState.backgroundColor} onChange={e => update('closedState.backgroundColor', e.target.value)} />
+            <ColorInput label="Border" value={c.closedState.borderColor} onChange={e => update('closedState.borderColor', e.target.value)} />
           <ColorInput label="Text Color" value={c.closedState.textColor} onChange={e => update('closedState.textColor', e.target.value)} />
           <ColorInput label="Heading Color" value={c.closedState.headingColor} onChange={e => update('closedState.headingColor', e.target.value)} />
           <label className="cs-field">
@@ -421,6 +626,7 @@ function CardStudio() {
             <span>Body Text</span>
             <textarea rows={3} value={c.closedState.bodyText} onChange={e => update('closedState.bodyText', e.target.value)} />
           </label>
+          </div>
           <div className="cs-sub-section">
             <p className="cs-sub-label">Open Button</p>
             <label className="cs-field">
@@ -810,18 +1016,18 @@ function CardStudio() {
           <div className="cs-sub-section">
             <p className="cs-sub-label">Open Effect</p>
             <div className="cs-choice-row">
-              {['confetti', 'none'].map(eff => (
+              {OPEN_EFFECTS.map(eff => (
                 <button
-                  key={eff}
+                  key={eff.value}
                   type="button"
-                  className={`cs-chip ${c.animation.openEffect === eff ? 'active' : ''}`}
-                  onClick={() => update('animation.openEffect', eff)}
+                  className={`cs-chip ${c.animation.openEffect === eff.value ? 'active' : ''}`}
+                  onClick={() => update('animation.openEffect', eff.value)}
                 >
-                  {eff === 'confetti' ? '🎉 Confetti' : 'None'}
+                  {eff.label}
                 </button>
               ))}
             </div>
-            {c.animation.openEffect === 'confetti' && (
+            {c.animation.openEffect !== 'none' && (
               <>
                 <p className="cs-sub-label">Confetti Colors</p>
                 {c.animation.confettiColors.map((color, i) => (
@@ -840,20 +1046,20 @@ function CardStudio() {
           </div>
 
           <div className="cs-sub-section">
-            <p className="cs-sub-label">Background Effect</p>
+            <p className="cs-sub-label">Ambient Effect</p>
             <div className="cs-choice-row">
-              {['floating', 'snow', 'reverse', 'sparkle', 'none'].map(type => (
+              {AMBIENT_EFFECTS.map(eff => (
                 <button
-                  key={type}
+                  key={eff.value}
                   type="button"
-                  className={`cs-chip ${c.animation.backgroundEffect.type === type ? 'active' : ''}`}
-                  onClick={() => update('animation.backgroundEffect.type', type)}
+                  className={`cs-chip ${c.animation.backgroundEffect.type === eff.value ? 'active' : ''}`}
+                  onClick={() => update('animation.backgroundEffect.type', eff.value)}
                 >
-                  {type}
+                  {eff.label}
                 </button>
               ))}
             </div>
-            {c.animation.backgroundEffect.type !== 'none' && (
+            {c.animation.backgroundEffect.type === 'floating' && (
               <div className="cs-sub-section">
                 <p className="cs-sub-label">Background Emojis</p>
                 <div className="cs-emoji-builder">
@@ -1336,6 +1542,15 @@ function CardStudio() {
         </div>
       </div>
 
+      {/* Hidden snapshot for template publish preview */}
+      {isArtist && (
+        <TemplatePreviewSnapshot
+          ref={previewSnapshotRef}
+          cardObject={cardObject}
+          recipientName={currentUser?.name || ''}
+        />
+      )}
+
       {/* Preview Modal */}
       {showPreview && (
         <CardPreviewModal
@@ -1443,6 +1658,7 @@ function CardStudio() {
 }
 
 export default CardStudio
+
 
 
 

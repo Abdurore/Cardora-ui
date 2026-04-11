@@ -10,6 +10,7 @@ function CardItem({
   tier = 'simple',
   variant = 'one',
   showOccasion = true,
+  previewImage,
   onClick,
   isFavorite,
   onToggleFavorite,
@@ -41,6 +42,7 @@ function CardItem({
         {'\u2764'}
       </button>
       <div className="card-thumb">
+        {previewImage ? <img src={previewImage} alt={title || ''} className="card-thumb-image" /> : null}
         <div className="card-thumb-glow" />
         <div className="card-thumb-aura" />
       </div>
@@ -74,3 +76,4 @@ function CardItem({
 }
 
 export default CardItem
+

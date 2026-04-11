@@ -114,6 +114,7 @@ function CardDetailModal({
       <div className="detail-backdrop" onClick={onClose} />
       <div className="detail-card" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove}>
         <div className={`detail-thumb ${card.variant || ''}`}>
+          {card.previewImage ? <img src={card.previewImage} alt={card.title || ''} className="detail-thumb-image" /> : null}
           <div className="detail-thumb-overlay">
             <div className="detail-thumb-top">
               <p className="detail-eyebrow">{card.occasion}</p>
@@ -215,4 +216,5 @@ function CardDetailModal({
 }
 
 export default CardDetailModal
+
 

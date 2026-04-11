@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(xargs grep:*)",
+      "WebSearch",
+      "WebFetch(domain:mixkit.co)",
+      "WebFetch(domain:www.soundjay.com)",
+      "WebFetch(domain:pixabay.com)",
+      "Bash(curl -sL -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0 Safari/537.36\" \"https://pixabay.com/sound-effects/search/paper-rustle/\" -o /tmp/pix.html)",
+      "Read(//tmp/**)"
     ]
   }
 }

@@ -30,7 +30,7 @@ import {
   getAdminCoupons,
 } from '../lib/api.js'
 
-const TABS = ['Overview', 'Users', 'Templates', 'Packages', 'Codes', 'Ads', 'Coupons', 'Logs']
+const TABS = ['Overview', 'Users', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Coupons', 'Logs']
 
 function pickStatValue(...values) {
   for (const value of values) {
@@ -101,7 +101,7 @@ function normalizeOverviewStats(overview, dashboard, usersStats, cardsStats, tem
 }
 
 function AdminDashboard() {
-  const { currentUser, balance, openAuthModal } = useOutletContext()
+  const { currentUser, balance, openAuthModal, marketplaceTemplates, deleteMarketplaceTemplate } = useOutletContext()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('Overview')
   const [stats, setStats] = useState(null)
@@ -192,6 +192,10 @@ function AdminDashboard() {
           break
         }
         case 'Templates': {
+          // Templates are already loaded into marketplaceTemplates via outlet context.
+          break
+        }
+        case 'Artists': {
           const res = await getAdminArtistApplications()
           setApplications(res?.data?.applications || res?.applications || [])
           break
@@ -502,8 +506,77 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* TEMPLATES / ARTIST APPLICATIONS */}
+        {/* TEMPLATES — review & delete */}
         {activeTab === 'Templates' && !loading && (
+          <div className="admin-section">
+            <h3 className="admin-section-title">Marketplace Templates</h3>
+            {(marketplaceTemplates?.length || 0) > 0 ? (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Preview</th>
+                      <th>Name</th>
+                      <th>Category</th>
+                      <th>Tier</th>
+                      <th>Likes</th>
+                      <th>Views</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {marketplaceTemplates.map((tpl) => (
+                      <tr key={tpl.id}>
+                        <td>
+                          {tpl.previewImage ? (
+                            <img
+                              src={tpl.previewImage}
+                              alt={tpl.title || ''}
+                              style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 6 }}
+                            />
+                          ) : '—'}
+                        </td>
+                        <td>{tpl.title || '-'}</td>
+                        <td>{tpl.occasion || '-'}</td>
+                        <td>{tpl.tier || '-'}</td>
+                        <td>{tpl.likeCount ?? tpl.likes ?? 0}</td>
+                        <td>{tpl.userCount ?? 0}</td>
+                        <td>
+                          <span className={`admin-template-status ${(tpl.tag || 'live').toLowerCase()}`}>
+                            {tpl.tag || 'Live'}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="admin-action-btn reject"
+                            onClick={async () => {
+                              if (!window.confirm(`Delete template "${tpl.title}"? This cannot be undone.`)) return
+                              const res = await deleteMarketplaceTemplate?.(tpl.templateId || tpl.id)
+                              if (res?.ok) showMsg('Template deleted.')
+                              else showMsg(res?.message || 'Delete failed.', false)
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="admin-empty">
+                <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
+                <p>No templates in the marketplace yet.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ARTISTS — applications */}
+        {activeTab === 'Artists' && !loading && (
           <div className="admin-section">
             <h3 className="admin-section-title">Artist Applications</h3>
             {applications.length > 0 ? (

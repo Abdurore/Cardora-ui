@@ -236,8 +236,19 @@ function WorldChat() {
             className="chat-send-btn"
             onClick={sendMessage}
             disabled={cooldown > 0 || !input.trim()}
+            aria-label="Send message"
           >
-            {cooldown > 0 ? cooldown : '→'}
+            {cooldown > 0 ? (
+              <span className="chat-send-cooldown">{cooldown}</span>
+            ) : (
+              <svg viewBox="0 0 24 24" className="chat-send-icon" aria-hidden="true">
+                <path
+                  d="M3.4 20.4l17.45-8.3a1.2 1.2 0 0 0 0-2.2L3.4 1.6a1.2 1.2 0 0 0-1.67 1.4L4.5 11 1.73 19a1.2 1.2 0 0 0 1.67 1.4z"
+                  fill="currentColor"
+                />
+                <path d="M4.8 11h7.4" stroke="rgba(4,16,21,0.35)" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            )}
           </button>
         </div>
       </div>

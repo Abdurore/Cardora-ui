@@ -5,7 +5,7 @@ import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
 import searchIcon from '../assets/icons/search.png'
-import { exploreCards, exploreTags } from '../data/catalog.js'
+import { exploreCards } from '../data/catalog.js'
 
 function Explore() {
   const {
@@ -20,25 +20,9 @@ function Explore() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [activeTag, setActiveTag] = useState(searchParams.get('tag') || 'all')
-  const [tierFilter, setTierFilter] = useState('all')
   const [visibleCount, setVisibleCount] = useState(12)
   const CARDS_PER_PAGE = 12
   const cardSource = marketplaceTemplates?.length ? marketplaceTemplates : exploreCards
-
-  const dynamicTags = useMemo(() => {
-    const counts = cardSource.reduce((acc, card) => {
-      const key = card.category || 'scratch'
-      acc[key] = (acc[key] || 0) + 1
-      return acc
-    }, {})
-
-    return exploreTags.map((tag) => {
-      if (tag.value === 'all') {
-        return { ...tag, count: cardSource.length }
-      }
-      return { ...tag, count: counts[tag.value] || 0 }
-    })
-  }, [cardSource])
 
   useEffect(() => {
     const params = {}
@@ -55,16 +39,13 @@ function Explore() {
           ? card.title.toLowerCase().includes(normalizedQuery)
           : true
         const matchesFavorites = activeTag === 'favorites' ? favorites.includes(card.id) : true
-        const matchesTag =
-          activeTag === 'all' || activeTag === 'favorites' ? true : card.category === activeTag
-        const matchesTier = tierFilter === 'all' ? true : card.tier === tierFilter
-        return matchesQuery && matchesTag && matchesFavorites && matchesTier
+        return matchesQuery && matchesFavorites
       })
-  }, [activeTag, cardSource, favorites, query, tierFilter])
+  }, [activeTag, cardSource, favorites, query])
 
   useEffect(() => {
     setVisibleCount(CARDS_PER_PAGE)
-  }, [activeTag, query, tierFilter])
+  }, [activeTag, query])
 
   const pagedCards = filteredCards.slice(0, visibleCount)
   const hasMore = filteredCards.length > visibleCount
@@ -89,53 +70,19 @@ function Explore() {
           />
         </div>
 
-        <div className="marketplace-filters secondary">
-          <button
-            type="button"
-            className={`filter-chip ${tierFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setTierFilter('all')}
-          >
-            All Tiers
-          </button>
-          <button
-            type="button"
-            className={`filter-chip ${tierFilter === 'simple' ? 'active' : ''}`}
-            onClick={() => setTierFilter('simple')}
-          >
-            Classic
-          </button>
-          <button
-            type="button"
-            className={`filter-chip ${tierFilter === 'special' ? 'active' : ''}`}
-            onClick={() => setTierFilter('special')}
-          >
-            Premium
-          </button>
-          <button
-            type="button"
-            className={`filter-chip ${tierFilter === 'signature' ? 'active' : ''}`}
-            onClick={() => setTierFilter('signature')}
-          >
-            Elite
-          </button>
-        </div>
-
         <div className="tag-list">
+          <button
+            className={`tag ${activeTag === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveTag('all')}
+          >
+            All <span>({cardSource.length})</span>
+          </button>
           <button
             className={`tag ${activeTag === 'favorites' ? 'active' : ''}`}
             onClick={() => setActiveTag('favorites')}
           >
             Favorites <span>({favorites.length})</span>
           </button>
-          {dynamicTags.map((tag) => (
-            <button
-              key={tag.label}
-              className={`tag ${activeTag === tag.value ? 'active' : ''}`}
-              onClick={() => setActiveTag(tag.value)}
-            >
-              {tag.label} <span>({tag.count})</span>
-            </button>
-          ))}
         </div>
 
         {filteredCards.length ? (

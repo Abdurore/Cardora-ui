@@ -1,3 +1,5 @@
+import { backfillEnvelope } from '../data/cardDefaults.js'
+
 const ROLE_MAP = {
   admin: 'Admin',
   artist: 'Artist',
@@ -87,18 +89,26 @@ export function mapTemplateToCard(template, index = 0) {
     template.usageCount ??
     0
 
+  const createdBy = template.createdBy || template.artist || template.author || template.owner || template.userId || null
+  const ownerId =
+    (createdBy && typeof createdBy === 'object' ? createdBy._id || createdBy.id || createdBy.userId : createdBy) || null
+
   return {
     id: template.templateId || template._id || `template-${index}`,
+    templateId: template.templateId || template._id || null,
     title,
     subtitle: template.description || message,
     message,
     occasion: capitalize(template.category || 'General'),
     meta: `${userCount} Views`,
     likes: String(likeCount),
+    likeCount,
+    userCount,
     category: (template.category || 'scratch').toLowerCase(),
     tier: (template.couponType || template.tier || layout.couponType || 'simple').toLowerCase(),
     previewImage: template.previewImage || layout.previewImage || layout.media?.images?.[0] || '',
     tag: template.status ? capitalize(template.status) : '',
+    ownerId,
     backendTemplate: template,
   }
 }
@@ -173,7 +183,6 @@ export function layoutDataToCardObject(layoutdata) {
   if (!layoutdata) return {}
   const obj = structuredClone(layoutdata)
 
-  // Transform media.images from string[] → [{url, caption, fit}]
   if (obj.media?.images && Array.isArray(obj.media.images)) {
     obj.media.images = obj.media.images.map(img =>
       typeof img === 'string'
@@ -181,6 +190,8 @@ export function layoutDataToCardObject(layoutdata) {
         : img
     )
   }
+
+  backfillEnvelope(obj)
 
   return obj
 }

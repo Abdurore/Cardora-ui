@@ -5,6 +5,8 @@ import { getTierInfo } from '../utils/tier.js'
 import { getCardBySlug, submitCardResponse, submitPollVote, submitChainReply, submitTriviaAnswer } from '../lib/api.js'
 import { mapBackendCard, layoutDataToCardObject } from '../lib/backendMappers.js'
 import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
+import Envelope from '../components/Envelope.jsx'
+import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
 
 const fallbackMusic =
   'data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA='
@@ -235,19 +237,12 @@ function CardView() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.4 }}
           >
-            <div className="card-entry-scene" aria-hidden="true">
-              <div className="card-entry-envelope">
-                <span className="entry-flap" />
-                <span className="entry-seal" />
-              </div>
-              <div className="card-entry-glow" />
-            </div>
-            <p className="entry-label">{'You have received a card \u{1F48C}'}</p>
-            <h2>{heading || card.title}</h2>
-            <p className="entry-sub">From {card.sender || 'Someone special'}</p>
-            <button className="primary" type="button" onClick={() => setIsOpen(true)}>
-              Open Card
-            </button>
+            <Envelope
+              cardObject={backfillEnvelope(card.cardObject || structuredClone(defaultCardObject))}
+              tier={tierInfo.key}
+              recipientEmail={card.recipient || card.recipientEmail || ''}
+              onOpenComplete={() => setIsOpen(true)}
+            />
           </motion.section>
         ) : (
           <motion.section

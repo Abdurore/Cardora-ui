@@ -8,6 +8,7 @@ import {
   createCouponCheckout,
   createPaystackCheckout,
   createTemplate,
+  deleteTemplate,
   extractToken,
   getCouponPackages,
   getCurrentUser,
@@ -418,12 +419,36 @@ function MainLayout() {
 
   const publishTemplate = async ({ name, category, previewImage, layoutConfig }) => {
     try {
-      const response = await createTemplate({ name, category, previewImage, layoutConfig })
+      const resolvedPreviewImage = previewImage || layoutConfig?.previewImage || layoutConfig?.previewUrl || ''
+      const normalizedLayoutConfig = structuredClone({
+        ...layoutConfig,
+        previewImage: resolvedPreviewImage,
+        previewUrl: resolvedPreviewImage,
+      })
+      const response = await createTemplate({
+        name,
+        category,
+        previewImage: resolvedPreviewImage,
+        layoutConfig: normalizedLayoutConfig,
+      })
       await loadPublicData()
       return { ok: true, message: response?.message || 'Template submitted successfully.' }
     } catch (error) {
       console.error('Template publish failed', error)
       return { ok: false, message: error.message || 'Could not publish template.' }
+    }
+  }
+
+  const deleteMarketplaceTemplate = async (templateId) => {
+    if (!templateId) return { ok: false, message: 'Missing template id.' }
+    try {
+      await deleteTemplate({ templateId })
+      setMarketplaceTemplates((prev) => prev.filter((t) => (t.templateId || t.id) !== templateId))
+      await loadPublicData()
+      return { ok: true }
+    } catch (error) {
+      console.error('Template delete failed', error)
+      return { ok: false, message: error.message || 'Could not delete template.' }
     }
   }
 
@@ -561,6 +586,7 @@ function MainLayout() {
           onLogout: handleLogout,
           inventory,
           publishTemplate,
+          deleteMarketplaceTemplate,
           createCardOnBackend: handleCreateCard,
           getUserCardsFromBackend: handleGetUserCards,
           deleteCardOnBackend: handleDeleteCard,
@@ -600,4 +626,5 @@ function MainLayout() {
 }
 
 export default MainLayout
+
 
