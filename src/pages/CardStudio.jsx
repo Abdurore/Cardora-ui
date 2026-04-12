@@ -1761,49 +1761,52 @@ function CardStudio() {
           )}
         </div>
 
-        {/* Sticky tab bar: stays at top when panel content scrolls */}
-        <div className="cs-mobile-sticky-bar">
-          <div className="cs-mobile-stepnav">
-            {steps.map(step => (
-              <button
-                key={step}
-                type="button"
-                className={`cs-mobile-step ${activeStep === step ? 'active' : ''}`}
-                onClick={() => goToStep(step)}
-              >
-                {step === 'closed' ? 'Closed' : step}
-              </button>
-            ))}
-          </div>
-
-          <div className="cs-mobile-tools">
-            {tools.map(tool => {
-              const Icon = tool.icon
-              return (
+        {/* Scroll zone: tabs are sticky inside here, panel scrolls freely */}
+        <div className="cs-mobile-scroll-zone">
+          <div className="cs-mobile-sticky-bar">
+            <div className="cs-mobile-stepnav">
+              {steps.map(step => (
                 <button
-                  key={tool.id}
+                  key={step}
                   type="button"
-                  className={`cs-mobile-tool-chip ${activeTool === tool.id ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveTool(tool.id)
-                    if (tool.id === 'closedState') setActiveStep('closed')
-                    else if (tool.id === 'questions') setActiveStep('questions')
-                    else setActiveStep('card')
-                  }}
+                  className={`cs-mobile-step ${activeStep === step ? 'active' : ''}`}
+                  onClick={() => goToStep(step)}
                 >
-                  <Icon size={16} />
-                  <span>{tool.label}</span>
+                  {step === 'closed' ? 'Closed' : step}
                 </button>
-              )
-            })}
+              ))}
+            </div>
+
+            <div className="cs-mobile-tools">
+              {tools.map(tool => {
+                const Icon = tool.icon
+                return (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    className={`cs-mobile-tool-chip ${activeTool === tool.id ? 'active' : ''}`}
+                    onClick={() => {
+                      setActiveTool(tool.id)
+                      if (tool.id === 'closedState') setActiveStep('closed')
+                      else if (tool.id === 'questions') setActiveStep('questions')
+                      else setActiveStep('card')
+                    }}
+                  >
+                    <Icon size={16} />
+                    <span>{tool.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Editing panel — scrolls inside scroll-zone */}
+          <div className="cs-mobile-panel">
+            {renderPanel()}
           </div>
         </div>
 
-        {/* Mobile panel */}
-        <div className="cs-mobile-panel">
-          {renderPanel()}
-        </div>
-
+        {/* Footer: natural-flow bottom bar */}
         <div className="cs-mobile-footer">
           <button type="button" className="cs-mobile-ghost" onClick={enterPreview}>
             <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview

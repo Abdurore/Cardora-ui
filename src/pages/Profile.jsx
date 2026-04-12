@@ -542,7 +542,7 @@ function Profile() {
           <div>
             <h4 className="section-title">CC Income History</h4>
             <div className="profile-income-list">
-              {currentUser.ccIncomeHistory.slice(0, 10).map((entry, i) => (
+              {currentUser.ccIncomeHistory.slice().reverse().slice(0, 10).map((entry, i) => (
                 <div key={`income-${i}`} className="profile-income-row">
                   <span className="profile-income-type">{(entry.type || entry.source || 'unknown').replace(/_/g, ' ')}</span>
                   <span className="profile-income-amount">+{entry.amount || entry.cc || 0} CC</span>

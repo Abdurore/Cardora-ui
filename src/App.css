@@ -6909,28 +6909,33 @@ a {
     background: #050910;
   }
 
+  /* ── Shell: full-viewport flex column — nothing escapes the screen ── */
   .cs-mobile-shell {
-    display: grid;
-    min-height: 100vh;
-    padding: 12px 12px calc(108px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
     background:
-      radial-gradient(circle at top, rgba(118, 239, 255, 0.05), transparent 30%),
+      radial-gradient(circle at 50% 0%, rgba(118, 239, 255, 0.06), transparent 35%),
       linear-gradient(180deg, #040810, #060c12);
-    align-content: start;
-    gap: 12px;
   }
 
+  /* ── Header ── */
   .cs-mobile-header {
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
     gap: 10px;
-    padding-top: env(safe-area-inset-top);
+    padding: max(env(safe-area-inset-top), 10px) 14px 10px;
+    flex-shrink: 0;
+    background: rgba(4, 8, 12, 0.9);
+    border-bottom: 1px solid rgba(118, 239, 255, 0.05);
   }
 
   .cs-mobile-back,
   .cs-mobile-save {
-    height: 36px;
+    height: 34px;
     padding: 0 14px;
     border-radius: 999px;
     border: 1px solid rgba(118, 239, 255, 0.12);
@@ -6940,58 +6945,80 @@ a {
   }
 
   .cs-mobile-back {
-    width: 36px;
+    width: 34px;
     padding: 0;
-    font-size: 1.6rem;
+    font-size: 1.4rem;
     line-height: 1;
   }
 
   .cs-mobile-title {
     text-align: center;
     font-family: 'Cinzel', serif;
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     color: #eafcff;
     letter-spacing: 0.06em;
   }
 
+  /* ── Preview: large fixed zone (~44% of viewport) — never scrolls ── */
   .cs-mobile-preview {
+    flex-shrink: 0;
+    height: 44vh;
+    height: 44dvh;
+    min-height: 220px;
     position: relative;
-    border-radius: 20px;
-    border: 1px solid rgba(118, 239, 255, 0.08);
-    min-height: 260px;
-    aspect-ratio: 4 / 3;
     display: grid;
     place-items: center;
     overflow: hidden;
+    border-radius: 0;
+    border-bottom: 1px solid rgba(118, 239, 255, 0.06);
     transition: background 0.3s ease;
   }
 
   .cs-mobile-img {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
-    min-height: 260px;
     object-fit: cover;
   }
 
   .cs-mobile-card-hint {
-    padding: 28px 22px;
-    border-radius: 16px;
+    padding: 32px 24px;
+    border-radius: 18px;
     text-align: center;
-    width: 90%;
+    width: 88%;
+    max-width: 360px;
   }
 
-  /* Sticky bar: stepnav + tools stay at top while panel scrolls */
+  /* ── Scroll zone: takes remaining height, scrolls independently ── */
+  .cs-mobile-scroll-zone {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cs-mobile-scroll-zone::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ── Sticky tab bar: glued to top of scroll zone as panel scrolls ── */
   .cs-mobile-sticky-bar {
     position: sticky;
     top: 0;
     z-index: 20;
-    background: rgba(4, 8, 16, 0.97);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    margin: 0 -12px;
-    padding: 8px 12px 10px;
+    flex-shrink: 0;
+    background: rgba(4, 8, 14, 0.98);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    padding: 10px 14px 12px;
     border-bottom: 1px solid rgba(118, 239, 255, 0.07);
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 8px;
   }
 
@@ -7007,20 +7034,22 @@ a {
   }
 
   .cs-mobile-step {
-    padding: 8px 14px;
+    padding: 7px 14px;
     border-radius: 999px;
     text-transform: capitalize;
     white-space: nowrap;
+    flex-shrink: 0;
     border: 1px solid rgba(118, 239, 255, 0.1);
     background: rgba(8, 14, 18, 0.75);
-    color: rgba(200, 230, 240, 0.6);
-    font-size: 0.78rem;
+    color: rgba(200, 230, 240, 0.55);
+    font-size: 0.76rem;
   }
 
   .cs-mobile-step.active {
-    border-color: rgba(118, 239, 255, 0.35);
+    border-color: rgba(118, 239, 255, 0.38);
     color: #e8f9ff;
-    box-shadow: inset 0 -2px 0 rgba(118, 239, 255, 0.7);
+    background: rgba(118, 239, 255, 0.07);
+    box-shadow: inset 0 -2px 0 rgba(118, 239, 255, 0.6);
   }
 
   .cs-mobile-tools {
@@ -7039,7 +7068,7 @@ a {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 7px 12px;
+    padding: 7px 13px;
     border-radius: 999px;
     border: 1px solid rgba(118, 239, 255, 0.08);
     background: rgba(8, 14, 18, 0.7);
@@ -7047,22 +7076,22 @@ a {
     font-size: 0.72rem;
     white-space: nowrap;
     flex-shrink: 0;
-    transition: all 0.2s ease;
+    transition: all 0.18s ease;
   }
 
   .cs-mobile-tool-chip.active {
-    border-color: rgba(118, 239, 255, 0.3);
+    border-color: rgba(118, 239, 255, 0.32);
     color: #ddf8ff;
-    background: rgba(118, 239, 255, 0.06);
+    background: rgba(118, 239, 255, 0.07);
   }
 
+  /* ── Editing panel: grows to fill scroll zone, scrolls inside it ── */
   .cs-mobile-panel {
+    flex: 1;
     display: grid;
-    gap: 12px;
-    padding: 14px;
-    border-radius: 18px;
-    border: 1px solid rgba(118, 239, 255, 0.08);
-    background: rgba(8, 14, 18, 0.85);
+    gap: 14px;
+    padding: 16px 14px 28px;
+    align-content: start;
   }
 
   .cs-mobile-panel h3 {
@@ -7072,19 +7101,15 @@ a {
     font-size: 1rem;
   }
 
+  /* ── Footer: natural-flow bottom bar, NOT position fixed ── */
   .cs-mobile-footer {
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom));
-    z-index: 35;
+    flex-shrink: 0;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    padding: 10px;
-    border-radius: 18px;
-    border: 1px solid rgba(118, 239, 255, 0.08);
-    background: rgba(4, 8, 12, 0.92);
+    padding: 10px 14px max(calc(10px + env(safe-area-inset-bottom)), 16px);
+    background: rgba(4, 8, 12, 0.95);
+    border-top: 1px solid rgba(118, 239, 255, 0.07);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }
@@ -7104,7 +7129,7 @@ a {
     background: linear-gradient(135deg, rgba(118, 239, 255, 0.9), rgba(98, 255, 162, 0.85));
     color: #041015;
     border: none;
-    box-shadow: 0 10px 25px rgba(118, 239, 255, 0.18);
+    box-shadow: 0 8px 22px rgba(118, 239, 255, 0.2);
   }
 }
 
@@ -8103,12 +8128,7 @@ a {
 /* ——— Studio v3 mobile refinements ——— */
 @media (max-width: 480px) {
 
-  /* Preview — keep it tall enough to be useful */
-  .cs-mobile-preview {
-    min-height: 240px;
-    border-radius: 16px;
-  }
-
+  /* Preview height handled by 640px flex layout — compact text sizes only */
   .cs-preview-closed.compact {
     padding: 24px 20px;
     width: 90%;
