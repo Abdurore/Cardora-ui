@@ -16,9 +16,12 @@ function WorldChat() {
   const [loading, setLoading] = useState(true)
   const [connected, setConnected] = useState(false)
   const [joinLeave, setJoinLeave] = useState([])
+  const [onlineCount, setOnlineCount] = useState(0)
   const socketRef = useRef(null)
   const messagesEndRef = useRef(null)
   const cooldownRef = useRef(null)
+
+  const MSG_CAP = 150
 
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -68,16 +71,25 @@ function WorldChat() {
 
     socket.on('new_message', (data) => {
       const msg = mapChatMessage(data)
-      setMessages(prev => [...prev, msg])
+      setMessages(prev => {
+        const next = [...prev, msg]
+        return next.length > MSG_CAP ? next.slice(-MSG_CAP) : next
+      })
       setTimeout(scrollToBottom, 50)
     })
 
     socket.on('user_joined', (data) => {
       setJoinLeave(prev => [...prev.slice(-4), { type: 'join', username: data.username, time: Date.now() }])
+      setOnlineCount((n) => n + 1)
     })
 
     socket.on('user_left', (data) => {
       setJoinLeave(prev => [...prev.slice(-4), { type: 'leave', username: data.username, time: Date.now() }])
+      setOnlineCount((n) => Math.max(0, n - 1))
+    })
+
+    socket.on('online_count', (data) => {
+      if (typeof data?.count === 'number') setOnlineCount(data.count)
     })
 
     socket.on('error', (data) => {
@@ -158,10 +170,15 @@ function WorldChat() {
             <p className="eyebrow">Community</p>
             <h2 className="chat-title">World Chat</h2>
           </div>
-          <span className={`chat-status ${connected ? 'online' : 'offline'}`}>
-            <span className="chat-status-dot" />
-            {connected ? 'Live' : 'Connecting...'}
-          </span>
+          <div className="chat-header-right">
+            {onlineCount > 0 && (
+              <span className="chat-online-count">{onlineCount} online</span>
+            )}
+            <span className={`chat-status ${connected ? 'online' : 'offline'}`}>
+              <span className={`chat-status-dot ${!connected ? 'pulse' : ''}`} />
+              {connected ? 'Live' : 'Reconnecting…'}
+            </span>
+          </div>
         </div>
 
         {/* Join/Leave toasts */}
@@ -207,7 +224,13 @@ function WorldChat() {
                       {msg.content}
                     </div>
                     <span className="chat-msg-time">
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {(() => {
+                        const diff = Date.now() - new Date(msg.createdAt).getTime()
+                        const mins = Math.floor(diff / 60000)
+                        if (mins < 1) return 'just now'
+                        if (mins < 60) return `${mins}m ago`
+                        return new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      })()}
                     </span>
                   </div>
                 </div>

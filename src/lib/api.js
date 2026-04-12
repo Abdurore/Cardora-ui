@@ -170,6 +170,7 @@ export async function getUserCards(query = 'page=1&limit=20') {
    CARDS
    ═══════════════════════════════════════════════ */
 export async function createCard(payload) {
+  // payload may include: type, poll, trivia, chain, anonTemplate fields
   return request('/create-card', { method: 'POST', auth: true, body: payload })
 }
 
@@ -280,6 +281,35 @@ export async function updateTemplate(payload) {
 
 export async function deleteTemplate(payload) {
   return request('/delete-template', { method: 'DELETE', auth: true, body: payload })
+}
+
+/* ═══════════════════════════════════════════════
+   ANONYMOUS INBOX
+   ═══════════════════════════════════════════════ */
+export async function sendAnonymousMessage(payload) {
+  // POST /anonymous-messages — no auth required (Classic tier)
+  // payload: { recipientUsername, message, templateId, tier }
+  return request('/anonymous-messages', { method: 'POST', body: payload }).catch(() => ({
+    ok: false,
+    message: 'Anonymous messaging not yet available.',
+  }))
+}
+
+export async function getAnonMessages() {
+  // GET /anonymous-messages — auth required
+  return request('/anonymous-messages', { auth: true }).catch(() => ({ messages: [] }))
+}
+
+export async function deleteAnonMessage(id) {
+  // DELETE /anonymous-messages/:id — auth required
+  return request(`/anonymous-messages/${id}`, { method: 'DELETE', auth: true }).catch(() => ({
+    ok: false,
+  }))
+}
+
+export async function getPublicUser(username) {
+  // GET /users/:username — public profile lookup for AnonSend page
+  return request(`/users/${username}`).catch(() => null)
 }
 
 /* ═══════════════════════════════════════════════

@@ -4,7 +4,6 @@ import { HiOutlineMagnifyingGlass } from 'react-icons/hi2'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
-import searchIcon from '../assets/icons/search.png'
 import { exploreCards } from '../data/catalog.js'
 
 function Explore() {
@@ -20,6 +19,8 @@ function Explore() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [activeTag, setActiveTag] = useState(searchParams.get('tag') || 'all')
+  const [activeType, setActiveType] = useState(searchParams.get('type') || 'all')
+  const [activeCategory, setActiveCategory] = useState(searchParams.get('cat') || 'all')
   const [visibleCount, setVisibleCount] = useState(12)
   const CARDS_PER_PAGE = 12
   const cardSource = marketplaceTemplates?.length ? marketplaceTemplates : exploreCards
@@ -28,27 +29,58 @@ function Explore() {
     const params = {}
     if (query) params.q = query
     if (activeTag && activeTag !== 'all') params.tag = activeTag
+    if (activeType && activeType !== 'all') params.type = activeType
+    if (activeCategory && activeCategory !== 'all') params.cat = activeCategory
     setSearchParams(params, { replace: true })
-  }, [activeTag, query, setSearchParams])
+  }, [activeTag, activeType, activeCategory, query, setSearchParams])
+
+  // Derive unique categories from card source
+  const categories = useMemo(() => {
+    const seen = new Set()
+    for (const card of cardSource) {
+      const cat = (card.category || card.occasion || '').toLowerCase().trim()
+      if (cat && cat !== 'general' && cat !== 'scratch') seen.add(cat)
+    }
+    return Array.from(seen).sort()
+  }, [cardSource])
 
   const filteredCards = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
-    return cardSource
-      .filter((card) => {
-        const matchesQuery = normalizedQuery
-          ? card.title.toLowerCase().includes(normalizedQuery)
-          : true
-        const matchesFavorites = activeTag === 'favorites' ? favorites.includes(card.id) : true
-        return matchesQuery && matchesFavorites
-      })
-  }, [activeTag, cardSource, favorites, query])
+    return cardSource.filter((card) => {
+      const matchesQuery = normalizedQuery
+        ? card.title.toLowerCase().includes(normalizedQuery)
+          || (card.category || '').toLowerCase().includes(normalizedQuery)
+          || (card.occasion || '').toLowerCase().includes(normalizedQuery)
+        : true
+      const matchesFavorites = activeTag === 'favorites' ? favorites.includes(card.id) : true
+      const matchesType =
+        activeType === 'all'
+          ? true
+          : activeType === 'greeting'
+            ? !card.type || card.type === 'standard'
+            : card.type === activeType
+      const matchesCategory =
+        activeCategory === 'all'
+          ? true
+          : (card.category || card.occasion || '').toLowerCase() === activeCategory
+      return matchesQuery && matchesFavorites && matchesType && matchesCategory
+    })
+  }, [activeTag, activeType, activeCategory, cardSource, favorites, query])
 
   useEffect(() => {
     setVisibleCount(CARDS_PER_PAGE)
-  }, [activeTag, query])
+  }, [activeTag, activeType, activeCategory, query])
 
   const pagedCards = filteredCards.slice(0, visibleCount)
   const hasMore = filteredCards.length > visibleCount
+
+  const cardTypes = [
+    { id: 'all', label: 'All' },
+    { id: 'greeting', label: 'Greeting' },
+    { id: 'poll', label: 'Poll' },
+    { id: 'trivia', label: 'Trivia' },
+    { id: 'chain', label: 'Chain' },
+  ]
 
   return (
     <div className="page-body">
@@ -64,12 +96,47 @@ function Explore() {
         <div className="search">
           <HiOutlineMagnifyingGlass className="search-icon" aria-hidden="true" />
           <input
-            placeholder="Search templates, music, effects"
+            placeholder="Search templates, occasions, effects"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
 
+        {/* Card type filter */}
+        <div className="tag-list explore-type-filter">
+          {cardTypes.map(({ id, label }) => (
+            <button
+              key={id}
+              className={`tag ${activeType === id ? 'active' : ''}`}
+              onClick={() => setActiveType(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Occasion / category filter */}
+        {categories.length > 0 && (
+          <div className="tag-list explore-category-filter">
+            <button
+              className={`tag tag-sm ${activeCategory === 'all' ? 'active' : ''}`}
+              onClick={() => setActiveCategory('all')}
+            >
+              All Occasions
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                className={`tag tag-sm ${activeCategory === cat ? 'active' : ''}`}
+                onClick={() => setActiveCategory(cat)}
+              >
+                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Favorites filter row */}
         <div className="tag-list">
           <button
             className={`tag ${activeTag === 'all' ? 'active' : ''}`}
@@ -121,5 +188,3 @@ function Explore() {
 }
 
 export default Explore
-
-

@@ -105,10 +105,15 @@ export function mapTemplateToCard(template, index = 0) {
     likeCount,
     userCount,
     category: (template.category || 'scratch').toLowerCase(),
+    type: (template.type || layout.type || 'standard').toLowerCase(),
     tier: (template.couponType || template.tier || layout.couponType || 'simple').toLowerCase(),
     previewImage: template.previewImage || layout.previewImage || layout.media?.images?.[0] || '',
     tag: template.status ? capitalize(template.status) : '',
     ownerId,
+    poll: template.poll || layout.poll || null,
+    trivia: template.trivia || layout.trivia || null,
+    chain: template.chain || layout.chain || null,
+    anonTier: template.anonTier || layout.anonTier || null,
     backendTemplate: template,
   }
 }

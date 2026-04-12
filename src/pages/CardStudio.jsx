@@ -4,7 +4,8 @@ import {
   HiOutlineEnvelope, HiOutlinePaintBrush, HiOutlinePhoto,
   HiOutlineSparkles, HiOutlineChatBubbleLeft, HiOutlineLockClosed,
   HiOutlineDocumentText, HiOutlineMusicalNote, HiOutlineEye,
-  HiOutlineGift
+  HiOutlineGift, HiOutlineChartBarSquare, HiOutlineLightBulb,
+  HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash
 } from 'react-icons/hi2'
 import { IoColorPaletteOutline } from 'react-icons/io5'
 import logo from '../assets/icons/logo.png'
@@ -32,6 +33,10 @@ const tools = [
   { id: 'gifts', icon: HiOutlineGift, label: 'Gifts', hint: 'End-of-card gift reveal' },
   { id: 'questions', icon: HiOutlineChatBubbleLeft, label: 'Questions', hint: 'Receiver interaction' },
   { id: 'interaction', icon: HiOutlineLockClosed, label: 'Interaction', hint: 'Lock & reveal' },
+  { id: 'poll', icon: HiOutlineChartBarSquare, label: 'Poll', hint: 'Question with selectable choices' },
+  { id: 'trivia', icon: HiOutlineLightBulb, label: 'Trivia', hint: 'Scored quiz with correct answers' },
+  { id: 'chain', icon: HiOutlineArrowPathRoundedSquare, label: 'Chain', hint: 'Invite recipient to reply with a card' },
+  { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template' },
 ]
 
 // Deep merge helper
@@ -287,6 +292,22 @@ function CardStudio() {
   const musicInputRef = useRef(null)
   const previewSnapshotRef = useRef(null)
   const [isUploading, setIsUploading] = useState(false)
+
+  // Poll / Trivia / Chain / Anonymous template state
+  const [pollData, setPollData] = useState({ question: '', options: ['', ''], allowMultiple: false })
+  const [triviaData, setTriviaData] = useState({
+    questions: [{ text: '', options: ['', '', '', ''], correctIndex: 0 }],
+  })
+  const [chainData, setChainData] = useState({ enabled: false, prompt: '' })
+  const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: 'classic' })
+
+  // URL-based type pre-selection (?type=poll / ?type=trivia)
+  useEffect(() => {
+    const urlType = new URLSearchParams(location.search).get('type')
+    if (urlType === 'poll') setActiveTool('poll')
+    else if (urlType === 'trivia') setActiveTool('trivia')
+    else if (urlType === 'chain') setActiveTool('chain')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isArtist = currentUser?.role === 'Artist'
 
@@ -1201,6 +1222,241 @@ function CardStudio() {
       )
     }
 
+    // POLL
+    if (activeTool === 'poll') {
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Poll</p>
+          <h3>Ask your audience a question</h3>
+          <label className="cs-field">
+            <span>Poll Question</span>
+            <input
+              value={pollData.question}
+              onChange={(e) => setPollData((prev) => ({ ...prev, question: e.target.value }))}
+              placeholder="What do you want to ask?"
+            />
+          </label>
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Options <small>(min 2, max 6)</small></p>
+            {pollData.options.map((opt, i) => (
+              <div key={i} className="cs-poll-option-row">
+                <label className="cs-field" style={{ flex: 1 }}>
+                  <span>Option {i + 1}</span>
+                  <input
+                    value={opt}
+                    onChange={(e) => {
+                      const next = [...pollData.options]
+                      next[i] = e.target.value
+                      setPollData((prev) => ({ ...prev, options: next }))
+                    }}
+                    placeholder={`Option ${i + 1}`}
+                  />
+                </label>
+                {pollData.options.length > 2 && (
+                  <button
+                    type="button"
+                    className="cs-remove-btn"
+                    onClick={() =>
+                      setPollData((prev) => ({ ...prev, options: prev.options.filter((_, idx) => idx !== i) }))
+                    }
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            {pollData.options.length < 6 && (
+              <button
+                type="button"
+                className="cs-button"
+                onClick={() => setPollData((prev) => ({ ...prev, options: [...prev.options, ''] }))}
+              >
+                + Add Option
+              </button>
+            )}
+          </div>
+          <label className="cs-field cs-toggle-field">
+            <span>Allow multiple selections</span>
+            <input
+              type="checkbox"
+              checked={pollData.allowMultiple}
+              onChange={(e) => setPollData((prev) => ({ ...prev, allowMultiple: e.target.checked }))}
+            />
+          </label>
+          <p className="cs-info-note">Recipients see live results after voting.</p>
+        </>
+      )
+    }
+
+    // TRIVIA
+    if (activeTool === 'trivia') {
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Trivia</p>
+          <h3>Create a scored quiz</h3>
+          {triviaData.questions.map((q, qi) => (
+            <div key={qi} className="cs-sub-section cs-trivia-question">
+              <div className="cs-trivia-q-header">
+                <p className="cs-sub-label">Question {qi + 1}</p>
+                {triviaData.questions.length > 1 && (
+                  <button
+                    type="button"
+                    className="cs-remove-btn"
+                    onClick={() =>
+                      setTriviaData((prev) => ({
+                        ...prev,
+                        questions: prev.questions.filter((_, idx) => idx !== qi),
+                      }))
+                    }
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <label className="cs-field">
+                <span>Question text</span>
+                <input
+                  value={q.text}
+                  onChange={(e) => {
+                    const next = triviaData.questions.map((item, idx) =>
+                      idx === qi ? { ...item, text: e.target.value } : item,
+                    )
+                    setTriviaData((prev) => ({ ...prev, questions: next }))
+                  }}
+                  placeholder="Enter your question..."
+                />
+              </label>
+              {q.options.map((opt, oi) => (
+                <label key={oi} className="cs-field cs-trivia-option">
+                  <span className="cs-trivia-option-label">
+                    <input
+                      type="radio"
+                      name={`correct-${qi}`}
+                      checked={q.correctIndex === oi}
+                      onChange={() => {
+                        const next = triviaData.questions.map((item, idx) =>
+                          idx === qi ? { ...item, correctIndex: oi } : item,
+                        )
+                        setTriviaData((prev) => ({ ...prev, questions: next }))
+                      }}
+                    />
+                    Option {oi + 1} {q.correctIndex === oi && <span className="cs-correct-tag">Correct</span>}
+                  </span>
+                  <input
+                    value={opt}
+                    onChange={(e) => {
+                      const nextOpts = [...q.options]
+                      nextOpts[oi] = e.target.value
+                      const next = triviaData.questions.map((item, idx) =>
+                        idx === qi ? { ...item, options: nextOpts } : item,
+                      )
+                      setTriviaData((prev) => ({ ...prev, questions: next }))
+                    }}
+                    placeholder={`Option ${oi + 1}`}
+                  />
+                </label>
+              ))}
+            </div>
+          ))}
+          {triviaData.questions.length < 10 && (
+            <button
+              type="button"
+              className="cs-button"
+              onClick={() =>
+                setTriviaData((prev) => ({
+                  ...prev,
+                  questions: [
+                    ...prev.questions,
+                    { text: '', options: ['', '', '', ''], correctIndex: 0 },
+                  ],
+                }))
+              }
+            >
+              + Add Question
+            </button>
+          )}
+          <p className="cs-info-note">Recipients see their score and correct answers at the end.</p>
+        </>
+      )
+    }
+
+    // CHAIN
+    if (activeTool === 'chain') {
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Chain Reply</p>
+          <h3>Invite your recipient to reply</h3>
+          <label className="cs-field cs-toggle-field">
+            <span>Enable chain reply</span>
+            <input
+              type="checkbox"
+              checked={chainData.enabled}
+              onChange={(e) => setChainData((prev) => ({ ...prev, enabled: e.target.checked }))}
+            />
+          </label>
+          {chainData.enabled && (
+            <label className="cs-field">
+              <span>Prompt shown to recipient</span>
+              <input
+                value={chainData.prompt}
+                onChange={(e) => setChainData((prev) => ({ ...prev, prompt: e.target.value }))}
+                placeholder="Now it's your turn…"
+              />
+            </label>
+          )}
+          <p className="cs-info-note">
+            {chainData.enabled
+              ? 'Recipient will be invited to create and send a card back to you.'
+              : 'Toggle on to invite your recipient to reply with their own card.'}
+          </p>
+        </>
+      )
+    }
+
+    // ANONYMOUS TEMPLATE
+    if (activeTool === 'anon') {
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Anonymous Inbox</p>
+          <h3>Tag as anonymous template</h3>
+          <label className="cs-field cs-toggle-field">
+            <span>Mark as Anonymous Inbox Template</span>
+            <input
+              type="checkbox"
+              checked={anonTemplate.enabled}
+              onChange={(e) => setAnonTemplate((prev) => ({ ...prev, enabled: e.target.checked }))}
+            />
+          </label>
+          {anonTemplate.enabled && (
+            <>
+              <p className="cs-info-note">
+                This card will appear as a template option when users visit an anonymous inbox link
+                (<code>/ask/@username</code>). Senders pick it to wrap their message.
+              </p>
+              <div className="cs-sub-section">
+                <p className="cs-sub-label">Template Tier</p>
+                <div className="cs-choice-row">
+                  {['classic', 'premium'].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`cs-chip ${anonTemplate.tier === t ? 'active' : ''}`}
+                      onClick={() => setAnonTemplate((prev) => ({ ...prev, tier: t }))}
+                    >
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <p className="cs-info-note" style={{ marginTop: 6 }}>
+                  Classic = free for senders. Premium = costs CC for senders.
+                </p>
+              </div>
+            </>
+          )}
+        </>
+      )
+    }
+
     // GIFTS
     if (activeTool === 'gifts') {
       return (
@@ -1290,9 +1546,24 @@ function CardStudio() {
             onClick={async () => {
               if (!currentUser) return
               setIsSending(true)
+              // Derive card type from active interactive data
+              const derivedType = chainData.enabled
+                ? 'chain'
+                : anonTemplate.enabled
+                  ? 'anonymous'
+                  : pollData.question.trim()
+                    ? 'poll'
+                    : triviaData.questions[0]?.text.trim()
+                      ? 'trivia'
+                      : 'standard'
               const result = await createCardOnBackend?.(cardObject, {
                 title: c.content?.heading || 'Untitled Card',
                 templateId: cardData?.id || 'custom',
+                type: derivedType,
+                poll: derivedType === 'poll' ? pollData : undefined,
+                trivia: derivedType === 'trivia' ? triviaData : undefined,
+                chain: derivedType === 'chain' ? chainData : undefined,
+                anonTemplate: anonTemplate.enabled ? anonTemplate : undefined,
               })
               setIsSending(false)
               if (result?.ok) {
