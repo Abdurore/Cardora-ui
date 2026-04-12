@@ -115,27 +115,6 @@ function Explore() {
           ))}
         </div>
 
-        {/* Occasion / category filter */}
-        {categories.length > 0 && (
-          <div className="tag-list explore-category-filter">
-            <button
-              className={`tag tag-sm ${activeCategory === 'all' ? 'active' : ''}`}
-              onClick={() => setActiveCategory('all')}
-            >
-              All Occasions
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                className={`tag tag-sm ${activeCategory === cat ? 'active' : ''}`}
-                onClick={() => setActiveCategory(cat)}
-              >
-                {cat.charAt(0).toUpperCase() + cat.slice(1)}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Favorites filter row */}
         <div className="tag-list">
           <button

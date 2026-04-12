@@ -10202,6 +10202,23 @@ a {
   box-shadow: 0 14px 28px rgba(255, 80, 120, 0.18);
 }
 
+.profile-stats-toggle {
+  display: block;
+  margin: -4px auto 0;
+  padding: 4px 14px;
+  border: none;
+  background: none;
+  color: rgba(126, 247, 255, 0.55);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.profile-stats-toggle:hover {
+  color: rgba(126, 247, 255, 0.9);
+}
+
 .profile-income-list {
   display: flex;
   flex-direction: column;
