@@ -37,7 +37,7 @@ function WorldChat() {
         const res = await getWorldChat('page=1&limit=50')
         const raw = res?.data?.messages || res?.messages || []
         if (!cancelled) {
-          setMessages(raw.map(mapChatMessage).reverse())
+          setMessages(raw.map(mapChatMessage))
           setLoading(false)
           setTimeout(scrollToBottom, 100)
         }
