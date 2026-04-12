@@ -402,6 +402,36 @@ function CardStudio() {
     setActiveStep('preview')
   }
 
+  const handleSend = async () => {
+    if (!currentUser) return
+    setIsSending(true)
+    const derivedType = chainData.enabled
+      ? 'chain'
+      : anonTemplate.enabled
+        ? 'anonymous'
+        : pollData.question.trim()
+          ? 'poll'
+          : triviaData.questions[0]?.text.trim()
+            ? 'trivia'
+            : 'standard'
+    const result = await createCardOnBackend?.(cardObject, {
+      title: c.content?.heading || 'Untitled Card',
+      templateId: cardData?.id || 'custom',
+      type: derivedType,
+      poll: derivedType === 'poll' ? pollData : undefined,
+      trivia: derivedType === 'trivia' ? triviaData : undefined,
+      chain: derivedType === 'chain' ? chainData : undefined,
+      anonTemplate: anonTemplate.enabled ? anonTemplate : undefined,
+    })
+    setIsSending(false)
+    if (result?.ok) {
+      const slug = result.data?.card?.slug || result.data?.slug || result.data?.data?.slug || ''
+      setSendResult({ ok: true, slug, message: result.message })
+    } else {
+      setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
+    }
+  }
+
   const handleSave = () => {
     try {
       const draftEntry = {
@@ -1543,36 +1573,7 @@ function CardStudio() {
             type="button"
             className="cs-nav-btn send"
             disabled={isSending}
-            onClick={async () => {
-              if (!currentUser) return
-              setIsSending(true)
-              // Derive card type from active interactive data
-              const derivedType = chainData.enabled
-                ? 'chain'
-                : anonTemplate.enabled
-                  ? 'anonymous'
-                  : pollData.question.trim()
-                    ? 'poll'
-                    : triviaData.questions[0]?.text.trim()
-                      ? 'trivia'
-                      : 'standard'
-              const result = await createCardOnBackend?.(cardObject, {
-                title: c.content?.heading || 'Untitled Card',
-                templateId: cardData?.id || 'custom',
-                type: derivedType,
-                poll: derivedType === 'poll' ? pollData : undefined,
-                trivia: derivedType === 'trivia' ? triviaData : undefined,
-                chain: derivedType === 'chain' ? chainData : undefined,
-                anonTemplate: anonTemplate.enabled ? anonTemplate : undefined,
-              })
-              setIsSending(false)
-              if (result?.ok) {
-                const slug = result.data?.card?.slug || result.data?.slug || result.data?.data?.slug || ''
-                setSendResult({ ok: true, slug, message: result.message })
-              } else {
-                setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
-              }
-            }}
+            onClick={handleSend}
           >
             {isSending ? 'Sending...' : 'Send'}
           </button>
@@ -1760,40 +1761,42 @@ function CardStudio() {
           )}
         </div>
 
-        <div className="cs-mobile-stepnav">
-          {steps.map(step => (
-            <button
-              key={step}
-              type="button"
-              className={`cs-mobile-step ${activeStep === step ? 'active' : ''}`}
-              onClick={() => goToStep(step)}
-            >
-              {step === 'closed' ? 'Closed' : step}
-            </button>
-          ))}
-        </div>
-
-        {/* Mobile tool selector */}
-        <div className="cs-mobile-tools">
-          {tools.map(tool => {
-            const Icon = tool.icon
-            return (
+        {/* Sticky tab bar: stays at top when panel content scrolls */}
+        <div className="cs-mobile-sticky-bar">
+          <div className="cs-mobile-stepnav">
+            {steps.map(step => (
               <button
-                key={tool.id}
+                key={step}
                 type="button"
-                className={`cs-mobile-tool-chip ${activeTool === tool.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveTool(tool.id)
-                  if (tool.id === 'closedState') setActiveStep('closed')
-                  else if (tool.id === 'questions') setActiveStep('questions')
-                  else setActiveStep('card')
-                }}
+                className={`cs-mobile-step ${activeStep === step ? 'active' : ''}`}
+                onClick={() => goToStep(step)}
               >
-                <Icon size={16} />
-                <span>{tool.label}</span>
+                {step === 'closed' ? 'Closed' : step}
               </button>
-            )
-          })}
+            ))}
+          </div>
+
+          <div className="cs-mobile-tools">
+            {tools.map(tool => {
+              const Icon = tool.icon
+              return (
+                <button
+                  key={tool.id}
+                  type="button"
+                  className={`cs-mobile-tool-chip ${activeTool === tool.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTool(tool.id)
+                    if (tool.id === 'closedState') setActiveStep('closed')
+                    else if (tool.id === 'questions') setActiveStep('questions')
+                    else setActiveStep('card')
+                  }}
+                >
+                  <Icon size={16} />
+                  <span>{tool.label}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Mobile panel */}
@@ -1808,7 +1811,14 @@ function CardStudio() {
           {isArtist ? (
             <button type="button" className="cs-mobile-primary" onClick={() => setShowPublish(true)}>Publish</button>
           ) : (
-            <button type="button" className="cs-mobile-primary disabled" disabled>Send</button>
+            <button
+              type="button"
+              className={`cs-mobile-primary${isSending ? ' disabled' : ''}`}
+              disabled={isSending}
+              onClick={handleSend}
+            >
+              {isSending ? 'Sending…' : 'Send'}
+            </button>
           )}
         </div>
       </div>
