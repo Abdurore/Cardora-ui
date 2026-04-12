@@ -60,6 +60,7 @@ function Profile() {
   const [currencies, setCurrencies] = useState([])
   const [userCurrency, setUserCurrency] = useState('')
   const [isSavingCurrency, setIsSavingCurrency] = useState(false)
+  const [showAllStats, setShowAllStats] = useState(false)
 
   const allCards = [...homeCards, ...exploreCards, ...profileCreations]
   const favoriteCards = allCards.filter((card) => favorites.includes(card.id))
@@ -244,7 +245,7 @@ function Profile() {
             </div>
           )}
 
-          {/* Stats Row — unified profile + analytics */}
+          {/* Stats Row — primary stats always visible, secondary behind toggle */}
           <div className="profile-stats">
             <div className="profile-stat">
               <strong>{balance}</strong>
@@ -262,25 +263,37 @@ function Profile() {
               <strong>{analytics?.totalLikes ?? analytics?.likes ?? 0}</strong>
               <span>Likes</span>
             </div>
-            <div className="profile-stat">
-              <strong>{analytics?.totalEarned ?? analytics?.ccEarned ?? 0}</strong>
-              <span>CC Earned</span>
-            </div>
-            <div className="profile-stat">
-              <strong>{favoriteCards.length}</strong>
-              <span>Saved</span>
-            </div>
-            <div className="profile-stat">
-              <strong>{giftInventory.length}</strong>
-              <span>Gifts</span>
-            </div>
-            {currentUser?.referralsCount > 0 && (
-              <div className="profile-stat">
-                <strong>{currentUser.referralsCount}</strong>
-                <span>Referrals</span>
-              </div>
+
+            {showAllStats && (
+              <>
+                <div className="profile-stat">
+                  <strong>{analytics?.totalEarned ?? analytics?.ccEarned ?? 0}</strong>
+                  <span>CC Earned</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{favoriteCards.length}</strong>
+                  <span>Saved</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{giftInventory.length}</strong>
+                  <span>Gifts</span>
+                </div>
+                {currentUser?.referralsCount > 0 && (
+                  <div className="profile-stat">
+                    <strong>{currentUser.referralsCount}</strong>
+                    <span>Referrals</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
+          <button
+            type="button"
+            className="profile-stats-toggle"
+            onClick={() => setShowAllStats(prev => !prev)}
+          >
+            {showAllStats ? 'Show less' : 'More stats'}
+          </button>
 
           {/* Edit profile */}
           {currentUser && (
