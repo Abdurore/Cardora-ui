@@ -5,6 +5,99 @@ import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
 import { homeCards } from '../data/catalog.js'
 
+const FORMAT_CHIPS = [
+  { icon: '✉', label: 'Greeting', cls: 'chip-greeting' },
+  { icon: '📊', label: 'Poll',     cls: 'chip-poll' },
+  { icon: '💡', label: 'Trivia',   cls: 'chip-trivia' },
+  { icon: '👁', label: 'Anonymous', cls: 'chip-anon' },
+]
+
+const CARD_FORMATS = [
+  {
+    icon: '✉',
+    title: 'Greeting Cards',
+    tagline: 'Cinematic reveals with music and effects.',
+    description: 'Build a personalized experience that opens like a tiny film — envelope, music, glow, and all.',
+    accent: 'warm',
+    cta: 'Try it',
+    to: '/studio',
+  },
+  {
+    icon: '📊',
+    title: 'Poll Cards',
+    tagline: 'Ask your audience. See who answers.',
+    description: 'Embed a live poll inside your card. Recipients vote and see real-time results instantly.',
+    accent: 'cool',
+    cta: 'Try it',
+    to: '/studio?type=poll',
+  },
+  {
+    icon: '💡',
+    title: 'Trivia Cards',
+    tagline: 'Quiz your friends. Score the moment.',
+    description: 'Add a scored trivia challenge inside your card. Recipients get their score at the end.',
+    accent: 'rose',
+    cta: 'Try it',
+    to: '/studio?type=trivia',
+  },
+  {
+    icon: '👁',
+    title: 'Anonymous Inbox',
+    tagline: 'Let anyone send you a message. Anonymously.',
+    description: 'Share your link and receive honest messages from anyone — wrapped in a beautifully designed card.',
+    accent: 'mint',
+    cta: 'Set up yours',
+    to: '/inbox',
+  },
+]
+
+const HOW_IT_WORKS = [
+  {
+    icon: '01',
+    title: 'Choose a Format',
+    description: 'Pick from Greeting, Poll, Trivia, or Anonymous Inbox — each format built for a different kind of moment.',
+  },
+  {
+    icon: '02',
+    title: 'Build Your Card',
+    description: 'Design with artist templates, customize colors, add music, and tune every detail in the Studio.',
+  },
+  {
+    icon: '03',
+    title: 'Pick a Tier',
+    description: 'Classic is free. Premium and Elite unlock cinematic effects, rich animations, and premium sound.',
+  },
+  {
+    icon: '04',
+    title: 'Share & Get Replies',
+    description: 'Send your link, get responses, and see how your audience reacted — all in one place.',
+  },
+]
+
+const TIERS = [
+  {
+    name: 'Classic',
+    label: 'Simple animation',
+    note: 'A clean animated reveal for smaller moments.',
+    details: 'No music',
+    className: 'basic',
+  },
+  {
+    name: 'Premium',
+    label: 'Music + better visuals',
+    note: 'Richer motion, stronger glow, and a more immersive flow.',
+    details: 'Signature sound',
+    className: 'premium',
+  },
+  {
+    name: 'Elite',
+    label: 'Full animations + effects',
+    note: 'The complete Cardora experience with gifts and premium music.',
+    details: 'Premium music',
+    className: 'premium-plus',
+  },
+]
+
 function Home() {
   const {
     openCardDetails,
@@ -16,81 +109,6 @@ function Home() {
     marketplaceTemplates,
   } = useOutletContext()
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
-
-  const howItWorks = [
-    {
-      title: 'Choose a Card',
-      description: 'Start with a template built for birthdays, confessions, milestones, and surprises.',
-      icon: '01',
-    },
-    {
-      title: 'Customize It',
-      description: 'Tune the copy, motion, and pacing until the whole reveal feels personal.',
-      icon: '02',
-    },
-    {
-      title: 'Add Gifts',
-      description: 'Layer in glow effects and premium surprises when the moment needs more impact.',
-      icon: '03',
-    },
-    {
-      title: 'Send & Surprise',
-      description: 'Deliver an experience that opens like a memory instead of a notification.',
-      icon: '04',
-    },
-  ]
-
-  const featureCards = [
-    {
-      title: 'Envelope Experience',
-      description: 'A cinematic open sequence with soft light and emotional pacing.',
-      accent: 'warm',
-    },
-    {
-      title: 'Music + Sound Effects',
-      description: 'Ambient sound that makes the message feel intimate the moment it starts.',
-      accent: 'cool',
-    },
-    {
-      title: 'Interactive Questions',
-      description: 'Add suspense, response, and playfulness inside the reveal itself.',
-      accent: 'rose',
-    },
-    {
-      title: 'Gift Animations',
-      description: 'Bursts, blooms, sparkles, and premium effects that feel like a reward.',
-      accent: 'mint',
-    },
-    {
-      title: 'Multi-recipient Sending',
-      description: 'Send one crafted experience to a person, a family, or a whole celebration.',
-      accent: 'violet',
-    },
-  ]
-
-  const tiers = [
-    {
-      name: 'Classic',
-      label: 'Simple animation',
-      note: 'A clean animated reveal for smaller moments.',
-      details: 'No music',
-      className: 'basic',
-    },
-    {
-      name: 'Premium',
-      label: 'Music + better visuals',
-      note: 'Richer motion, stronger glow, and a more immersive flow.',
-      details: 'Signature sound',
-      className: 'premium',
-    },
-    {
-      name: 'Elite',
-      label: 'Full animations + effects',
-      note: 'The complete Cardora experience with gifts and premium music.',
-      details: 'Premium music',
-      className: 'premium-plus',
-    },
-  ]
 
   const highlightCards = useMemo(() => {
     if (marketplaceTemplates?.length) {
@@ -112,6 +130,7 @@ function Home() {
         onAuthOpen={openAuthModal}
       />
 
+      {/* ── HERO ── */}
       <header className="topbar hero-shell">
         <div className="hero-particles" aria-hidden="true">
           {Array.from({ length: 12 }).map((_, index) => (
@@ -119,18 +138,29 @@ function Home() {
           ))}
         </div>
         <div className="hero-copy">
-          <p className="eyebrow hero-eyebrow">Cardora Experience</p>
-          <h1>Don&apos;t just send a message. Create a moment.</h1>
+          <p className="eyebrow hero-eyebrow">Cardora Platform</p>
+          <h1>One platform.<br />Every kind of card.</h1>
           <p className="subtext">
-            Interactive cards with music, animations, and emotion. Build a reveal that
-            feels cinematic from the envelope to the final glow.
+            Greeting reveals, live polls, scored trivia, and anonymous inboxes —
+            all designed to make the moment feel real.
           </p>
+          <div className="hero-format-chips" aria-hidden="true">
+            {FORMAT_CHIPS.map((chip, i) => (
+              <span
+                key={chip.label}
+                className={`hero-format-chip ${chip.cls} fc${i + 1}`}
+              >
+                <span className="hfc-icon">{chip.icon}</span>
+                <span className="hfc-label">{chip.label}</span>
+              </span>
+            ))}
+          </div>
           <div className="cta-row">
             <Link className="primary" to="/studio">
               Create a Card
             </Link>
             <Link className="ghost" to="/explore">
-              Explore Cards
+              Browse Cards
             </Link>
           </div>
         </div>
@@ -156,13 +186,35 @@ function Home() {
         </div>
       </header>
 
+      {/* ── CARD FORMATS ── */}
+      <section className="landing-section">
+        <div className="section-heading">
+          <p className="eyebrow">Card Formats</p>
+          <h3 className="landing-title">Four ways to make someone feel something.</h3>
+        </div>
+        <div className="format-grid">
+          {CARD_FORMATS.map((format) => (
+            <article key={format.title} className={`format-card ${format.accent}`}>
+              <div className="format-card-icon">{format.icon}</div>
+              <h4>{format.title}</h4>
+              <p className="format-card-tagline">{format.tagline}</p>
+              <p className="format-card-desc">{format.description}</p>
+              <Link className="format-card-cta" to={format.to}>
+                {format.cta} →
+              </Link>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ── */}
       <section className="landing-section">
         <div className="section-heading">
           <p className="eyebrow">How It Works</p>
-          <h3 className="landing-title">Every card unfolds like a tiny film.</h3>
+          <h3 className="landing-title">From idea to impression in four steps.</h3>
         </div>
         <div className="steps-row">
-          {howItWorks.map((step) => (
+          {HOW_IT_WORKS.map((step) => (
             <article key={step.title} className="step-card">
               <span className="step-icon">{step.icon}</span>
               <h4>{step.title}</h4>
@@ -172,33 +224,14 @@ function Home() {
         </div>
       </section>
 
-      <section className="landing-section">
-        <div className="section-heading">
-          <p className="eyebrow">Features</p>
-          <h3 className="landing-title">Designed to feel alive the moment it opens.</h3>
-        </div>
-        <div className="feature-grid">
-          {featureCards.map((feature) => (
-            <article key={feature.title} className={`feature-card ${feature.accent}`}>
-              <div className="feature-preview">
-                <span className="feature-orb orb-a" />
-                <span className="feature-orb orb-b" />
-                <span className="feature-wave" />
-              </div>
-              <h4>{feature.title}</h4>
-              <p>{feature.description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
+      {/* ── TIERS ── */}
       <section className="landing-section">
         <div className="section-heading">
           <p className="eyebrow">Card Tiers</p>
           <h3 className="landing-title">Pick the depth of the experience.</h3>
         </div>
         <div className="tiers-grid">
-          {tiers.map((tier) => (
+          {TIERS.map((tier) => (
             <article key={tier.name} className={`tier-card ${tier.className}`}>
               <p className="tier-name">{tier.name}</p>
               <h4>{tier.label}</h4>
@@ -207,8 +240,12 @@ function Home() {
             </article>
           ))}
         </div>
+        <p className="tiers-footnote">
+          Anonymous Inbox also has Classic (free) and Premium tiers for template effects.
+        </p>
       </section>
 
+      {/* ── CTA ── */}
       <section className="landing-section landing-cta">
         <p className="eyebrow">Start Here</p>
         <h3 className="landing-title">Create something unforgettable.</h3>
@@ -217,6 +254,7 @@ function Home() {
         </Link>
       </section>
 
+      {/* ── MARKETPLACE HIGHLIGHTS ── */}
       <div className="page-body">
         <div className="screen-body">
           <div className="section-heading inline">
@@ -261,4 +299,3 @@ function Home() {
 }
 
 export default Home
-

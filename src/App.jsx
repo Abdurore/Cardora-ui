@@ -11,6 +11,8 @@ import AdminDashboard from './pages/AdminDashboard.jsx'
 import WorldChat from './pages/WorldChat.jsx'
 import AuthPage from './pages/AuthPage.jsx'
 import LegalPage from './pages/LegalPage.jsx'
+import AnonSend from './pages/AnonSend.jsx'
+import AnonInbox from './pages/AnonInbox.jsx'
 
 function App() {
   return (
@@ -28,8 +30,11 @@ function App() {
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
         <Route path="/legal/:doc" element={<LegalPage />} />
+        <Route path="/inbox" element={<AnonInbox />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
+      {/* Public anonymous send page — outside MainLayout so no auth context required */}
+      <Route path="/ask/:username" element={<AnonSend />} />
     </Routes>
   )
 }

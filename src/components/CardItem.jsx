@@ -1,5 +1,11 @@
 import { getTierInfo } from '../utils/tier.js'
 
+const TYPE_BADGE = {
+  poll:   { label: 'Poll',   cls: 'type-badge-poll' },
+  trivia: { label: 'Trivia', cls: 'type-badge-trivia' },
+  chain:  { label: 'Chain',  cls: 'type-badge-chain' },
+}
+
 function CardItem({
   id,
   title,
@@ -8,6 +14,7 @@ function CardItem({
   meta,
   likes,
   tier = 'simple',
+  type,
   variant = 'one',
   showOccasion = true,
   previewImage,
@@ -46,6 +53,11 @@ function CardItem({
         <div className="card-thumb-glow" />
         <div className="card-thumb-aura" />
       </div>
+      {TYPE_BADGE[type] && (
+        <span className={`card-type-badge ${TYPE_BADGE[type].cls}`}>
+          {TYPE_BADGE[type].label}
+        </span>
+      )}
       <div className="card-info">
         {showOccasion && occasion ? <p className="card-eyebrow">{occasion}</p> : null}
         <h4>{title}</h4>
