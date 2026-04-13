@@ -448,4 +448,69 @@ export async function getAdminAdsAnalytics() {
   return request('/admin/ads/analytics', { auth: true })
 }
 
+export async function deleteAdminAd(adId) {
+  return request(`/admin/ads/${adId}`, { method: 'DELETE', auth: true })
+}
+
+export async function getAdminAdsGlobalStats() {
+  return request('/admin/ads/global-stats', { auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   TIER-SPECIFIC CARD CREATION
+   ═══════════════════════════════════════════════ */
+export async function createCardClassic(payload) {
+  return request('/create-card/classic', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardPremium(payload) {
+  return request('/create-card/premium', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardElite(payload) {
+  return request('/create-card/elite', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardAnonymous(payload) {
+  return request('/create-card/anonymous', { method: 'POST', auth: true, body: payload })
+}
+
+export async function useCouponCreateCard(payload) {
+  return request('/use-coupon-create-card', { method: 'POST', auth: true, body: payload })
+}
+
+/* ═══════════════════════════════════════════════
+   CARD ANONYMOUS MESSAGES
+   ═══════════════════════════════════════════════ */
+export async function sendCardAnonymousMessage(slug, body) {
+  return request(`/cards/${slug}/anonymous-message`, { method: 'POST', body })
+}
+
+/* ═══════════════════════════════════════════════
+   MEDIA MANAGEMENT
+   ═══════════════════════════════════════════════ */
+export async function getMediaVideos() {
+  return request('/media/videos', { auth: true })
+}
+
+export async function uploadMediaVideo(payload) {
+  return request('/media/videos', { method: 'POST', auth: true, body: payload })
+}
+
+export async function deleteMediaVideo(videoId) {
+  return request(`/media/videos/${videoId}`, { method: 'DELETE', auth: true })
+}
+
+export async function getMediaMusic() {
+  return request('/media/music', { auth: true })
+}
+
+export async function uploadMediaMusic(payload) {
+  return request('/media/music', { method: 'POST', auth: true, body: payload })
+}
+
+export async function deleteMediaMusic(musicId) {
+  return request(`/media/music/${musicId}`, { method: 'DELETE', auth: true })
+}
+
 export { API_BASE }

@@ -8,7 +8,7 @@ import Dropdown from '../components/Dropdown.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
 import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
-import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency } from '../lib/api.js'
+import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics } from '../lib/api.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
@@ -61,6 +61,21 @@ function Profile() {
   const [userCurrency, setUserCurrency] = useState('')
   const [isSavingCurrency, setIsSavingCurrency] = useState(false)
   const [showAllStats, setShowAllStats] = useState(false)
+  const [cardAnalytics, setCardAnalytics] = useState({}) // keyed by slug
+  const [loadingCardAnalytics, setLoadingCardAnalytics] = useState({}) // keyed by slug
+
+  const fetchCardAnalytics = async (slug) => {
+    if (!slug || cardAnalytics[slug] !== undefined) return
+    setLoadingCardAnalytics(prev => ({ ...prev, [slug]: true }))
+    try {
+      const res = await getCardAnalytics(slug)
+      setCardAnalytics(prev => ({ ...prev, [slug]: res?.analytics || res?.data || res || null }))
+    } catch {
+      setCardAnalytics(prev => ({ ...prev, [slug]: null }))
+    } finally {
+      setLoadingCardAnalytics(prev => ({ ...prev, [slug]: false }))
+    }
+  }
 
   const allCards = [...homeCards, ...exploreCards, ...profileCreations]
   const favoriteCards = allCards.filter((card) => favorites.includes(card.id))
@@ -477,6 +492,16 @@ function Profile() {
                           🔗
                         </button>
                       )}
+                      {card.slug && (
+                        <button
+                          className="profile-card-action-btn stats"
+                          type="button"
+                          onClick={() => fetchCardAnalytics(card.slug)}
+                          title="View analytics"
+                        >
+                          📊
+                        </button>
+                      )}
                       <button
                         className="profile-card-action-btn delete"
                         type="button"
@@ -486,6 +511,21 @@ function Profile() {
                         🗑
                       </button>
                     </div>
+                    {card.slug && cardAnalytics[card.slug] !== undefined && (
+                      <div className="profile-card-analytics">
+                        {loadingCardAnalytics[card.slug] ? (
+                          <span className="profile-card-analytics-loading">Loading…</span>
+                        ) : cardAnalytics[card.slug] ? (
+                          <>
+                            <span>{cardAnalytics[card.slug].views ?? 0} views</span>
+                            <span>{cardAnalytics[card.slug].likes ?? 0} likes</span>
+                            <span>{cardAnalytics[card.slug].responses ?? cardAnalytics[card.slug].replies ?? 0} replies</span>
+                          </>
+                        ) : (
+                          <span className="profile-card-analytics-empty">No data yet</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -597,7 +637,7 @@ function Profile() {
             const blob = dataUrlToBlob(dataUrl)
             const cloudUrl = await uploadToCloudinary(blob, 'image')
             updateAvatar(cloudUrl)
-            updateProfile({ avatarUrl: cloudUrl })
+            updateProfile({ profilePictureUrl: cloudUrl })
           } catch (err) {
             setAvatarUploadError('Avatar upload failed. Please try again.')
             console.error('Avatar upload error:', err)

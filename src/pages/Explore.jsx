@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { HiOutlineMagnifyingGlass } from 'react-icons/hi2'
+import { HiOutlineMagnifyingGlass, HiOutlineFire } from 'react-icons/hi2'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
 import { exploreCards } from '../data/catalog.js'
+import { getPopularTemplates } from '../lib/api.js'
+import { mapTemplateToCard } from '../lib/backendMappers.js'
 
 function Explore() {
   const {
@@ -22,8 +24,18 @@ function Explore() {
   const [activeType, setActiveType] = useState(searchParams.get('type') || 'all')
   const [activeCategory, setActiveCategory] = useState(searchParams.get('cat') || 'all')
   const [visibleCount, setVisibleCount] = useState(12)
+  const [trendingTemplates, setTrendingTemplates] = useState([])
   const CARDS_PER_PAGE = 12
   const cardSource = marketplaceTemplates?.length ? marketplaceTemplates : exploreCards
+
+  useEffect(() => {
+    getPopularTemplates('days=7&page=1&limit=8')
+      .then((res) => {
+        const items = res?.templates || res?.data?.templates || []
+        if (items.length) setTrendingTemplates(items.map(mapTemplateToCard))
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const params = {}
@@ -101,6 +113,27 @@ function Explore() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
+
+        {/* Trending rail */}
+        {trendingTemplates.length > 0 && !query && activeTag === 'all' && activeType === 'all' ? (
+          <div className="explore-trending">
+            <p className="explore-trending-label">
+              <HiOutlineFire aria-hidden="true" /> Trending this week
+            </p>
+            <div className="explore-trending-rail">
+              {trendingTemplates.map((card, index) => (
+                <CardItem
+                  key={`trending-${card.id}-${index}`}
+                  {...card}
+                  variant={`v${(index % 4) + 1}`}
+                  isFavorite={favorites.includes(card.id)}
+                  onToggleFavorite={toggleFavorite}
+                  onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Card type filter */}
         <div className="tag-list explore-type-filter">
