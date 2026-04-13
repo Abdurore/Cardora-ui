@@ -561,6 +561,45 @@
   min-width: 220px;
 }
 
+/* ═══════════════════════════════════════════════
+   EXPLORE TRENDING RAIL
+   ═══════════════════════════════════════════════ */
+.explore-trending {
+  margin: 0 0 8px;
+}
+
+.explore-trending-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(118, 239, 255, 0.85);
+  margin: 0 0 12px;
+}
+
+.explore-trending-rail {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.explore-trending-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.explore-trending-rail .card {
+  flex: 0 0 200px;
+  min-width: 200px;
+  scroll-snap-align: start;
+}
+
 .profile-edit-btn {
   margin-top: 14px;
   padding: 10px 22px;
@@ -1132,6 +1171,25 @@
   margin: 0;
   color: rgba(220, 242, 247, 0.72);
   line-height: 1.65;
+}
+
+.auth-bonus-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: rgba(118, 239, 255, 0.07);
+  border: 1px solid rgba(118, 239, 255, 0.18);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: rgba(118, 239, 255, 0.9);
+  line-height: 1.45;
+}
+
+.auth-bonus-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .auth-page-back {
@@ -10161,6 +10219,33 @@ a {
 
 .profile-card-action-btn.delete:hover {
   border-color: rgba(255, 80, 120, 0.4);
+}
+
+.profile-card-action-btn.stats:hover {
+  border-color: rgba(118, 239, 255, 0.4);
+}
+
+.profile-card-analytics {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  margin-top: 4px;
+  background: rgba(118, 239, 255, 0.05);
+  border: 1px solid rgba(118, 239, 255, 0.12);
+  border-radius: 8px;
+  font-size: 0.72rem;
+  color: rgba(220, 242, 247, 0.7);
+}
+
+.profile-card-analytics span {
+  white-space: nowrap;
+}
+
+.profile-card-analytics-loading,
+.profile-card-analytics-empty {
+  color: rgba(220, 242, 247, 0.4);
+  font-style: italic;
 }
 
 .profile-card-action-pill {

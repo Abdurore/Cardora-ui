@@ -1,5 +1,6 @@
 import { Link, Navigate, useNavigate, useOutletContext } from 'react-router-dom'
 import { useMemo, useState, useRef, useEffect } from 'react'
+import { getSignupBonusAvailability } from '../lib/api.js'
 
 const currencyOptions = ['NGN', 'USD', 'EUR', 'GBP']
 
@@ -28,10 +29,18 @@ function AuthPage({ mode = 'login' }) {
   const [showCurrencyMenu, setShowCurrencyMenu] = useState(false)
   const [forgotFlow, setForgotFlow] = useState(null) // null | 'email' | 'reset'
   const [verifyFlow, setVerifyFlow] = useState(null) // null | 'email' | 'otp'
+  const [signupBonus, setSignupBonus] = useState(null)
   const slowTimerRef = useRef(null)
 
   // Clear slow timer on unmount
   useEffect(() => () => clearTimeout(slowTimerRef.current), [])
+
+  useEffect(() => {
+    if (mode !== 'signup') return
+    getSignupBonusAvailability()
+      .then((res) => { if (res?.available) setSignupBonus(res) })
+      .catch(() => {})
+  }, [mode])
 
   const pageCopy = useMemo(
     () =>
@@ -282,6 +291,16 @@ function AuthPage({ mode = 'login' }) {
             <p className="eyebrow">{getEyebrow()}</p>
             <h1>{getHeading()}</h1>
             <p className="auth-page-copy">{getCopy()}</p>
+            {signupBonus && mode === 'signup' && !pendingVerification && !forgotFlow && !verifyFlow ? (
+              <div className="auth-bonus-banner">
+                <span className="auth-bonus-icon">🎁</span>
+                <span>
+                  {signupBonus.bonusAmount
+                    ? `New accounts get ${signupBonus.bonusAmount} free CC on sign up`
+                    : signupBonus.message || 'New accounts get free Cardora Credits on sign up'}
+                </span>
+              </div>
+            ) : null}
           </div>
 
           <form className="auth-form" onSubmit={handleSubmit} action="" noValidate>
