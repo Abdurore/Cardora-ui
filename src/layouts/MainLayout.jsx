@@ -127,7 +127,7 @@ function MainLayout() {
       setBalance(normalized.balance)
       setFavorites(meta.favorites || [])
       setInventory(meta.inventory || [])
-      setAvatarUrl(meta.avatarUrl || '')
+      setAvatarUrl(normalized.avatarUrl || '')
       setAvatarColor(meta.avatarColor || normalized.avatarColor)
       return normalized
     } catch (error) {
