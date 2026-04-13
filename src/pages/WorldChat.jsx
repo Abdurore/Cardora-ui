@@ -6,6 +6,17 @@ import ScreenNav from '../components/ScreenNav.jsx'
 import { getWorldChat, API_BASE } from '../lib/api.js'
 import { mapChatMessage } from '../lib/backendMappers.js'
 
+function formatAge(isoStr) {
+  if (!isoStr) return ''
+  const diff = Date.now() - new Date(isoStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return new Date(isoStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return new Date(isoStr).toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
 function WorldChat() {
   const { currentUser, balance, openAuthModal } = useOutletContext()
   const navigate = useNavigate()
@@ -15,8 +26,10 @@ function WorldChat() {
   const [cooldown, setCooldown] = useState(0)
   const [loading, setLoading] = useState(true)
   const [connected, setConnected] = useState(false)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [joinLeave, setJoinLeave] = useState([])
   const [onlineCount, setOnlineCount] = useState(0)
+  const [, setTick] = useState(0)
   const socketRef = useRef(null)
   const messagesEndRef = useRef(null)
   const cooldownRef = useRef(null)
@@ -119,6 +132,24 @@ function WorldChat() {
     }
   }, [currentUser, scrollToBottom])
 
+  // Online / offline detection
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true)
+    const goOffline = () => setIsOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
+  // Live timestamp ticker — re-renders every 30s so "just now" → "2m ago" etc.
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 30000)
+    return () => clearInterval(timer)
+  }, [])
+
   // Auto-clear join/leave toasts
   useEffect(() => {
     if (joinLeave.length === 0) return
@@ -129,7 +160,7 @@ function WorldChat() {
   }, [joinLeave])
 
   const sendMessage = () => {
-    if (!input.trim() || cooldown > 0) return
+    if (!input.trim() || cooldown > 0 || !isOnline || !connected) return
     socketRef.current?.emit('send_message', { content: input.trim() })
     setInput('')
     setError('')
@@ -142,24 +173,7 @@ function WorldChat() {
     }
   }
 
-  if (!currentUser) {
-    return (
-      <div className="page-body">
-        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
-        <div className="screen-body">
-          <div className="chat-auth-wall">
-            <span className="chat-auth-icon">💬</span>
-            <h2>World Chat</h2>
-            <p>Sign in to join the conversation with the Cardora community.</p>
-            <button className="primary" type="button" onClick={() => navigate('/login')}>
-              Sign In
-            </button>
-          </div>
-        </div>
-        <ScreenNav />
-      </div>
-    )
-  }
+  const canSend = Boolean(currentUser && isOnline && connected && !cooldown)
 
   return (
     <div className="page-body chat-page">
@@ -180,6 +194,13 @@ function WorldChat() {
             </span>
           </div>
         </div>
+
+        {/* Offline banner */}
+        {!isOnline && (
+          <div className="chat-offline-banner">
+            You're offline — messages are read-only until you reconnect.
+          </div>
+        )}
 
         {/* Join/Leave toasts */}
         {joinLeave.length > 0 && (
@@ -223,15 +244,7 @@ function WorldChat() {
                     <div className="chat-msg-bubble">
                       {msg.content}
                     </div>
-                    <span className="chat-msg-time">
-                      {(() => {
-                        const diff = Date.now() - new Date(msg.createdAt).getTime()
-                        const mins = Math.floor(diff / 60000)
-                        if (mins < 1) return 'just now'
-                        if (mins < 60) return `${mins}m ago`
-                        return new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      })()}
-                    </span>
+                    <span className="chat-msg-time">{formatAge(msg.createdAt)}</span>
                   </div>
                 </div>
               )
@@ -244,36 +257,48 @@ function WorldChat() {
         {error && <p className="chat-error">{error}</p>}
 
         {/* Input */}
-        <div className="chat-input-bar">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={cooldown > 0 ? `Wait ${cooldown}s...` : 'Type a message...'}
-            disabled={cooldown > 0}
-            maxLength={500}
-          />
-          <button
-            type="button"
-            className="chat-send-btn"
-            onClick={sendMessage}
-            disabled={cooldown > 0 || !input.trim()}
-            aria-label="Send message"
-          >
-            {cooldown > 0 ? (
-              <span className="chat-send-cooldown">{cooldown}</span>
-            ) : (
-              <svg viewBox="0 0 24 24" className="chat-send-icon" aria-hidden="true">
-                <path
-                  d="M3.4 20.4l17.45-8.3a1.2 1.2 0 0 0 0-2.2L3.4 1.6a1.2 1.2 0 0 0-1.67 1.4L4.5 11 1.73 19a1.2 1.2 0 0 0 1.67 1.4z"
-                  fill="currentColor"
-                />
-                <path d="M4.8 11h7.4" stroke="rgba(4,16,21,0.35)" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
-        </div>
+        {!currentUser ? (
+          <div className="chat-signin-bar">
+            <p>Sign in to join the conversation.</p>
+            <button className="primary" type="button" onClick={() => navigate('/login')}>Sign In</button>
+          </div>
+        ) : (
+          <div className="chat-input-bar">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                !isOnline ? 'You\'re offline…'
+                : !connected ? 'Reconnecting…'
+                : cooldown > 0 ? `Wait ${cooldown}s…`
+                : 'Type a message…'
+              }
+              disabled={!canSend}
+              maxLength={500}
+            />
+            <button
+              type="button"
+              className="chat-send-btn"
+              onClick={sendMessage}
+              disabled={!canSend || !input.trim()}
+              aria-label="Send message"
+            >
+              {cooldown > 0 ? (
+                <span className="chat-send-cooldown">{cooldown}</span>
+              ) : (
+                <svg viewBox="0 0 24 24" className="chat-send-icon" aria-hidden="true">
+                  <path
+                    d="M3.4 20.4l17.45-8.3a1.2 1.2 0 0 0 0-2.2L3.4 1.6a1.2 1.2 0 0 0-1.67 1.4L4.5 11 1.73 19a1.2 1.2 0 0 0 1.67 1.4z"
+                    fill="currentColor"
+                  />
+                  <path d="M4.8 11h7.4" stroke="rgba(4,16,21,0.35)" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+          </div>
+        )}
       </div>
       <ScreenNav />
     </div>

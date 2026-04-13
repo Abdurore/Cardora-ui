@@ -2758,6 +2758,97 @@
   gap: 12px;
 }
 
+/* ═══════════════════════════════════════════════
+   CARD DETAIL SHARE PANEL
+   ═══════════════════════════════════════════════ */
+.detail-share-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-share-link-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(118, 239, 255, 0.05);
+  border: 1px solid rgba(118, 239, 255, 0.14);
+  border-radius: 12px;
+  padding: 10px 14px;
+  min-width: 0;
+}
+
+.detail-share-link-pill {
+  flex: 1;
+  font-size: 0.78rem;
+  color: rgba(220, 242, 247, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: monospace;
+  letter-spacing: 0.02em;
+}
+
+.detail-share-copy-btn {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(118, 239, 255, 0.3);
+  background: rgba(118, 239, 255, 0.07);
+  color: #7ef7ff;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  letter-spacing: 0.04em;
+}
+
+.detail-share-copy-btn:hover {
+  background: rgba(118, 239, 255, 0.15);
+}
+
+.detail-share-copy-btn.copied {
+  background: rgba(98, 255, 162, 0.12);
+  color: #62ffa2;
+  border-color: rgba(98, 255, 162, 0.3);
+}
+
+.detail-share-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(220, 242, 247, 0.4);
+  margin: 0;
+}
+
+.detail-share-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.detail-share-platform-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--platform-color, #ecfbff);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.detail-share-platform-btn:hover {
+  background: color-mix(in srgb, var(--platform-color, #ecfbff) 12%, transparent);
+  border-color: color-mix(in srgb, var(--platform-color, #ecfbff) 35%, transparent);
+  transform: translateY(-1px);
+}
+
 .detail-strong {
   border-color: rgba(98, 255, 162, 0.36);
   color: #d8fff0;
@@ -9715,6 +9806,41 @@ a {
   max-width: 360px;
 }
 
+.chat-offline-banner {
+  margin: 0 0 8px;
+  padding: 9px 14px;
+  background: rgba(255, 180, 60, 0.1);
+  border: 1px solid rgba(255, 180, 60, 0.25);
+  border-radius: 10px;
+  font-size: 0.8rem;
+  color: rgba(255, 200, 80, 0.9);
+  text-align: center;
+}
+
+.chat-signin-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(118, 239, 255, 0.04);
+  border: 1px solid rgba(118, 239, 255, 0.1);
+  border-radius: 12px;
+  margin-top: 8px;
+}
+
+.chat-signin-bar p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(220, 242, 247, 0.6);
+}
+
+.chat-signin-bar .primary {
+  padding: 8px 18px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 /* ═══════════════════════════════════════════════════
    REWARDED ADS
    ═══════════════════════════════════════════════════ */
@@ -10175,6 +10301,25 @@ a {
   background: rgba(126, 247, 255, 0.08);
   padding: 4px 10px;
   border-radius: 8px;
+  font-family: monospace;
+}
+
+.profile-referral-copy {
+  border: 1px solid rgba(126, 247, 255, 0.2);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  letter-spacing: 0.04em;
+}
+
+.profile-referral-copy:hover {
+  background: rgba(126, 247, 255, 0.15);
+  border-color: rgba(126, 247, 255, 0.4);
+}
+
+.profile-referral-copy.copied {
+  background: rgba(98, 255, 162, 0.12);
+  color: #62ffa2;
+  border-color: rgba(98, 255, 162, 0.3);
 }
 
 .profile-cards-loading {

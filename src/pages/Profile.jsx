@@ -8,6 +8,8 @@ import Dropdown from '../components/Dropdown.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
 import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
+
+const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
 import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics } from '../lib/api.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
@@ -61,6 +63,7 @@ function Profile() {
   const [userCurrency, setUserCurrency] = useState('')
   const [isSavingCurrency, setIsSavingCurrency] = useState(false)
   const [showAllStats, setShowAllStats] = useState(false)
+  const [codeCopied, setCodeCopied] = useState(false)
   const [cardAnalytics, setCardAnalytics] = useState({}) // keyed by slug
   const [loadingCardAnalytics, setLoadingCardAnalytics] = useState({}) // keyed by slug
 
@@ -118,7 +121,14 @@ function Profile() {
         ])
         if (cancelled) return
         if (a) setAnalytics(a.analytics || a.data || a)
-        if (c) setCurrencies(c.currencies || c.data || c || [])
+        if (c) {
+          const raw = c.currencies || c.data || (Array.isArray(c) ? c : [])
+          const fromApi = raw.map(item => typeof item === 'string' ? item : item.code || item)
+          const merged = [...new Set([...CURRENCY_FALLBACK, ...fromApi])]
+          setCurrencies(merged)
+        } else {
+          setCurrencies(CURRENCY_FALLBACK)
+        }
         if (uc) setUserCurrency(uc.currency || uc.code || uc.data?.currency || '')
       } catch { /* silent */ }
     })()
@@ -256,7 +266,19 @@ function Profile() {
           {currentUser?.referralCode && (
             <div className="profile-referral">
               <span className="profile-referral-label">Referral Code:</span>
-              <code className="profile-referral-code">{currentUser.referralCode}</code>
+              <button
+                type="button"
+                className={`profile-referral-code profile-referral-copy ${codeCopied ? 'copied' : ''}`}
+                title="Click to copy"
+                onClick={() => {
+                  navigator.clipboard?.writeText(currentUser.referralCode).then(() => {
+                    setCodeCopied(true)
+                    setTimeout(() => setCodeCopied(false), 1600)
+                  }).catch(() => {})
+                }}
+              >
+                {codeCopied ? '✓ Copied!' : currentUser.referralCode}
+              </button>
             </div>
           )}
 
@@ -353,7 +375,7 @@ function Profile() {
         ) : null}
 
         {/* Currency preference */}
-        {currentUser && currencies.length > 0 && (
+        {currentUser && (
           <div className="profile-currency">
             <h4 className="section-title">Display Currency</h4>
             <div className="profile-currency-row">
@@ -362,9 +384,9 @@ function Profile() {
                 onChange={handleCurrencyChange}
                 disabled={isSavingCurrency}
                 placeholder="Select currency"
-                options={currencies.map((c) => ({
-                  value: c.code || c,
-                  label: `${c.code || c}${c.name ? ` — ${c.name}` : ''}`,
+                options={(currencies.length ? currencies : CURRENCY_FALLBACK).map((c) => ({
+                  value: typeof c === 'string' ? c : c.code,
+                  label: typeof c === 'string' ? c : `${c.code}${c.name ? ` — ${c.name}` : ''}`,
                 }))}
               />
               {isSavingCurrency && <span className="profile-currency-saving">Saving...</span>}
