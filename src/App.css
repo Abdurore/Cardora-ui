@@ -1028,6 +1028,33 @@
   color: #9ef6cf;
 }
 
+.auth-unverified-notice {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(255, 200, 80, 0.9);
+  background: rgba(255, 180, 60, 0.08);
+  border: 1px solid rgba(255, 180, 60, 0.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  line-height: 1.5;
+}
+
+.auth-inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: #7ef7ff;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-inline-link:hover {
+  color: #fff;
+}
+
 .auth-slow-hint {
   margin: 0;
   padding: 12px 16px;
