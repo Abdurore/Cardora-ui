@@ -1,5 +1,5 @@
 import { Link, Navigate, useNavigate, useOutletContext } from 'react-router-dom'
-import { useMemo, useState, useRef, useEffect } from 'react'
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { getSignupBonusAvailability } from '../lib/api.js'
 
 const currencyOptions = ['NGN', 'USD', 'EUR', 'GBP']
@@ -32,6 +32,7 @@ function AuthPage({ mode = 'login' }) {
   const [verifyFlow, setVerifyFlow] = useState(null)  // null | 'email' | 'otp'  (login page only)
   const [signupBonus, setSignupBonus] = useState(null)
   const slowTimerRef = useRef(null)
+  const otpInputRef = useRef(null)
 
   // Reset ALL transient UI state whenever the user switches between /login and /signup
   useEffect(() => {
@@ -47,6 +48,15 @@ function AuthPage({ mode = 'login' }) {
   }, [mode])
 
   useEffect(() => () => clearTimeout(slowTimerRef.current), [])
+
+  // Auto-focus OTP input when entering a code-entry flow
+  useEffect(() => {
+    if (verifyFlow === 'otp' || forgotFlow === 'reset' || pendingVerification) {
+      // Small delay to allow the DOM to render the input first
+      const timer = setTimeout(() => otpInputRef.current?.focus(), 80)
+      return () => clearTimeout(timer)
+    }
+  }, [verifyFlow, forgotFlow, pendingVerification])
 
   useEffect(() => {
     if (mode !== 'signup') return
@@ -287,8 +297,8 @@ function AuthPage({ mode = 'login' }) {
               <label className="detail-field">
                 Verification Code
                 <small className="detail-hint">6-digit code from your email.</small>
-                <input name="otp" type="text" value={form.otp} onChange={handleChange}
-                  placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus />
+                <input ref={otpInputRef} name="otp" type="text" value={form.otp} onChange={handleChange}
+                  placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" />
               </label>
             )}
 
@@ -308,8 +318,8 @@ function AuthPage({ mode = 'login' }) {
                 <label className="detail-field">
                   Reset Code
                   <small className="detail-hint">6-digit code from your email.</small>
-                  <input name="otp" type="text" value={form.otp} onChange={handleChange}
-                    placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus />
+                  <input ref={otpInputRef} name="otp" type="text" value={form.otp} onChange={handleChange}
+                    placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" />
                 </label>
                 <label className="detail-field">
                   New Password
@@ -410,8 +420,8 @@ function AuthPage({ mode = 'login' }) {
               <label className="detail-field">
                 Verification Code
                 <small className="detail-hint">Enter the 6-digit code sent to your email.</small>
-                <input name="otp" type="text" value={form.otp} onChange={handleChange}
-                  placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus />
+                <input ref={otpInputRef} name="otp" type="text" value={form.otp} onChange={handleChange}
+                  placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" />
               </label>
             )}
 

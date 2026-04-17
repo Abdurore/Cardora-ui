@@ -1,0 +1,190 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  HiOutlineEnvelope,
+  HiOutlineChartBarSquare,
+  HiOutlineLightBulb,
+  HiOutlineEyeSlash,
+} from 'react-icons/hi2'
+
+const CARD_TYPES = [
+  {
+    id: 'moment',
+    icon: HiOutlineEnvelope,
+    emoji: '💌',
+    label: 'Moment Card',
+    tagline: 'The full cinematic experience',
+    description: 'Envelope reveals, background music, animations, images, gifts, questions — everything.',
+    accent: 'warm',
+    tiers: ['classic', 'premium', 'elite'],
+  },
+  {
+    id: 'poll',
+    icon: HiOutlineChartBarSquare,
+    emoji: '📊',
+    label: 'Poll Card',
+    tagline: 'Ask and see who answers',
+    description: 'Embed a live poll. Recipients vote and see real-time results.',
+    accent: 'cool',
+    tiers: ['classic', 'premium'],
+  },
+  {
+    id: 'trivia',
+    icon: HiOutlineLightBulb,
+    emoji: '💡',
+    label: 'Trivia Card',
+    tagline: 'Quiz your people',
+    description: 'Create a scored quiz. Recipients see their score and correct answers at the end.',
+    accent: 'rose',
+    tiers: ['classic', 'premium'],
+  },
+  {
+    id: 'anonymous',
+    icon: HiOutlineEyeSlash,
+    emoji: '👁',
+    label: 'Anonymous Card',
+    tagline: 'Receive honest messages',
+    description: 'Share a link and let anyone send you a message — anonymously, beautifully wrapped.',
+    accent: 'mint',
+    tiers: ['classic', 'premium'],
+  },
+]
+
+const TIER_INFO = {
+  classic: { label: 'Classic', note: 'Free · Clean animated reveal' },
+  premium: { label: 'Premium', note: 'Music + richer visuals · Costs CC' },
+  elite: { label: 'Elite', note: 'Full effects + gifts · Costs CC' },
+}
+
+function CardTypeModal({ open, onClose, preselectedType }) {
+  const navigate = useNavigate()
+  const [selectedType, setSelectedType] = useState(null)
+  const [selectedTier, setSelectedTier] = useState(null)
+
+  // Reset state when modal opens / closes or preselection changes
+  useEffect(() => {
+    if (open && preselectedType) {
+      setSelectedType(preselectedType)
+      const type = CARD_TYPES.find((t) => t.id === preselectedType)
+      setSelectedTier(type?.tiers[0] || 'classic')
+    } else if (open) {
+      setSelectedType(null)
+      setSelectedTier(null)
+    }
+  }, [open, preselectedType])
+
+  if (!open) return null
+
+  const activeType = CARD_TYPES.find((t) => t.id === selectedType)
+
+  const handleStart = () => {
+    if (!selectedType || !selectedTier) return
+    onClose()
+    navigate(`/studio?type=${selectedType}&tier=${selectedTier}`)
+  }
+
+  const handleSelectType = (typeId) => {
+    setSelectedType(typeId)
+    const type = CARD_TYPES.find((t) => t.id === typeId)
+    // Auto-select the first tier
+    setSelectedTier(type?.tiers[0] || 'classic')
+  }
+
+  const handleBack = () => {
+    if (selectedType) {
+      setSelectedType(null)
+      setSelectedTier(null)
+    } else {
+      onClose()
+    }
+  }
+
+  return (
+    <section className="ctm-overlay" role="dialog" aria-modal="true" aria-label="Choose card type">
+      <div className="ctm-backdrop" onClick={onClose} />
+      <div className="ctm-shell">
+        {/* Header */}
+        <div className="ctm-header">
+          <button type="button" className="ctm-back" onClick={handleBack}>
+            {selectedType ? '← Back' : '✕'}
+          </button>
+          <div className="ctm-header-text">
+            <p className="eyebrow">Create a Card</p>
+            <h2>{selectedType ? 'Choose your tier' : 'What are you creating?'}</h2>
+          </div>
+        </div>
+
+        {/* Type Selection */}
+        {!selectedType && (
+          <div className="ctm-grid">
+            {CARD_TYPES.map((type) => {
+              const Icon = type.icon
+              return (
+                <button
+                  key={type.id}
+                  type="button"
+                  className={`ctm-card ctm-${type.accent}`}
+                  onClick={() => handleSelectType(type.id)}
+                >
+                  <div className="ctm-card-icon-wrap">
+                    <span className="ctm-card-emoji">{type.emoji}</span>
+                    <Icon size={28} className="ctm-card-icon" />
+                  </div>
+                  <h3>{type.label}</h3>
+                  <p className="ctm-card-tagline">{type.tagline}</p>
+                  <p className="ctm-card-desc">{type.description}</p>
+                  <span className="ctm-card-tiers-hint">
+                    {type.tiers.map((t) => TIER_INFO[t].label).join(' · ')}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Tier Selection */}
+        {selectedType && activeType && (
+          <div className="ctm-tier-section">
+            <div className={`ctm-type-summary ctm-${activeType.accent}`}>
+              <span className="ctm-type-summary-emoji">{activeType.emoji}</span>
+              <div>
+                <h3>{activeType.label}</h3>
+                <p>{activeType.description}</p>
+              </div>
+            </div>
+
+            <div className="ctm-tier-grid">
+              {activeType.tiers.map((tier) => {
+                const info = TIER_INFO[tier]
+                return (
+                  <button
+                    key={tier}
+                    type="button"
+                    className={`ctm-tier ${selectedTier === tier ? 'active' : ''} ctm-tier-${tier}`}
+                    onClick={() => setSelectedTier(tier)}
+                  >
+                    <span className="ctm-tier-name">{info.label}</span>
+                    <span className="ctm-tier-note">{info.note}</span>
+                    {selectedTier === tier && <span className="ctm-tier-check">✓</span>}
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              className={`ctm-start ctm-start-${activeType.accent}`}
+              disabled={!selectedTier}
+              onClick={handleStart}
+            >
+              Start Creating →
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+export default CardTypeModal
+export { CARD_TYPES, TIER_INFO }

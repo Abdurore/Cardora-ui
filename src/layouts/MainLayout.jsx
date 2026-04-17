@@ -1,6 +1,7 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import CardDetailModal from '../components/CardDetailModal.jsx'
+import CardTypeModal from '../components/CardTypeModal.jsx'
 import AuthModal from '../components/AuthModal.jsx'
 import '../App.css'
 import {
@@ -67,6 +68,8 @@ function MainLayout() {
   const [avatarUrl, setAvatarUrl] = useState('')
   const [avatarColor, setAvatarColor] = useState('linear-gradient(135deg, #7ef7ff, #62ffa2)')
   const [showAuth, setShowAuth] = useState(false)
+  const [showCardTypeModal, setShowCardTypeModal] = useState(false)
+  const [cardTypePreselect, setCardTypePreselect] = useState(null)
   const [couponPackages, setCouponPackages] = useState([])
   const [marketplaceTemplates, setMarketplaceTemplates] = useState([])
   const [authReady, setAuthReady] = useState(false)
@@ -456,7 +459,7 @@ function MainLayout() {
     }
   }
 
-  const handleCreateCard = async (cardObject, { title, templateId, type, tier, couponType, useCoupons, poll, chain, trivia, anonTemplate } = {}) => {
+  const handleCreateCard = async (cardObject, { title, templateId, type, couponType, useCoupons, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
       const layoutdata = cardObjectToLayoutData(cardObject)
       const payload = {
@@ -470,20 +473,21 @@ function MainLayout() {
       if (poll) payload.poll = poll
       if (chain) payload.chain = chain
       if (trivia) payload.trivia = trivia
-      if (anonTemplate) payload.anonTemplate = anonTemplate
 
-      let apiCall = createCard
-      if (type === 'anonymous') {
-        apiCall = createCardAnonymous
-      } else if (tier === 'elite') {
-        apiCall = createCardElite
-      } else if (tier === 'premium') {
-        apiCall = createCardPremium
-      } else if (tier === 'classic') {
-        apiCall = createCardClassic
+      // Route to the correct tier-specific endpoint
+      let response
+      const resolvedTier = (tier || 'classic').toLowerCase()
+      if (type === 'anonymous' || anonTemplate) {
+        payload.anonTemplate = anonTemplate
+        response = await createCardAnonymous(payload)
+      } else if (resolvedTier === 'elite') {
+        response = await createCardElite(payload)
+      } else if (resolvedTier === 'premium') {
+        response = await createCardPremium(payload)
+      } else {
+        response = await createCardClassic(payload)
       }
 
-      const response = await apiCall(payload)
       return { ok: true, data: response, message: response?.message || 'Card created!' }
     } catch (error) {
       return { ok: false, message: error.message || 'Card creation failed.' }
@@ -614,6 +618,14 @@ function MainLayout() {
           onResetPassword: handleResetPassword,
           onDeleteAccount: handleDeleteAccount,
           refreshBalance,
+          openCardTypeModal: (preselect = null) => {
+            if (!hydratedUser) {
+              navigate('/login')
+              return
+            }
+            setCardTypePreselect(preselect)
+            setShowCardTypeModal(true)
+          },
           openEditor: (data) => {
             window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
             navigate('/studio', { state: { cardData: data || null } })
@@ -629,6 +641,10 @@ function MainLayout() {
         onRequireAuth={() => navigate('/login')}
         onDeductCC={deductCC}
         inventory={inventory}
+        openCardTypeModal={(preselect) => {
+          setCardTypePreselect(preselect || null)
+          setShowCardTypeModal(true)
+        }}
       />
       <AuthModal
         open={showAuth}
@@ -637,6 +653,11 @@ function MainLayout() {
         onSignup={handleSignup}
         currentUser={hydratedUser}
         onLogout={handleLogout}
+      />
+      <CardTypeModal
+        open={showCardTypeModal}
+        onClose={() => { setShowCardTypeModal(false); setCardTypePreselect(null) }}
+        preselectedType={cardTypePreselect}
       />
     </div>
   )

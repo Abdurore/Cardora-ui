@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+﻿import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import PremiumGiftReveal from './PremiumGiftReveal.jsx'
 import Envelope from './Envelope.jsx'
@@ -24,14 +24,32 @@ function useTypewriter(text, speed, active) {
   return displayed
 }
 
-function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail = '' }) {
-  const [stage, setStage] = useState('closed') // closed, opening, open, questions, end, giftIntro, giftReveal, giftReceive
+function CardPreviewModal({
+  cardObject,
+  onClose,
+  tier = 'simple',
+  recipientEmail = '',
+  studioType = 'moment',
+  pollData = null,
+  triviaData = null,
+  anonTemplate = null,
+}) {
+  const [stage, setStage] = useState('closed') // closed, opening, open, questions, end, giftIntro, giftReveal, giftReceive, pollVote, triviaQ, triviaResults, anonPreview
   const [questionIdx, setQuestionIdx] = useState(0)
   const [fadeBody, setFadeBody] = useState(false)
   const [bodyVisible, setBodyVisible] = useState(false)
   const [revealStep, setRevealStep] = useState(0)
   const audioRef = useRef(null)
   const containerRef = useRef(null)
+
+  // Poll preview state
+  const [previewPollVotes, setPreviewPollVotes] = useState([])
+  const [previewPollSubmitted, setPreviewPollSubmitted] = useState(false)
+
+  // Trivia preview state
+  const [previewTriviaIdx, setPreviewTriviaIdx] = useState(0)
+  const [previewTriviaAnswers, setPreviewTriviaAnswers] = useState([])
+  const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const c = cardObject
   const hasQuestions = c.questions.items.length > 0
@@ -51,7 +69,7 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
 
     audioRef.current.volume = c.background.music.volume
 
-    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive') {
+    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview') {
       audioRef.current.play().catch(() => {})
     } else {
       audioRef.current.pause()
@@ -63,7 +81,7 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
     }
   }, [c.background.music.url, c.background.music.volume, stage])
 
-  // Open effect dispatcher (confetti / fireworks / hearts / stars / balloons / emoji rain)
+  // Open effect dispatcher
   const triggerOpenEffect = useCallback(() => {
     if (!c.animation.openEffect || c.animation.openEffect === 'none') return
     fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
@@ -84,6 +102,22 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
   }
 
   const handleContinue = () => {
+    // Route to type-specific stage after open card
+    if (studioType === 'poll' && pollData) {
+      setStage('pollVote')
+      return
+    }
+    if (studioType === 'trivia' && triviaData) {
+      setPreviewTriviaIdx(0)
+      setPreviewTriviaAnswers([])
+      setPreviewTriviaSubmitted(false)
+      setStage('triviaQ')
+      return
+    }
+    if (studioType === 'anonymous') {
+      setStage('anonPreview')
+      return
+    }
     if (hasQuestions) {
       setStage('questions')
       setQuestionIdx(0)
@@ -106,6 +140,11 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
     setFadeBody(false)
     setBodyVisible(false)
     setRevealStep(0)
+    setPreviewPollVotes([])
+    setPreviewPollSubmitted(false)
+    setPreviewTriviaIdx(0)
+    setPreviewTriviaAnswers([])
+    setPreviewTriviaSubmitted(false)
   }
 
   const handleEndDone = () => {
@@ -154,12 +193,12 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
     })),
   [])
 
-  // Background effect — legacy emoji loops OR tsparticles ambient presets
+  // Background effect
   const renderBgEffect = () => {
     const eff = c.animation.backgroundEffect
     if (!eff || eff.type === 'none') return null
     if (LEGACY_EMOJI_AMBIENTS.has(eff.type)) {
-      const emojis = eff.emojis.length > 0 ? eff.emojis : ['✨']
+      const emojis = eff.emojis.length > 0 ? eff.emojis : ['âœ¨']
       return (
         <div className={`cp-bg-effect cp-bg-${eff.type}`}>
           {particlePositions.map((pos, i) => (
@@ -224,6 +263,12 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
       sequence.forEach(clearTimeout)
     }
   }, [stage, primaryImage])
+
+  // Continue label for the open card
+  const continueLabel = studioType === 'poll' ? 'Vote Now'
+    : studioType === 'trivia' ? 'Start Quiz'
+    : studioType === 'anonymous' ? 'Preview Inbox'
+    : hasQuestions ? 'Continue' : 'Done'
 
   return createPortal(
     <section className="cp-overlay" ref={containerRef}>
@@ -325,8 +370,222 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
                   }}
                   onClick={handleContinue}
                 >
-                  {hasQuestions ? 'Continue' : 'Done'}
+                  {continueLabel}
                 </button>
+              </div>
+            </article>,
+            'cp-gradient-border-full'
+          )}
+        </div>
+      )}
+
+      {/* POLL VOTE STAGE */}
+      {stage === 'pollVote' && pollData && (
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article
+              className="cp-card cp-card-full"
+              style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
+            >
+              <div className="cp-card-inner cp-card-inner-full">
+                <div className="cp-poll-stage">
+                  <p className="cp-poll-eyebrow" style={{ color: c.theme.accentColor }}>Poll Experience</p>
+                  <h2
+                    className="cp-poll-question-text"
+                    style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}
+                  >
+                    {pollData.question || 'Your poll question'}
+                  </h2>
+                  <div className="cp-poll-options">
+                    {(pollData.options || []).map((opt, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className={`cp-poll-option ${previewPollVotes.includes(i) ? 'selected' : ''}`}
+                        style={{ color: c.card.textColor }}
+                        onClick={() => {
+                          if (previewPollSubmitted) return
+                          if (pollData.allowMultiple) {
+                            setPreviewPollVotes(prev => prev.includes(i) ? prev.filter(v => v !== i) : [...prev, i])
+                          } else {
+                            setPreviewPollVotes([i])
+                          }
+                        }}
+                      >
+                        <span className="cp-poll-radio" />
+                        <span>{opt || `Option ${i + 1}`}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {!previewPollSubmitted ? (
+                    <button
+                      type="button"
+                      className="cp-poll-submit"
+                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      disabled={previewPollVotes.length === 0}
+                      onClick={() => setPreviewPollSubmitted(true)}
+                    >
+                      Submit Vote
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="cp-continue-btn visible"
+                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      onClick={() => setStage('end')}
+                    >
+                      Continue
+                    </button>
+                  )}
+                </div>
+              </div>
+            </article>,
+            'cp-gradient-border-full'
+          )}
+        </div>
+      )}
+
+      {/* TRIVIA QUESTION STAGE */}
+      {stage === 'triviaQ' && triviaData && (
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article
+              className="cp-card cp-card-full"
+              style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
+            >
+              <div className="cp-card-inner cp-card-inner-full">
+                <div className="cp-trivia-stage">
+                  <div className="cp-trivia-progress">
+                    {triviaData.questions.map((_, i) => (
+                      <div
+                        key={i}
+                        className={`cp-trivia-progress-dot ${i < previewTriviaIdx ? 'done' : ''} ${i === previewTriviaIdx ? 'active' : ''}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="cp-trivia-counter" style={{ color: c.theme.accentColor }}>
+                    Question {previewTriviaIdx + 1} of {triviaData.questions.length}
+                  </p>
+                  <h3
+                    className="cp-trivia-question-text"
+                    style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}
+                  >
+                    {triviaData.questions[previewTriviaIdx]?.text || 'Question'}
+                  </h3>
+                  <div className="cp-trivia-options">
+                    {(triviaData.questions[previewTriviaIdx]?.options || []).map((opt, oi) => (
+                      <button
+                        key={oi}
+                        type="button"
+                        className={`cp-trivia-option ${previewTriviaAnswers[previewTriviaIdx] === oi ? 'selected' : ''}`}
+                        style={{ color: c.card.textColor }}
+                        onClick={() => {
+                          const next = [...previewTriviaAnswers]
+                          next[previewTriviaIdx] = oi
+                          setPreviewTriviaAnswers(next)
+                        }}
+                      >
+                        <span className="cp-trivia-option-letter">{String.fromCharCode(65 + oi)}</span>
+                        <span>{opt || `Option ${oi + 1}`}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="cp-trivia-next"
+                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                    onClick={() => {
+                      if (previewTriviaIdx < triviaData.questions.length - 1) {
+                        setPreviewTriviaIdx(i => i + 1)
+                      } else {
+                        setStage('triviaResults')
+                      }
+                    }}
+                  >
+                    {previewTriviaIdx < triviaData.questions.length - 1 ? 'Next Question' : 'See Results'}
+                  </button>
+                </div>
+              </div>
+            </article>,
+            'cp-gradient-border-full'
+          )}
+        </div>
+      )}
+
+      {/* TRIVIA RESULTS */}
+      {stage === 'triviaResults' && triviaData && (
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article
+              className="cp-card cp-card-full"
+              style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
+            >
+              <div className="cp-card-inner cp-card-inner-full">
+                <div className="cp-trivia-results">
+                  <div
+                    className="cp-trivia-score-circle"
+                    style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                  >
+                    {triviaData.questions.filter((q, i) => previewTriviaAnswers[i] === q.correctIndex).length}/{triviaData.questions.length}
+                  </div>
+                  <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, margin: 0 }}>
+                    Quiz Complete!
+                  </h3>
+                  <p className="cp-trivia-score-label" style={{ color: c.card.textColor }}>
+                    You got {triviaData.questions.filter((q, i) => previewTriviaAnswers[i] === q.correctIndex).length} out of {triviaData.questions.length} correct
+                  </p>
+                  <button
+                    type="button"
+                    className="cp-continue-btn visible"
+                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                    onClick={() => setStage('end')}
+                  >
+                    Continue
+                  </button>
+                </div>
+              </div>
+            </article>,
+            'cp-gradient-border-full'
+          )}
+        </div>
+      )}
+
+      {/* ANONYMOUS PREVIEW */}
+      {stage === 'anonPreview' && (
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article
+              className="cp-card cp-card-full"
+              style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
+            >
+              <div className="cp-card-inner cp-card-inner-full">
+                <div className="cp-anon-stage">
+                  <p className="cp-anon-template-label" style={{ color: c.theme.accentColor }}>
+                    Anonymous Inbox Template
+                  </p>
+                  <h2 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, margin: 0, fontSize: '1.3rem' }}>
+                    {c.content.heading}
+                  </h2>
+                  <p style={{ color: c.card.textColor, margin: 0, fontSize: '0.9rem', lineHeight: 1.6 }}>
+                    {c.content.body}
+                  </p>
+                  <div className="cp-anon-sample-msg">
+                    <p style={{ color: c.card.textColor }}>
+                      "This is a preview of how anonymous messages will appear, wrapped in your template design."
+                    </p>
+                  </div>
+                  <div className="cp-anon-mock-input">
+                    <p>Senders will type their message here</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="cp-continue-btn visible"
+                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                    onClick={() => setStage('end')}
+                  >
+                    Done
+                  </button>
+                </div>
               </div>
             </article>,
             'cp-gradient-border-full'
@@ -399,7 +658,7 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
             className="cp-card cp-card-full cp-end-card"
             style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
           >
-            <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>✓</div>
+            <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>âœ“</div>
             <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               Card Complete
             </h3>
@@ -423,11 +682,11 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
         </div>
       )}
 
-      {/* GIFT INTRO — suspenseful text */}
+      {/* GIFT INTRO */}
       {stage === 'giftIntro' && (
         <div className="cp-card-wrap cp-card-wrap-full">
           <article className="cp-card cp-card-full cp-gift-intro" style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}>
-            <div className="cp-gift-sparkle">🎁</div>
+            <div className="cp-gift-sparkle">ðŸŽ</div>
             <h3 className="cp-gift-intro-heading" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               Wait... there's more
             </h3>
@@ -448,7 +707,7 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
         </div>
       )}
 
-      {/* GIFT REVEAL — PremiumGiftReveal animation */}
+      {/* GIFT REVEAL */}
       {stage === 'giftReveal' && (
         <PremiumGiftReveal
           effect={c.giftEffect.effectKey}
@@ -456,11 +715,11 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
         />
       )}
 
-      {/* GIFT RECEIVE — claim option (dummy) */}
+      {/* GIFT RECEIVE */}
       {stage === 'giftReceive' && (
         <div className="cp-card-wrap cp-card-wrap-full">
           <article className="cp-card cp-card-full cp-gift-receive" style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}>
-            <div className="cp-gift-received-icon">🎉</div>
+            <div className="cp-gift-received-icon">ðŸŽ‰</div>
             <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               You received a gift!
             </h3>
@@ -476,7 +735,7 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
               <button
                 className="cp-end-btn"
                 style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                onClick={() => { /* Dummy — future: claim via backend */ }}
+                onClick={() => { /* Dummy â€” future: claim via backend */ }}
               >
                 Claim Gift
               </button>
@@ -496,3 +755,4 @@ function CardPreviewModal({ cardObject, onClose, tier = 'simple', recipientEmail
 }
 
 export default CardPreviewModal
+

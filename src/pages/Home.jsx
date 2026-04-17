@@ -14,13 +14,13 @@ const FORMAT_CHIPS = [
 
 const CARD_FORMATS = [
   {
-    icon: '✉',
-    title: 'Greeting Cards',
+    icon: '💌',
+    title: 'Moment Cards',
     tagline: 'Cinematic reveals with music and effects.',
     description: 'Build a personalized experience that opens like a tiny film — envelope, music, glow, and all.',
     accent: 'warm',
     cta: 'Try it',
-    to: '/studio',
+    typePreselect: 'moment',
   },
   {
     icon: '📊',
@@ -29,7 +29,7 @@ const CARD_FORMATS = [
     description: 'Embed a live poll inside your card. Recipients vote and see real-time results instantly.',
     accent: 'cool',
     cta: 'Try it',
-    to: '/studio?type=poll',
+    typePreselect: 'poll',
   },
   {
     icon: '💡',
@@ -38,7 +38,7 @@ const CARD_FORMATS = [
     description: 'Add a scored trivia challenge inside your card. Recipients get their score at the end.',
     accent: 'rose',
     cta: 'Try it',
-    to: '/studio?type=trivia',
+    typePreselect: 'trivia',
   },
   {
     icon: '👁',
@@ -47,7 +47,7 @@ const CARD_FORMATS = [
     description: 'Share your link and receive honest messages from anyone — wrapped in a beautifully designed card.',
     accent: 'mint',
     cta: 'Set up yours',
-    to: '/inbox',
+    typePreselect: 'anonymous',
   },
 ]
 
@@ -107,6 +107,7 @@ function Home() {
     openAuthModal,
     balance,
     marketplaceTemplates,
+    openCardTypeModal,
   } = useOutletContext()
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
 
@@ -156,9 +157,9 @@ function Home() {
             ))}
           </div>
           <div className="cta-row">
-            <Link className="primary" to="/studio">
+            <button className="primary" type="button" onClick={() => openCardTypeModal?.()}>
               Create a Card
-            </Link>
+            </button>
             <Link className="ghost" to="/explore">
               Browse Cards
             </Link>
@@ -199,9 +200,9 @@ function Home() {
               <h4>{format.title}</h4>
               <p className="format-card-tagline">{format.tagline}</p>
               <p className="format-card-desc">{format.description}</p>
-              <Link className="format-card-cta" to={format.to}>
+              <button className="format-card-cta" type="button" onClick={() => openCardTypeModal?.(format.typePreselect)}>
                 {format.cta} →
-              </Link>
+              </button>
             </article>
           ))}
         </div>
@@ -249,9 +250,9 @@ function Home() {
       <section className="landing-section landing-cta">
         <p className="eyebrow">Start Here</p>
         <h3 className="landing-title">Create something unforgettable.</h3>
-        <Link className="primary" to="/studio">
+        <button className="primary" type="button" onClick={() => openCardTypeModal?.()}>
           Start Creating
-        </Link>
+        </button>
       </section>
 
       {/* ── MARKETPLACE HIGHLIGHTS ── */}
