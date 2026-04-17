@@ -40,19 +40,38 @@ const ALL_TOOLS = [
   { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template' },
 ]
 
-// Which tools appear for each card type
-const STUDIO_TOOL_CONFIG = {
-  moment: ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'gifts', 'questions', 'interaction', 'chain'],
-  poll: ['content', 'poll', 'background', 'theme', 'cardStyle'],
-  trivia: ['content', 'trivia', 'background', 'theme', 'cardStyle'],
-  anonymous: ['closedState', 'content', 'anon', 'background', 'theme', 'cardStyle'],
+// Tools available per type + tier — aligned to home page tier promises:
+// Classic  = simple animated reveal, no music/media ("Simple animation, No music")
+// Premium  = music + better visuals ("Music + better visuals, Richer motion")
+// Elite    = full experience + gifts ("Full animations + effects, gifts") — Moment Card only
+const TOOLS_BY_TYPE_TIER = {
+  'moment:classic': ['closedState', 'content', 'background', 'theme'],
+  'moment:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
+  'moment:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
+  'poll:classic':   ['closedState', 'content', 'background', 'theme', 'poll'],
+  'poll:premium':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'poll'],
+  'trivia:classic': ['closedState', 'content', 'background', 'theme', 'trivia'],
+  'trivia:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'trivia'],
+  'chain:classic':  ['closedState', 'content', 'background', 'theme', 'chain'],
+  'chain:premium':  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'chain'],
+  'anon:classic':   ['closedState', 'content', 'background', 'theme', 'anon'],
+  'anon:premium':   ['closedState', 'content', 'media', 'background', 'theme', 'animation', 'anon'],
 }
 
 const STUDIO_TYPE_META = {
-  moment: { emoji: '💌', label: 'Moment Card', badge: 'badge-moment' },
-  poll: { emoji: '📊', label: 'Poll Card', badge: 'badge-poll' },
-  trivia: { emoji: '💡', label: 'Trivia Card', badge: 'badge-trivia' },
-  anonymous: { emoji: '👤', label: 'Anonymous Card', badge: 'badge-anonymous' },
+  moment:    { emoji: '💌', label: 'Moment Card', badge: 'badge-moment' },
+  poll:      { emoji: '📊', label: 'Poll Card',   badge: 'badge-poll' },
+  trivia:    { emoji: '💡', label: 'Trivia Card', badge: 'badge-trivia' },
+  chain:     { emoji: '🔗', label: 'Chain Card',  badge: 'badge-chain' },
+  anon:      { emoji: '👁', label: 'Anonymous',   badge: 'badge-anon' },
+}
+
+const TYPE_ACCENT = {
+  moment: '#f0c060',
+  poll:   '#60a5fa',
+  trivia: '#a78bfa',
+  chain:  '#34d399',
+  anon:   '#7ef7ff',
 }
 
 const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
@@ -282,6 +301,7 @@ function CardStudio() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { currentUser, publishTemplate, createCardOnBackend } = useOutletContext() || {}
+  // Read card type and tier from location state (set by CreateCardPicker)
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
   const draftIdRef = useRef(location.state?.draftId || cardData?.draftId || `draft-${Date.now()}`)
@@ -295,10 +315,13 @@ function CardStudio() {
   const typeMeta = STUDIO_TYPE_META[studioType] || STUDIO_TYPE_META.moment
   const tierLabel = TIER_LABELS[studioTier] || 'Classic'
 
-  // -- Filter tools for this card type --
-  const toolIds = STUDIO_TOOL_CONFIG[studioType] || STUDIO_TOOL_CONFIG.moment
-  const tools = useMemo(() => ALL_TOOLS.filter(t => toolIds.includes(t.id)), [toolIds])
-  const defaultToolId = tools[0]?.id || 'content'
+  // Filter tools by type + tier — aligned to home page tier promises
+  const activeTools = useMemo(() => {
+    const key = `${studioType}:${studioTier}`
+    const allowed = TOOLS_BY_TYPE_TIER[key] || TOOLS_BY_TYPE_TIER[`${studioType}:classic`] || TOOLS_BY_TYPE_TIER['moment:classic']
+    return ALL_TOOLS.filter(t => allowed.includes(t.id))
+  }, [studioType, studioTier])
+  const defaultToolId = activeTools[0]?.id || 'content'
 
   const [cardObject, setCardObject] = useState(() =>
     existingDraftObject ? structuredClone(existingDraftObject) : resolveTemplateCardObject(cardData),
@@ -332,11 +355,12 @@ function CardStudio() {
   const [chainData, setChainData] = useState({ enabled: false, prompt: '' })
   const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: studioTier || 'classic' })
 
-  // Set active tool for specific card types on mount
+  // Set active tool and auto-enable state for specific card types on mount
   useEffect(() => {
     if (studioType === 'poll') setActiveTool('poll')
     else if (studioType === 'trivia') setActiveTool('trivia')
-    else if (studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
+    else if (studioType === 'chain') { setChainData(prev => ({ ...prev, enabled: true })); setActiveTool('chain') }
+    else if (studioType === 'anon' || studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isArtist = currentUser?.role === 'Artist'
@@ -436,11 +460,9 @@ function CardStudio() {
     if (!currentUser) return
     setIsSending(true)
 
-    // Derive card type from studio type
-    const derivedType = studioType === 'moment'
-      ? (chainData.enabled ? 'chain' : 'standard')
-      : studioType === 'anonymous' ? 'anonymous'
-      : studioType // 'poll' or 'trivia'
+    // Resolve backend card type from studioType
+    const typeMap = { moment: 'standard', poll: 'poll', trivia: 'trivia', chain: 'chain', anon: 'anonymous', anonymous: 'anonymous' }
+    const derivedType = typeMap[studioType] || 'standard'
 
     const extras = {
       title: c.content?.heading || 'Untitled Card',
@@ -449,8 +471,8 @@ function CardStudio() {
       tier: studioTier,
       poll: studioType === 'poll' ? pollData : undefined,
       trivia: studioType === 'trivia' ? triviaData : undefined,
-      chain: (studioType === 'moment' && chainData.enabled) ? chainData : undefined,
-      anonTemplate: studioType === 'anonymous' ? { enabled: true, tier: studioTier } : undefined,
+      chain: chainData.enabled ? chainData : undefined,
+      anonTemplate: (studioType === 'anon' || studioType === 'anonymous') ? { enabled: true, tier: studioTier } : undefined,
     }
 
     const result = await createCardOnBackend?.(cardObject, extras)
@@ -1443,32 +1465,43 @@ function CardStudio() {
 
     // CHAIN
     if (activeTool === 'chain') {
+      const isChainType = studioType === 'chain'
       return (
         <>
           <p className="cs-panel-eyebrow">Chain Reply</p>
           <h3>Invite your recipient to reply</h3>
-          <label className="cs-field cs-toggle-field">
-            <span>Enable chain reply</span>
-            <input
-              type="checkbox"
-              checked={chainData.enabled}
-              onChange={(e) => setChainData((prev) => ({ ...prev, enabled: e.target.checked }))}
-            />
-          </label>
-          {chainData.enabled && (
-            <label className="cs-field">
-              <span>Prompt shown to recipient</span>
+          {!isChainType && (
+            <label className="cs-field cs-toggle-field">
+              <span>Enable chain reply</span>
               <input
-                value={chainData.prompt}
-                onChange={(e) => setChainData((prev) => ({ ...prev, prompt: e.target.value }))}
-                placeholder="Now it's your turn…"
+                type="checkbox"
+                checked={chainData.enabled}
+                onChange={(e) => setChainData((prev) => ({ ...prev, enabled: e.target.checked }))}
               />
             </label>
           )}
+          {(isChainType || chainData.enabled) && (
+            <>
+              <label className="cs-field">
+                <span>Prompt shown to recipient</span>
+                <input
+                  value={chainData.prompt}
+                  onChange={(e) => setChainData((prev) => ({ ...prev, prompt: e.target.value }))}
+                  placeholder="Now it's your turn…"
+                />
+              </label>
+              <div className="cs-chain-preview-hint">
+                <span className="cs-chain-icon">🔗</span>
+                <p>After opening your card, the recipient will see a <strong>"Reply with your own card"</strong> button.</p>
+              </div>
+            </>
+          )}
           <p className="cs-info-note">
-            {chainData.enabled
+            {isChainType
               ? 'Recipient will be invited to create and send a card back to you.'
-              : 'Toggle on to invite your recipient to reply with their own card.'}
+              : chainData.enabled
+                ? 'Recipient will be invited to create and send a card back to you.'
+                : 'Toggle on to invite your recipient to reply with their own card.'}
           </p>
         </>
       )
@@ -1646,6 +1679,22 @@ function CardStudio() {
       )
     }
 
+    if (studioType === 'chain') {
+      return (
+        <div className={`cs-mobile-chain-preview ${compact ? 'compact' : ''}`} style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}>
+          <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+            {c.content.heading || 'Your message here'}
+          </h3>
+          <p style={{ color: c.card.textColor, fontSize: '0.85rem', opacity: 0.7 }}>{c.content.body}</p>
+          <div className="cs-chain-reply-strip">
+            <span>🔗</span>
+            <span>{chainData.prompt || "Now it's your turn…"}</span>
+          </div>
+          <button type="button" className="cs-chain-reply-btn" disabled>Reply with a card</button>
+        </div>
+      )
+    }
+
     if (studioType === 'anonymous') {
       return (
         <div className={`cs-preview-anon ${compact ? 'compact' : ''}`}>
@@ -1734,11 +1783,12 @@ function CardStudio() {
   }
 
   return (
-    <div className="page-body cs-shell">
+    <div className="page-body cs-shell" style={{ '--type-accent': TYPE_ACCENT[studioType] || TYPE_ACCENT.moment }}>
       {/* TOPBAR */}
       <div className="cs-topbar">
         <div className="cs-top-left">
           <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
+          <span className="cs-type-badge">{TYPE_LABEL[studioType] || 'Moment Card'}</span>
           <div className="cs-status">{savedState}</div>
         </div>
         <div className="cs-progress">
@@ -1787,7 +1837,7 @@ function CardStudio() {
       <div className="cs-layout">
         {/* TOOL RAIL */}
         <aside className="cs-toolrail">
-          {tools.map(tool => {
+          {activeTools.map(tool => {
             const Icon = tool.icon
             return (
               <button
@@ -1924,7 +1974,7 @@ function CardStudio() {
             </div>
 
             <div className="cs-mobile-tools">
-              {tools.map(tool => {
+              {activeTools.map(tool => {
                 const Icon = tool.icon
                 return (
                   <button
