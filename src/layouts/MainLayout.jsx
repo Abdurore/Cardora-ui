@@ -24,6 +24,10 @@ import {
   updateProfile,
   verifyEmail,
   createCard,
+  createCardClassic,
+  createCardPremium,
+  createCardElite,
+  createCardAnonymous,
   deleteCard as apiDeleteCard,
   getUserCards,
   claimDailyFreeCoupon,
@@ -452,7 +456,7 @@ function MainLayout() {
     }
   }
 
-  const handleCreateCard = async (cardObject, { title, templateId, type, couponType, useCoupons, poll, chain, trivia } = {}) => {
+  const handleCreateCard = async (cardObject, { title, templateId, type, tier, couponType, useCoupons, poll, chain, trivia, anonTemplate } = {}) => {
     try {
       const layoutdata = cardObjectToLayoutData(cardObject)
       const payload = {
@@ -466,7 +470,20 @@ function MainLayout() {
       if (poll) payload.poll = poll
       if (chain) payload.chain = chain
       if (trivia) payload.trivia = trivia
-      const response = await createCard(payload)
+      if (anonTemplate) payload.anonTemplate = anonTemplate
+
+      let apiCall = createCard
+      if (type === 'anonymous') {
+        apiCall = createCardAnonymous
+      } else if (tier === 'elite') {
+        apiCall = createCardElite
+      } else if (tier === 'premium') {
+        apiCall = createCardPremium
+      } else if (tier === 'classic') {
+        apiCall = createCardClassic
+      }
+
+      const response = await apiCall(payload)
       return { ok: true, data: response, message: response?.message || 'Card created!' }
     } catch (error) {
       return { ok: false, message: error.message || 'Card creation failed.' }

@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 
 const navItems = [
   {
@@ -21,23 +21,13 @@ const navItems = [
       </svg>
     ),
   },
+  // Center FAB handled separately
   {
     label: 'Chat',
     to: '/chat',
     icon: (
       <svg className="nav-icon nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Store',
-    to: '/store',
-    icon: (
-      <svg className="nav-icon nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="9" cy="21" r="1" />
-        <circle cx="20" cy="21" r="1" />
-        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
       </svg>
     ),
   },
@@ -56,7 +46,23 @@ const navItems = [
 function ScreenNav() {
   return (
     <nav className="screen-nav">
-      {navItems.map((item) => (
+      {navItems.slice(0, 2).map((item) => (
+        <NavLink
+          key={item.label}
+          to={item.to}
+          className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          aria-label={item.label}
+          end={item.to === '/'}
+        >
+          {item.icon}
+          <span>{item.label}</span>
+        </NavLink>
+      ))}
+      <Link to="/create" className="nav-create-fab" aria-label="Create card">
+        <span className="nav-create-plus">+</span>
+        <span className="nav-create-label">Create</span>
+      </Link>
+      {navItems.slice(2).map((item) => (
         <NavLink
           key={item.label}
           to={item.to}

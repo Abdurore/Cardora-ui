@@ -13,6 +13,7 @@ import AuthPage from './pages/AuthPage.jsx'
 import LegalPage from './pages/LegalPage.jsx'
 import AnonSend from './pages/AnonSend.jsx'
 import AnonInbox from './pages/AnonInbox.jsx'
+import CreateCardPicker from './pages/CreateCardPicker.jsx'
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/store/gifts" element={<StoreGifts />} />
         <Route path="/card/:id" element={<CardView />} />
         <Route path="/studio" element={<CardStudio />} />
+        <Route path="/create" element={<CreateCardPicker />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/chat" element={<WorldChat />} />
         <Route path="/profile" element={<Profile />} />

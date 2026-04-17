@@ -288,7 +288,7 @@ function AuthPage({ mode = 'login' }) {
                 Verification Code
                 <small className="detail-hint">6-digit code from your email.</small>
                 <input name="otp" type="text" value={form.otp} onChange={handleChange}
-                  placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" />
+                  placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus />
               </label>
             )}
 
@@ -309,7 +309,7 @@ function AuthPage({ mode = 'login' }) {
                   Reset Code
                   <small className="detail-hint">6-digit code from your email.</small>
                   <input name="otp" type="text" value={form.otp} onChange={handleChange}
-                    placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" />
+                    placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus />
                 </label>
                 <label className="detail-field">
                   New Password
@@ -411,7 +411,7 @@ function AuthPage({ mode = 'login' }) {
                 Verification Code
                 <small className="detail-hint">Enter the 6-digit code sent to your email.</small>
                 <input name="otp" type="text" value={form.otp} onChange={handleChange}
-                  placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" />
+                  placeholder="123456" inputMode="numeric" maxLength={6} autoComplete="one-time-code" autoFocus />
               </label>
             )}
 

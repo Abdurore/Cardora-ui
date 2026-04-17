@@ -39,6 +39,28 @@ const tools = [
   { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template' },
 ]
 
+// Tools visible per card type
+const TOOLS_BY_TYPE = {
+  letter: ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
+  poll:   ['closedState', 'content', 'poll', 'background', 'animation'],
+  trivia: ['closedState', 'content', 'trivia', 'background', 'animation'],
+  anon:   ['closedState', 'content', 'background', 'animation', 'anon'],
+}
+
+const TYPE_ACCENT = {
+  letter: '#f0c060',
+  poll: '#60a5fa',
+  trivia: '#a78bfa',
+  anon: '#7ef7ff',
+}
+
+const TYPE_LABEL = {
+  letter: 'Letter',
+  poll: 'Poll',
+  trivia: 'Trivia',
+  anon: 'Anonymous',
+}
+
 // Deep merge helper
 function deepMerge(target, source) {
   const result = { ...target }
@@ -263,6 +285,9 @@ function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
   const { currentUser, publishTemplate, createCardOnBackend } = useOutletContext() || {}
+  // Read card type and tier from location state (set by CreateCardPicker)
+  const cardType = useMemo(() => location.state?.cardType || 'letter', [location.state])
+  const cardTier = useMemo(() => location.state?.cardTier || 'classic', [location.state])
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
   const draftIdRef = useRef(location.state?.draftId || cardData?.draftId || `draft-${Date.now()}`)
@@ -273,6 +298,9 @@ function CardStudio() {
     existingDraftObject ? structuredClone(existingDraftObject) : resolveTemplateCardObject(cardData),
   )
   const [activeTool, setActiveTool] = useState('closedState')
+
+  // Filter tools by card type; default to letter tools if type is unknown
+  const activeTools = tools.filter(t => (TOOLS_BY_TYPE[cardType] || TOOLS_BY_TYPE.letter).includes(t.id))
   const [activeStep, setActiveStep] = useState('closed')
   const [showPreview, setShowPreview] = useState(false)
   const [savedState, setSavedState] = useState('Unsaved draft')
@@ -301,13 +329,20 @@ function CardStudio() {
   const [chainData, setChainData] = useState({ enabled: false, prompt: '' })
   const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: 'classic' })
 
-  // URL-based type pre-selection (?type=poll / ?type=trivia)
+  // URL-based type pre-selection (?type=poll / ?type=trivia) — kept for backward compatibility
   useEffect(() => {
     const urlType = new URLSearchParams(location.search).get('type')
     if (urlType === 'poll') setActiveTool('poll')
     else if (urlType === 'trivia') setActiveTool('trivia')
     else if (urlType === 'chain') setActiveTool('chain')
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Set default active tool based on cardType from location state (set by CreateCardPicker)
+  useEffect(() => {
+    if (cardType === 'poll') setActiveTool('poll')
+    else if (cardType === 'trivia') setActiveTool('trivia')
+    // anon and letter both start at closedState (the default)
+  }, [cardType])
 
   const isArtist = currentUser?.role === 'Artist'
 
@@ -405,23 +440,17 @@ function CardStudio() {
   const handleSend = async () => {
     if (!currentUser) return
     setIsSending(true)
-    const derivedType = chainData.enabled
-      ? 'chain'
-      : anonTemplate.enabled
-        ? 'anonymous'
-        : pollData.question.trim()
-          ? 'poll'
-          : triviaData.questions[0]?.text.trim()
-            ? 'trivia'
-            : 'standard'
+    const typeMap = { letter: 'standard', poll: 'poll', trivia: 'trivia', anon: 'anonymous' }
+    const resolvedType = typeMap[cardType] || 'standard'
     const result = await createCardOnBackend?.(cardObject, {
       title: c.content?.heading || 'Untitled Card',
       templateId: cardData?.id || 'custom',
-      type: derivedType,
-      poll: derivedType === 'poll' ? pollData : undefined,
-      trivia: derivedType === 'trivia' ? triviaData : undefined,
-      chain: derivedType === 'chain' ? chainData : undefined,
-      anonTemplate: anonTemplate.enabled ? anonTemplate : undefined,
+      type: resolvedType,
+      tier: cardTier,
+      poll: resolvedType === 'poll' ? pollData : undefined,
+      trivia: resolvedType === 'trivia' ? triviaData : undefined,
+      chain: chainData.enabled ? chainData : undefined,
+      anonTemplate: resolvedType === 'anonymous' ? anonTemplate : undefined,
     })
     setIsSending(false)
     if (result?.ok) {
@@ -1535,11 +1564,12 @@ function CardStudio() {
   }, [c.card.cardBorder])
 
   return (
-    <div className="page-body cs-shell">
+    <div className="page-body cs-shell" style={{ '--type-accent': TYPE_ACCENT[cardType] || TYPE_ACCENT.letter }}>
       {/* TOPBAR */}
       <div className="cs-topbar">
         <div className="cs-top-left">
           <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
+          <span className="cs-type-badge">{TYPE_LABEL[cardType] || 'Letter'}</span>
           <div className="cs-status">{savedState}</div>
         </div>
         <div className="cs-progress">
@@ -1584,7 +1614,7 @@ function CardStudio() {
       <div className="cs-layout">
         {/* TOOL RAIL */}
         <aside className="cs-toolrail">
-          {tools.map(tool => {
+          {activeTools.map(tool => {
             const Icon = tool.icon
             return (
               <button
@@ -1778,7 +1808,7 @@ function CardStudio() {
             </div>
 
             <div className="cs-mobile-tools">
-              {tools.map(tool => {
+              {activeTools.map(tool => {
                 const Icon = tool.icon
                 return (
                   <button
