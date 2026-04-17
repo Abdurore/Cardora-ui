@@ -5,6 +5,7 @@ import {
   HiOutlineChartBarSquare,
   HiOutlineLightBulb,
   HiOutlineEyeSlash,
+  HiOutlineArrowPathRoundedSquare,
 } from 'react-icons/hi2'
 
 const CARD_TYPES = [
@@ -36,6 +37,16 @@ const CARD_TYPES = [
     tagline: 'Quiz your people',
     description: 'Create a scored quiz. Recipients see their score and correct answers at the end.',
     accent: 'rose',
+    tiers: ['classic', 'premium'],
+  },
+  {
+    id: 'chain',
+    icon: HiOutlineArrowPathRoundedSquare,
+    emoji: '🔗',
+    label: 'Chain Card',
+    tagline: 'Send and receive back',
+    description: 'Send a card that invites the recipient to reply with their own card back.',
+    accent: 'emerald',
     tiers: ['classic', 'premium'],
   },
   {

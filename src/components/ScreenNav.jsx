@@ -1,4 +1,4 @@
-import { Link, NavLink } from 'react-router-dom'
+import { NavLink, useOutletContext } from 'react-router-dom'
 
 const navItems = [
   {
@@ -23,6 +23,17 @@ const navItems = [
   },
   // Center FAB handled separately
   {
+    label: 'Store',
+    to: '/store',
+    icon: (
+      <svg className="nav-icon nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <path d="M16 10a4 4 0 01-8 0" />
+      </svg>
+    ),
+  },
+  {
     label: 'Chat',
     to: '/chat',
     icon: (
@@ -31,19 +42,12 @@ const navItems = [
       </svg>
     ),
   },
-  {
-    label: 'Profile',
-    to: '/profile',
-    icon: (
-      <svg className="nav-icon nav-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
-    ),
-  },
 ]
 
 function ScreenNav() {
+  const context = useOutletContext() || {}
+  const { openCardTypeModal } = context
+
   return (
     <nav className="screen-nav">
       {navItems.slice(0, 2).map((item) => (
@@ -58,10 +62,10 @@ function ScreenNav() {
           <span>{item.label}</span>
         </NavLink>
       ))}
-      <Link to="/create" className="nav-create-fab" aria-label="Create card">
+      <button type="button" className="nav-create-fab" aria-label="Create card" onClick={() => openCardTypeModal?.()}>
         <span className="nav-create-plus">+</span>
         <span className="nav-create-label">Create</span>
-      </Link>
+      </button>
       {navItems.slice(2).map((item) => (
         <NavLink
           key={item.label}
