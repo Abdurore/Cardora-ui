@@ -46,6 +46,7 @@ function CardDetailModal({
   currentUser,
   onRequireAuth,
   onDeductCC,
+  openCardTypeModal,
 }) {
   const [showForm, setShowForm] = useState(false)
   const [showShare, setShowShare] = useState(false)
@@ -202,7 +203,11 @@ function CardDetailModal({
                 type="button"
                 onClick={() => {
                   onClose()
-                  navigate('/studio', { state: { cardData: card } })
+                  if (openCardTypeModal) {
+                    openCardTypeModal()
+                  } else {
+                    navigate('/studio', { state: { cardData: card } })
+                  }
                 }}
               >
                 Use Template

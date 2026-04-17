@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
-import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+﻿import { useEffect, useMemo, useState, useRef } from 'react'
+import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import {
   HiOutlineEnvelope, HiOutlinePaintBrush, HiOutlinePhoto,
   HiOutlineSparkles, HiOutlineChatBubbleLeft, HiOutlineLockClosed,
@@ -14,6 +14,7 @@ import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
 import { dataUrlToBlob, uploadToCloudinary } from '../lib/cloudinary.js'
+import { createCardClassic, createCardPremium, createCardElite, createCardAnonymous } from '../lib/api.js'
 import html2canvas from 'html2canvas'
 import TemplatePreviewSnapshot from '../components/TemplatePreviewSnapshot.jsx'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
@@ -22,7 +23,7 @@ const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
 const steps = ['closed', 'card', 'questions', 'preview']
 
-const tools = [
+const ALL_TOOLS = [
   { id: 'closedState', icon: HiOutlineEnvelope, label: 'Envelope', hint: 'Sealed reveal & first impression' },
   { id: 'content', icon: HiOutlineDocumentText, label: 'Content', hint: 'Heading, body, extended' },
   { id: 'media', icon: HiOutlinePhoto, label: 'Media', hint: 'Images & captions' },
@@ -38,6 +39,23 @@ const tools = [
   { id: 'chain', icon: HiOutlineArrowPathRoundedSquare, label: 'Chain', hint: 'Invite recipient to reply with a card' },
   { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template' },
 ]
+
+// Which tools appear for each card type
+const STUDIO_TOOL_CONFIG = {
+  moment: ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'gifts', 'questions', 'interaction', 'chain'],
+  poll: ['content', 'poll', 'background', 'theme', 'cardStyle'],
+  trivia: ['content', 'trivia', 'background', 'theme', 'cardStyle'],
+  anonymous: ['closedState', 'content', 'anon', 'background', 'theme', 'cardStyle'],
+}
+
+const STUDIO_TYPE_META = {
+  moment: { emoji: '💌', label: 'Moment Card', badge: 'badge-moment' },
+  poll: { emoji: '📊', label: 'Poll Card', badge: 'badge-poll' },
+  trivia: { emoji: '💡', label: 'Trivia Card', badge: 'badge-trivia' },
+  anonymous: { emoji: '👤', label: 'Anonymous Card', badge: 'badge-anonymous' },
+}
+
+const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
 
 // Deep merge helper
 function deepMerge(target, source) {
@@ -262,6 +280,7 @@ function StudioAudioPlayer({ src, volume = 0.8 }) {
 function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const { currentUser, publishTemplate, createCardOnBackend } = useOutletContext() || {}
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
@@ -269,11 +288,23 @@ function CardStudio() {
   const draftStorageKey = currentUser?.id
     ? `${STUDIO_DRAFT_PREFIX}${currentUser.id}`
     : `${STUDIO_DRAFT_PREFIX}guest`
+
+  // -- Card type + tier from URL --
+  const studioType = searchParams.get('type') || 'moment'
+  const studioTier = searchParams.get('tier') || 'classic'
+  const typeMeta = STUDIO_TYPE_META[studioType] || STUDIO_TYPE_META.moment
+  const tierLabel = TIER_LABELS[studioTier] || 'Classic'
+
+  // -- Filter tools for this card type --
+  const toolIds = STUDIO_TOOL_CONFIG[studioType] || STUDIO_TOOL_CONFIG.moment
+  const tools = useMemo(() => ALL_TOOLS.filter(t => toolIds.includes(t.id)), [toolIds])
+  const defaultToolId = tools[0]?.id || 'content'
+
   const [cardObject, setCardObject] = useState(() =>
     existingDraftObject ? structuredClone(existingDraftObject) : resolveTemplateCardObject(cardData),
   )
-  const [activeTool, setActiveTool] = useState('closedState')
-  const [activeStep, setActiveStep] = useState('closed')
+  const [activeTool, setActiveTool] = useState(defaultToolId)
+  const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'closed' : 'card')
   const [showPreview, setShowPreview] = useState(false)
   const [savedState, setSavedState] = useState('Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
@@ -299,14 +330,13 @@ function CardStudio() {
     questions: [{ text: '', options: ['', '', '', ''], correctIndex: 0 }],
   })
   const [chainData, setChainData] = useState({ enabled: false, prompt: '' })
-  const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: 'classic' })
+  const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: studioTier || 'classic' })
 
-  // URL-based type pre-selection (?type=poll / ?type=trivia)
+  // Set active tool for specific card types on mount
   useEffect(() => {
-    const urlType = new URLSearchParams(location.search).get('type')
-    if (urlType === 'poll') setActiveTool('poll')
-    else if (urlType === 'trivia') setActiveTool('trivia')
-    else if (urlType === 'chain') setActiveTool('chain')
+    if (studioType === 'poll') setActiveTool('poll')
+    else if (studioType === 'trivia') setActiveTool('trivia')
+    else if (studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isArtist = currentUser?.role === 'Artist'
@@ -405,24 +435,25 @@ function CardStudio() {
   const handleSend = async () => {
     if (!currentUser) return
     setIsSending(true)
-    const derivedType = chainData.enabled
-      ? 'chain'
-      : anonTemplate.enabled
-        ? 'anonymous'
-        : pollData.question.trim()
-          ? 'poll'
-          : triviaData.questions[0]?.text.trim()
-            ? 'trivia'
-            : 'standard'
-    const result = await createCardOnBackend?.(cardObject, {
+
+    // Derive card type from studio type
+    const derivedType = studioType === 'moment'
+      ? (chainData.enabled ? 'chain' : 'standard')
+      : studioType === 'anonymous' ? 'anonymous'
+      : studioType // 'poll' or 'trivia'
+
+    const extras = {
       title: c.content?.heading || 'Untitled Card',
       templateId: cardData?.id || 'custom',
       type: derivedType,
-      poll: derivedType === 'poll' ? pollData : undefined,
-      trivia: derivedType === 'trivia' ? triviaData : undefined,
-      chain: derivedType === 'chain' ? chainData : undefined,
-      anonTemplate: anonTemplate.enabled ? anonTemplate : undefined,
-    })
+      tier: studioTier,
+      poll: studioType === 'poll' ? pollData : undefined,
+      trivia: studioType === 'trivia' ? triviaData : undefined,
+      chain: (studioType === 'moment' && chainData.enabled) ? chainData : undefined,
+      anonTemplate: studioType === 'anonymous' ? { enabled: true, tier: studioTier } : undefined,
+    }
+
+    const result = await createCardOnBackend?.(cardObject, extras)
     setIsSending(false)
     if (result?.ok) {
       const slug = result.data?.card?.slug || result.data?.slug || result.data?.data?.slug || ''
@@ -1290,7 +1321,7 @@ function CardStudio() {
                       setPollData((prev) => ({ ...prev, options: prev.options.filter((_, idx) => idx !== i) }))
                     }
                   >
-                    ✕
+                    &times;
                   </button>
                 )}
               </div>
@@ -1534,6 +1565,174 @@ function CardStudio() {
     return {}
   }, [c.card.cardBorder])
 
+  const renderStudioContentPreview = (compact = false) => {
+    const previewQuestion = triviaData.questions[0] || { text: '', options: ['', '', '', ''], correctIndex: 0 }
+    const previewPollOptions = pollData.options.filter(Boolean)
+    const primaryImage = c.media.images[0]
+
+    if (studioType === 'poll') {
+      return (
+        <div className={`cs-preview-poll ${compact ? 'compact' : ''}`} style={{
+          backgroundColor: c.card.backgroundColor,
+          ...cardBorderCss,
+        }}>
+          <div className="cs-preview-poll-head">
+            <p className="cs-preview-poll-eyebrow">Live Poll Experience</p>
+            <span className="cs-preview-pill">Recipients vote</span>
+          </div>
+          <h3 style={{
+            color: c.card.headingColor,
+            fontFamily: `'${c.theme.fontFamily}', serif`,
+          }}>
+            {c.content.heading}
+          </h3>
+          <p className="cs-preview-poll-question" style={{ color: c.card.textColor }}>
+            {pollData.question || 'Ask a question your recipients can answer instantly.'}
+          </p>
+          <div className="cs-preview-poll-options">
+            {(previewPollOptions.length > 0 ? previewPollOptions : ['Option 1', 'Option 2', 'Option 3']).map((opt, i) => (
+              <div key={i} className="cs-preview-poll-option" style={{ color: c.card.textColor }}>
+                <span className="cs-preview-poll-dot" />
+                <span>{opt}</span>
+              </div>
+            ))}
+          </div>
+          <div className="cs-preview-poll-foot">
+            <span>Tap to vote</span>
+            <span>Results unlock after submit</span>
+          </div>
+        </div>
+      )
+    }
+
+    if (studioType === 'trivia') {
+      return (
+        <div className={`cs-preview-trivia ${compact ? 'compact' : ''}`} style={{
+          backgroundColor: c.card.backgroundColor,
+          ...cardBorderCss,
+        }}>
+          <div className="cs-preview-trivia-head">
+            <p className="cs-preview-trivia-eyebrow">Trivia Challenge</p>
+            <span className="cs-preview-pill">Score-based card</span>
+          </div>
+          <h3 style={{
+            color: c.card.headingColor,
+            fontFamily: `'${c.theme.fontFamily}', serif`,
+          }}>
+            {c.content.heading}
+          </h3>
+          <p className="cs-preview-trivia-counter" style={{ color: c.theme.accentColor }}>
+            Question 1 of {Math.max(triviaData.questions.length, 1)}
+          </p>
+          <div className="cs-preview-trivia-q" style={{ color: c.card.textColor }}>
+            <p>{previewQuestion.text || 'Place your first quiz question here.'}</p>
+          </div>
+          <div className="cs-preview-trivia-opts">
+            {(previewQuestion.options?.length ? previewQuestion.options : ['', '', '', '']).map((opt, oi) => (
+              <div
+                key={oi}
+                className={`cs-preview-trivia-opt ${previewQuestion.correctIndex === oi ? 'correct' : ''}`}
+                style={{ color: c.card.textColor }}
+              >
+                <span className="cs-preview-trivia-opt-index">{String.fromCharCode(65 + oi)}</span>
+                <span>{opt || `Option ${oi + 1}`}</span>
+              </div>
+            ))}
+          </div>
+          <p className="cs-preview-trivia-score">
+            {triviaData.questions.length || 1} question{(triviaData.questions.length || 1) !== 1 ? 's' : ''} · interactive result screen
+          </p>
+        </div>
+      )
+    }
+
+    if (studioType === 'anonymous') {
+      return (
+        <div className={`cs-preview-anon ${compact ? 'compact' : ''}`}>
+          <div className="cs-preview-anon-template" style={{
+            backgroundColor: c.card.backgroundColor,
+            ...cardBorderCss,
+          }}>
+            <div className="cs-preview-anon-head">
+              <p className="cs-preview-anon-eyebrow">Anonymous Inbox</p>
+              <span className="cs-preview-pill">{anonTemplate.tier === 'premium' ? 'Premium' : 'Classic'} template</span>
+            </div>
+            <h3 style={{
+              color: c.card.headingColor,
+              fontFamily: `'${c.theme.fontFamily}', serif`,
+            }}>
+              {c.content.heading}
+            </h3>
+            <p style={{ color: c.card.textColor }}>
+              {c.content.body || 'Your inbox template message will greet every anonymous sender.'}
+            </p>
+            <div className="cs-preview-anon-message" style={{ borderColor: `${c.theme.accentColor}33` }}>
+              <p className="cs-preview-anon-message-label">Sample incoming note</p>
+              <p>"You make people feel seen. Keep going."</p>
+            </div>
+          </div>
+          <div className="cs-preview-anon-input-mock">
+            <p className="cs-preview-anon-input-label">What senders see</p>
+            <div className="cs-preview-anon-textarea-mock">
+              Write something honest, kind, or surprising…
+            </div>
+            <div
+              className="cs-preview-anon-send-mock"
+              style={{
+                backgroundColor: c.theme.accentColor,
+                color: c.card.backgroundColor,
+              }}
+            >
+              Send Anonymously
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className={`cs-preview-card ${compact ? 'compact' : ''}`} style={{
+        backgroundColor: c.card.backgroundColor,
+        ...cardBorderCss,
+      }}>
+        {primaryImage && (
+          <div className="cs-preview-media">
+            <img
+              src={primaryImage.url}
+              alt=""
+              style={{
+                objectFit: primaryImage.fit || 'cover',
+                objectPosition: `${primaryImage.positionX ?? 50}% ${primaryImage.positionY ?? 50}%`,
+              }}
+            />
+          </div>
+        )}
+        <h3 style={{
+          color: c.card.headingColor,
+          fontFamily: `'${c.theme.fontFamily}', serif`,
+        }}>
+          {c.content.heading}
+        </h3>
+        <p style={{ color: c.card.textColor }}>{c.content.body}</p>
+        {c.content.extendedBody && (
+          <p className="cs-extended" style={{ color: c.card.textColor }}>
+            {c.content.extendedBody}
+          </p>
+        )}
+        {c.questions.items.length > 0 && (
+          <div className="cs-preview-questions">
+            <p className="cs-q-label">Questions ({c.questions.items.length})</p>
+            {c.questions.items.map((q, i) => (
+              <div key={i} className="cs-q-preview-item">
+                <span>{q.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="page-body cs-shell">
       {/* TOPBAR */}
@@ -1546,6 +1745,10 @@ function CardStudio() {
           <div className="cs-wordmark">
             <img src={logo} alt="Cardora" className="cs-top-logo" />
             <span>Cardora Studio</span>
+            <span className={`cs-type-badge ${typeMeta.badge}`}>
+              <span className="cs-type-badge-emoji">{typeMeta.emoji}</span>
+              {typeMeta.label} · {tierLabel}
+            </span>
           </div>
           <div className="cs-steps">
             {steps.map((step, i) => {
@@ -1662,50 +1865,7 @@ function CardStudio() {
                   </div>
                 )}
 
-                {/* Card Content Preview */}
-                {(activeStep === 'card' || activeStep === 'questions') && (
-                  <div className="cs-preview-card" style={{
-                    backgroundColor: c.card.backgroundColor,
-                    ...cardBorderCss,
-                  }}>
-                    {c.media.images.length > 0 && (
-                      <div className="cs-preview-media">
-                        <img
-                          src={c.media.images[0].url}
-                          alt=""
-                          style={{
-                            objectFit: c.media.images[0].fit || 'cover',
-                            objectPosition: `${c.media.images[0].positionX ?? 50}% ${c.media.images[0].positionY ?? 50}%`,
-                          }}
-                        />
-                      </div>
-                    )}
-                    <h3 style={{
-                      color: c.card.headingColor,
-                      fontFamily: `'${c.theme.fontFamily}', serif`,
-                    }}>
-                      {c.content.heading}
-                    </h3>
-                    <p style={{ color: c.card.textColor }}>{c.content.body}</p>
-                    {c.content.extendedBody && (
-                      <p className="cs-extended" style={{ color: c.card.textColor }}>
-                        {c.content.extendedBody}
-                      </p>
-                    )}
-
-                    {/* Questions preview */}
-                    {c.questions.items.length > 0 && (
-                      <div className="cs-preview-questions">
-                        <p className="cs-q-label">Questions ({c.questions.items.length})</p>
-                        {c.questions.items.map((q, i) => (
-                          <div key={i} className="cs-q-preview-item">
-                            <span>{q.text}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {(activeStep === 'card' || activeStep === 'questions') && renderStudioContentPreview(false)}
               </div>
             </div>
           </div>
@@ -1721,7 +1881,7 @@ function CardStudio() {
       <div className="cs-mobile-shell">
         <div className="cs-mobile-header">
           <button type="button" className="cs-mobile-back" onClick={() => navigate(-1)}>‹</button>
-          <div className="cs-mobile-title">Cardora Studio</div>
+          <div className="cs-mobile-title">{typeMeta.emoji} {typeMeta.label}</div>
           <button type="button" className="cs-mobile-save" onClick={handleSave}>Save</button>
         </div>
 
@@ -1742,22 +1902,8 @@ function CardStudio() {
               </h3>
               <p style={{ color: c.closedState.textColor }}>{c.closedState.bodyText}</p>
             </div>
-          ) : c.media.images.length > 0 ? (
-            <img
-              src={c.media.images[0].url}
-              alt=""
-              className="cs-mobile-img"
-              style={{
-                objectFit: c.media.images[0].fit || 'cover',
-                objectPosition: `${c.media.images[0].positionX ?? 50}% ${c.media.images[0].positionY ?? 50}%`,
-              }}
-            />
           ) : (
-            <div className="cs-mobile-card-hint" style={{ backgroundColor: c.card.backgroundColor }}>
-              <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: '1rem' }}>
-                {c.content.heading}
-              </h3>
-            </div>
+            renderStudioContentPreview(true)
           )}
         </div>
 
@@ -1839,6 +1985,10 @@ function CardStudio() {
       {showPreview && (
         <CardPreviewModal
           cardObject={cardObject}
+          studioType={studioType}
+          pollData={pollData}
+          triviaData={triviaData}
+          anonTemplate={anonTemplate}
           onClose={() => {
             setShowPreview(false)
             if (activeStep === 'preview') setActiveStep('card')
@@ -1942,6 +2092,7 @@ function CardStudio() {
 }
 
 export default CardStudio
+
 
 
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+﻿import { useEffect, useState, useCallback } from 'react'
 import { useOutletContext, useNavigate, Link } from 'react-router-dom'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -17,8 +17,16 @@ function formatRelativeTime(iso) {
   return new Date(iso).toLocaleDateString()
 }
 
+function resolveAnonAccent(msg) {
+  return msg.templateAccent || msg.template?.accentColor || msg.accent || 'linear-gradient(135deg, #0d1b22, #163543)'
+}
+
 function AnonMessageCard({ msg, onDelete }) {
   const [deleting, setDeleting] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const messageText = msg.message || msg.content || ''
+  const longMessage = messageText.length > 180
+  const accent = resolveAnonAccent(msg)
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -30,7 +38,11 @@ function AnonMessageCard({ msg, onDelete }) {
     <article className="anon-msg-card">
       <div
         className="anon-msg-card-bg"
-        style={{ background: msg.templateAccent || 'linear-gradient(135deg, #0d1b22, #163543)' }}
+        style={{ background: accent }}
+      />
+      <div
+        className="anon-msg-card-accent"
+        style={{ background: `linear-gradient(90deg, ${accent}, rgba(255,255,255,0.35))` }}
       />
       <div className="anon-msg-card-body">
         <div className="anon-msg-header">
@@ -39,7 +51,12 @@ function AnonMessageCard({ msg, onDelete }) {
           </span>
           <span className="anon-msg-time">{formatRelativeTime(msg.createdAt)}</span>
         </div>
-        <p className="anon-msg-text">{msg.message || msg.content || ''}</p>
+        <p className={`anon-msg-text ${!expanded && longMessage ? 'truncated' : ''}`}>{messageText}</p>
+        {longMessage ? (
+          <button type="button" className="anon-msg-expand" onClick={() => setExpanded((prev) => !prev)}>
+            {expanded ? 'Show less' : 'Read full message'}
+          </button>
+        ) : null}
       </div>
       <button
         type="button"
@@ -49,7 +66,7 @@ function AnonMessageCard({ msg, onDelete }) {
         title="Delete message"
         aria-label="Delete message"
       >
-        {deleting ? '…' : '✕'}
+        {deleting ? '…' : '?'}
       </button>
     </article>
   )
@@ -104,14 +121,13 @@ function AnonInbox() {
     setMessages((prev) => prev.filter((m) => (m.id || m._id) !== id))
   }
 
-  // Not logged in — prompt auth
   if (!currentUser) {
     return (
       <div className="page-body">
         <ScreenHeader user={null} balance={0} onAuthOpen={openAuthModal} />
         <div className="screen-body">
           <div className="anon-inbox-auth-wall">
-            <span className="anon-inbox-auth-icon">👁</span>
+            <span className="anon-inbox-auth-icon">??</span>
             <h2>Anonymous Inbox</h2>
             <p>Sign in to set up your anonymous inbox and receive messages from anyone.</p>
             <button className="primary" type="button" onClick={() => navigate('/login')}>
@@ -128,8 +144,6 @@ function AnonInbox() {
     <div className="page-body">
       <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
       <div className="screen-body">
-
-        {/* Header */}
         <div className="anon-inbox-header">
           <div>
             <p className="eyebrow">Anonymous Inbox</p>
@@ -140,7 +154,6 @@ function AnonInbox() {
           </p>
         </div>
 
-        {/* Share link */}
         <div className="anon-inbox-share-card">
           <p className="anon-inbox-share-label">Your anonymous link</p>
           <div className="anon-inbox-share-row">
@@ -158,7 +171,6 @@ function AnonInbox() {
           </p>
         </div>
 
-        {/* Messages */}
         {loading ? (
           <div className="anon-inbox-loading">
             <div className="chat-loading-spinner" />
@@ -166,7 +178,7 @@ function AnonInbox() {
           </div>
         ) : messages.length === 0 ? (
           <div className="anon-inbox-empty">
-            <span className="anon-inbox-empty-icon">✉</span>
+            <span className="anon-inbox-empty-icon">?</span>
             <h3>No messages yet</h3>
             <p>Share your link above to start receiving anonymous messages.</p>
             <button type="button" className="primary" onClick={copyLink}>
@@ -208,3 +220,4 @@ function AnonInbox() {
 }
 
 export default AnonInbox
+
