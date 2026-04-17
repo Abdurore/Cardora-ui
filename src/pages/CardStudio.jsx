@@ -41,18 +41,24 @@ const tools = [
 
 // Tools available per type + tier combination
 // Each key is `type:tier`; falls back to `type:classic` then `moment:classic`
+//
+// Classic  — simple animated reveal, no music, no media (home page: "Simple animation, No music")
+// Premium  — music + better visuals: adds media, background music, animation, card styling
+//            (home page: "Music + better visuals, Signature sound, Richer motion")
+// Elite    — full experience: adds gifts, questions, interaction on top of Premium
+//            (home page: "Full animations + effects, gifts, premium music") — Moment Card only
 const TOOLS_BY_TYPE_TIER = {
-  'moment:classic': ['closedState', 'content', 'background'],
+  'moment:classic': ['closedState', 'content', 'background', 'theme'],
   'moment:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
   'moment:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
-  'poll:classic':   ['closedState', 'content', 'poll', 'background'],
-  'poll:premium':   ['closedState', 'content', 'poll', 'background', 'animation'],
-  'trivia:classic': ['closedState', 'content', 'trivia', 'background'],
-  'trivia:premium': ['closedState', 'content', 'trivia', 'background', 'animation'],
-  'chain:classic':  ['closedState', 'content', 'background', 'chain'],
-  'chain:premium':  ['closedState', 'content', 'background', 'animation', 'chain'],
-  'anon:classic':   ['closedState', 'content', 'background', 'anon'],
-  'anon:premium':   ['closedState', 'content', 'background', 'animation', 'anon'],
+  'poll:classic':   ['closedState', 'content', 'background', 'theme', 'poll'],
+  'poll:premium':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'poll'],
+  'trivia:classic': ['closedState', 'content', 'background', 'theme', 'trivia'],
+  'trivia:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'trivia'],
+  'chain:classic':  ['closedState', 'content', 'background', 'theme', 'chain'],
+  'chain:premium':  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'chain'],
+  'anon:classic':   ['closedState', 'content', 'background', 'theme', 'anon'],
+  'anon:premium':   ['closedState', 'content', 'media', 'background', 'theme', 'animation', 'anon'],
 }
 
 const TYPE_ACCENT = {
