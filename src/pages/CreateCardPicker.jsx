@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 const CARD_TYPES = [
   {
@@ -33,6 +33,17 @@ const CARD_TYPES = [
     accent: '#a78bfa',
     tiers: [
       { id: 'classic', label: 'Classic', desc: 'Standard quiz format', cost: '0 CC' },
+      { id: 'premium', label: 'Premium', desc: 'Styled card with animations', cost: '5 CC' },
+    ],
+  },
+  {
+    id: 'chain',
+    label: 'Chain',
+    icon: '🔗',
+    desc: 'Send a card that invites the recipient to reply with their own card back.',
+    accent: '#34d399',
+    tiers: [
+      { id: 'classic', label: 'Classic', desc: 'Simple card with chain prompt', cost: '0 CC' },
       { id: 'premium', label: 'Premium', desc: 'Styled card with animations', cost: '5 CC' },
     ],
   },

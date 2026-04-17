@@ -39,26 +39,36 @@ const tools = [
   { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template' },
 ]
 
-// Tools visible per card type
-const TOOLS_BY_TYPE = {
-  letter: ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
-  poll:   ['closedState', 'content', 'poll', 'background', 'animation'],
-  trivia: ['closedState', 'content', 'trivia', 'background', 'animation'],
-  anon:   ['closedState', 'content', 'background', 'animation', 'anon'],
+// Tools available per type + tier combination
+// Each key is `type:tier`; falls back to `type:classic` then `letter:classic`
+const TOOLS_BY_TYPE_TIER = {
+  'letter:classic': ['closedState', 'content', 'background'],
+  'letter:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
+  'letter:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
+  'poll:classic':   ['closedState', 'content', 'poll', 'background'],
+  'poll:premium':   ['closedState', 'content', 'poll', 'background', 'animation'],
+  'trivia:classic': ['closedState', 'content', 'trivia', 'background'],
+  'trivia:premium': ['closedState', 'content', 'trivia', 'background', 'animation'],
+  'chain:classic':  ['closedState', 'content', 'background', 'chain'],
+  'chain:premium':  ['closedState', 'content', 'background', 'animation', 'chain'],
+  'anon:classic':   ['closedState', 'content', 'background', 'anon'],
+  'anon:premium':   ['closedState', 'content', 'background', 'animation', 'anon'],
 }
 
 const TYPE_ACCENT = {
   letter: '#f0c060',
-  poll: '#60a5fa',
+  poll:   '#60a5fa',
   trivia: '#a78bfa',
-  anon: '#7ef7ff',
+  chain:  '#34d399',
+  anon:   '#7ef7ff',
 }
 
 const TYPE_LABEL = {
   letter: 'Letter',
-  poll: 'Poll',
+  poll:   'Poll',
   trivia: 'Trivia',
-  anon: 'Anonymous',
+  chain:  'Chain',
+  anon:   'Anonymous',
 }
 
 // Deep merge helper
@@ -299,8 +309,12 @@ function CardStudio() {
   )
   const [activeTool, setActiveTool] = useState('closedState')
 
-  // Filter tools by card type; default to letter tools if type is unknown
-  const activeTools = tools.filter(t => (TOOLS_BY_TYPE[cardType] || TOOLS_BY_TYPE.letter).includes(t.id))
+  // Filter tools by card type + tier; falls back to classic for that type, then letter:classic
+  const activeTools = useMemo(() => {
+    const key = `${cardType}:${cardTier}`
+    const allowed = TOOLS_BY_TYPE_TIER[key] || TOOLS_BY_TYPE_TIER[`${cardType}:classic`] || TOOLS_BY_TYPE_TIER['letter:classic']
+    return tools.filter(t => allowed.includes(t.id))
+  }, [cardType, cardTier])
   const [activeStep, setActiveStep] = useState('closed')
   const [showPreview, setShowPreview] = useState(false)
   const [savedState, setSavedState] = useState('Unsaved draft')
@@ -341,7 +355,13 @@ function CardStudio() {
   useEffect(() => {
     if (cardType === 'poll') setActiveTool('poll')
     else if (cardType === 'trivia') setActiveTool('trivia')
+    else if (cardType === 'chain') setActiveTool('chain')
     // anon and letter both start at closedState (the default)
+  }, [cardType])
+
+  // Auto-enable chain reply when the card type is chain
+  useEffect(() => {
+    if (cardType === 'chain') setChainData(prev => ({ ...prev, enabled: true }))
   }, [cardType])
 
   const isArtist = currentUser?.role === 'Artist'
@@ -440,7 +460,7 @@ function CardStudio() {
   const handleSend = async () => {
     if (!currentUser) return
     setIsSending(true)
-    const typeMap = { letter: 'standard', poll: 'poll', trivia: 'trivia', anon: 'anonymous' }
+    const typeMap = { letter: 'standard', poll: 'poll', trivia: 'trivia', chain: 'chain', anon: 'anonymous' }
     const resolvedType = typeMap[cardType] || 'standard'
     const result = await createCardOnBackend?.(cardObject, {
       title: c.content?.heading || 'Untitled Card',
@@ -1441,32 +1461,43 @@ function CardStudio() {
 
     // CHAIN
     if (activeTool === 'chain') {
+      const isChainType = cardType === 'chain'
       return (
         <>
           <p className="cs-panel-eyebrow">Chain Reply</p>
           <h3>Invite your recipient to reply</h3>
-          <label className="cs-field cs-toggle-field">
-            <span>Enable chain reply</span>
-            <input
-              type="checkbox"
-              checked={chainData.enabled}
-              onChange={(e) => setChainData((prev) => ({ ...prev, enabled: e.target.checked }))}
-            />
-          </label>
-          {chainData.enabled && (
-            <label className="cs-field">
-              <span>Prompt shown to recipient</span>
+          {!isChainType && (
+            <label className="cs-field cs-toggle-field">
+              <span>Enable chain reply</span>
               <input
-                value={chainData.prompt}
-                onChange={(e) => setChainData((prev) => ({ ...prev, prompt: e.target.value }))}
-                placeholder="Now it's your turn…"
+                type="checkbox"
+                checked={chainData.enabled}
+                onChange={(e) => setChainData((prev) => ({ ...prev, enabled: e.target.checked }))}
               />
             </label>
           )}
+          {(isChainType || chainData.enabled) && (
+            <>
+              <label className="cs-field">
+                <span>Prompt shown to recipient</span>
+                <input
+                  value={chainData.prompt}
+                  onChange={(e) => setChainData((prev) => ({ ...prev, prompt: e.target.value }))}
+                  placeholder="Now it's your turn…"
+                />
+              </label>
+              <div className="cs-chain-preview-hint">
+                <span className="cs-chain-icon">🔗</span>
+                <p>After opening your card, the recipient will see a <strong>"Reply with your own card"</strong> button.</p>
+              </div>
+            </>
+          )}
           <p className="cs-info-note">
-            {chainData.enabled
+            {isChainType
               ? 'Recipient will be invited to create and send a card back to you.'
-              : 'Toggle on to invite your recipient to reply with their own card.'}
+              : chainData.enabled
+                ? 'Recipient will be invited to create and send a card back to you.'
+                : 'Toggle on to invite your recipient to reply with their own card.'}
           </p>
         </>
       )
@@ -1723,6 +1754,14 @@ function CardStudio() {
                       </p>
                     )}
 
+                    {/* Chain reply preview */}
+                    {cardType === 'chain' && (
+                      <div className="cs-chain-reply-strip">
+                        <span>🔗</span>
+                        <span>{chainData.prompt || 'Now it\'s your turn…'}</span>
+                      </div>
+                    )}
+
                     {/* Questions preview */}
                     {c.questions.items.length > 0 && (
                       <div className="cs-preview-questions">
@@ -1771,6 +1810,18 @@ function CardStudio() {
                 {c.closedState.headingText}
               </h3>
               <p style={{ color: c.closedState.textColor }}>{c.closedState.bodyText}</p>
+            </div>
+          ) : cardType === 'chain' ? (
+            <div className="cs-mobile-chain-preview" style={{ backgroundColor: c.card.backgroundColor }}>
+              <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: '1rem' }}>
+                {c.content.heading || 'Your message here'}
+              </h3>
+              <p style={{ color: c.card.textColor, fontSize: '0.8rem', opacity: 0.7 }}>{c.content.body}</p>
+              <div className="cs-chain-reply-strip">
+                <span>🔗</span>
+                <span>{chainData.prompt || 'Now it\'s your turn…'}</span>
+              </div>
+              <button type="button" className="cs-chain-reply-btn" disabled>Reply with a card</button>
             </div>
           ) : c.media.images.length > 0 ? (
             <img
