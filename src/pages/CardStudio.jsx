@@ -40,11 +40,11 @@ const tools = [
 ]
 
 // Tools available per type + tier combination
-// Each key is `type:tier`; falls back to `type:classic` then `letter:classic`
+// Each key is `type:tier`; falls back to `type:classic` then `moment:classic`
 const TOOLS_BY_TYPE_TIER = {
-  'letter:classic': ['closedState', 'content', 'background'],
-  'letter:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
-  'letter:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
+  'moment:classic': ['closedState', 'content', 'background'],
+  'moment:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
+  'moment:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
   'poll:classic':   ['closedState', 'content', 'poll', 'background'],
   'poll:premium':   ['closedState', 'content', 'poll', 'background', 'animation'],
   'trivia:classic': ['closedState', 'content', 'trivia', 'background'],
@@ -56,7 +56,7 @@ const TOOLS_BY_TYPE_TIER = {
 }
 
 const TYPE_ACCENT = {
-  letter: '#f0c060',
+  moment: '#f0c060',
   poll:   '#60a5fa',
   trivia: '#a78bfa',
   chain:  '#34d399',
@@ -64,7 +64,7 @@ const TYPE_ACCENT = {
 }
 
 const TYPE_LABEL = {
-  letter: 'Letter',
+  moment: 'Moment Card',
   poll:   'Poll',
   trivia: 'Trivia',
   chain:  'Chain',
@@ -296,7 +296,7 @@ function CardStudio() {
   const location = useLocation()
   const { currentUser, publishTemplate, createCardOnBackend } = useOutletContext() || {}
   // Read card type and tier from location state (set by CreateCardPicker)
-  const cardType = useMemo(() => location.state?.cardType || 'letter', [location.state])
+  const cardType = useMemo(() => location.state?.cardType || 'moment', [location.state])
   const cardTier = useMemo(() => location.state?.cardTier || 'classic', [location.state])
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
@@ -312,7 +312,7 @@ function CardStudio() {
   // Filter tools by card type + tier; falls back to classic for that type, then letter:classic
   const activeTools = useMemo(() => {
     const key = `${cardType}:${cardTier}`
-    const allowed = TOOLS_BY_TYPE_TIER[key] || TOOLS_BY_TYPE_TIER[`${cardType}:classic`] || TOOLS_BY_TYPE_TIER['letter:classic']
+    const allowed = TOOLS_BY_TYPE_TIER[key] || TOOLS_BY_TYPE_TIER[`${cardType}:classic`] || TOOLS_BY_TYPE_TIER['moment:classic']
     return tools.filter(t => allowed.includes(t.id))
   }, [cardType, cardTier])
   const [activeStep, setActiveStep] = useState('closed')
@@ -356,7 +356,7 @@ function CardStudio() {
     if (cardType === 'poll') setActiveTool('poll')
     else if (cardType === 'trivia') setActiveTool('trivia')
     else if (cardType === 'chain') setActiveTool('chain')
-    // anon and letter both start at closedState (the default)
+    // moment and anon both start at closedState (the default)
   }, [cardType])
 
   // Auto-enable chain reply when the card type is chain
@@ -460,7 +460,7 @@ function CardStudio() {
   const handleSend = async () => {
     if (!currentUser) return
     setIsSending(true)
-    const typeMap = { letter: 'standard', poll: 'poll', trivia: 'trivia', chain: 'chain', anon: 'anonymous' }
+    const typeMap = { moment: 'standard', poll: 'poll', trivia: 'trivia', chain: 'chain', anon: 'anonymous' }
     const resolvedType = typeMap[cardType] || 'standard'
     const result = await createCardOnBackend?.(cardObject, {
       title: c.content?.heading || 'Untitled Card',
@@ -1595,12 +1595,12 @@ function CardStudio() {
   }, [c.card.cardBorder])
 
   return (
-    <div className="page-body cs-shell" style={{ '--type-accent': TYPE_ACCENT[cardType] || TYPE_ACCENT.letter }}>
+    <div className="page-body cs-shell" style={{ '--type-accent': TYPE_ACCENT[cardType] || TYPE_ACCENT.moment }}>
       {/* TOPBAR */}
       <div className="cs-topbar">
         <div className="cs-top-left">
           <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
-          <span className="cs-type-badge">{TYPE_LABEL[cardType] || 'Letter'}</span>
+          <span className="cs-type-badge">{TYPE_LABEL[cardType] || 'Moment Card'}</span>
           <div className="cs-status">{savedState}</div>
         </div>
         <div className="cs-progress">
