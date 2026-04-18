@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { getRewardedAd, completeAd, getAdStats } from '../lib/api.js'
 
+const AD_COOLDOWN_SECS = 30
+
 function RewardedAds({ onBalanceUpdate }) {
   const [ad, setAd] = useState(null)
   const [stats, setStats] = useState(null)
-  const [phase, setPhase] = useState('idle') // idle, loading, watching, completing, done, error
+  const [phase, setPhase] = useState('idle') // idle, cooldown, loading, watching, completing, done, error
   const [progress, setProgress] = useState(0)
   const [reward, setReward] = useState(null)
   const [error, setError] = useState('')
+  const [cooldown, setCooldown] = useState(0)
   const timerRef = useRef(null)
+  const cooldownRef = useRef(null)
   const startRef = useRef(null)
   const videoRef = useRef(null)
 
@@ -23,6 +27,29 @@ function RewardedAds({ onBalanceUpdate }) {
     })()
     return () => { cancelled = true }
   }, [reward])
+
+  useEffect(() => {
+    return () => {
+      clearInterval(timerRef.current)
+      clearInterval(cooldownRef.current)
+    }
+  }, [])
+
+  const startCooldown = (secs = AD_COOLDOWN_SECS) => {
+    setCooldown(secs)
+    setPhase('cooldown')
+    clearInterval(cooldownRef.current)
+    cooldownRef.current = setInterval(() => {
+      setCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current)
+          setPhase('idle')
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
 
   const loadAd = async () => {
     setPhase('loading')
@@ -72,13 +99,12 @@ function RewardedAds({ onBalanceUpdate }) {
     }
   }
 
-  useEffect(() => {
-    return () => clearInterval(timerRef.current)
-  }, [])
-
   const adsWatched = stats?.adsWatchedToday ?? 0
   const remaining = stats?.remainingAdsToday ?? 10
   const earned = stats?.ccEarnedToday ?? 0
+
+  // Cooldown fill percentage
+  const cooldownPct = Math.round(((AD_COOLDOWN_SECS - cooldown) / AD_COOLDOWN_SECS) * 100)
 
   return (
     <div className="rad-container">
@@ -116,6 +142,27 @@ function RewardedAds({ onBalanceUpdate }) {
         >
           {remaining <= 0 ? 'Daily Limit Reached' : '▶ Watch Ad & Earn 2 CC'}
         </button>
+      )}
+
+      {phase === 'cooldown' && (
+        <div className="rad-cooldown">
+          <div className="rad-cooldown-ring">
+            <svg viewBox="0 0 44 44" className="rad-cooldown-svg">
+              <circle cx="22" cy="22" r="18" className="rad-cooldown-track" />
+              <circle
+                cx="22" cy="22" r="18"
+                className="rad-cooldown-fill"
+                strokeDasharray={`${(cooldownPct / 100) * 113} 113`}
+                strokeDashoffset="28"
+              />
+            </svg>
+            <span className="rad-cooldown-num">{cooldown}</span>
+          </div>
+          <p className="rad-cooldown-label">Next ad in <strong>{cooldown}s</strong></p>
+          <div className="rad-progress-bar">
+            <div className="rad-cooldown-bar-fill" style={{ width: `${cooldownPct}%` }} />
+          </div>
+        </div>
       )}
 
       {phase === 'loading' && (
@@ -167,9 +214,19 @@ function RewardedAds({ onBalanceUpdate }) {
           <span className="rad-reward-icon">🎉</span>
           <h4>+{reward.amount} CC earned!</h4>
           <p>Your new balance includes this reward.</p>
-          <button className="rad-watch-btn" type="button" onClick={() => { setPhase('idle'); setAd(null) }}>
-            {remaining > 1 ? 'Watch Another' : 'Done'}
-          </button>
+          {remaining > 1 ? (
+            <button
+              className="rad-watch-btn"
+              type="button"
+              onClick={() => { setAd(null); startCooldown() }}
+            >
+              Watch Another
+            </button>
+          ) : (
+            <button className="rad-watch-btn" type="button" onClick={() => { setPhase('idle'); setAd(null) }}>
+              Done
+            </button>
+          )}
         </div>
       )}
 

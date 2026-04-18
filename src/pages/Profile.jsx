@@ -39,6 +39,7 @@ function Profile() {
     onLogout,
     artistApplyAction,
     marketplaceTemplates,
+    onCurrencyChange,
   } = useOutletContext()
   const navigate = useNavigate()
   const avatarInputRef = useRef(null)
@@ -53,6 +54,7 @@ function Profile() {
   const [artistMsg, setArtistMsg] = useState({ text: '', ok: false })
   const [isApplying, setIsApplying] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', username: '', bio: '' })
@@ -142,15 +144,19 @@ function Profile() {
     }
     setIsSavingProfile(true)
     try {
-      await updateProfile({
+      const result = await updateProfile({
         name: editForm.name.trim(),
         username: editForm.username.trim(),
         bio: editForm.bio.trim(),
       })
+      if (!result?.ok) {
+        setEditMsg({ text: result?.message || 'Could not update profile.', ok: false })
+        return
+      }
       setEditMsg({ text: 'Profile updated!', ok: true })
       setTimeout(() => { setShowEditProfile(false); setEditMsg({ text: '', ok: false }) }, 900)
-    } catch {
-      setEditMsg({ text: 'Could not update profile.', ok: false })
+    } catch (err) {
+      setEditMsg({ text: err?.message || 'Could not update profile.', ok: false })
     } finally {
       setIsSavingProfile(false)
     }
@@ -160,7 +166,7 @@ function Profile() {
     setUserCurrency(code)
     setIsSavingCurrency(true)
     try {
-      await updateCurrency({ currency: code })
+      await (onCurrencyChange ? onCurrencyChange(code) : updateCurrency({ currency: code }))
     } catch { /* ignore */ }
     setIsSavingCurrency(false)
   }
@@ -576,24 +582,6 @@ function Profile() {
           </div>
         ) : null}
 
-        {/* Anonymous Inbox */}
-        {currentUser && (
-          <div className="profile-anon-inbox-section">
-            <h4 className="section-title">Anonymous Inbox</h4>
-            <div className="profile-anon-inbox-card">
-              <div className="profile-anon-inbox-icon">👁</div>
-              <div>
-                <p className="profile-anon-inbox-desc">
-                  Let anyone send you anonymous messages — wrapped in a beautifully designed card.
-                </p>
-                <Link to="/inbox" className="profile-anon-inbox-link primary">
-                  Open Inbox
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Gift Inventory — display only */}
         <div>
           <h4 className="section-title">Gift Inventory</h4>
@@ -764,21 +752,30 @@ function Profile() {
       {/* Delete Account Confirm Modal */}
       {showDeleteConfirm && (
         <section className="detail-modal" role="dialog" aria-modal="true">
-          <div className="detail-backdrop" onClick={() => setShowDeleteConfirm(false)} />
+          <div className="detail-backdrop" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }} />
           <div className="detail-card delete-confirm-modal">
             <span className="delete-confirm-icon">⚠️</span>
             <h3>Delete your account?</h3>
             <p className="detail-subtitle">This action is permanent. All your cards, CC balance, and data will be lost.</p>
+            <p className="delete-confirm-instruction">Type <strong>DELETE</strong> to confirm:</p>
+            <input
+              className="delete-confirm-input"
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              autoComplete="off"
+            />
             <div className="detail-actions artist-apply-actions">
               <button
                 className="profile-delete-btn"
                 type="button"
                 onClick={handleDeleteAccount}
-                disabled={isDeleting}
+                disabled={isDeleting || deleteConfirmText !== 'DELETE'}
               >
                 {isDeleting ? 'Deleting...' : 'Yes, delete my account'}
               </button>
-              <button className="ghost" type="button" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+              <button className="ghost" type="button" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }}>Cancel</button>
             </div>
           </div>
         </section>

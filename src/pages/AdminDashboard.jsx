@@ -28,6 +28,7 @@ import {
   updateAdminPackage,
   getAdminStatsReferrals,
   getAdminCoupons,
+  sendAdminBroadcast,
   getMediaVideos,
   uploadMediaVideo,
   deleteMediaVideo,
@@ -130,7 +131,7 @@ function AdminDashboard() {
   // New redeem code form
   const [newCode, setNewCode] = useState({ numberOfCC: 10, maxUses: 200, isActive: true })
   // New ad form
-  const [newAd, setNewAd] = useState({ type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+  const [newAd, setNewAd] = useState({ name: '', type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
   const [adVideoUploading, setAdVideoUploading] = useState(false)
   const [adVideoDragOver, setAdVideoDragOver] = useState(false)
   const adVideoInputRef = useRef(null)
@@ -143,8 +144,8 @@ function AdminDashboard() {
   const mediaMusicInputRef = useRef(null)
   // Ban form
   const [banForm, setBanForm] = useState({ userId: '', durationDays: 7, reason: '' })
-  // Seasonal reminder
-  const [season, setSeason] = useState('valentines')
+  // Broadcast message
+  const [broadcastMessage, setBroadcastMessage] = useState('')
 
   // Gate: only Admin role
   if (!currentUser || currentUser.role !== 'Admin') {
@@ -352,7 +353,7 @@ function AdminDashboard() {
     try {
       await createAdminAd(newAd)
       showMsg('Ad created!')
-      setNewAd({ type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+      setNewAd({ name: '', type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
       if (adVideoInputRef.current) adVideoInputRef.current.value = ''
       loadTabData('Ads')
     } catch (err) {
@@ -360,10 +361,12 @@ function AdminDashboard() {
     }
   }
 
-  const handleSeasonalReminder = async () => {
+  const handleBroadcast = async () => {
+    if (!broadcastMessage.trim()) { showMsg('Message cannot be empty.', false); return }
     try {
-      await sendSeasonalReminder({ season })
-      showMsg(`${season} reminder sent!`)
+      await sendAdminBroadcast({ message: broadcastMessage.trim() })
+      showMsg('Broadcast sent to all users!')
+      setBroadcastMessage('')
     } catch (err) {
       showMsg(err.message || 'Failed', false)
     }
@@ -529,22 +532,25 @@ function AdminDashboard() {
               </div>
             )}
 
-            {/* Seasonal Reminder */}
+            {/* Broadcast Message */}
             <div className="admin-sub-section">
-              <h4>Send Seasonal Reminder</h4>
-              <div className="admin-inline-form">
-                <Dropdown
-                  value={season}
-                  onChange={setSeason}
-                  options={[
-                    { value: 'valentines', label: "Valentine's Day" },
-                    { value: 'christmas', label: 'Christmas' },
-                    { value: 'mothers_day', label: "Mother's Day" },
-                    { value: 'fathers_day', label: "Father's Day" },
-                    { value: 'independence_day', label: 'Independence Day' },
-                  ]}
+              <h4>Send Message to All Users</h4>
+              <p className="admin-section-note">This will notify every registered user with your message.</p>
+              <div className="admin-broadcast-form">
+                <textarea
+                  className="admin-broadcast-textarea"
+                  placeholder="Write your message to all users…"
+                  value={broadcastMessage}
+                  onChange={e => setBroadcastMessage(e.target.value)}
+                  rows={3}
+                  maxLength={500}
                 />
-                <button className="primary" type="button" onClick={handleSeasonalReminder}>Send</button>
+                <div className="admin-broadcast-footer">
+                  <span className="admin-broadcast-count">{broadcastMessage.length}/500</span>
+                  <button className="primary" type="button" onClick={handleBroadcast} disabled={!broadcastMessage.trim()}>
+                    Send to All
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -812,6 +818,10 @@ function AdminDashboard() {
             <div className="admin-sub-section">
               <h4>Create Ad</h4>
               <div className="admin-form-grid">
+                <label className="admin-field">
+                  <span>Ad Name</span>
+                  <input placeholder="e.g. Summer Promo" value={newAd.name} onChange={e => setNewAd(p => ({ ...p, name: e.target.value }))} />
+                </label>
                 <Dropdown
                   value={newAd.type}
                   onChange={(v) => setNewAd(p => ({ ...p, type: v }))}
@@ -903,11 +913,12 @@ function AdminDashboard() {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Type</th><th>Reward</th><th>Duration</th><th>Active</th><th>Actions</th></tr>
+                  <tr><th>Name</th><th>Type</th><th>Reward</th><th>Duration</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {ads.map(ad => (
                     <tr key={ad._id || ad.id}>
+                      <td>{ad.name || '—'}</td>
                       <td>{ad.type}</td>
                       <td>{ad.rewardCC} CC</td>
                       <td>{ad.duration}s</td>
@@ -930,12 +941,20 @@ function AdminDashboard() {
         {activeTab === 'Media' && !loading && (
           <div className="admin-section">
             <h3 className="admin-section-title">Media Library</h3>
-            <p className="admin-section-note">Upload videos and music tracks that users can pick in the Card Studio.</p>
+            <p className="admin-section-note">Upload videos and music that users can pick inside Card Studio backgrounds.</p>
 
-            {/* Videos */}
-            <div className="admin-sub-section">
-              <h4>Background Videos</h4>
-              <div className="admin-media-upload-row">
+            {/* ── Background Videos ── */}
+            <div className="admin-media-block">
+              <div className="admin-media-block-header">
+                <span className="admin-media-block-icon">🎬</span>
+                <div>
+                  <h4 className="admin-media-block-title">Background Videos</h4>
+                  <p className="admin-media-block-desc">Looping videos available as card backgrounds in the studio.</p>
+                </div>
+              </div>
+
+              {/* Upload form */}
+              <div className="admin-media-add-form">
                 <input
                   ref={mediaVideoInputRef}
                   type="file"
@@ -943,53 +962,91 @@ function AdminDashboard() {
                   style={{ display: 'none' }}
                   onChange={e => handleMediaVideoFile(e.target.files?.[0])}
                 />
-                <label className="admin-field">
-                  <span>Title</span>
-                  <input placeholder="e.g. Ocean Waves" value={newVideo.title} onChange={e => setNewVideo(p => ({ ...p, title: e.target.value }))} />
-                </label>
-                <div
-                  className={`admin-video-drop compact${mediaVideoUploading ? ' uploading' : ''}${newVideo.url ? ' has-video' : ''}`}
-                  onClick={() => !mediaVideoUploading && mediaVideoInputRef.current?.click()}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={e => e.key === 'Enter' && mediaVideoInputRef.current?.click()}
-                >
-                  {mediaVideoUploading ? (
-                    <span>Uploading…</span>
-                  ) : newVideo.url ? (
-                    <span>✓ Video ready</span>
-                  ) : (
-                    <span>Click to upload video</span>
-                  )}
+                <div className="admin-media-add-row">
+                  <label className="admin-field admin-media-title-field">
+                    <span>Video Title</span>
+                    <input
+                      placeholder="e.g. Ocean Waves"
+                      value={newVideo.title}
+                      onChange={e => setNewVideo(p => ({ ...p, title: e.target.value }))}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={`admin-media-file-btn${newVideo.url ? ' ready' : ''}${mediaVideoUploading ? ' uploading' : ''}`}
+                    onClick={() => !mediaVideoUploading && mediaVideoInputRef.current?.click()}
+                    disabled={mediaVideoUploading}
+                  >
+                    {mediaVideoUploading ? (
+                      <><span className="admin-media-file-spinner" />Uploading…</>
+                    ) : newVideo.url ? (
+                      <><span>✓</span> Video ready</>
+                    ) : (
+                      <><span className="admin-media-file-icon">↑</span> Choose file</>
+                    )}
+                  </button>
+                  <button
+                    className="primary admin-media-add-btn"
+                    type="button"
+                    onClick={handleAddVideo}
+                    disabled={mediaVideoUploading || !newVideo.url || !newVideo.title.trim()}
+                  >
+                    Add
+                  </button>
                 </div>
-                <button className="primary" type="button" onClick={handleAddVideo} disabled={mediaVideoUploading}>
-                  Add Video
-                </button>
               </div>
+
+              {/* Video grid */}
               {mediaVideos.length > 0 ? (
-                <div className="admin-media-grid">
+                <div className="admin-media-video-grid">
                   {mediaVideos.map(v => (
-                    <div key={v._id || v.id} className="admin-media-item">
-                      <video src={v.url || v.videoUrl} muted loop playsInline className="admin-media-thumb" onMouseEnter={e => e.currentTarget.play()} onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }} />
-                      <div className="admin-media-item-info">
-                        <span className="admin-media-item-title">{v.title || 'Untitled'}</span>
-                        <button type="button" className="admin-action-btn reject small" onClick={() => handleDeleteVideo(v._id || v.id)}>Delete</button>
+                    <div key={v._id || v.id} className="admin-media-video-card">
+                      <div className="admin-media-video-thumb-wrap">
+                        <video
+                          src={v.url || v.videoUrl}
+                          muted
+                          loop
+                          playsInline
+                          className="admin-media-video-thumb"
+                          onMouseEnter={e => e.currentTarget.play()}
+                          onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
+                        />
+                        <div className="admin-media-video-play-hint">▶</div>
+                      </div>
+                      <div className="admin-media-video-footer">
+                        <span className="admin-media-video-title">{v.title || 'Untitled'}</span>
+                        <button
+                          type="button"
+                          className="admin-media-delete-btn"
+                          onClick={() => handleDeleteVideo(v._id || v.id)}
+                          aria-label="Delete"
+                        >
+                          ✕
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="admin-empty">
-                  <span className="admin-empty-icon">{"\u{1F3AC}"}</span>
-                  <p>No videos uploaded yet.</p>
+                <div className="admin-media-empty">
+                  <span>🎬</span>
+                  <p>No videos yet. Add the first one above.</p>
                 </div>
               )}
             </div>
 
-            {/* Music */}
-            <div className="admin-sub-section">
-              <h4>Music Tracks</h4>
-              <div className="admin-media-upload-row">
+            {/* ── Music Tracks ── */}
+            <div className="admin-media-block">
+              <div className="admin-media-block-header">
+                <span className="admin-media-block-icon">🎵</span>
+                <div>
+                  <h4 className="admin-media-block-title">Music Tracks</h4>
+                  <p className="admin-media-block-desc">Audio tracks users can set as card background music.</p>
+                </div>
+              </div>
+
+              {/* Upload form */}
+              <div className="admin-media-add-form">
                 <input
                   ref={mediaMusicInputRef}
                   type="file"
@@ -997,44 +1054,65 @@ function AdminDashboard() {
                   style={{ display: 'none' }}
                   onChange={e => handleMediaMusicFile(e.target.files?.[0])}
                 />
-                <label className="admin-field">
-                  <span>Title</span>
-                  <input placeholder="e.g. Soft Piano" value={newTrack.title} onChange={e => setNewTrack(p => ({ ...p, title: e.target.value }))} />
-                </label>
-                <div
-                  className={`admin-video-drop compact${mediaMusicUploading ? ' uploading' : ''}${newTrack.url ? ' has-video' : ''}`}
-                  onClick={() => !mediaMusicUploading && mediaMusicInputRef.current?.click()}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={e => e.key === 'Enter' && mediaMusicInputRef.current?.click()}
-                >
-                  {mediaMusicUploading ? (
-                    <span>Uploading…</span>
-                  ) : newTrack.url ? (
-                    <span>✓ Audio ready</span>
-                  ) : (
-                    <span>Click to upload audio</span>
-                  )}
+                <div className="admin-media-add-row">
+                  <label className="admin-field admin-media-title-field">
+                    <span>Track Title</span>
+                    <input
+                      placeholder="e.g. Soft Piano"
+                      value={newTrack.title}
+                      onChange={e => setNewTrack(p => ({ ...p, title: e.target.value }))}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={`admin-media-file-btn${newTrack.url ? ' ready' : ''}${mediaMusicUploading ? ' uploading' : ''}`}
+                    onClick={() => !mediaMusicUploading && mediaMusicInputRef.current?.click()}
+                    disabled={mediaMusicUploading}
+                  >
+                    {mediaMusicUploading ? (
+                      <><span className="admin-media-file-spinner" />Uploading…</>
+                    ) : newTrack.url ? (
+                      <><span>✓</span> Audio ready</>
+                    ) : (
+                      <><span className="admin-media-file-icon">↑</span> Choose file</>
+                    )}
+                  </button>
+                  <button
+                    className="primary admin-media-add-btn"
+                    type="button"
+                    onClick={handleAddTrack}
+                    disabled={mediaMusicUploading || !newTrack.url || !newTrack.title.trim()}
+                  >
+                    Add
+                  </button>
                 </div>
-                <button className="primary" type="button" onClick={handleAddTrack} disabled={mediaMusicUploading}>
-                  Add Track
-                </button>
               </div>
+
+              {/* Music list */}
               {mediaMusic.length > 0 ? (
-                <div className="admin-music-list">
+                <div className="admin-media-music-list">
                   {mediaMusic.map(track => (
-                    <div key={track._id || track.id} className="admin-music-item">
-                      <span className="admin-music-note">♫</span>
-                      <span className="admin-music-title">{track.title || 'Untitled'}</span>
-                      <audio controls src={track.url || track.audioUrl} className="admin-music-audio" />
-                      <button type="button" className="admin-action-btn reject small" onClick={() => handleDeleteTrack(track._id || track.id)}>Delete</button>
+                    <div key={track._id || track.id} className="admin-media-music-item">
+                      <div className="admin-media-music-icon">♫</div>
+                      <div className="admin-media-music-info">
+                        <span className="admin-media-music-name">{track.title || 'Untitled'}</span>
+                        <audio controls src={track.url || track.audioUrl} className="admin-media-music-player" />
+                      </div>
+                      <button
+                        type="button"
+                        className="admin-media-delete-btn"
+                        onClick={() => handleDeleteTrack(track._id || track.id)}
+                        aria-label="Delete"
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="admin-empty">
-                  <span className="admin-empty-icon">♫</span>
-                  <p>No music tracks uploaded yet.</p>
+                <div className="admin-media-empty">
+                  <span>🎵</span>
+                  <p>No tracks yet. Add the first one above.</p>
                 </div>
               )}
             </div>

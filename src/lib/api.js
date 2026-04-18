@@ -412,6 +412,10 @@ export async function sendSeasonalReminder(payload) {
   return request('/admin/send-seasonal-reminder', { method: 'POST', auth: true, body: payload })
 }
 
+export async function sendAdminBroadcast(payload) {
+  return request('/admin/broadcast-message', { method: 'POST', auth: true, body: payload })
+}
+
 export async function getAdminStatsOverview() {
   return request('/admin/stats/overview', { auth: true })
 }

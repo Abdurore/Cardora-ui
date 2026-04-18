@@ -71,7 +71,7 @@ const TYPE_ACCENT = {
   moment: '#f0c060',
   poll:   '#60a5fa',
   trivia: '#a78bfa',
-  chain:  '#34d399',
+  chain:  '#f97316',
   anon:   '#7ef7ff',
 }
 
@@ -392,10 +392,8 @@ function CardStudio() {
   const [sendCopied, setSendCopied] = useState(false)
   const [sendEmail, setSendEmail] = useState('')
   const fileInputRef = useRef(null)
-  const bgImageInputRef = useRef(null)
-  const bgVideoInputRef = useRef(null)
-  const musicInputRef = useRef(null)
   const previewSnapshotRef = useRef(null)
+  const pendingUploadsRef = useRef(new Map()) // blobUrl → { file, type }
   const [isUploading, setIsUploading] = useState(false)
 
   // Poll / Trivia / Chain / Anonymous template state
@@ -425,6 +423,27 @@ function CardStudio() {
     else if (studioType === 'anon' || studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Revoke blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      pendingUploadsRef.current.forEach((_, blobUrl) => URL.revokeObjectURL(blobUrl))
+      pendingUploadsRef.current.clear()
+    }
+  }, [])
+
+  const flushPendingUploads = async (cardObj) => {
+    if (pendingUploadsRef.current.size === 0) return cardObj
+    let json = JSON.stringify(cardObj)
+    for (const [blobUrl, { file, type }] of pendingUploadsRef.current.entries()) {
+      if (!json.includes(blobUrl)) { URL.revokeObjectURL(blobUrl); pendingUploadsRef.current.delete(blobUrl); continue }
+      const cloudUrl = await uploadToCloudinary(file, type)
+      json = json.replaceAll(blobUrl, cloudUrl)
+      URL.revokeObjectURL(blobUrl)
+      pendingUploadsRef.current.delete(blobUrl)
+    }
+    return JSON.parse(json)
+  }
+
   const isArtist = currentUser?.role === 'Artist'
 
   const c = cardObject
@@ -439,6 +458,9 @@ function CardStudio() {
     setIsPublishing(true)
 
     try {
+      const flushedForPublish = await flushPendingUploads(cardObject)
+      setCardObject(flushedForPublish)
+
       let previewDataUrl
       if (previewSnapshotRef.current) {
         await new Promise((resolve) => requestAnimationFrame(() => resolve()))
@@ -450,11 +472,11 @@ function CardStudio() {
         })
         previewDataUrl = canvas.toDataURL('image/jpeg', 0.88)
       } else {
-        previewDataUrl = generateTemplatePreviewDataUrl(cardObject)
+        previewDataUrl = generateTemplatePreviewDataUrl(flushedForPublish)
       }
       const previewBlob = dataUrlToBlob(previewDataUrl)
       const uploadedPreviewImage = await uploadToCloudinary(previewBlob, 'image')
-      const previewImage = uploadedPreviewImage || c.media.images?.[0]?.url || c.background.imageUrl || ''
+      const previewImage = uploadedPreviewImage || flushedForPublish.media.images?.[0]?.url || flushedForPublish.background.imageUrl || ''
 
       if (!previewImage) {
         throw new Error('Could not generate a preview image for this template.')
@@ -465,7 +487,7 @@ function CardStudio() {
         category: publishForm.category,
         previewImage,
         layoutConfig: structuredClone({
-          ...cardObject,
+          ...flushedForPublish,
           previewImage,
           previewUrl: previewImage,
         }),
@@ -526,8 +548,18 @@ function CardStudio() {
     const typeMap = { moment: 'standard', poll: 'poll', trivia: 'trivia', chain: 'chain', anon: 'anonymous', anonymous: 'anonymous' }
     const derivedType = typeMap[studioType] || 'standard'
 
+    let flushedCardObject
+    try {
+      flushedCardObject = await flushPendingUploads(cardObject)
+      setCardObject(flushedCardObject)
+    } catch (err) {
+      setSendResult({ ok: false, message: 'Media upload failed: ' + err.message })
+      setIsSending(false)
+      return
+    }
+
     const extras = {
-      title: c.content?.heading || 'Untitled Card',
+      title: flushedCardObject.content?.heading || 'Untitled Card',
       templateId: cardData?.id || 'custom',
       type: derivedType,
       tier: studioTier,
@@ -537,7 +569,7 @@ function CardStudio() {
       anonTemplate: (studioType === 'anon' || studioType === 'anonymous') ? { enabled: true, tier: studioTier } : undefined,
     }
 
-    const result = await createCardOnBackend?.(cardObject, extras)
+    const result = await createCardOnBackend?.(flushedCardObject, extras)
     setIsSending(false)
     if (result?.ok) {
       const slug = result.data?.card?.slug || result.data?.slug || result.data?.data?.slug || ''
@@ -584,78 +616,16 @@ function CardStudio() {
   }
 
 
-  const handleImageUpload = async (e) => {
+  const handleImageUpload = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setIsUploading(true)
-    try {
-      const url = await uploadToCloudinary(file, 'image')
-      const newImages = [
-        ...c.media.images,
-        {
-          url,
-          caption: '',
-          fit: 'cover',
-          positionX: 50,
-          positionY: 50,
-        },
-      ]
-      update('media.images', newImages)
-    } catch (err) {
-      alert('Upload failed: ' + err.message)
-    } finally {
-      setIsUploading(false)
-      e.target.value = ''
-    }
-  }
-
-  const handleBackgroundImageUpload = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    setIsUploading(true)
-    try {
-      const url = await uploadToCloudinary(file, 'image')
-      update('background.type', 'image')
-      update('background.imageUrl', url)
-    } catch (err) {
-      alert('Upload failed: ' + err.message)
-    } finally {
-      setIsUploading(false)
-      event.target.value = ''
-    }
-  }
-
-  const handleBackgroundVideoUpload = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    setIsUploading(true)
-    try {
-      const url = await uploadToCloudinary(file, 'video')
-      update('background.type', 'video')
-      update('background.videoUrl', url)
-    } catch (err) {
-      alert('Upload failed: ' + err.message)
-    } finally {
-      setIsUploading(false)
-      event.target.value = ''
-    }
-  }
-
-  const handleMusicUpload = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    setIsUploading(true)
-    try {
-      // Cloudinary handles audio as 'video' or 'raw'. 'video' is better for streaming optimization.
-      const url = await uploadToCloudinary(file, 'video')
-      update('background.music.url', url)
-      update('background.music.isUploaded', true)
-    } catch (err) {
-      alert('Upload failed: ' + err.message)
-    } finally {
-      setIsUploading(false)
-      event.target.value = ''
-    }
+    const blobUrl = URL.createObjectURL(file)
+    pendingUploadsRef.current.set(blobUrl, { file, type: 'image' })
+    update('media.images', [
+      ...c.media.images,
+      { url: blobUrl, caption: '', fit: 'cover', positionX: 50, positionY: 50 },
+    ])
+    e.target.value = ''
   }
 
   const removeImage = (idx) => {
@@ -931,7 +901,7 @@ function CardStudio() {
           <p className="cs-panel-eyebrow">Background</p>
           <h3>Set the stage</h3>
           <div className="cs-choice-row">
-            {['color', 'gradient', 'image', 'video', 'animated'].map(type => (
+            {['color', 'gradient', 'video', 'animated'].map(type => (
               <button
                 key={type}
                 type="button"
@@ -974,37 +944,11 @@ function CardStudio() {
             </label>
           )}
 
-          {c.background.type === 'image' && (
-            <div className="cs-sub-section">
-              <p className="cs-sub-label">Background Image Upload</p>
-              <input
-                ref={bgImageInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleBackgroundImageUpload}
-              />
-              <button 
-                type="button" 
-                className={`cs-button ${isUploading ? 'loading' : ''}`} 
-                onClick={() => !isUploading && bgImageInputRef.current?.click()}
-                disabled={isUploading}
-              >
-                {isUploading ? 'Uploading...' : 'Upload Image From Device'}
-              </button>
-              {c.background.imageUrl ? (
-                <div className="cs-background-thumb">
-                  <img src={c.background.imageUrl} alt="" />
-                </div>
-              ) : null}
-            </div>
-          )}
-
           {c.background.type === 'video' && (
             <div className="cs-sub-section">
               <p className="cs-sub-label">Background Video</p>
               {adminVideos.length > 0 ? (
-                <div className="cs-media-picker-grid">
+                <div className="cs-video-picker-grid">
                   {adminVideos.map((v) => {
                     const url = v.url || v.videoUrl || v.src || ''
                     const label = v.title || v.name || v.label || 'Video'
@@ -1013,26 +957,40 @@ function CardStudio() {
                       <button
                         key={v._id || v.id || url}
                         type="button"
-                        className={`cs-media-picker-item ${selected ? 'active' : ''}`}
+                        className={`cs-video-picker-item ${selected ? 'selected' : ''}`}
                         onClick={() => update('background.videoUrl', url)}
                         title={label}
                       >
-                        <video src={url} muted loop playsInline className="cs-media-picker-thumb" />
-                        <span className="cs-media-picker-label">{label}</span>
-                        {selected && <span className="cs-media-picker-check">✓</span>}
+                        <div className="cs-video-picker-thumb-wrap">
+                          <video
+                            src={url}
+                            muted
+                            loop
+                            playsInline
+                            className="cs-video-picker-thumb"
+                            onMouseEnter={e => e.currentTarget.play()}
+                            onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
+                          />
+                          {selected && (
+                            <div className="cs-video-picker-check-overlay">
+                              <span>✓</span>
+                            </div>
+                          )}
+                        </div>
+                        <span className="cs-video-picker-label">{label}</span>
                       </button>
                     )
                   })}
                 </div>
               ) : (
-                <p className="cs-empty">No admin videos available yet.</p>
-              )}
-              {c.background.videoUrl ? (
-                <div className="cs-background-thumb video">
-                  <video src={c.background.videoUrl} muted autoPlay loop playsInline />
-                  <button type="button" className="cs-inline-remove" onClick={() => update('background.videoUrl', '')}>Remove</button>
+                <div className="cs-media-empty-state">
+                  <span>🎬</span>
+                  <p>No videos available yet. Ask your admin to upload some.</p>
                 </div>
-              ) : null}
+              )}
+              {c.background.videoUrl && (
+                <button type="button" className="cs-inline-remove" style={{ marginTop: 8 }} onClick={() => update('background.videoUrl', '')}>Remove video</button>
+              )}
             </div>
           )}
 
@@ -1054,7 +1012,7 @@ function CardStudio() {
                         update('background.music.isUploaded', false)
                       }}
                     >
-                      <span className="cs-music-picker-note">♫</span>
+                      <span className="cs-music-picker-icon">♫</span>
                       <span className="cs-music-picker-label">{label}</span>
                       {selected && <span className="cs-music-picker-check">✓</span>}
                     </button>

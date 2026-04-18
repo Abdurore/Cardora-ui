@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
+import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import { getWorldChat, API_BASE } from '../lib/api.js'
 import { mapChatMessage } from '../lib/backendMappers.js'
@@ -158,14 +159,14 @@ function WorldChat() {
     return () => clearTimeout(timer)
   }, [joinLeave])
 
-  const SEND_COOLDOWN = 5 // seconds between messages
+  const SEND_COOLDOWN = 15 // seconds between messages
 
   const sendMessage = () => {
     if (!input.trim() || cooldown > 0 || !isOnline || !connected) return
     socketRef.current?.emit('send_message', { content: input.trim() })
     setInput('')
     setError('')
-    // Start client-side cooldown
+    // Client-side cooldown so button is visually locked immediately
     setCooldown(SEND_COOLDOWN)
     clearInterval(cooldownRef.current)
     cooldownRef.current = setInterval(() => {
@@ -190,6 +191,7 @@ function WorldChat() {
 
   return (
     <div className="page-body chat-page">
+      <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
       <div className="screen-body chat-body">
         <div className="chat-header-bar">
           <div>
