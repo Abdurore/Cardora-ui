@@ -392,9 +392,6 @@ function CardStudio() {
   const [sendCopied, setSendCopied] = useState(false)
   const [sendEmail, setSendEmail] = useState('')
   const fileInputRef = useRef(null)
-  const bgImageInputRef = useRef(null)
-  const bgVideoInputRef = useRef(null)
-  const musicInputRef = useRef(null)
   const previewSnapshotRef = useRef(null)
   const pendingUploadsRef = useRef(new Map()) // blobUrl → { file, type }
   const [isUploading, setIsUploading] = useState(false)
@@ -629,36 +626,6 @@ function CardStudio() {
       { url: blobUrl, caption: '', fit: 'cover', positionX: 50, positionY: 50 },
     ])
     e.target.value = ''
-  }
-
-  const handleBackgroundImageUpload = (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    const blobUrl = URL.createObjectURL(file)
-    pendingUploadsRef.current.set(blobUrl, { file, type: 'image' })
-    update('background.type', 'image')
-    update('background.imageUrl', blobUrl)
-    event.target.value = ''
-  }
-
-  const handleBackgroundVideoUpload = (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    const blobUrl = URL.createObjectURL(file)
-    pendingUploadsRef.current.set(blobUrl, { file, type: 'video' })
-    update('background.type', 'video')
-    update('background.videoUrl', blobUrl)
-    event.target.value = ''
-  }
-
-  const handleMusicUpload = (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    const blobUrl = URL.createObjectURL(file)
-    pendingUploadsRef.current.set(blobUrl, { file, type: 'video' })
-    update('background.music.url', blobUrl)
-    update('background.music.isUploaded', true)
-    event.target.value = ''
   }
 
   const removeImage = (idx) => {
@@ -934,7 +901,7 @@ function CardStudio() {
           <p className="cs-panel-eyebrow">Background</p>
           <h3>Set the stage</h3>
           <div className="cs-choice-row">
-            {['color', 'gradient', 'image', 'video', 'animated'].map(type => (
+            {['color', 'gradient', 'video', 'animated'].map(type => (
               <button
                 key={type}
                 type="button"
@@ -977,37 +944,11 @@ function CardStudio() {
             </label>
           )}
 
-          {c.background.type === 'image' && (
-            <div className="cs-sub-section">
-              <p className="cs-sub-label">Background Image Upload</p>
-              <input
-                ref={bgImageInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleBackgroundImageUpload}
-              />
-              <button 
-                type="button" 
-                className={`cs-button ${isUploading ? 'loading' : ''}`} 
-                onClick={() => !isUploading && bgImageInputRef.current?.click()}
-                disabled={isUploading}
-              >
-                {isUploading ? 'Uploading...' : 'Upload Image From Device'}
-              </button>
-              {c.background.imageUrl ? (
-                <div className="cs-background-thumb">
-                  <img src={c.background.imageUrl} alt="" />
-                </div>
-              ) : null}
-            </div>
-          )}
-
           {c.background.type === 'video' && (
             <div className="cs-sub-section">
               <p className="cs-sub-label">Background Video</p>
               {adminVideos.length > 0 ? (
-                <div className="cs-media-picker-grid">
+                <div className="cs-video-picker-grid">
                   {adminVideos.map((v) => {
                     const url = v.url || v.videoUrl || v.src || ''
                     const label = v.title || v.name || v.label || 'Video'
@@ -1016,26 +957,40 @@ function CardStudio() {
                       <button
                         key={v._id || v.id || url}
                         type="button"
-                        className={`cs-media-picker-item ${selected ? 'active' : ''}`}
+                        className={`cs-video-picker-item ${selected ? 'selected' : ''}`}
                         onClick={() => update('background.videoUrl', url)}
                         title={label}
                       >
-                        <video src={url} muted loop playsInline className="cs-media-picker-thumb" />
-                        <span className="cs-media-picker-label">{label}</span>
-                        {selected && <span className="cs-media-picker-check">✓</span>}
+                        <div className="cs-video-picker-thumb-wrap">
+                          <video
+                            src={url}
+                            muted
+                            loop
+                            playsInline
+                            className="cs-video-picker-thumb"
+                            onMouseEnter={e => e.currentTarget.play()}
+                            onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
+                          />
+                          {selected && (
+                            <div className="cs-video-picker-check-overlay">
+                              <span>✓</span>
+                            </div>
+                          )}
+                        </div>
+                        <span className="cs-video-picker-label">{label}</span>
                       </button>
                     )
                   })}
                 </div>
               ) : (
-                <p className="cs-empty">No admin videos available yet.</p>
-              )}
-              {c.background.videoUrl ? (
-                <div className="cs-background-thumb video">
-                  <video src={c.background.videoUrl} muted autoPlay loop playsInline />
-                  <button type="button" className="cs-inline-remove" onClick={() => update('background.videoUrl', '')}>Remove</button>
+                <div className="cs-media-empty-state">
+                  <span>🎬</span>
+                  <p>No videos available yet. Ask your admin to upload some.</p>
                 </div>
-              ) : null}
+              )}
+              {c.background.videoUrl && (
+                <button type="button" className="cs-inline-remove" style={{ marginTop: 8 }} onClick={() => update('background.videoUrl', '')}>Remove video</button>
+              )}
             </div>
           )}
 
@@ -1057,7 +1012,7 @@ function CardStudio() {
                         update('background.music.isUploaded', false)
                       }}
                     >
-                      <span className="cs-music-picker-note">♫</span>
+                      <span className="cs-music-picker-icon">♫</span>
                       <span className="cs-music-picker-label">{label}</span>
                       {selected && <span className="cs-music-picker-check">✓</span>}
                     </button>
