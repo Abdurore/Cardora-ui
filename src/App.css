@@ -866,7 +866,7 @@
 }
 
 .screen-header+* {
-  margin-top: 114px;
+  margin-top: 86px;
 }
 
 .brand {
@@ -880,14 +880,14 @@
 .brand-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .brand-logo {
-  width: 64px;
-  height: 64px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
-  filter: drop-shadow(0 0 16px rgba(126, 247, 255, 0.45));
+  filter: drop-shadow(0 0 10px rgba(126, 247, 255, 0.5));
 }
 
 .brand-wordmark {
@@ -5170,12 +5170,12 @@ a {
   }
 
   .brand-lockup {
-    gap: 8px;
+    gap: 6px;
   }
 
   .brand-logo {
-    width: 50px;
-    height: 50px;
+    width: 26px;
+    height: 26px;
   }
 
   .brand-wordmark {
@@ -5192,7 +5192,7 @@ a {
   }
 
   .screen-header+* {
-    margin-top: 96px;
+    margin-top: 76px;
   }
 
   .steps-row,
@@ -7253,11 +7253,12 @@ a {
     flex-shrink: 0;
     height: 44vh;
     height: 44dvh;
+    max-height: 45vh;
     min-height: 220px;
     position: relative;
     display: grid;
     place-items: center;
-    overflow: hidden;
+    overflow-y: auto;
     border-radius: 0;
     border-bottom: 1px solid rgba(118, 239, 255, 0.06);
     transition: background 0.3s ease;
@@ -7304,18 +7305,20 @@ a {
     background: rgba(4, 8, 14, 0.98);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
-    padding: 10px 14px 12px;
     border-bottom: 1px solid rgba(118, 239, 255, 0.07);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
   }
 
+  /* Level 1 — compact step tabs */
   .cs-mobile-stepnav {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     overflow-x: auto;
     scrollbar-width: none;
+    padding: 8px 14px 6px;
+    border-bottom: 1px solid rgba(118, 239, 255, 0.05);
   }
 
   .cs-mobile-stepnav::-webkit-scrollbar {
@@ -7323,30 +7326,35 @@ a {
   }
 
   .cs-mobile-step {
-    padding: 7px 14px;
+    padding: 5px 12px;
     border-radius: 999px;
     text-transform: capitalize;
     white-space: nowrap;
     flex-shrink: 0;
-    border: 1px solid rgba(118, 239, 255, 0.1);
-    background: rgba(8, 14, 18, 0.75);
-    color: rgba(200, 230, 240, 0.55);
-    font-size: 0.76rem;
+    border: 1px solid transparent;
+    background: transparent;
+    color: rgba(200, 230, 240, 0.45);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    position: relative;
   }
 
   .cs-mobile-step.active {
-    border-color: rgba(118, 239, 255, 0.38);
-    color: #e8f9ff;
-    background: rgba(118, 239, 255, 0.07);
-    box-shadow: inset 0 -2px 0 rgba(118, 239, 255, 0.6);
+    border-color: transparent;
+    color: var(--type-accent, #7ef7ff);
+    background: transparent;
+    border-bottom: 2px solid var(--type-accent, #7ef7ff);
+    border-radius: 0;
+    font-weight: 600;
   }
 
+  /* Level 2 — tool chips with more presence */
   .cs-mobile-tools {
     display: flex;
     gap: 6px;
     overflow-x: auto;
     scrollbar-width: none;
-    padding-bottom: 2px;
+    padding: 8px 14px 10px;
   }
 
   .cs-mobile-tools::-webkit-scrollbar {
@@ -7356,22 +7364,23 @@ a {
   .cs-mobile-tool-chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 7px 13px;
+    gap: 6px;
+    padding: 8px 14px;
     border-radius: 999px;
-    border: 1px solid rgba(118, 239, 255, 0.08);
-    background: rgba(8, 14, 18, 0.7);
-    color: rgba(200, 230, 240, 0.5);
-    font-size: 0.72rem;
+    border: 1px solid rgba(118, 239, 255, 0.1);
+    background: rgba(8, 14, 18, 0.6);
+    color: rgba(200, 230, 240, 0.55);
+    font-size: 0.74rem;
     white-space: nowrap;
     flex-shrink: 0;
     transition: all 0.18s ease;
   }
 
   .cs-mobile-tool-chip.active {
-    border-color: rgba(118, 239, 255, 0.32);
-    color: #ddf8ff;
-    background: rgba(118, 239, 255, 0.07);
+    border-color: var(--type-accent, #7ef7ff);
+    color: #041015;
+    background: var(--type-accent, #7ef7ff);
+    font-weight: 600;
   }
 
   /* â”€â”€ Editing panel: grows to fill scroll zone, scrolls inside it â”€â”€ */
@@ -8433,23 +8442,25 @@ a {
 
   /* Step nav */
   .cs-mobile-stepnav {
-    gap: 4px;
+    gap: 2px;
+    padding: 6px 10px 4px;
   }
 
   .cs-mobile-step {
-    padding: 6px 10px;
-    font-size: 0.72rem;
+    padding: 4px 10px;
+    font-size: 0.68rem;
   }
 
   /* Tool chips */
   .cs-mobile-tools {
     gap: 4px;
+    padding: 6px 10px 8px;
   }
 
   .cs-mobile-tool-chip {
-    padding: 5px 9px;
-    font-size: 0.68rem;
-    gap: 3px;
+    padding: 6px 11px;
+    font-size: 0.7rem;
+    gap: 4px;
   }
 
   /* Panel sizing */
@@ -14482,10 +14493,15 @@ a {
 .cs-shell {
   --type-accent: #f0c060;
 }
-.cs-toolrail .cs-tool.active .cs-tool-icon,
-.cs-mobile-tool-chip.active {
+.cs-toolrail .cs-tool.active .cs-tool-icon {
   color: var(--type-accent);
   border-color: var(--type-accent);
+}
+.cs-mobile-tool-chip.active {
+  background: var(--type-accent, #7ef7ff);
+  color: #041015;
+  border-color: var(--type-accent, #7ef7ff);
+  font-weight: 600;
 }
 .cs-nav-btn.send {
   background: color-mix(in srgb, var(--type-accent, #7ef7ff) 18%, transparent);
@@ -14942,3 +14958,627 @@ a {
   }
 }
 
+
+/* ═══════════════════════════════════════════════════
+   CARD STUDIO — SEND / SHARE MODAL
+   ═══════════════════════════════════════════════════ */
+.cs-send-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 env(safe-area-inset-bottom, 0);
+}
+
+@media (min-width: 600px) {
+  .cs-send-modal-overlay {
+    align-items: center;
+  }
+}
+
+.cs-send-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 4, 8, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.cs-send-modal {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+  padding: 28px 24px 32px;
+  border-radius: 24px 24px 0 0;
+  background: linear-gradient(160deg, #0c1820, #080e16);
+  border: 1px solid rgba(118, 239, 255, 0.12);
+  border-bottom: none;
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 600px) {
+  .cs-send-modal {
+    border-radius: 24px;
+    border-bottom: 1px solid rgba(118, 239, 255, 0.12);
+    max-width: 460px;
+  }
+}
+
+.cs-send-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cs-send-modal-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cs-send-modal-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(126, 247, 255, 0.55);
+}
+
+.cs-send-modal h3 {
+  font-family: 'Cinzel', serif;
+  color: #eafcff;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.cs-send-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(118, 239, 255, 0.12);
+  background: rgba(8, 14, 18, 0.7);
+  color: rgba(220, 240, 248, 0.6);
+  font-size: 1.3rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.cs-send-modal-close:hover {
+  background: rgba(118, 239, 255, 0.1);
+  color: #e8f9ff;
+}
+
+.cs-send-modal-note {
+  font-size: 0.8rem;
+  color: rgba(200, 226, 238, 0.55);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.cs-send-link-pill {
+  display: block;
+  padding: 9px 13px;
+  border-radius: 10px;
+  background: rgba(8, 16, 20, 0.8);
+  border: 1px solid rgba(126, 247, 255, 0.15);
+  color: #7ef7ff;
+  font-size: 0.78rem;
+  word-break: break-all;
+  font-family: monospace;
+}
+
+.cs-send-modal-platforms {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.cs-send-modal-platforms::-webkit-scrollbar {
+  display: none;
+}
+
+.cs-send-modal-email-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(118, 239, 255, 0.06);
+}
+
+.cs-send-modal-email-input-wrap {
+  display: flex;
+  gap: 8px;
+}
+
+.cs-send-modal-email-input {
+  flex: 1;
+  padding: 9px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(118, 239, 255, 0.12);
+  background: rgba(8, 14, 18, 0.75);
+  color: #e8f9ff;
+  font-size: 0.82rem;
+}
+
+.cs-send-modal-email-input::placeholder {
+  color: rgba(200, 220, 230, 0.35);
+}
+
+.cs-send-modal-tier-note {
+  font-size: 0.72rem;
+  color: rgba(200, 220, 230, 0.35);
+  margin: 0;
+  text-align: center;
+  letter-spacing: 0.03em;
+}
+
+/* ═══════════════════════════════════════════════════
+   CARD STUDIO — POLISHED PUBLISH MODAL
+   ═══════════════════════════════════════════════════ */
+.cs-publish-modal--polished {
+  padding: 0;
+  overflow: hidden;
+}
+
+.cs-publish-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid rgba(118, 239, 255, 0.07);
+  background: rgba(6, 10, 16, 0.6);
+}
+
+.cs-publish-modal-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cs-publish-modal-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(126, 247, 255, 0.5);
+}
+
+.cs-publish-modal--polished h3 {
+  font-family: 'Cinzel', serif;
+  color: #eafcff;
+  font-size: 1.05rem;
+  margin: 0;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-publish-close-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(118, 239, 255, 0.1);
+  background: rgba(8, 14, 18, 0.7);
+  color: rgba(220, 240, 248, 0.55);
+  font-size: 1.3rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.cs-publish-close-btn:hover {
+  background: rgba(118, 239, 255, 0.1);
+  color: #e8f9ff;
+}
+
+.cs-publish-modal-desc {
+  font-size: 0.78rem !important;
+  color: rgba(180, 200, 212, 0.55) !important;
+  line-height: 1.55 !important;
+  margin: 0 !important;
+  padding: 14px 24px 0 !important;
+}
+
+.cs-publish-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 24px;
+}
+
+.cs-publish-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cs-publish-field-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(200, 226, 238, 0.5);
+}
+
+.cs-publish-preview-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: rgba(118, 239, 255, 0.04);
+  border-top: 1px solid rgba(118, 239, 255, 0.06);
+  border-bottom: 1px solid rgba(118, 239, 255, 0.06);
+  font-size: 0.76rem;
+  color: rgba(180, 210, 222, 0.5);
+}
+
+.cs-publish-preview-note-icon {
+  font-size: 0.9rem;
+}
+
+.cs-publish-modal--polished .cs-publish-actions {
+  padding: 14px 24px 20px;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+}
+
+.cs-publish-submit-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.cs-publish-modal--polished .form-error {
+  margin: 0;
+  padding: 0 24px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PREVIEW WATERMARK — "Made with Cardora · Create yours →"
+   ════════════════════════════════════════════════════════════════ */
+.cs-preview-watermark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: auto;
+  padding: 8px 12px 4px;
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.28);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: none;
+}
+.cs-preview-watermark-cta {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.cs-preview-watermark-cta:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+.cs-preview-watermark-sep {
+  opacity: 0.3;
+  margin: 0 2px;
+}
+
+/* Ensure preview card uses flex column so watermark sticks to bottom */
+.cs-preview-card,
+.cs-preview-poll,
+.cs-preview-trivia,
+.cs-mobile-chain-preview,
+.cs-preview-anon .cs-preview-anon-template {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CARDVIEW WATERMARK
+   ════════════════════════════════════════════════════════════════ */
+.cv-watermark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 24px;
+  padding: 10px 0 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.25);
+}
+.cv-watermark-brand {
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+}
+.cv-watermark-sep {
+  opacity: 0.25;
+}
+.cv-watermark-cta {
+  color: rgba(255, 255, 255, 0.45);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.cv-watermark-cta:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CC COST BADGE — Studio topbar
+   ════════════════════════════════════════════════════════════════ */
+.cs-cc-cost-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: rgba(var(--type-accent-rgb, 240, 192, 96), 0.12);
+  color: var(--type-accent, #f0c060);
+  border: 1px solid color-mix(in srgb, var(--type-accent, #f0c060) 25%, transparent);
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SEND MODAL — CC deducted confirmation
+   ════════════════════════════════════════════════════════════════ */
+.cs-send-modal-cc-deducted {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  font-size: 0.8rem;
+  color: #6ee7b7;
+}
+.cs-send-modal-cc-deducted.free {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.15);
+  color: rgba(148, 163, 184, 0.7);
+}
+.cs-send-modal-cc-icon {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMIN MEDIA LIBRARY
+   ════════════════════════════════════════════════════════════════ */
+.admin-section-note {
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.7);
+  margin: -8px 0 20px;
+}
+
+.admin-media-upload-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.admin-media-upload-row .admin-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.admin-video-drop.compact {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  border: 1.5px dashed rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.04);
+  color: rgba(148, 163, 184, 0.55);
+  transition: border-color 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-video-drop.compact:hover {
+  border-color: rgba(148, 163, 184, 0.45);
+  color: rgba(148, 163, 184, 0.85);
+}
+.admin-video-drop.compact.has-video {
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.admin-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.admin-media-item {
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: border-color 0.2s;
+}
+.admin-media-item:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.admin-media-thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+}
+.admin-media-item-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  gap: 6px;
+}
+.admin-media-item-title {
+  font-size: 0.72rem;
+  color: rgba(148, 163, 184, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.admin-action-btn.small {
+  padding: 3px 8px;
+  font-size: 0.68rem;
+}
+
+.admin-music-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.admin-music-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.admin-music-note {
+  font-size: 1rem;
+  opacity: 0.5;
+}
+.admin-music-title {
+  flex: 1;
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.85);
+}
+.admin-music-audio {
+  height: 28px;
+  max-width: 180px;
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STUDIO ADMIN-CURATED MEDIA PICKERS
+   ════════════════════════════════════════════════════════════════ */
+.cs-media-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cs-media-picker-item {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.cs-media-picker-item:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.cs-media-picker-item.active {
+  border-color: var(--type-accent, #f0c060);
+}
+.cs-media-picker-thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+}
+.cs-media-picker-label {
+  display: block;
+  padding: 4px 6px;
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-media-picker-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--type-accent, #f0c060);
+  color: #000;
+  font-size: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.cs-music-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.cs-music-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.cs-music-picker-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.cs-music-picker-item.active {
+  border-color: var(--type-accent, #f0c060);
+  background: color-mix(in srgb, var(--type-accent, #f0c060) 8%, transparent);
+}
+.cs-music-picker-note {
+  font-size: 0.9rem;
+  opacity: 0.5;
+}
+.cs-music-picker-label {
+  flex: 1;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: left;
+}
+.cs-music-picker-check {
+  font-size: 0.75rem;
+  color: var(--type-accent, #f0c060);
+  font-weight: 700;
+}

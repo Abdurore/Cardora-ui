@@ -576,6 +576,13 @@ function CardView() {
                     Create yours
                   </button>
                 </div>
+
+                <div className="cv-watermark">
+                  <span>Made with</span>
+                  <Link to="/" className="cv-watermark-brand">Cardora</Link>
+                  <span className="cv-watermark-sep">·</span>
+                  <Link to="/create" className="cv-watermark-cta">Create yours →</Link>
+                </div>
               </div>
             </div>
           </motion.section>

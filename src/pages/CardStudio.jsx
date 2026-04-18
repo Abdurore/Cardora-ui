@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import {
   HiOutlineEnvelope, HiOutlinePaintBrush, HiOutlinePhoto,
@@ -14,7 +15,7 @@ import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
 import { dataUrlToBlob, uploadToCloudinary } from '../lib/cloudinary.js'
-import { createCardClassic, createCardPremium, createCardElite, createCardAnonymous } from '../lib/api.js'
+import { createCardClassic, createCardPremium, createCardElite, createCardAnonymous, getMediaVideos, getMediaMusic } from '../lib/api.js'
 import html2canvas from 'html2canvas'
 import TemplatePreviewSnapshot from '../components/TemplatePreviewSnapshot.jsx'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
@@ -75,6 +76,53 @@ const TYPE_ACCENT = {
 }
 
 const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
+
+const TIER_COST = { classic: 0, premium: 5, elite: 10 }
+
+const TYPE_LABEL = {
+  moment: 'Moment Card',
+  poll: 'Poll Card',
+  trivia: 'Trivia Card',
+  chain: 'Chain Card',
+  anon: 'Anonymous',
+  anonymous: 'Anonymous',
+}
+
+const SHARE_PLATFORMS = [
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp',
+    color: '#25D366',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+    ),
+    getUrl: (url, title) => `https://wa.me/?text=${encodeURIComponent(`${title}\n${url}`)}`,
+  },
+  {
+    id: 'telegram',
+    label: 'Telegram',
+    color: '#2AABEE',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+      </svg>
+    ),
+    getUrl: (url, title) => `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`,
+  },
+  {
+    id: 'twitter',
+    label: 'X / Twitter',
+    color: '#1DA1F2',
+    icon: (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+    ),
+    getUrl: (url, title) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
+  },
+]
 
 // Deep merge helper
 function deepMerge(target, source) {
@@ -340,6 +388,9 @@ function CardStudio() {
   const [emojiInput, setEmojiInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState(null) // { ok, slug?, message }
+  const [showSendModal, setShowSendModal] = useState(false)
+  const [sendCopied, setSendCopied] = useState(false)
+  const [sendEmail, setSendEmail] = useState('')
   const fileInputRef = useRef(null)
   const bgImageInputRef = useRef(null)
   const bgVideoInputRef = useRef(null)
@@ -354,6 +405,17 @@ function CardStudio() {
   })
   const [chainData, setChainData] = useState({ enabled: false, prompt: '' })
   const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: studioTier || 'classic' })
+
+  // Admin-curated media
+  const [adminVideos, setAdminVideos] = useState([])
+  const [adminMusic, setAdminMusic] = useState([])
+
+  useEffect(() => {
+    Promise.allSettled([getMediaVideos(), getMediaMusic()]).then(([vRes, mRes]) => {
+      if (vRes.status === 'fulfilled') setAdminVideos(vRes.value?.data?.videos || vRes.value?.videos || [])
+      if (mRes.status === 'fulfilled') setAdminMusic(mRes.value?.data?.music || mRes.value?.music || [])
+    })
+  }, [])
 
   // Set active tool and auto-enable state for specific card types on mount
   useEffect(() => {
@@ -483,6 +545,16 @@ function CardStudio() {
     } else {
       setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
     }
+  }
+
+  const handleSendClick = async () => {
+    if (!currentUser) {
+      // Show a simple auth notice — open auth modal if available via context
+      alert('Please sign in to send a card.')
+      return
+    }
+    await handleSend()
+    setShowSendModal(true)
   }
 
   const handleSave = () => {
@@ -930,25 +1002,35 @@ function CardStudio() {
 
           {c.background.type === 'video' && (
             <div className="cs-sub-section">
-              <p className="cs-sub-label">Background Video Upload</p>
-              <input
-                ref={bgVideoInputRef}
-                type="file"
-                accept="video/*"
-                style={{ display: 'none' }}
-                onChange={handleBackgroundVideoUpload}
-              />
-              <button 
-                type="button" 
-                className={`cs-button ${isUploading ? 'loading' : ''}`} 
-                onClick={() => !isUploading && bgVideoInputRef.current?.click()}
-                disabled={isUploading}
-              >
-                {isUploading ? 'Uploading...' : 'Upload Video From Device'}
-              </button>
+              <p className="cs-sub-label">Background Video</p>
+              {adminVideos.length > 0 ? (
+                <div className="cs-media-picker-grid">
+                  {adminVideos.map((v) => {
+                    const url = v.url || v.videoUrl || v.src || ''
+                    const label = v.title || v.name || v.label || 'Video'
+                    const selected = c.background.videoUrl === url
+                    return (
+                      <button
+                        key={v._id || v.id || url}
+                        type="button"
+                        className={`cs-media-picker-item ${selected ? 'active' : ''}`}
+                        onClick={() => update('background.videoUrl', url)}
+                        title={label}
+                      >
+                        <video src={url} muted loop playsInline className="cs-media-picker-thumb" />
+                        <span className="cs-media-picker-label">{label}</span>
+                        {selected && <span className="cs-media-picker-check">✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="cs-empty">No admin videos available yet.</p>
+              )}
               {c.background.videoUrl ? (
                 <div className="cs-background-thumb video">
                   <video src={c.background.videoUrl} muted autoPlay loop playsInline />
+                  <button type="button" className="cs-inline-remove" onClick={() => update('background.videoUrl', '')}>Remove</button>
                 </div>
               ) : null}
             </div>
@@ -956,38 +1038,51 @@ function CardStudio() {
 
           <div className="cs-sub-section">
             <p className="cs-sub-label"><HiOutlineMusicalNote style={{ verticalAlign: 'middle' }} /> Background Music</p>
-            <input
-              ref={musicInputRef}
-              type="file"
-              accept="audio/*"
-              style={{ display: 'none' }}
-              onChange={handleMusicUpload}
-            />
-            <button 
-              type="button" 
-              className={`cs-button ${isUploading ? 'loading' : ''}`} 
-              onClick={() => !isUploading && musicInputRef.current?.click()}
-              disabled={isUploading}
-            >
-              {isUploading ? 'Uploading...' : 'Upload Music From Device'}
-            </button>
-            <div className="cs-preset-list">
-              {musicPresets.map(preset => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  className={`cs-chip small ${c.background.music.url === preset.url ? 'active' : ''}`}
-                  onClick={() => {
-                    update('background.music.url', preset.url)
-                    update('background.music.isUploaded', false)
-                  }}
-                >
-                  ♫ {preset.label}
-                </button>
-              ))}
-            </div>
+            {adminMusic.length > 0 ? (
+              <div className="cs-music-picker-list">
+                {adminMusic.map((track) => {
+                  const url = track.url || track.audioUrl || track.src || ''
+                  const label = track.title || track.name || track.label || 'Track'
+                  const selected = c.background.music.url === url
+                  return (
+                    <button
+                      key={track._id || track.id || url}
+                      type="button"
+                      className={`cs-music-picker-item ${selected ? 'active' : ''}`}
+                      onClick={() => {
+                        update('background.music.url', url)
+                        update('background.music.isUploaded', false)
+                      }}
+                    >
+                      <span className="cs-music-picker-note">♫</span>
+                      <span className="cs-music-picker-label">{label}</span>
+                      {selected && <span className="cs-music-picker-check">✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="cs-preset-list">
+                {musicPresets.map(preset => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    className={`cs-chip small ${c.background.music.url === preset.url ? 'active' : ''}`}
+                    onClick={() => {
+                      update('background.music.url', preset.url)
+                      update('background.music.isUploaded', false)
+                    }}
+                  >
+                    ♫ {preset.label}
+                  </button>
+                ))}
+              </div>
+            )}
             {c.background.music.url ? (
-              <StudioAudioPlayer src={c.background.music.url} volume={c.background.music.volume} />
+              <>
+                <StudioAudioPlayer src={c.background.music.url} volume={c.background.music.volume} />
+                <button type="button" className="cs-inline-remove" style={{ marginTop: 4 }} onClick={() => update('background.music.url', '')}>Remove track</button>
+              </>
             ) : null}
             <label className="cs-field">
               <span>Volume</span>
@@ -1634,6 +1729,12 @@ function CardStudio() {
             <span>Tap to vote</span>
             <span>Results unlock after submit</span>
           </div>
+          <div className="cs-preview-watermark">
+            <span>Made with </span>
+            <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+            <span className="cs-preview-watermark-sep">·</span>
+            <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+          </div>
         </div>
       )
     }
@@ -1675,6 +1776,12 @@ function CardStudio() {
           <p className="cs-preview-trivia-score">
             {triviaData.questions.length || 1} question{(triviaData.questions.length || 1) !== 1 ? 's' : ''} · interactive result screen
           </p>
+          <div className="cs-preview-watermark">
+            <span>Made with </span>
+            <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+            <span className="cs-preview-watermark-sep">·</span>
+            <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+          </div>
         </div>
       )
     }
@@ -1691,6 +1798,12 @@ function CardStudio() {
             <span>{chainData.prompt || "Now it's your turn…"}</span>
           </div>
           <button type="button" className="cs-chain-reply-btn" disabled>Reply with a card</button>
+          <div className="cs-preview-watermark">
+            <span>Made with </span>
+            <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+            <span className="cs-preview-watermark-sep">·</span>
+            <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+          </div>
         </div>
       )
     }
@@ -1735,6 +1848,12 @@ function CardStudio() {
               Send Anonymously
             </div>
           </div>
+          <div className="cs-preview-watermark">
+            <span>Made with </span>
+            <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+            <span className="cs-preview-watermark-sep">·</span>
+            <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+          </div>
         </div>
       )
     }
@@ -1778,6 +1897,12 @@ function CardStudio() {
             ))}
           </div>
         )}
+        <div className="cs-preview-watermark">
+          <span>Made with </span>
+          <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+          <span className="cs-preview-watermark-sep">·</span>
+          <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+        </div>
       </div>
     )
   }
@@ -1819,6 +1944,11 @@ function CardStudio() {
               Publish Template
             </button>
           )}
+          {!isArtist && (
+            <span className="cs-cc-cost-badge">
+              {TIER_COST[studioTier] === 0 ? 'Free' : `${TIER_COST[studioTier]} CC`}
+            </span>
+          )}
           <button type="button" className="cs-nav-btn accent" onClick={enterPreview}>
             <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
           </button>
@@ -1826,9 +1956,9 @@ function CardStudio() {
             type="button"
             className="cs-nav-btn send"
             disabled={isSending}
-            onClick={handleSend}
+            onClick={handleSendClick}
           >
-            {isSending ? 'Sending...' : 'Send'}
+            {isSending ? 'Sending...' : 'Send Now'}
           </button>
         </div>
       </div>
@@ -2014,9 +2144,9 @@ function CardStudio() {
               type="button"
               className={`cs-mobile-primary${isSending ? ' disabled' : ''}`}
               disabled={isSending}
-              onClick={handleSend}
+              onClick={handleSendClick}
             >
-              {isSending ? 'Sending…' : 'Send'}
+              {isSending ? 'Sending…' : 'Send Now'}
             </button>
           )}
         </div>
@@ -2056,41 +2186,62 @@ function CardStudio() {
               setPublishError('')
             }}
           />
-          <div className="cs-publish-modal">
-            <h3>Publish Template</h3>
-            <p>Your card will be submitted for review and added to the marketplace once approved.</p>
-            <label className="cs-field">
-              <span>Category</span>
-              <Dropdown
-                value={publishForm.category}
-                onChange={(v) => setPublishForm((prev) => ({ ...prev, category: v }))}
-                options={[
-                  { value: 'proposal', label: 'Proposal' },
-                  { value: 'anniversary', label: 'Anniversary' },
-                  { value: 'birthday', label: 'Birthday' },
-                  { value: 'scratch', label: 'General / Other' },
-                ]}
-              />
-            </label>
-            <label className="cs-field">
-              <span>Template Name</span>
-              <input
-                value={publishForm.name}
-                onChange={(event) =>
-                  setPublishForm((prev) => ({ ...prev, name: event.target.value }))
-                }
-                placeholder="Give your template a name"
-              />
-            </label>
+          <div className="cs-publish-modal cs-publish-modal--polished">
+            <div className="cs-publish-modal-header">
+              <div className="cs-publish-modal-header-left">
+                <span className="cs-publish-modal-eyebrow">Artist Studio</span>
+                <h3>{publishForm.name || 'Untitled Template'}</h3>
+              </div>
+              <button
+                type="button"
+                className="cs-publish-close-btn"
+                aria-label="Close"
+                onClick={() => { setShowPublish(false); setPublishError('') }}
+              >
+                ×
+              </button>
+            </div>
+            <p className="cs-publish-modal-desc">
+              Your card will be submitted for review and added to the Cardora marketplace once approved by our team.
+            </p>
+            <div className="cs-publish-fields">
+              <label className="cs-field cs-publish-field">
+                <span className="cs-publish-field-label">Template Name</span>
+                <input
+                  value={publishForm.name}
+                  onChange={(event) =>
+                    setPublishForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  placeholder="Give your template a memorable name"
+                />
+              </label>
+              <label className="cs-field cs-publish-field">
+                <span className="cs-publish-field-label">Category</span>
+                <Dropdown
+                  value={publishForm.category}
+                  onChange={(v) => setPublishForm((prev) => ({ ...prev, category: v }))}
+                  options={[
+                    { value: 'proposal', label: 'Proposal' },
+                    { value: 'anniversary', label: 'Anniversary' },
+                    { value: 'birthday', label: 'Birthday' },
+                    { value: 'scratch', label: 'General / Other' },
+                  ]}
+                />
+              </label>
+            </div>
+            <div className="cs-publish-preview-note">
+              <span className="cs-publish-preview-note-icon">👁</span>
+              <span>A preview image will be generated automatically from your current card design.</span>
+            </div>
             {publishError ? <p className="form-error">{publishError}</p> : null}
             <div className="cs-publish-actions">
               <button
                 type="button"
-                className="cs-nav-btn publish"
+                className="cs-nav-btn publish cs-publish-submit-btn"
                 onClick={handlePublish}
                 disabled={isPublishing}
               >
-                {isPublishing ? 'Submitting...' : 'Submit for Review'}
+                {isPublishing ? 'Submitting…' : 'Submit for Review →'}
               </button>
               <button
                 type="button"
@@ -2107,35 +2258,117 @@ function CardStudio() {
         </div>
       )}
 
-      {/* Send Result Modal */}
-      {sendResult && (
-        <div className="cs-publish-overlay">
-          <div className="cs-publish-modal">
-            <h3>{sendResult.ok ? '🎉 Card Sent!' : '❌ Could not send'}</h3>
-            <p>{sendResult.message}</p>
-            {sendResult.ok && sendResult.slug && (
-              <div className="cs-send-link-wrap">
-                <p className="cs-send-link-label">Share this link:</p>
-                <code className="cs-send-link">{`${window.location.origin}/card/${sendResult.slug}`}</code>
+      {/* Send / Share Modal */}
+      {showSendModal && createPortal(
+        <div className="cs-send-modal-overlay">
+          <div
+            className="cs-send-modal-backdrop"
+            onClick={() => { setShowSendModal(false); setSendResult(null) }}
+          />
+          <div className="cs-send-modal">
+            <div className="cs-send-modal-header">
+              <div className="cs-send-modal-header-left">
+                <span className="cs-send-modal-eyebrow">{TYPE_LABEL[studioType] || 'Moment Card'} · {tierLabel}</span>
+                <h3>{sendResult?.ok ? 'Your card is ready to share!' : 'Share Your Card'}</h3>
+              </div>
+              <button
+                type="button"
+                className="cs-send-modal-close"
+                aria-label="Close"
+                onClick={() => { setShowSendModal(false); setSendResult(null) }}
+              >
+                ×
+              </button>
+            </div>
+
+            {sendResult?.ok && TIER_COST[studioTier] > 0 && (
+              <div className="cs-send-modal-cc-deducted">
+                <span className="cs-send-modal-cc-icon">✓</span>
+                <span><strong>{TIER_COST[studioTier]} CC</strong> deducted from your balance</span>
+              </div>
+            )}
+            {sendResult?.ok && TIER_COST[studioTier] === 0 && (
+              <div className="cs-send-modal-cc-deducted free">
+                <span className="cs-send-modal-cc-icon">✓</span>
+                <span>Sent free — Classic tier</span>
+              </div>
+            )}
+            {!sendResult?.ok && (
+              <p className="cs-send-modal-note">
+                {sendResult?.message || `This card costs ${TIER_COST[studioTier] === 0 ? 'nothing (free)' : `${TIER_COST[studioTier]} CC`} to send.`}
+              </p>
+            )}
+
+            <div className="cs-send-link-wrap">
+              <p className="cs-send-link-label">Card link</p>
+              <span className="detail-share-link-pill cs-send-link-pill">
+                {`${window.location.origin}/card/${sendResult?.slug || 'preview'}`.replace(/^https?:\/\//, '')}
+              </span>
+              <button
+                type="button"
+                className={`detail-share-copy-btn ${sendCopied ? 'copied' : ''}`}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(`${window.location.origin}/card/${sendResult?.slug || 'preview'}`)
+                    setSendCopied(true)
+                    setTimeout(() => setSendCopied(false), 1600)
+                  } catch { /* ignore */ }
+                }}
+              >
+                {sendCopied ? '✓ Copied' : 'Copy Link'}
+              </button>
+            </div>
+
+            <p className="detail-share-label">Share via</p>
+            <div className="detail-share-platforms cs-send-modal-platforms">
+              {SHARE_PLATFORMS.map((p) => {
+                const shareUrl = `${window.location.origin}/card/${sendResult?.slug || 'preview'}`
+                const shareTitle = `Check out this card I made on Cardora`
+                return (
+                  <a
+                    key={p.id}
+                    href={p.getUrl(shareUrl, shareTitle)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="detail-share-platform-btn"
+                    style={{ '--platform-color': p.color }}
+                  >
+                    {p.icon}
+                    <span>{p.label}</span>
+                  </a>
+                )
+              })}
+            </div>
+
+            <div className="cs-send-modal-email-row">
+              <p className="cs-send-link-label">Send via Email</p>
+              <div className="cs-send-modal-email-input-wrap">
+                <input
+                  type="email"
+                  className="cs-send-modal-email-input"
+                  placeholder="recipient@email.com"
+                  value={sendEmail}
+                  onChange={(e) => setSendEmail(e.target.value)}
+                />
                 <button
                   type="button"
                   className="cs-nav-btn accent"
                   onClick={() => {
-                    navigator.clipboard?.writeText(`${window.location.origin}/card/${sendResult.slug}`)
-                    setSendResult(prev => ({ ...prev, message: 'Link copied!' }))
+                    // TODO: wire to backend
+                    alert(`Email to ${sendEmail} — coming soon!`)
                   }}
                 >
-                  Copy Link
+                  Send
                 </button>
               </div>
-            )}
-            <div className="cs-publish-actions">
-              <button type="button" className="cs-nav-btn" onClick={() => setSendResult(null)}>
-                Close
-              </button>
             </div>
+
+            <p className="cs-send-modal-tier-note">
+              {typeMeta.emoji} {TYPE_LABEL[studioType] || 'Card'} · {tierLabel} tier
+            </p>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
