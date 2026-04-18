@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import CardTypeModal from '../components/CardTypeModal.jsx'
 import AuthModal from '../components/AuthModal.jsx'
+import WelcomeBackBanner from '../components/WelcomeBackBanner.jsx'
 import '../App.css'
 import {
   clearStoredToken,
@@ -181,6 +182,13 @@ function MainLayout() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [location.pathname, location.search, location.hash])
 
+  // Track last-active timestamp so WelcomeBackBanner can detect long absences
+  useEffect(() => {
+    const saveActive = () => localStorage.setItem('cardora:lastActive', String(Date.now()))
+    window.addEventListener('beforeunload', saveActive)
+    return () => window.removeEventListener('beforeunload', saveActive)
+  }, [])
+
   useEffect(() => {
     if (!hydratedUser?.id) return
     const storageKey = `${USER_META_PREFIX}${hydratedUser.id}`
@@ -298,6 +306,10 @@ function MainLayout() {
       }
       setStoredToken(token)
       await hydrateSession()
+      // Seed lastActive on first-ever login so beforeunload tracking can start
+      if (!localStorage.getItem('cardora:lastActive')) {
+        localStorage.setItem('cardora:lastActive', String(Date.now()))
+      }
       return { ok: true }
     } catch (error) {
       return {
@@ -659,6 +671,7 @@ function MainLayout() {
         onClose={() => { setShowCardTypeModal(false); setCardTypePreselect(null) }}
         preselectedType={cardTypePreselect}
       />
+      <WelcomeBackBanner currentUser={hydratedUser} />
     </div>
   )
 }
