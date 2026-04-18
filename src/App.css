@@ -2048,6 +2048,15 @@
   gap: 12px;
 }
 
+.pack-currency-note {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: rgba(118, 239, 255, 0.55);
+  text-align: center;
+  margin: 0 0 4px;
+  letter-spacing: 0.02em;
+}
+
 .pack {
   position: relative;
   padding: 16px;

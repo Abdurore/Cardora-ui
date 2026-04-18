@@ -118,10 +118,16 @@ export function mapTemplateToCard(template, index = 0) {
   }
 }
 
-export function mapCouponPackage(pack) {
+const CURRENCY_LOCALE = {
+  NGN: 'en-NG', USD: 'en-US', GBP: 'en-GB', EUR: 'de-DE',
+  GHS: 'en-GH', KES: 'sw-KE', ZAR: 'en-ZA',
+}
+
+export function mapCouponPackage(pack, targetCurrency) {
   const ccAmount = pack.numberOfCC || pack.quantity || 0
-  const currency = pack.priceCurrency || pack.currency || 'NGN'
-  const formatter = new Intl.NumberFormat('en-NG')
+  const currency = targetCurrency || pack.priceCurrency || pack.currency || 'NGN'
+  const locale = CURRENCY_LOCALE[currency] || 'en-US'
+  const formatter = new Intl.NumberFormat(locale)
   return {
     id: pack.packageId || pack._id,
     packageId: pack.packageId || pack._id,

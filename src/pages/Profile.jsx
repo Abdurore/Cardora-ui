@@ -39,6 +39,7 @@ function Profile() {
     onLogout,
     artistApplyAction,
     marketplaceTemplates,
+    onCurrencyChange,
   } = useOutletContext()
   const navigate = useNavigate()
   const avatarInputRef = useRef(null)
@@ -165,7 +166,7 @@ function Profile() {
     setUserCurrency(code)
     setIsSavingCurrency(true)
     try {
-      await updateCurrency({ currency: code })
+      await (onCurrencyChange ? onCurrencyChange(code) : updateCurrency({ currency: code }))
     } catch { /* ignore */ }
     setIsSavingCurrency(false)
   }

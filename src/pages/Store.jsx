@@ -18,6 +18,7 @@ function Store() {
     claimDailyCoupon,
     redeemCodeAction,
     refreshBalance,
+    userCurrency,
   } = useOutletContext()
 
   const [checkoutMessage, setCheckoutMessage] = useState('')
@@ -150,6 +151,9 @@ function Store() {
 
         {activeSection === 'buy' && (
           <div className="pack-grid">
+            {userCurrency && (
+              <p className="pack-currency-note">Prices shown in {userCurrency}. Change currency in your profile settings.</p>
+            )}
             {packs.map((pack, index) => (
               <PackCard
                 key={pack.id || `${pack.title}-${index}`}

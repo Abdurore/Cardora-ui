@@ -38,6 +38,7 @@ import {
   forgotPassword,
   resetPassword,
   deleteAccount,
+  updateCurrency,
 } from '../lib/api.js'
 import {
   extractCheckoutUrl,
@@ -72,6 +73,7 @@ function MainLayout() {
   const [showCardTypeModal, setShowCardTypeModal] = useState(false)
   const [cardTypePreselect, setCardTypePreselect] = useState(null)
   const [couponPackages, setCouponPackages] = useState([])
+  const [userCurrency, setUserCurrency] = useState('NGN')
   const [marketplaceTemplates, setMarketplaceTemplates] = useState([])
   const [authReady, setAuthReady] = useState(false)
   const navigate = useNavigate()
@@ -137,6 +139,7 @@ function MainLayout() {
       setInventory(meta.inventory || [])
       setAvatarUrl(normalized.avatarUrl || '')
       setAvatarColor(meta.avatarColor || normalized.avatarColor)
+      if (normalized.currency) setUserCurrency(normalized.currency)
       return normalized
     } catch (error) {
       console.error('Session hydration failed', error)
@@ -145,16 +148,17 @@ function MainLayout() {
     }
   }
 
-  const loadPublicData = async () => {
+  const loadPublicData = async (currency) => {
     try {
+      const currencyParam = currency || userCurrency || 'NGN'
       const [packagePayload, templatePayload] = await Promise.allSettled([
-        getCouponPackages('activeOnly=true&page=1&limit=20'),
+        getCouponPackages(`activeOnly=true&page=1&limit=20&currency=${currencyParam}`),
         getTemplates('page=1&limit=24'),
       ])
 
       if (packagePayload.status === 'fulfilled') {
         const packs = packagePayload.value?.packages || packagePayload.value?.data?.packages || []
-        setCouponPackages(packs.map(mapCouponPackage))
+        setCouponPackages(packs.map((p) => mapCouponPackage(p, currencyParam)))
       }
 
       if (templatePayload.status === 'fulfilled') {
@@ -170,7 +174,11 @@ function MainLayout() {
   useEffect(() => {
     let mounted = true
     ;(async () => {
-      await Promise.allSettled([loadPublicData(), hydrateSession()])
+      const [, userResult] = await Promise.allSettled([loadPublicData(), hydrateSession()])
+      const user = userResult.status === 'fulfilled' ? userResult.value : null
+      if (user?.currency && user.currency !== 'NGN' && mounted) {
+        await loadPublicData(user.currency)
+      }
       if (mounted) setAuthReady(true)
     })()
     return () => {
@@ -586,6 +594,14 @@ function MainLayout() {
     await hydrateSession()
   }
 
+  const handleCurrencyChange = async (code) => {
+    setUserCurrency(code)
+    try {
+      await updateCurrency({ currency: code })
+    } catch { /* ignore */ }
+    await loadPublicData(code)
+  }
+
   return (
     <div className={`page ${location.pathname === '/studio' ? 'page-studio' : ''}`}>
       <Outlet
@@ -630,6 +646,8 @@ function MainLayout() {
           onResetPassword: handleResetPassword,
           onDeleteAccount: handleDeleteAccount,
           refreshBalance,
+          userCurrency,
+          onCurrencyChange: handleCurrencyChange,
           openCardTypeModal: (preselect = null) => {
             if (!hydratedUser) {
               navigate('/login')
