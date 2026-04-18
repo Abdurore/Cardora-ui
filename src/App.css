@@ -15110,3 +15110,335 @@ a {
   margin: 0;
   padding: 0 24px;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PREVIEW WATERMARK — "Made with Cardora · Create yours →"
+   ════════════════════════════════════════════════════════════════ */
+.cs-preview-watermark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: auto;
+  padding: 8px 12px 4px;
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.28);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: none;
+}
+.cs-preview-watermark-cta {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.cs-preview-watermark-cta:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+.cs-preview-watermark-sep {
+  opacity: 0.3;
+  margin: 0 2px;
+}
+
+/* Ensure preview card uses flex column so watermark sticks to bottom */
+.cs-preview-card,
+.cs-preview-poll,
+.cs-preview-trivia,
+.cs-mobile-chain-preview,
+.cs-preview-anon .cs-preview-anon-template {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CARDVIEW WATERMARK
+   ════════════════════════════════════════════════════════════════ */
+.cv-watermark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 24px;
+  padding: 10px 0 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.25);
+}
+.cv-watermark-brand {
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+}
+.cv-watermark-sep {
+  opacity: 0.25;
+}
+.cv-watermark-cta {
+  color: rgba(255, 255, 255, 0.45);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.cv-watermark-cta:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CC COST BADGE — Studio topbar
+   ════════════════════════════════════════════════════════════════ */
+.cs-cc-cost-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: rgba(var(--type-accent-rgb, 240, 192, 96), 0.12);
+  color: var(--type-accent, #f0c060);
+  border: 1px solid color-mix(in srgb, var(--type-accent, #f0c060) 25%, transparent);
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SEND MODAL — CC deducted confirmation
+   ════════════════════════════════════════════════════════════════ */
+.cs-send-modal-cc-deducted {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  font-size: 0.8rem;
+  color: #6ee7b7;
+}
+.cs-send-modal-cc-deducted.free {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.15);
+  color: rgba(148, 163, 184, 0.7);
+}
+.cs-send-modal-cc-icon {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMIN MEDIA LIBRARY
+   ════════════════════════════════════════════════════════════════ */
+.admin-section-note {
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.7);
+  margin: -8px 0 20px;
+}
+
+.admin-media-upload-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.admin-media-upload-row .admin-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.admin-video-drop.compact {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  border: 1.5px dashed rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.04);
+  color: rgba(148, 163, 184, 0.55);
+  transition: border-color 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-video-drop.compact:hover {
+  border-color: rgba(148, 163, 184, 0.45);
+  color: rgba(148, 163, 184, 0.85);
+}
+.admin-video-drop.compact.has-video {
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.admin-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.admin-media-item {
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: border-color 0.2s;
+}
+.admin-media-item:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.admin-media-thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+}
+.admin-media-item-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  gap: 6px;
+}
+.admin-media-item-title {
+  font-size: 0.72rem;
+  color: rgba(148, 163, 184, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.admin-action-btn.small {
+  padding: 3px 8px;
+  font-size: 0.68rem;
+}
+
+.admin-music-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.admin-music-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.admin-music-note {
+  font-size: 1rem;
+  opacity: 0.5;
+}
+.admin-music-title {
+  flex: 1;
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.85);
+}
+.admin-music-audio {
+  height: 28px;
+  max-width: 180px;
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STUDIO ADMIN-CURATED MEDIA PICKERS
+   ════════════════════════════════════════════════════════════════ */
+.cs-media-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cs-media-picker-item {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.cs-media-picker-item:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.cs-media-picker-item.active {
+  border-color: var(--type-accent, #f0c060);
+}
+.cs-media-picker-thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+}
+.cs-media-picker-label {
+  display: block;
+  padding: 4px 6px;
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-media-picker-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--type-accent, #f0c060);
+  color: #000;
+  font-size: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.cs-music-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.cs-music-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.cs-music-picker-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.cs-music-picker-item.active {
+  border-color: var(--type-accent, #f0c060);
+  background: color-mix(in srgb, var(--type-accent, #f0c060) 8%, transparent);
+}
+.cs-music-picker-note {
+  font-size: 0.9rem;
+  opacity: 0.5;
+}
+.cs-music-picker-label {
+  flex: 1;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: left;
+}
+.cs-music-picker-check {
+  font-size: 0.75rem;
+  color: var(--type-accent, #f0c060);
+  font-weight: 700;
+}

@@ -28,9 +28,15 @@ import {
   updateAdminPackage,
   getAdminStatsReferrals,
   getAdminCoupons,
+  getMediaVideos,
+  uploadMediaVideo,
+  deleteMediaVideo,
+  getMediaMusic,
+  uploadMediaMusic,
+  deleteMediaMusic,
 } from '../lib/api.js'
 
-const TABS = ['Overview', 'Users', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Coupons', 'Logs']
+const TABS = ['Overview', 'Users', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
 
 function pickStatValue(...values) {
   for (const value of values) {
@@ -114,6 +120,8 @@ function AdminDashboard() {
   const [logs, setLogs] = useState([])
   const [coupons, setCoupons] = useState([])
   const [referralStats, setReferralStats] = useState(null)
+  const [mediaVideos, setMediaVideos] = useState([])
+  const [mediaMusic, setMediaMusic] = useState([])
   const [loading, setLoading] = useState(false)
   const [actionMsg, setActionMsg] = useState({ text: '', ok: false })
 
@@ -126,6 +134,13 @@ function AdminDashboard() {
   const [adVideoUploading, setAdVideoUploading] = useState(false)
   const [adVideoDragOver, setAdVideoDragOver] = useState(false)
   const adVideoInputRef = useRef(null)
+  // Media library forms
+  const [newVideo, setNewVideo] = useState({ title: '', url: '' })
+  const [newTrack, setNewTrack] = useState({ title: '', url: '' })
+  const [mediaVideoUploading, setMediaVideoUploading] = useState(false)
+  const [mediaMusicUploading, setMediaMusicUploading] = useState(false)
+  const mediaVideoInputRef = useRef(null)
+  const mediaMusicInputRef = useRef(null)
   // Ban form
   const [banForm, setBanForm] = useState({ userId: '', durationDays: 7, reason: '' })
   // Seasonal reminder
@@ -214,6 +229,12 @@ function AdminDashboard() {
           const [adsRes, analyticsRes] = await Promise.allSettled([getAdminAds(), getAdminAdsAnalytics()])
           if (adsRes.status === 'fulfilled') setAds(adsRes.value?.data?.ads || adsRes.value?.ads || [])
           if (analyticsRes.status === 'fulfilled') setAdsAnalytics(analyticsRes.value?.data || analyticsRes.value || null)
+          break
+        }
+        case 'Media': {
+          const [videosRes, musicRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic()])
+          if (videosRes.status === 'fulfilled') setMediaVideos(videosRes.value?.data?.videos || videosRes.value?.videos || [])
+          if (musicRes.status === 'fulfilled') setMediaMusic(musicRes.value?.data?.music || musicRes.value?.music || [])
           break
         }
         case 'Logs': {
@@ -345,6 +366,82 @@ function AdminDashboard() {
       showMsg(`${season} reminder sent!`)
     } catch (err) {
       showMsg(err.message || 'Failed', false)
+    }
+  }
+
+  const handleMediaVideoFile = async (file) => {
+    if (!file || !file.type.startsWith('video/')) { showMsg('Please select a video file.', false); return }
+    setMediaVideoUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'video')
+      setNewVideo(p => ({ ...p, url }))
+      showMsg('Video uploaded!')
+    } catch (err) {
+      showMsg(err.message || 'Upload failed.', false)
+    } finally {
+      setMediaVideoUploading(false)
+    }
+  }
+
+  const handleAddVideo = async () => {
+    if (!newVideo.title || !newVideo.url) { showMsg('Title and video required.', false); return }
+    try {
+      await uploadMediaVideo(newVideo)
+      showMsg('Video added to library!')
+      setNewVideo({ title: '', url: '' })
+      if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
+      loadTabData('Media')
+    } catch (err) {
+      showMsg(err.message || 'Failed.', false)
+    }
+  }
+
+  const handleDeleteVideo = async (id) => {
+    if (!window.confirm('Delete this video?')) return
+    try {
+      await deleteMediaVideo(id)
+      showMsg('Video deleted.')
+      loadTabData('Media')
+    } catch (err) {
+      showMsg(err.message || 'Delete failed.', false)
+    }
+  }
+
+  const handleMediaMusicFile = async (file) => {
+    if (!file || !file.type.startsWith('audio/')) { showMsg('Please select an audio file.', false); return }
+    setMediaMusicUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'auto')
+      setNewTrack(p => ({ ...p, url }))
+      showMsg('Audio uploaded!')
+    } catch (err) {
+      showMsg(err.message || 'Upload failed.', false)
+    } finally {
+      setMediaMusicUploading(false)
+    }
+  }
+
+  const handleAddTrack = async () => {
+    if (!newTrack.title || !newTrack.url) { showMsg('Title and audio required.', false); return }
+    try {
+      await uploadMediaMusic(newTrack)
+      showMsg('Track added to library!')
+      setNewTrack({ title: '', url: '' })
+      if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
+      loadTabData('Media')
+    } catch (err) {
+      showMsg(err.message || 'Failed.', false)
+    }
+  }
+
+  const handleDeleteTrack = async (id) => {
+    if (!window.confirm('Delete this track?')) return
+    try {
+      await deleteMediaMusic(id)
+      showMsg('Track deleted.')
+      loadTabData('Media')
+    } catch (err) {
+      showMsg(err.message || 'Delete failed.', false)
     }
   }
 
@@ -825,6 +922,121 @@ function AdminDashboard() {
                   {ads.length === 0 && <tr><td colSpan={5}>No ads.</td></tr>}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* MEDIA LIBRARY */}
+        {activeTab === 'Media' && !loading && (
+          <div className="admin-section">
+            <h3 className="admin-section-title">Media Library</h3>
+            <p className="admin-section-note">Upload videos and music tracks that users can pick in the Card Studio.</p>
+
+            {/* Videos */}
+            <div className="admin-sub-section">
+              <h4>Background Videos</h4>
+              <div className="admin-media-upload-row">
+                <input
+                  ref={mediaVideoInputRef}
+                  type="file"
+                  accept="video/*"
+                  style={{ display: 'none' }}
+                  onChange={e => handleMediaVideoFile(e.target.files?.[0])}
+                />
+                <label className="admin-field">
+                  <span>Title</span>
+                  <input placeholder="e.g. Ocean Waves" value={newVideo.title} onChange={e => setNewVideo(p => ({ ...p, title: e.target.value }))} />
+                </label>
+                <div
+                  className={`admin-video-drop compact${mediaVideoUploading ? ' uploading' : ''}${newVideo.url ? ' has-video' : ''}`}
+                  onClick={() => !mediaVideoUploading && mediaVideoInputRef.current?.click()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => e.key === 'Enter' && mediaVideoInputRef.current?.click()}
+                >
+                  {mediaVideoUploading ? (
+                    <span>Uploading…</span>
+                  ) : newVideo.url ? (
+                    <span>✓ Video ready</span>
+                  ) : (
+                    <span>Click to upload video</span>
+                  )}
+                </div>
+                <button className="primary" type="button" onClick={handleAddVideo} disabled={mediaVideoUploading}>
+                  Add Video
+                </button>
+              </div>
+              {mediaVideos.length > 0 ? (
+                <div className="admin-media-grid">
+                  {mediaVideos.map(v => (
+                    <div key={v._id || v.id} className="admin-media-item">
+                      <video src={v.url || v.videoUrl} muted loop playsInline className="admin-media-thumb" onMouseEnter={e => e.currentTarget.play()} onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }} />
+                      <div className="admin-media-item-info">
+                        <span className="admin-media-item-title">{v.title || 'Untitled'}</span>
+                        <button type="button" className="admin-action-btn reject small" onClick={() => handleDeleteVideo(v._id || v.id)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="admin-empty">
+                  <span className="admin-empty-icon">{"\u{1F3AC}"}</span>
+                  <p>No videos uploaded yet.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Music */}
+            <div className="admin-sub-section">
+              <h4>Music Tracks</h4>
+              <div className="admin-media-upload-row">
+                <input
+                  ref={mediaMusicInputRef}
+                  type="file"
+                  accept="audio/*"
+                  style={{ display: 'none' }}
+                  onChange={e => handleMediaMusicFile(e.target.files?.[0])}
+                />
+                <label className="admin-field">
+                  <span>Title</span>
+                  <input placeholder="e.g. Soft Piano" value={newTrack.title} onChange={e => setNewTrack(p => ({ ...p, title: e.target.value }))} />
+                </label>
+                <div
+                  className={`admin-video-drop compact${mediaMusicUploading ? ' uploading' : ''}${newTrack.url ? ' has-video' : ''}`}
+                  onClick={() => !mediaMusicUploading && mediaMusicInputRef.current?.click()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => e.key === 'Enter' && mediaMusicInputRef.current?.click()}
+                >
+                  {mediaMusicUploading ? (
+                    <span>Uploading…</span>
+                  ) : newTrack.url ? (
+                    <span>✓ Audio ready</span>
+                  ) : (
+                    <span>Click to upload audio</span>
+                  )}
+                </div>
+                <button className="primary" type="button" onClick={handleAddTrack} disabled={mediaMusicUploading}>
+                  Add Track
+                </button>
+              </div>
+              {mediaMusic.length > 0 ? (
+                <div className="admin-music-list">
+                  {mediaMusic.map(track => (
+                    <div key={track._id || track.id} className="admin-music-item">
+                      <span className="admin-music-note">♫</span>
+                      <span className="admin-music-title">{track.title || 'Untitled'}</span>
+                      <audio controls src={track.url || track.audioUrl} className="admin-music-audio" />
+                      <button type="button" className="admin-action-btn reject small" onClick={() => handleDeleteTrack(track._id || track.id)}>Delete</button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="admin-empty">
+                  <span className="admin-empty-icon">♫</span>
+                  <p>No music tracks uploaded yet.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
