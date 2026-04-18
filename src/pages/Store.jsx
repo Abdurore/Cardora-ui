@@ -292,35 +292,57 @@ function Store() {
                     </div>
                   </div>
 
-                  <div className="store-referral-history">
-                    <div className="store-referral-history-head">
-                      <h5>Milestone Rewards</h5>
-                      <span className="store-referral-unlocked">{referralRewards.length} unlocked</span>
-                    </div>
-                    {referralRewards.length ? (
-                      <div className="store-referral-history-list">
-                        {referralRewards.map((entry, index) => (
-                          <div key={`referral-reward-${index}`} className="store-referral-history-item">
-                            <div>
-                              <strong>+{entry.amount || entry.cc || 0} CC</strong>
-                              <p>{entry.description || 'Referral milestone reward received.'}</p>
-                            </div>
-                            <span>
-                              {entry.date || entry.createdAt
-                                ? new Date(entry.date || entry.createdAt).toLocaleDateString()
-                                : 'Recently'}
-                            </span>
+                  {/* Milestone progress bar */}
+                  {(() => {
+                    const MILESTONES = [
+                      { count: 1,  reward: 5,   label: '1' },
+                      { count: 5,  reward: 15,  label: '5' },
+                      { count: 10, reward: 30,  label: '10' },
+                      { count: 25, reward: 75,  label: '25' },
+                      { count: 50, reward: 150, label: '50' },
+                    ]
+                    const count = referralStats.referralsCount
+                    const nextMilestone = MILESTONES.find(m => m.count > count) || MILESTONES[MILESTONES.length - 1]
+                    const prevMilestone = [...MILESTONES].reverse().find(m => m.count <= count)
+                    const rangeStart = prevMilestone ? prevMilestone.count : 0
+                    const rangeEnd = nextMilestone.count
+                    const pct = count >= rangeEnd ? 100 : Math.min(((count - rangeStart) / (rangeEnd - rangeStart)) * 100, 100)
+
+                    return (
+                      <div className="store-referral-milestones">
+                        <div className="store-referral-milestones-head">
+                          <h5>Milestone Progress</h5>
+                          <span className="store-referral-unlocked">{referralRewards.length} unlocked</span>
+                        </div>
+                        <div className="store-referral-track-wrap">
+                          <div className="store-referral-track">
+                            <div className="store-referral-track-fill" style={{ width: `${pct}%` }} />
+                            {MILESTONES.map((m) => {
+                              const pos = (m.count / MILESTONES[MILESTONES.length - 1].count) * 100
+                              const unlocked = count >= m.count
+                              return (
+                                <div
+                                  key={m.count}
+                                  className={`store-referral-marker ${unlocked ? 'unlocked' : ''}`}
+                                  style={{ left: `${pos}%` }}
+                                  title={`${m.count} referrals → +${m.reward} CC`}
+                                >
+                                  <div className="store-referral-marker-dot" />
+                                  <span className="store-referral-marker-label">{m.label}</span>
+                                  <span className="store-referral-marker-reward">+{m.reward} CC</span>
+                                </div>
+                              )
+                            })}
                           </div>
-                        ))}
+                          <div className="store-referral-track-hint">
+                            {count >= MILESTONES[MILESTONES.length - 1].count
+                              ? 'All milestones unlocked!'
+                              : `${count} / ${nextMilestone.count} referrals — next reward: +${nextMilestone.reward} CC`}
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="store-referral-empty">
-                        <span className="store-referral-empty-icon">&#x1F3C6;</span>
-                        <p>No milestone rewards yet.</p>
-                        <span>Invite friends and milestone rewards appear here automatically.</span>
-                      </div>
-                    )}
-                  </div>
+                    )
+                  })()}
                 </div>
               </div>
             )}

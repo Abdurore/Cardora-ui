@@ -28,6 +28,7 @@ import {
   updateAdminPackage,
   getAdminStatsReferrals,
   getAdminCoupons,
+  sendAdminBroadcast,
   getMediaVideos,
   uploadMediaVideo,
   deleteMediaVideo,
@@ -130,7 +131,7 @@ function AdminDashboard() {
   // New redeem code form
   const [newCode, setNewCode] = useState({ numberOfCC: 10, maxUses: 200, isActive: true })
   // New ad form
-  const [newAd, setNewAd] = useState({ type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+  const [newAd, setNewAd] = useState({ name: '', type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
   const [adVideoUploading, setAdVideoUploading] = useState(false)
   const [adVideoDragOver, setAdVideoDragOver] = useState(false)
   const adVideoInputRef = useRef(null)
@@ -143,8 +144,8 @@ function AdminDashboard() {
   const mediaMusicInputRef = useRef(null)
   // Ban form
   const [banForm, setBanForm] = useState({ userId: '', durationDays: 7, reason: '' })
-  // Seasonal reminder
-  const [season, setSeason] = useState('valentines')
+  // Broadcast message
+  const [broadcastMessage, setBroadcastMessage] = useState('')
 
   // Gate: only Admin role
   if (!currentUser || currentUser.role !== 'Admin') {
@@ -352,7 +353,7 @@ function AdminDashboard() {
     try {
       await createAdminAd(newAd)
       showMsg('Ad created!')
-      setNewAd({ type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+      setNewAd({ name: '', type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
       if (adVideoInputRef.current) adVideoInputRef.current.value = ''
       loadTabData('Ads')
     } catch (err) {
@@ -360,10 +361,12 @@ function AdminDashboard() {
     }
   }
 
-  const handleSeasonalReminder = async () => {
+  const handleBroadcast = async () => {
+    if (!broadcastMessage.trim()) { showMsg('Message cannot be empty.', false); return }
     try {
-      await sendSeasonalReminder({ season })
-      showMsg(`${season} reminder sent!`)
+      await sendAdminBroadcast({ message: broadcastMessage.trim() })
+      showMsg('Broadcast sent to all users!')
+      setBroadcastMessage('')
     } catch (err) {
       showMsg(err.message || 'Failed', false)
     }
@@ -529,22 +532,25 @@ function AdminDashboard() {
               </div>
             )}
 
-            {/* Seasonal Reminder */}
+            {/* Broadcast Message */}
             <div className="admin-sub-section">
-              <h4>Send Seasonal Reminder</h4>
-              <div className="admin-inline-form">
-                <Dropdown
-                  value={season}
-                  onChange={setSeason}
-                  options={[
-                    { value: 'valentines', label: "Valentine's Day" },
-                    { value: 'christmas', label: 'Christmas' },
-                    { value: 'mothers_day', label: "Mother's Day" },
-                    { value: 'fathers_day', label: "Father's Day" },
-                    { value: 'independence_day', label: 'Independence Day' },
-                  ]}
+              <h4>Send Message to All Users</h4>
+              <p className="admin-section-note">This will notify every registered user with your message.</p>
+              <div className="admin-broadcast-form">
+                <textarea
+                  className="admin-broadcast-textarea"
+                  placeholder="Write your message to all users…"
+                  value={broadcastMessage}
+                  onChange={e => setBroadcastMessage(e.target.value)}
+                  rows={3}
+                  maxLength={500}
                 />
-                <button className="primary" type="button" onClick={handleSeasonalReminder}>Send</button>
+                <div className="admin-broadcast-footer">
+                  <span className="admin-broadcast-count">{broadcastMessage.length}/500</span>
+                  <button className="primary" type="button" onClick={handleBroadcast} disabled={!broadcastMessage.trim()}>
+                    Send to All
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -812,6 +818,10 @@ function AdminDashboard() {
             <div className="admin-sub-section">
               <h4>Create Ad</h4>
               <div className="admin-form-grid">
+                <label className="admin-field">
+                  <span>Ad Name</span>
+                  <input placeholder="e.g. Summer Promo" value={newAd.name} onChange={e => setNewAd(p => ({ ...p, name: e.target.value }))} />
+                </label>
                 <Dropdown
                   value={newAd.type}
                   onChange={(v) => setNewAd(p => ({ ...p, type: v }))}
@@ -903,11 +913,12 @@ function AdminDashboard() {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Type</th><th>Reward</th><th>Duration</th><th>Active</th><th>Actions</th></tr>
+                  <tr><th>Name</th><th>Type</th><th>Reward</th><th>Duration</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {ads.map(ad => (
                     <tr key={ad._id || ad.id}>
+                      <td>{ad.name || '—'}</td>
                       <td>{ad.type}</td>
                       <td>{ad.rewardCC} CC</td>
                       <td>{ad.duration}s</td>

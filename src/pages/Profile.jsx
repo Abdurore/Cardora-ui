@@ -576,24 +576,6 @@ function Profile() {
           </div>
         ) : null}
 
-        {/* Anonymous Inbox */}
-        {currentUser && (
-          <div className="profile-anon-inbox-section">
-            <h4 className="section-title">Anonymous Inbox</h4>
-            <div className="profile-anon-inbox-card">
-              <div className="profile-anon-inbox-icon">👁</div>
-              <div>
-                <p className="profile-anon-inbox-desc">
-                  Let anyone send you anonymous messages — wrapped in a beautifully designed card.
-                </p>
-                <Link to="/inbox" className="profile-anon-inbox-link primary">
-                  Open Inbox
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Gift Inventory — display only */}
         <div>
           <h4 className="section-title">Gift Inventory</h4>

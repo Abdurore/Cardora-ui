@@ -15442,3 +15442,181 @@ a {
   color: var(--type-accent, #f0c060);
   font-weight: 700;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMIN BROADCAST MESSAGE
+   ════════════════════════════════════════════════════════════════ */
+.admin-broadcast-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-broadcast-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  color: #e2eaf0;
+  font-size: 0.88rem;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.admin-broadcast-textarea:focus {
+  outline: none;
+  border-color: rgba(126, 247, 255, 0.35);
+}
+.admin-broadcast-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-broadcast-count {
+  font-size: 0.72rem;
+  color: rgba(148, 163, 184, 0.45);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   REFERRAL MILESTONE PROGRESS BAR
+   ════════════════════════════════════════════════════════════════ */
+.store-referral-milestones {
+  margin-top: 20px;
+}
+.store-referral-milestones-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.store-referral-milestones-head h5 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(200, 225, 235, 0.85);
+}
+.store-referral-track-wrap {
+  padding: 0 10px;
+}
+.store-referral-track {
+  position: relative;
+  height: 6px;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 999px;
+  margin-bottom: 32px;
+}
+.store-referral-track-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7ef7ff 0%, #a78bfa 100%);
+  transition: width 0.6s ease;
+}
+.store-referral-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.store-referral-marker-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.2);
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  transition: background 0.3s, border-color 0.3s;
+  z-index: 1;
+}
+.store-referral-marker.unlocked .store-referral-marker-dot {
+  background: #7ef7ff;
+  border-color: #7ef7ff;
+  box-shadow: 0 0 8px rgba(126, 247, 255, 0.5);
+}
+.store-referral-marker-label {
+  position: absolute;
+  top: 14px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: rgba(148, 163, 184, 0.55);
+  white-space: nowrap;
+}
+.store-referral-marker.unlocked .store-referral-marker-label {
+  color: #7ef7ff;
+}
+.store-referral-marker-reward {
+  position: absolute;
+  bottom: 14px;
+  font-size: 0.6rem;
+  color: rgba(148, 163, 184, 0.4);
+  white-space: nowrap;
+}
+.store-referral-marker.unlocked .store-referral-marker-reward {
+  color: rgba(126, 247, 255, 0.65);
+}
+.store-referral-track-hint {
+  font-size: 0.76rem;
+  color: rgba(148, 163, 184, 0.55);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AD COOLDOWN RING — RewardedAds
+   ════════════════════════════════════════════════════════════════ */
+.rad-cooldown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+}
+.rad-cooldown-ring {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rad-cooldown-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  transform: rotate(-90deg);
+}
+.rad-cooldown-track {
+  fill: none;
+  stroke: rgba(148, 163, 184, 0.12);
+  stroke-width: 3;
+}
+.rad-cooldown-fill {
+  fill: none;
+  stroke: #7ef7ff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.9s linear;
+}
+.rad-cooldown-num {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #e2eaf0;
+  z-index: 1;
+}
+.rad-cooldown-label {
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.65);
+}
+.rad-cooldown-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7ef7ff, #a78bfa);
+  transition: width 0.9s linear;
+}

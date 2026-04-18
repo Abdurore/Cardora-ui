@@ -164,6 +164,15 @@ function WorldChat() {
     socketRef.current?.emit('send_message', { content: input.trim() })
     setInput('')
     setError('')
+    // Client-side 15s cooldown so button is visually locked immediately
+    setCooldown(15)
+    clearInterval(cooldownRef.current)
+    cooldownRef.current = setInterval(() => {
+      setCooldown(prev => {
+        if (prev <= 1) { clearInterval(cooldownRef.current); return 0 }
+        return prev - 1
+      })
+    }, 1000)
   }
 
   const handleKeyDown = (e) => {

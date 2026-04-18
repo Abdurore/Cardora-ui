@@ -172,7 +172,7 @@ function Home() {
               Create a Card
             </button>
             <Link className="ghost" to="/explore">
-              Browse Cards
+              Explore Templates
             </Link>
           </div>
         </div>
