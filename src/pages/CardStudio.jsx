@@ -1885,9 +1885,9 @@ function CardStudio() {
             type="button"
             className="cs-nav-btn send"
             disabled={isSending}
-            onClick={handleSend}
+            onClick={handleSendClick}
           >
-            {isSending ? 'Sending...' : 'Send'}
+            {isSending ? 'Sending...' : 'Send Now'}
           </button>
         </div>
       </div>
@@ -2073,9 +2073,9 @@ function CardStudio() {
               type="button"
               className={`cs-mobile-primary${isSending ? ' disabled' : ''}`}
               disabled={isSending}
-              onClick={handleSend}
+              onClick={handleSendClick}
             >
-              {isSending ? 'Sending…' : 'Send'}
+              {isSending ? 'Sending…' : 'Send Now'}
             </button>
           )}
         </div>
@@ -2115,41 +2115,62 @@ function CardStudio() {
               setPublishError('')
             }}
           />
-          <div className="cs-publish-modal">
-            <h3>Publish Template</h3>
-            <p>Your card will be submitted for review and added to the marketplace once approved.</p>
-            <label className="cs-field">
-              <span>Category</span>
-              <Dropdown
-                value={publishForm.category}
-                onChange={(v) => setPublishForm((prev) => ({ ...prev, category: v }))}
-                options={[
-                  { value: 'proposal', label: 'Proposal' },
-                  { value: 'anniversary', label: 'Anniversary' },
-                  { value: 'birthday', label: 'Birthday' },
-                  { value: 'scratch', label: 'General / Other' },
-                ]}
-              />
-            </label>
-            <label className="cs-field">
-              <span>Template Name</span>
-              <input
-                value={publishForm.name}
-                onChange={(event) =>
-                  setPublishForm((prev) => ({ ...prev, name: event.target.value }))
-                }
-                placeholder="Give your template a name"
-              />
-            </label>
+          <div className="cs-publish-modal cs-publish-modal--polished">
+            <div className="cs-publish-modal-header">
+              <div className="cs-publish-modal-header-left">
+                <span className="cs-publish-modal-eyebrow">Artist Studio</span>
+                <h3>{publishForm.name || 'Untitled Template'}</h3>
+              </div>
+              <button
+                type="button"
+                className="cs-publish-close-btn"
+                aria-label="Close"
+                onClick={() => { setShowPublish(false); setPublishError('') }}
+              >
+                ×
+              </button>
+            </div>
+            <p className="cs-publish-modal-desc">
+              Your card will be submitted for review and added to the Cardora marketplace once approved by our team.
+            </p>
+            <div className="cs-publish-fields">
+              <label className="cs-field cs-publish-field">
+                <span className="cs-publish-field-label">Template Name</span>
+                <input
+                  value={publishForm.name}
+                  onChange={(event) =>
+                    setPublishForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  placeholder="Give your template a memorable name"
+                />
+              </label>
+              <label className="cs-field cs-publish-field">
+                <span className="cs-publish-field-label">Category</span>
+                <Dropdown
+                  value={publishForm.category}
+                  onChange={(v) => setPublishForm((prev) => ({ ...prev, category: v }))}
+                  options={[
+                    { value: 'proposal', label: 'Proposal' },
+                    { value: 'anniversary', label: 'Anniversary' },
+                    { value: 'birthday', label: 'Birthday' },
+                    { value: 'scratch', label: 'General / Other' },
+                  ]}
+                />
+              </label>
+            </div>
+            <div className="cs-publish-preview-note">
+              <span className="cs-publish-preview-note-icon">👁</span>
+              <span>A preview image will be generated automatically from your current card design.</span>
+            </div>
             {publishError ? <p className="form-error">{publishError}</p> : null}
             <div className="cs-publish-actions">
               <button
                 type="button"
-                className="cs-nav-btn publish"
+                className="cs-nav-btn publish cs-publish-submit-btn"
                 onClick={handlePublish}
                 disabled={isPublishing}
               >
-                {isPublishing ? 'Submitting...' : 'Submit for Review'}
+                {isPublishing ? 'Submitting…' : 'Submit for Review →'}
               </button>
               <button
                 type="button"
@@ -2166,35 +2187,105 @@ function CardStudio() {
         </div>
       )}
 
-      {/* Send Result Modal */}
-      {sendResult && (
-        <div className="cs-publish-overlay">
-          <div className="cs-publish-modal">
-            <h3>{sendResult.ok ? '🎉 Card Sent!' : '❌ Could not send'}</h3>
-            <p>{sendResult.message}</p>
-            {sendResult.ok && sendResult.slug && (
-              <div className="cs-send-link-wrap">
-                <p className="cs-send-link-label">Share this link:</p>
-                <code className="cs-send-link">{`${window.location.origin}/card/${sendResult.slug}`}</code>
+      {/* Send / Share Modal */}
+      {showSendModal && createPortal(
+        <div className="cs-send-modal-overlay">
+          <div
+            className="cs-send-modal-backdrop"
+            onClick={() => { setShowSendModal(false); setSendResult(null) }}
+          />
+          <div className="cs-send-modal">
+            <div className="cs-send-modal-header">
+              <div className="cs-send-modal-header-left">
+                <span className="cs-send-modal-eyebrow">{TYPE_LABEL[studioType] || 'Moment Card'} · {tierLabel}</span>
+                <h3>{sendResult?.ok ? 'Your card is ready to share!' : 'Share Your Card'}</h3>
+              </div>
+              <button
+                type="button"
+                className="cs-send-modal-close"
+                aria-label="Close"
+                onClick={() => { setShowSendModal(false); setSendResult(null) }}
+              >
+                ×
+              </button>
+            </div>
+
+            {!sendResult?.ok && (
+              <p className="cs-send-modal-note">
+                {sendResult?.message || 'Your card will be created when you share or send it.'}
+              </p>
+            )}
+
+            <div className="cs-send-link-wrap">
+              <p className="cs-send-link-label">Card link</p>
+              <span className="detail-share-link-pill cs-send-link-pill">
+                {`${window.location.origin}/card/${sendResult?.slug || 'preview'}`.replace(/^https?:\/\//, '')}
+              </span>
+              <button
+                type="button"
+                className={`detail-share-copy-btn ${sendCopied ? 'copied' : ''}`}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(`${window.location.origin}/card/${sendResult?.slug || 'preview'}`)
+                    setSendCopied(true)
+                    setTimeout(() => setSendCopied(false), 1600)
+                  } catch { /* ignore */ }
+                }}
+              >
+                {sendCopied ? '✓ Copied' : 'Copy Link'}
+              </button>
+            </div>
+
+            <p className="detail-share-label">Share via</p>
+            <div className="detail-share-platforms cs-send-modal-platforms">
+              {SHARE_PLATFORMS.map((p) => {
+                const shareUrl = `${window.location.origin}/card/${sendResult?.slug || 'preview'}`
+                const shareTitle = `Check out this card I made on Cardora`
+                return (
+                  <a
+                    key={p.id}
+                    href={p.getUrl(shareUrl, shareTitle)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="detail-share-platform-btn"
+                    style={{ '--platform-color': p.color }}
+                  >
+                    {p.icon}
+                    <span>{p.label}</span>
+                  </a>
+                )
+              })}
+            </div>
+
+            <div className="cs-send-modal-email-row">
+              <p className="cs-send-link-label">Send via Email</p>
+              <div className="cs-send-modal-email-input-wrap">
+                <input
+                  type="email"
+                  className="cs-send-modal-email-input"
+                  placeholder="recipient@email.com"
+                  value={sendEmail}
+                  onChange={(e) => setSendEmail(e.target.value)}
+                />
                 <button
                   type="button"
                   className="cs-nav-btn accent"
                   onClick={() => {
-                    navigator.clipboard?.writeText(`${window.location.origin}/card/${sendResult.slug}`)
-                    setSendResult(prev => ({ ...prev, message: 'Link copied!' }))
+                    // TODO: wire to backend
+                    alert(`Email to ${sendEmail} — coming soon!`)
                   }}
                 >
-                  Copy Link
+                  Send
                 </button>
               </div>
-            )}
-            <div className="cs-publish-actions">
-              <button type="button" className="cs-nav-btn" onClick={() => setSendResult(null)}>
-                Close
-              </button>
             </div>
+
+            <p className="cs-send-modal-tier-note">
+              {typeMeta.emoji} {TYPE_LABEL[studioType] || 'Card'} · {tierLabel} tier
+            </p>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
