@@ -10,6 +10,7 @@ const FORMAT_CHIPS = [
   { icon: '📊', label: 'Poll',     cls: 'chip-poll' },
   { icon: '💡', label: 'Trivia',   cls: 'chip-trivia' },
   { icon: '👁', label: 'Anonymous', cls: 'chip-anon' },
+  { icon: '🔗', label: 'Chain',    cls: 'chip-chain' },
 ]
 
 const CARD_FORMATS = [
@@ -49,13 +50,23 @@ const CARD_FORMATS = [
     cta: 'Set up yours',
     typePreselect: 'anonymous',
   },
+  {
+    icon: '🔗',
+    title: 'Chain Cards',
+    tagline: 'Send a card. Invite a card back.',
+    description: 'Start a back-and-forth — recipient opens your card and is invited to reply with their own.',
+    accent: 'teal',
+    cta: 'Try it',
+    to: '/studio?type=chain&tier=classic',
+    typePreselect: 'chain',
+  },
 ]
 
 const HOW_IT_WORKS = [
   {
     icon: '01',
     title: 'Choose a Format',
-    description: 'Pick from Greeting, Poll, Trivia, or Anonymous Inbox — each format built for a different kind of moment.',
+    description: 'Pick from Greeting, Poll, Trivia, Chain, or Anonymous Inbox — each format built for a different kind of moment.',
   },
   {
     icon: '02',
@@ -142,7 +153,7 @@ function Home() {
           <p className="eyebrow hero-eyebrow">Cardora Platform</p>
           <h1>One platform.<br />Every kind of card.</h1>
           <p className="subtext">
-            Greeting reveals, live polls, scored trivia, and anonymous inboxes —
+            Greeting reveals, live polls, scored trivia, chain replies, and anonymous inboxes —
             all designed to make the moment feel real.
           </p>
           <div className="hero-format-chips" aria-hidden="true">
@@ -191,7 +202,7 @@ function Home() {
       <section className="landing-section">
         <div className="section-heading">
           <p className="eyebrow">Card Formats</p>
-          <h3 className="landing-title">Four ways to make someone feel something.</h3>
+          <h3 className="landing-title">Five ways to make someone feel something.</h3>
         </div>
         <div className="format-grid">
           {CARD_FORMATS.map((format) => (
@@ -200,9 +211,13 @@ function Home() {
               <h4>{format.title}</h4>
               <p className="format-card-tagline">{format.tagline}</p>
               <p className="format-card-desc">{format.description}</p>
-              <button className="format-card-cta" type="button" onClick={() => openCardTypeModal?.(format.typePreselect)}>
-                {format.cta} →
-              </button>
+              {format.to ? (
+                <Link className="format-card-cta" to={format.to}>{format.cta} →</Link>
+              ) : (
+                <button className="format-card-cta" type="button" onClick={() => openCardTypeModal?.(format.typePreselect)}>
+                  {format.cta} →
+                </button>
+              )}
             </article>
           ))}
         </div>
