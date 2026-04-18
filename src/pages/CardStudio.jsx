@@ -1766,7 +1766,7 @@ function CardStudio() {
       )
     }
 
-    if (studioType === 'anonymous') {
+    if (studioType === 'anon' || studioType === 'anonymous') {
       return (
         <div className={`cs-preview-anon ${compact ? 'compact' : ''}`}>
           <div className="cs-preview-anon-template" style={{
@@ -1871,7 +1871,7 @@ function CardStudio() {
       <div className="cs-topbar">
         <div className="cs-top-left">
           <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
-          <span className="cs-type-badge">{TYPE_LABEL[studioType] || 'Moment Card'}</span>
+          <span className="cs-type-badge">{typeMeta.label || 'Moment Card'}</span>
           <div className="cs-status">{savedState}</div>
         </div>
         <div className="cs-progress">

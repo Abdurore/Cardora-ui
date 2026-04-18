@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import logo from '../assets/icons/logo.png'
 
 function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
@@ -10,11 +11,30 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
         </div>
       </div>
       <div className="header-actions">
-        <div className="cc-chip">{balance} CC</div>
-        <button className="user-chip" type="button" onClick={onAuthOpen}>
-          <span className="user-dot" style={{ background: user?.avatarColor }} />
-          <span>{user ? user.username || user.name : 'Sign in'}</span>
-        </button>
+        {user ? (
+          <Link to="/profile" className="header-user-capsule" aria-label="Profile">
+            <span className="header-capsule-avatar">
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" className="header-avatar-img" />
+              ) : (
+                <span className="header-avatar-dot" style={{ background: user.avatarColor || 'linear-gradient(135deg, #7ef7ff, #62ffa2)' }}>
+                  {(user.username || user.name || '?').charAt(0).toUpperCase()}
+                </span>
+              )}
+            </span>
+            <span className="header-capsule-info">
+              <span className="header-capsule-name">{user.username || user.name || 'User'}</span>
+              <span className="header-capsule-balance">
+                <span className="header-cc-icon">◈</span> {balance} CC
+              </span>
+            </span>
+          </Link>
+        ) : (
+          <button className="user-chip" type="button" onClick={onAuthOpen}>
+            <span className="user-dot" />
+            <span>Sign in</span>
+          </button>
+        )}
       </div>
     </header>
   )

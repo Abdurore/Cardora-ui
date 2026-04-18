@@ -159,17 +159,22 @@ function WorldChat() {
     return () => clearTimeout(timer)
   }, [joinLeave])
 
+  const SEND_COOLDOWN = 15 // seconds between messages
+
   const sendMessage = () => {
     if (!input.trim() || cooldown > 0 || !isOnline || !connected) return
     socketRef.current?.emit('send_message', { content: input.trim() })
     setInput('')
     setError('')
-    // Client-side 15s cooldown so button is visually locked immediately
-    setCooldown(15)
+    // Client-side cooldown so button is visually locked immediately
+    setCooldown(SEND_COOLDOWN)
     clearInterval(cooldownRef.current)
     cooldownRef.current = setInterval(() => {
       setCooldown(prev => {
-        if (prev <= 1) { clearInterval(cooldownRef.current); return 0 }
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current)
+          return 0
+        }
         return prev - 1
       })
     }, 1000)
