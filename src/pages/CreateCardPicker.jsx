@@ -41,7 +41,7 @@ const CARD_TYPES = [
     label: 'Chain',
     icon: '🔗',
     desc: 'Send a card that invites the recipient to reply with their own card back.',
-    accent: '#34d399',
+    accent: '#f97316',
     tiers: [
       { id: 'classic', label: 'Classic', desc: 'Simple card with chain prompt', cost: '0 CC' },
       { id: 'premium', label: 'Premium', desc: 'Styled card with animations', cost: '5 CC' },

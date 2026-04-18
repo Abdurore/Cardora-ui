@@ -71,7 +71,7 @@ const TYPE_ACCENT = {
   moment: '#f0c060',
   poll:   '#60a5fa',
   trivia: '#a78bfa',
-  chain:  '#34d399',
+  chain:  '#f97316',
   anon:   '#7ef7ff',
 }
 
@@ -396,6 +396,7 @@ function CardStudio() {
   const bgVideoInputRef = useRef(null)
   const musicInputRef = useRef(null)
   const previewSnapshotRef = useRef(null)
+  const pendingUploadsRef = useRef(new Map()) // blobUrl → { file, type }
   const [isUploading, setIsUploading] = useState(false)
 
   // Poll / Trivia / Chain / Anonymous template state
@@ -425,6 +426,27 @@ function CardStudio() {
     else if (studioType === 'anon' || studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Revoke blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      pendingUploadsRef.current.forEach((_, blobUrl) => URL.revokeObjectURL(blobUrl))
+      pendingUploadsRef.current.clear()
+    }
+  }, [])
+
+  const flushPendingUploads = async (cardObj) => {
+    if (pendingUploadsRef.current.size === 0) return cardObj
+    let json = JSON.stringify(cardObj)
+    for (const [blobUrl, { file, type }] of pendingUploadsRef.current.entries()) {
+      if (!json.includes(blobUrl)) { URL.revokeObjectURL(blobUrl); pendingUploadsRef.current.delete(blobUrl); continue }
+      const cloudUrl = await uploadToCloudinary(file, type)
+      json = json.replaceAll(blobUrl, cloudUrl)
+      URL.revokeObjectURL(blobUrl)
+      pendingUploadsRef.current.delete(blobUrl)
+    }
+    return JSON.parse(json)
+  }
+
   const isArtist = currentUser?.role === 'Artist'
 
   const c = cardObject
@@ -439,6 +461,9 @@ function CardStudio() {
     setIsPublishing(true)
 
     try {
+      const flushedForPublish = await flushPendingUploads(cardObject)
+      setCardObject(flushedForPublish)
+
       let previewDataUrl
       if (previewSnapshotRef.current) {
         await new Promise((resolve) => requestAnimationFrame(() => resolve()))
@@ -450,11 +475,11 @@ function CardStudio() {
         })
         previewDataUrl = canvas.toDataURL('image/jpeg', 0.88)
       } else {
-        previewDataUrl = generateTemplatePreviewDataUrl(cardObject)
+        previewDataUrl = generateTemplatePreviewDataUrl(flushedForPublish)
       }
       const previewBlob = dataUrlToBlob(previewDataUrl)
       const uploadedPreviewImage = await uploadToCloudinary(previewBlob, 'image')
-      const previewImage = uploadedPreviewImage || c.media.images?.[0]?.url || c.background.imageUrl || ''
+      const previewImage = uploadedPreviewImage || flushedForPublish.media.images?.[0]?.url || flushedForPublish.background.imageUrl || ''
 
       if (!previewImage) {
         throw new Error('Could not generate a preview image for this template.')
@@ -465,7 +490,7 @@ function CardStudio() {
         category: publishForm.category,
         previewImage,
         layoutConfig: structuredClone({
-          ...cardObject,
+          ...flushedForPublish,
           previewImage,
           previewUrl: previewImage,
         }),
@@ -526,8 +551,18 @@ function CardStudio() {
     const typeMap = { moment: 'standard', poll: 'poll', trivia: 'trivia', chain: 'chain', anon: 'anonymous', anonymous: 'anonymous' }
     const derivedType = typeMap[studioType] || 'standard'
 
+    let flushedCardObject
+    try {
+      flushedCardObject = await flushPendingUploads(cardObject)
+      setCardObject(flushedCardObject)
+    } catch (err) {
+      setSendResult({ ok: false, message: 'Media upload failed: ' + err.message })
+      setIsSending(false)
+      return
+    }
+
     const extras = {
-      title: c.content?.heading || 'Untitled Card',
+      title: flushedCardObject.content?.heading || 'Untitled Card',
       templateId: cardData?.id || 'custom',
       type: derivedType,
       tier: studioTier,
@@ -537,7 +572,7 @@ function CardStudio() {
       anonTemplate: (studioType === 'anon' || studioType === 'anonymous') ? { enabled: true, tier: studioTier } : undefined,
     }
 
-    const result = await createCardOnBackend?.(cardObject, extras)
+    const result = await createCardOnBackend?.(flushedCardObject, extras)
     setIsSending(false)
     if (result?.ok) {
       const slug = result.data?.card?.slug || result.data?.slug || result.data?.data?.slug || ''
@@ -584,78 +619,46 @@ function CardStudio() {
   }
 
 
-  const handleImageUpload = async (e) => {
+  const handleImageUpload = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setIsUploading(true)
-    try {
-      const url = await uploadToCloudinary(file, 'image')
-      const newImages = [
-        ...c.media.images,
-        {
-          url,
-          caption: '',
-          fit: 'cover',
-          positionX: 50,
-          positionY: 50,
-        },
-      ]
-      update('media.images', newImages)
-    } catch (err) {
-      alert('Upload failed: ' + err.message)
-    } finally {
-      setIsUploading(false)
-      e.target.value = ''
-    }
+    const blobUrl = URL.createObjectURL(file)
+    pendingUploadsRef.current.set(blobUrl, { file, type: 'image' })
+    update('media.images', [
+      ...c.media.images,
+      { url: blobUrl, caption: '', fit: 'cover', positionX: 50, positionY: 50 },
+    ])
+    e.target.value = ''
   }
 
-  const handleBackgroundImageUpload = async (event) => {
+  const handleBackgroundImageUpload = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-    setIsUploading(true)
-    try {
-      const url = await uploadToCloudinary(file, 'image')
-      update('background.type', 'image')
-      update('background.imageUrl', url)
-    } catch (err) {
-      alert('Upload failed: ' + err.message)
-    } finally {
-      setIsUploading(false)
-      event.target.value = ''
-    }
+    const blobUrl = URL.createObjectURL(file)
+    pendingUploadsRef.current.set(blobUrl, { file, type: 'image' })
+    update('background.type', 'image')
+    update('background.imageUrl', blobUrl)
+    event.target.value = ''
   }
 
-  const handleBackgroundVideoUpload = async (event) => {
+  const handleBackgroundVideoUpload = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-    setIsUploading(true)
-    try {
-      const url = await uploadToCloudinary(file, 'video')
-      update('background.type', 'video')
-      update('background.videoUrl', url)
-    } catch (err) {
-      alert('Upload failed: ' + err.message)
-    } finally {
-      setIsUploading(false)
-      event.target.value = ''
-    }
+    const blobUrl = URL.createObjectURL(file)
+    pendingUploadsRef.current.set(blobUrl, { file, type: 'video' })
+    update('background.type', 'video')
+    update('background.videoUrl', blobUrl)
+    event.target.value = ''
   }
 
-  const handleMusicUpload = async (event) => {
+  const handleMusicUpload = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-    setIsUploading(true)
-    try {
-      // Cloudinary handles audio as 'video' or 'raw'. 'video' is better for streaming optimization.
-      const url = await uploadToCloudinary(file, 'video')
-      update('background.music.url', url)
-      update('background.music.isUploaded', true)
-    } catch (err) {
-      alert('Upload failed: ' + err.message)
-    } finally {
-      setIsUploading(false)
-      event.target.value = ''
-    }
+    const blobUrl = URL.createObjectURL(file)
+    pendingUploadsRef.current.set(blobUrl, { file, type: 'video' })
+    update('background.music.url', blobUrl)
+    update('background.music.isUploaded', true)
+    event.target.value = ''
   }
 
   const removeImage = (idx) => {
