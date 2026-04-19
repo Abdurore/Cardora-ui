@@ -386,14 +386,29 @@ function AdminDashboard() {
     }
   }
 
+  const refreshMediaSilent = async () => {
+    try {
+      const [videosRes, musicRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic()])
+      if (videosRes.status === 'fulfilled') {
+        const list = videosRes.value?.data?.videos || videosRes.value?.videos || null
+        if (list) setMediaVideos(list)
+      }
+      if (musicRes.status === 'fulfilled') {
+        const list = musicRes.value?.data?.music || musicRes.value?.music || null
+        if (list) setMediaMusic(list)
+      }
+    } catch { /* ignore */ }
+  }
+
   const handleAddVideo = async () => {
     if (!newVideo.title || !newVideo.url) { showMsg('Title and video required.', false); return }
     try {
-      await uploadMediaVideo(newVideo)
+      await uploadMediaVideo({ title: newVideo.title, url: newVideo.url, videoUrl: newVideo.url })
       showMsg('Video added to library!')
+      setMediaVideos(prev => [...prev, { title: newVideo.title, url: newVideo.url, _id: `tmp-${Date.now()}` }])
       setNewVideo({ title: '', url: '' })
       if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
-      loadTabData('Media')
+      refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Failed.', false)
     }
@@ -403,8 +418,9 @@ function AdminDashboard() {
     if (!window.confirm('Delete this video?')) return
     try {
       await deleteMediaVideo(id)
+      setMediaVideos(prev => prev.filter(v => (v._id || v.id) !== id))
       showMsg('Video deleted.')
-      loadTabData('Media')
+      refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Delete failed.', false)
     }
@@ -427,11 +443,12 @@ function AdminDashboard() {
   const handleAddTrack = async () => {
     if (!newTrack.title || !newTrack.url) { showMsg('Title and audio required.', false); return }
     try {
-      await uploadMediaMusic(newTrack)
+      await uploadMediaMusic({ title: newTrack.title, url: newTrack.url, audioUrl: newTrack.url })
       showMsg('Track added to library!')
+      setMediaMusic(prev => [...prev, { title: newTrack.title, url: newTrack.url, _id: `tmp-${Date.now()}` }])
       setNewTrack({ title: '', url: '' })
       if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
-      loadTabData('Media')
+      refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Failed.', false)
     }
@@ -441,8 +458,9 @@ function AdminDashboard() {
     if (!window.confirm('Delete this track?')) return
     try {
       await deleteMediaMusic(id)
+      setMediaMusic(prev => prev.filter(t => (t._id || t.id) !== id))
       showMsg('Track deleted.')
-      loadTabData('Media')
+      refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Delete failed.', false)
     }
