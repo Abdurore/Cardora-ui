@@ -13927,10 +13927,6 @@ a {
   margin: 0;
 }
 
-.cs-preview-poll-eyebrow::before {
-  content: '\1F4CA ';
-  font-size: 0.85rem;
-}
 
 .cs-preview-poll h3 {
   margin: 0;
@@ -14012,10 +14008,6 @@ a {
   margin: 0;
 }
 
-.cs-preview-trivia-eyebrow::before {
-  content: ‘\1F4A1 ‘;
-  font-size: 0.85rem;
-}
 
 .cs-preview-trivia h3 {
   margin: 0;
@@ -14119,10 +14111,6 @@ a {
   margin: 0;
 }
 
-.cs-preview-anon-eyebrow::before {
-  content: '\1F441 ';
-  font-size: 0.85rem;
-}
 
 .cs-preview-anon-template h3 {
   margin: 0;

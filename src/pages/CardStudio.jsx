@@ -77,7 +77,14 @@ const TYPE_ACCENT = {
 
 const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
 
-const TIER_COST = { classic: 0, premium: 5, elite: 10 }
+const TIER_COST_BY_TYPE = {
+  moment:    { classic: 0, premium: 10, elite: 25 },
+  poll:      { classic: 0, premium: 25, elite: 25 },
+  trivia:    { classic: 0, premium: 25, elite: 25 },
+  chain:     { classic: 0, premium: 25, elite: 25 },
+  anon:      { classic: 0, premium: 45, elite: 45 },
+  anonymous: { classic: 0, premium: 45, elite: 45 },
+}
 
 const TYPE_LABEL = {
   moment: 'Moment Card',
@@ -348,7 +355,7 @@ function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const { currentUser, publishTemplate, createCardOnBackend } = useOutletContext() || {}
+  const { currentUser, publishTemplate, createCardOnBackend, refreshBalance, balance } = useOutletContext() || {}
   // Read card type and tier from location state (set by CreateCardPicker)
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
@@ -362,6 +369,7 @@ function CardStudio() {
   const studioTier = searchParams.get('tier') || 'classic'
   const typeMeta = STUDIO_TYPE_META[studioType] || STUDIO_TYPE_META.moment
   const tierLabel = TIER_LABELS[studioTier] || 'Classic'
+  const tierCost = (TIER_COST_BY_TYPE[studioType] || TIER_COST_BY_TYPE.moment)[studioTier] ?? 0
 
   // Filter tools by type + tier — aligned to home page tier promises
   const activeTools = useMemo(() => {
@@ -542,6 +550,11 @@ function CardStudio() {
 
   const handleSend = async () => {
     if (!currentUser) return
+    if (tierCost > 0 && (balance ?? 0) < tierCost) {
+      setSendResult({ ok: false, message: `You need ${tierCost} CC to send this card. Your balance: ${balance ?? 0} CC.` })
+      setShowSendModal(true)
+      return
+    }
     setIsSending(true)
 
     // Resolve backend card type from studioType
@@ -574,6 +587,7 @@ function CardStudio() {
     if (result?.ok) {
       const slug = result.data?.card?.slug || result.data?.slug || result.data?.data?.slug || ''
       setSendResult({ ok: true, slug, message: result.message })
+      refreshBalance?.()
     } else {
       setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
     }
@@ -1663,7 +1677,7 @@ function CardStudio() {
           ...cardBorderCss,
         }}>
           <div className="cs-preview-poll-head">
-            <p className="cs-preview-poll-eyebrow">Live Poll Experience</p>
+            <p className="cs-preview-poll-eyebrow">&#x1F4CA; Live Poll Experience</p>
             <span className="cs-preview-pill">Recipients vote</span>
           </div>
           <h3 style={{
@@ -1704,7 +1718,7 @@ function CardStudio() {
           ...cardBorderCss,
         }}>
           <div className="cs-preview-trivia-head">
-            <p className="cs-preview-trivia-eyebrow">Trivia Challenge</p>
+            <p className="cs-preview-trivia-eyebrow">&#x1F4A1; Trivia Challenge</p>
             <span className="cs-preview-pill">Score-based card</span>
           </div>
           <h3 style={{
@@ -1774,7 +1788,7 @@ function CardStudio() {
             ...cardBorderCss,
           }}>
             <div className="cs-preview-anon-head">
-              <p className="cs-preview-anon-eyebrow">Anonymous Inbox</p>
+              <p className="cs-preview-anon-eyebrow">&#x1F441;&#xFE0F; Anonymous Inbox</p>
               <span className="cs-preview-pill">{anonTemplate.tier === 'premium' ? 'Premium' : 'Classic'} template</span>
             </div>
             <h3 style={{
@@ -1904,7 +1918,7 @@ function CardStudio() {
           )}
           {!isArtist && (
             <span className="cs-cc-cost-badge">
-              {TIER_COST[studioTier] === 0 ? 'Free' : `${TIER_COST[studioTier]} CC`}
+              {tierCost === 0 ? 'Free' : `${tierCost} CC`}
             </span>
           )}
           <button type="button" className="cs-nav-btn accent" onClick={enterPreview}>
@@ -2239,13 +2253,13 @@ function CardStudio() {
               </button>
             </div>
 
-            {sendResult?.ok && TIER_COST[studioTier] > 0 && (
+            {sendResult?.ok && tierCost > 0 && (
               <div className="cs-send-modal-cc-deducted">
                 <span className="cs-send-modal-cc-icon">✓</span>
-                <span><strong>{TIER_COST[studioTier]} CC</strong> deducted from your balance</span>
+                <span><strong>{tierCost} CC</strong> deducted from your balance</span>
               </div>
             )}
-            {sendResult?.ok && TIER_COST[studioTier] === 0 && (
+            {sendResult?.ok && tierCost === 0 && (
               <div className="cs-send-modal-cc-deducted free">
                 <span className="cs-send-modal-cc-icon">✓</span>
                 <span>Sent free — Classic tier</span>
@@ -2253,7 +2267,7 @@ function CardStudio() {
             )}
             {!sendResult?.ok && (
               <p className="cs-send-modal-note">
-                {sendResult?.message || `This card costs ${TIER_COST[studioTier] === 0 ? 'nothing (free)' : `${TIER_COST[studioTier]} CC`} to send.`}
+                {sendResult?.message || `This card costs ${tierCost === 0 ? 'nothing (free)' : `${tierCost} CC`} to send.`}
               </p>
             )}
 

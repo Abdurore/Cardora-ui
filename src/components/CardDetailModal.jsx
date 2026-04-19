@@ -106,11 +106,7 @@ function CardDetailModal({
 
   const handleUseTemplate = () => {
     onClose()
-    if (openCardTypeModal) {
-      openCardTypeModal()
-    } else {
-      navigate('/studio', { state: { cardData: card } })
-    }
+    navigate('/studio', { state: { cardData: card } })
   }
 
   return createPortal(
