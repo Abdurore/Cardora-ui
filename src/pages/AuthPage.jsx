@@ -115,7 +115,7 @@ function AuthPage({ mode = 'login' }) {
         if (!form.otp.trim()) { setError('Enter the 6-digit code from your email.'); return }
         const result = await onVerifyEmail(form.email, form.otp.trim())
         if (!result.ok) { setError(result.message || 'That code didn\'t work. Check it and try again.'); return }
-        navigate(result.session ? '/profile' : '/login') // silent success
+        navigate(result.session ? '/' : '/login') // silent success
         return
       }
 
@@ -151,7 +151,7 @@ function AuthPage({ mode = 'login' }) {
           }
           return
         }
-        navigate('/profile')
+        navigate('/')
         return
       }
 
@@ -160,7 +160,7 @@ function AuthPage({ mode = 'login' }) {
         if (!form.otp.trim()) { setError('Enter the OTP sent to your email.'); return }
         const result = await onVerifyEmail(pendingVerification.email, form.otp.trim())
         if (!result.ok) { setError(result.message || 'Verification failed.'); return }
-        navigate(result.session ? '/profile' : '/login')
+        navigate(result.session ? '/' : '/login')
         return
       }
 
@@ -189,7 +189,7 @@ function AuthPage({ mode = 'login' }) {
         return
       }
 
-      if (result.verified) { navigate('/profile'); return }
+      if (result.verified) { navigate('/'); return }
       setPendingVerification({ email: form.email }) // heading copy provides context — no extra toast
     } finally {
       setIsSubmitting(false)

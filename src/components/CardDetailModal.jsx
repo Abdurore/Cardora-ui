@@ -106,11 +106,10 @@ function CardDetailModal({
 
   const handleUseTemplate = () => {
     onClose()
-    if (openCardTypeModal) {
-      openCardTypeModal()
-    } else {
-      navigate('/studio', { state: { cardData: card } })
-    }
+    // Go directly to studio with the template preloaded — no card-type picker
+    const type = card?.type || 'moment'
+    const tier = card?.tier || 'classic'
+    navigate(`/studio?type=${type}&tier=${tier}`, { state: { cardData: card } })
   }
 
   return createPortal(

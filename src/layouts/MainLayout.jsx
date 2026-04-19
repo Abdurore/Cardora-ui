@@ -485,9 +485,10 @@ function MainLayout() {
       const payload = {
         title: title || cardObject.content?.heading || 'Untitled Card',
         layoutdata,
-        templateId: templateId || 'custom',
         type: type || 'standard',
       }
+      // Only include templateId when it's a real template id — omitting it signals "custom card"
+      if (templateId && templateId !== 'custom') payload.templateId = templateId
       if (couponType) payload.couponType = couponType
       if (useCoupons) payload.useCoupons = useCoupons
       if (poll) payload.poll = poll

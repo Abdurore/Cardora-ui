@@ -136,8 +136,8 @@ function AdminDashboard() {
   const [adVideoDragOver, setAdVideoDragOver] = useState(false)
   const adVideoInputRef = useRef(null)
   // Media library forms
-  const [newVideo, setNewVideo] = useState({ title: '', url: '' })
-  const [newTrack, setNewTrack] = useState({ title: '', url: '' })
+  const [newVideo, setNewVideo] = useState({ name: '', url: '' })
+  const [newTrack, setNewTrack] = useState({ name: '', url: '' })
   const [mediaVideoUploading, setMediaVideoUploading] = useState(false)
   const [mediaMusicUploading, setMediaMusicUploading] = useState(false)
   const mediaVideoInputRef = useRef(null)
@@ -387,11 +387,11 @@ function AdminDashboard() {
   }
 
   const handleAddVideo = async () => {
-    if (!newVideo.title || !newVideo.url) { showMsg('Title and video required.', false); return }
+    if (!newVideo.name || !newVideo.url) { showMsg('Name and video required.', false); return }
     try {
       await uploadMediaVideo(newVideo)
       showMsg('Video added to library!')
-      setNewVideo({ title: '', url: '' })
+      setNewVideo({ name: '', url: '' })
       if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
       loadTabData('Media')
     } catch (err) {
@@ -425,11 +425,11 @@ function AdminDashboard() {
   }
 
   const handleAddTrack = async () => {
-    if (!newTrack.title || !newTrack.url) { showMsg('Title and audio required.', false); return }
+    if (!newTrack.name || !newTrack.url) { showMsg('Name and audio required.', false); return }
     try {
       await uploadMediaMusic(newTrack)
       showMsg('Track added to library!')
-      setNewTrack({ title: '', url: '' })
+      setNewTrack({ name: '', url: '' })
       if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
       loadTabData('Media')
     } catch (err) {
@@ -964,11 +964,11 @@ function AdminDashboard() {
                 />
                 <div className="admin-media-add-row">
                   <label className="admin-field admin-media-title-field">
-                    <span>Video Title</span>
+                    <span>Video Name</span>
                     <input
                       placeholder="e.g. Ocean Waves"
-                      value={newVideo.title}
-                      onChange={e => setNewVideo(p => ({ ...p, title: e.target.value }))}
+                      value={newVideo.name}
+                      onChange={e => setNewVideo(p => ({ ...p, name: e.target.value }))}
                     />
                   </label>
                   <button
@@ -989,7 +989,7 @@ function AdminDashboard() {
                     className="primary admin-media-add-btn"
                     type="button"
                     onClick={handleAddVideo}
-                    disabled={mediaVideoUploading || !newVideo.url || !newVideo.title.trim()}
+                    disabled={mediaVideoUploading || !newVideo.url || !newVideo.name.trim()}
                   >
                     Add
                   </button>
@@ -1056,11 +1056,11 @@ function AdminDashboard() {
                 />
                 <div className="admin-media-add-row">
                   <label className="admin-field admin-media-title-field">
-                    <span>Track Title</span>
+                    <span>Track Name</span>
                     <input
                       placeholder="e.g. Soft Piano"
-                      value={newTrack.title}
-                      onChange={e => setNewTrack(p => ({ ...p, title: e.target.value }))}
+                      value={newTrack.name}
+                      onChange={e => setNewTrack(p => ({ ...p, name: e.target.value }))}
                     />
                   </label>
                   <button
@@ -1081,7 +1081,7 @@ function AdminDashboard() {
                     className="primary admin-media-add-btn"
                     type="button"
                     onClick={handleAddTrack}
-                    disabled={mediaMusicUploading || !newTrack.url || !newTrack.title.trim()}
+                    disabled={mediaMusicUploading || !newTrack.url || !newTrack.name.trim()}
                   >
                     Add
                   </button>

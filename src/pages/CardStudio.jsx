@@ -572,7 +572,16 @@ function CardStudio() {
     const result = await createCardOnBackend?.(flushedCardObject, extras)
     setIsSending(false)
     if (result?.ok) {
-      const slug = result.data?.card?.slug || result.data?.slug || result.data?.data?.slug || ''
+      // Backend returns a unique slug per created card — check every possible shape
+      const d = result.data || {}
+      const slug =
+        d.card?.slug || d.card?.shareSlug || d.card?.cardId || d.card?._id ||
+        d.slug || d.shareSlug || d.cardId || d._id ||
+        d.data?.card?.slug || d.data?.slug || d.data?.cardId || d.data?._id ||
+        ''
+      if (!slug) {
+        console.warn('Card created but no slug returned. Response shape:', d)
+      }
       setSendResult({ ok: true, slug, message: result.message })
     } else {
       setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
@@ -2257,30 +2266,36 @@ function CardStudio() {
               </p>
             )}
 
-            <div className="cs-send-link-wrap">
-              <p className="cs-send-link-label">Card link</p>
-              <span className="detail-share-link-pill cs-send-link-pill">
-                {`${window.location.origin}/card/${sendResult?.slug || 'preview'}`.replace(/^https?:\/\//, '')}
-              </span>
-              <button
-                type="button"
-                className={`detail-share-copy-btn ${sendCopied ? 'copied' : ''}`}
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(`${window.location.origin}/card/${sendResult?.slug || 'preview'}`)
-                    setSendCopied(true)
-                    setTimeout(() => setSendCopied(false), 1600)
-                  } catch { /* ignore */ }
-                }}
-              >
-                {sendCopied ? '✓ Copied' : 'Copy Link'}
-              </button>
-            </div>
+            {sendResult?.ok && sendResult?.slug ? (
+              <div className="cs-send-link-wrap">
+                <p className="cs-send-link-label">Your unique card link</p>
+                <span className="detail-share-link-pill cs-send-link-pill">
+                  {`${window.location.origin}/card/${sendResult.slug}`.replace(/^https?:\/\//, '')}
+                </span>
+                <button
+                  type="button"
+                  className={`detail-share-copy-btn ${sendCopied ? 'copied' : ''}`}
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(`${window.location.origin}/card/${sendResult.slug}`)
+                      setSendCopied(true)
+                      setTimeout(() => setSendCopied(false), 1600)
+                    } catch { /* ignore */ }
+                  }}
+                >
+                  {sendCopied ? '✓ Copied' : 'Copy Link'}
+                </button>
+              </div>
+            ) : sendResult?.ok ? (
+              <p className="cs-send-modal-note" style={{ color: '#ffb4b4' }}>
+                Card created but no link was returned by the server. Please refresh your profile to find it.
+              </p>
+            ) : null}
 
-            <p className="detail-share-label">Share via</p>
-            <div className="detail-share-platforms cs-send-modal-platforms">
+            {sendResult?.ok && sendResult?.slug && <p className="detail-share-label">Share via</p>}
+            {sendResult?.ok && sendResult?.slug && <div className="detail-share-platforms cs-send-modal-platforms">
               {SHARE_PLATFORMS.map((p) => {
-                const shareUrl = `${window.location.origin}/card/${sendResult?.slug || 'preview'}`
+                const shareUrl = `${window.location.origin}/card/${sendResult.slug}`
                 const shareTitle = `Check out this card I made on Cardora`
                 return (
                   <a
@@ -2296,7 +2311,7 @@ function CardStudio() {
                   </a>
                 )
               })}
-            </div>
+            </div>}
 
             <div className="cs-send-modal-email-row">
               <p className="cs-send-link-label">Send via Email</p>

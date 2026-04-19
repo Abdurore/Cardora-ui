@@ -6,6 +6,7 @@ import CardItem from '../components/CardItem.jsx'
 import InventoryCard from '../components/InventoryCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
+import ShareCardModal from '../components/ShareCardModal.jsx'
 import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
@@ -68,6 +69,7 @@ function Profile() {
   const [codeCopied, setCodeCopied] = useState(false)
   const [cardAnalytics, setCardAnalytics] = useState({}) // keyed by slug
   const [loadingCardAnalytics, setLoadingCardAnalytics] = useState({}) // keyed by slug
+  const [shareTarget, setShareTarget] = useState(null) // { url, title } | null
 
   const fetchCardAnalytics = async (slug) => {
     if (!slug || cardAnalytics[slug] !== undefined) return
@@ -511,11 +513,11 @@ function Profile() {
                         <button
                           className="profile-card-action-btn share"
                           type="button"
-                          onClick={() => {
-                            const url = `${window.location.origin}/card/${card.slug}`
-                            navigator.clipboard?.writeText(url)
-                          }}
-                          title="Copy link"
+                          onClick={() => setShareTarget({
+                            url: `${window.location.origin}/card/${card.slug}`,
+                            title: `Check out this "${card.title || 'card'}" I made on Cardora`,
+                          })}
+                          title="Share card"
                         >
                           🔗
                         </button>
@@ -657,6 +659,12 @@ function Profile() {
         }}
       />
 
+      <ShareCardModal
+        open={Boolean(shareTarget)}
+        onClose={() => setShareTarget(null)}
+        url={shareTarget?.url || ''}
+        title={shareTarget?.title || 'Check out this card I made on Cardora'}
+      />
 
       {/* Edit Profile Modal */}
       {showEditProfile && (
