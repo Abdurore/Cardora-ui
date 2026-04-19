@@ -411,6 +411,7 @@ function CardStudio() {
   })
   const [chainData, setChainData] = useState({ enabled: false, prompt: '' })
   const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: studioTier || 'classic' })
+  const [anonPreviewTab, setAnonPreviewTab] = useState('sender') // 'sender' | 'recipient'
 
   // Admin-curated media
   const [adminVideos, setAdminVideos] = useState([])
@@ -1781,45 +1782,85 @@ function CardStudio() {
     }
 
     if (studioType === 'anon' || studioType === 'anonymous') {
+      const accent = c.theme.accentColor || '#7ef7ff'
+      const cardBg = c.card.backgroundColor || '#07111a'
       return (
         <div className={`cs-preview-anon ${compact ? 'compact' : ''}`}>
-          <div className="cs-preview-anon-template" style={{
-            backgroundColor: c.card.backgroundColor,
-            ...cardBorderCss,
-          }}>
-            <div className="cs-preview-anon-head">
-              <p className="cs-preview-anon-eyebrow">&#x1F441;&#xFE0F; Anonymous Inbox</p>
-              <span className="cs-preview-pill">{anonTemplate.tier === 'premium' ? 'Premium' : 'Classic'} template</span>
-            </div>
-            <h3 style={{
-              color: c.card.headingColor,
-              fontFamily: `'${c.theme.fontFamily}', serif`,
-            }}>
-              {c.content.heading}
-            </h3>
-            <p style={{ color: c.card.textColor }}>
-              {c.content.body || 'Your inbox template message will greet every anonymous sender.'}
-            </p>
-            <div className="cs-preview-anon-message" style={{ borderColor: `${c.theme.accentColor}33` }}>
-              <p className="cs-preview-anon-message-label">Sample incoming note</p>
-              <p>"You make people feel seen. Keep going."</p>
-            </div>
-          </div>
-          <div className="cs-preview-anon-input-mock">
-            <p className="cs-preview-anon-input-label">What senders see</p>
-            <div className="cs-preview-anon-textarea-mock">
-              Write something honest, kind, or surprising…
-            </div>
-            <div
-              className="cs-preview-anon-send-mock"
-              style={{
-                backgroundColor: c.theme.accentColor,
-                color: c.card.backgroundColor,
-              }}
+          {/* View toggle */}
+          <div className="cs-anon-preview-tabs">
+            <button
+              type="button"
+              className={`cs-anon-preview-tab ${anonPreviewTab === 'sender' ? 'active' : ''}`}
+              onClick={() => setAnonPreviewTab('sender')}
             >
-              Send Anonymously
-            </div>
+              Sender view
+            </button>
+            <button
+              type="button"
+              className={`cs-anon-preview-tab ${anonPreviewTab === 'recipient' ? 'active' : ''}`}
+              onClick={() => setAnonPreviewTab('recipient')}
+            >
+              Recipient view
+            </button>
           </div>
+
+          {/* SENDER VIEW — what opens at /ask/@username */}
+          {anonPreviewTab === 'sender' && (
+            <div className="cs-preview-anon-sender" style={{ background: cardBg, borderColor: `${accent}1a`, ...cardBorderCss }}>
+              <div className="cs-preview-anon-sender-header">
+                <div className="cs-preview-anon-avatar-mock" style={{ borderColor: `${accent}44` }}>
+                  <span style={{ color: accent }}>U</span>
+                </div>
+                <div>
+                  <p className="cs-preview-anon-label" style={{ color: `${accent}99` }}>Anonymous message for</p>
+                  <p className="cs-preview-anon-username" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>@recipient</p>
+                </div>
+              </div>
+              {(c.content.heading || c.content.body) && (
+                <div className="cs-preview-anon-copy">
+                  {c.content.heading && <h4 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>{c.content.heading}</h4>}
+                  {c.content.body && <p style={{ color: c.card.textColor }}>{c.content.body}</p>}
+                </div>
+              )}
+              <div className="cs-preview-anon-textarea-mock" style={{ borderColor: `${accent}28`, color: `${c.card.textColor}88` }}>
+                Write something honest, kind, or surprising…
+              </div>
+              <div className="cs-preview-anon-meta-mock">
+                <span style={{ color: `${c.card.textColor}66` }}>0/500</span>
+                <span style={{ color: accent }}>&#x1F441;&#xFE0F; Anonymous</span>
+              </div>
+              <div className="cs-preview-anon-send-mock" style={{ background: accent, color: cardBg }}>
+                Send Anonymously
+              </div>
+            </div>
+          )}
+
+          {/* RECIPIENT VIEW — the card in their profile with messages */}
+          {anonPreviewTab === 'recipient' && (
+            <div className="cs-preview-anon-recipient" style={{ background: cardBg, borderColor: `${accent}1a`, ...cardBorderCss }}>
+              <div className="cs-preview-anon-head">
+                <p className="cs-preview-anon-eyebrow">&#x1F441;&#xFE0F; Anonymous Inbox</p>
+                <span className="cs-preview-pill">{anonTemplate.tier === 'premium' ? 'Premium' : 'Classic'}</span>
+              </div>
+              <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                {c.content.heading || 'Your inbox card'}
+              </h3>
+              {c.content.body && <p style={{ color: c.card.textColor, fontSize: '0.8rem', marginBottom: 10 }}>{c.content.body}</p>}
+              <div className="cs-preview-anon-messages">
+                {[
+                  '"You make people feel seen. Keep going."',
+                  '"That thing you did last week was genuinely kind."',
+                  '"Still thinking about how you handled that situation."',
+                ].map((msg, i) => (
+                  <div key={i} className="cs-preview-anon-msg-bubble" style={{ borderColor: `${accent}22`, background: `${accent}08` }}>
+                    <p style={{ color: c.card.textColor }}>{msg}</p>
+                    <span className="cs-preview-anon-msg-time" style={{ color: `${accent}66` }}>Anonymous · just now</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="cs-preview-watermark">
             <span>Made with </span>
             <a href="/" className="cs-preview-watermark-cta">Cardora</a>
