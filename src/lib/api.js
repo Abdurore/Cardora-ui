@@ -312,6 +312,11 @@ export async function getPublicUser(username) {
   return request(`/users/${username}`).catch(() => null)
 }
 
+export async function getUserAnonCard(username) {
+  // GET /users/:username/anon-card — fetch recipient's active anonymous inbox card
+  return request(`/users/${username}/anon-card`).catch(() => null)
+}
+
 /* ═══════════════════════════════════════════════
    ARTIST
    ═══════════════════════════════════════════════ */
