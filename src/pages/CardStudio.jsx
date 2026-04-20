@@ -10,7 +10,7 @@ import {
 } from 'react-icons/hi2'
 import { IoColorPaletteOutline } from 'react-icons/io5'
 import logo from '../assets/icons/logo.png'
-import { defaultCardObject, resolveTemplateCardObject, musicPresets, fontOptions } from '../data/cardDefaults.js'
+import { defaultCardObject, resolveTemplateCardObject, musicPresets, getFontsForTier } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
@@ -19,6 +19,7 @@ import { createCardClassic, createCardPremium, createCardElite, createCardAnonym
 import html2canvas from 'html2canvas'
 import TemplatePreviewSnapshot from '../components/TemplatePreviewSnapshot.jsx'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
+import { getTierLimits } from '../lib/tierLimits.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
@@ -44,7 +45,7 @@ const ALL_TOOLS = [
 // Tools available per type + tier — aligned to home page tier promises:
 // Classic  = simple animated reveal, no music/media ("Simple animation, No music")
 // Premium  = music + better visuals ("Music + better visuals, Richer motion")
-// Elite    = full experience + gifts ("Full animations + effects, gifts") — Moment Card only
+// Elite    = full experience + gifts ("Full animations + effects, gifts") — Personal Card only
 const TOOLS_BY_TYPE_TIER = {
   'moment:classic': ['closedState', 'content', 'background', 'theme'],
   'moment:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
@@ -60,7 +61,7 @@ const TOOLS_BY_TYPE_TIER = {
 }
 
 const STUDIO_TYPE_META = {
-  moment:    { emoji: '💌', label: 'Moment Card', badge: 'badge-moment' },
+  moment:    { emoji: '💌', label: 'Personal Card', badge: 'badge-moment' },
   poll:      { emoji: '📊', label: 'Poll Card',   badge: 'badge-poll' },
   trivia:    { emoji: '💡', label: 'Trivia Card', badge: 'badge-trivia' },
   chain:     { emoji: '🔗', label: 'Chain Card',  badge: 'badge-chain' },
@@ -77,10 +78,17 @@ const TYPE_ACCENT = {
 
 const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
 
-const TIER_COST = { classic: 0, premium: 5, elite: 10 }
+const TIER_COST_BY_TYPE = {
+  moment:    { classic: 0, premium: 10, elite: 25 },
+  poll:      { classic: 0, premium: 25, elite: 25 },
+  trivia:    { classic: 0, premium: 25, elite: 25 },
+  chain:     { classic: 0, premium: 25, elite: 25 },
+  anon:      { classic: 0, premium: 45, elite: 45 },
+  anonymous: { classic: 0, premium: 45, elite: 45 },
+}
 
 const TYPE_LABEL = {
-  moment: 'Moment Card',
+  moment: 'Personal Card',
   poll: 'Poll Card',
   trivia: 'Trivia Card',
   chain: 'Chain Card',
@@ -348,7 +356,7 @@ function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const { currentUser, publishTemplate, createCardOnBackend } = useOutletContext() || {}
+  const { currentUser, publishTemplate, createCardOnBackend, refreshBalance, balance } = useOutletContext() || {}
   // Read card type and tier from location state (set by CreateCardPicker)
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
@@ -362,13 +370,42 @@ function CardStudio() {
   const studioTier = searchParams.get('tier') || 'classic'
   const typeMeta = STUDIO_TYPE_META[studioType] || STUDIO_TYPE_META.moment
   const tierLabel = TIER_LABELS[studioTier] || 'Classic'
+  const tierCost = (TIER_COST_BY_TYPE[studioType] || TIER_COST_BY_TYPE.moment)[studioTier] ?? 0
 
   // Filter tools by type + tier — aligned to home page tier promises
-  const activeTools = useMemo(() => {
+  const isArtist = currentUser?.role === 'Artist'
+  const allowedToolIds = useMemo(() => {
+    if (isArtist) {
+      // Artists bypass tool visibility gating — they can use every tool the type supports.
+      const anyTierForType = Object.keys(TOOLS_BY_TYPE_TIER)
+        .filter((k) => k.startsWith(`${studioType}:`))
+        .reduce((acc, k) => {
+          TOOLS_BY_TYPE_TIER[k].forEach((id) => acc.add(id))
+          return acc
+        }, new Set())
+      if (anyTierForType.size) return Array.from(anyTierForType)
+    }
     const key = `${studioType}:${studioTier}`
-    const allowed = TOOLS_BY_TYPE_TIER[key] || TOOLS_BY_TYPE_TIER[`${studioType}:classic`] || TOOLS_BY_TYPE_TIER['moment:classic']
-    return ALL_TOOLS.filter(t => allowed.includes(t.id))
-  }, [studioType, studioTier])
+    return TOOLS_BY_TYPE_TIER[key] || TOOLS_BY_TYPE_TIER[`${studioType}:classic`] || TOOLS_BY_TYPE_TIER['moment:classic']
+  }, [studioType, studioTier, isArtist])
+  const tierLimits = useMemo(
+    () => getTierLimits(studioTier, { isArtist }),
+    [studioTier, isArtist],
+  )
+  const activeTools = useMemo(
+    () => ALL_TOOLS.filter(t => allowedToolIds.includes(t.id)),
+    [allowedToolIds],
+  )
+
+  // Tier-gated font library. Labels render in the actual typeface so users can preview them.
+  const availableFonts = useMemo(() => getFontsForTier(studioType, studioTier), [studioType, studioTier])
+  const fontDropdownOptions = useMemo(
+    () => availableFonts.map((f) => ({
+      value: f,
+      label: <span style={{ fontFamily: `'${f}', serif`, fontSize: '1rem' }}>{f}</span>,
+    })),
+    [availableFonts],
+  )
   const defaultToolId = activeTools[0]?.id || 'content'
 
   const [cardObject, setCardObject] = useState(() =>
@@ -403,6 +440,7 @@ function CardStudio() {
   })
   const [chainData, setChainData] = useState({ enabled: false, prompt: '' })
   const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: studioTier || 'classic' })
+  const [anonPreviewTab, setAnonPreviewTab] = useState('sender') // 'sender' | 'recipient'
 
   // Admin-curated media
   const [adminVideos, setAdminVideos] = useState([])
@@ -422,6 +460,22 @@ function CardStudio() {
     else if (studioType === 'chain') { setChainData(prev => ({ ...prev, enabled: true })); setActiveTool('chain') }
     else if (studioType === 'anon' || studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Snap font to a tier-allowed family when the current pick isn't available at this tier.
+  useEffect(() => {
+    const fallback = availableFonts[0] || 'Cinzel'
+    setCardObject(prev => {
+      const themeFont = prev.theme?.fontFamily
+      const closedFont = prev.closedState?.headingFont
+      const themeOk = availableFonts.includes(themeFont)
+      const closedOk = availableFonts.includes(closedFont)
+      if (themeOk && closedOk) return prev
+      const next = structuredClone(prev)
+      if (!themeOk) next.theme.fontFamily = fallback
+      if (!closedOk) next.closedState.headingFont = fallback
+      return next
+    })
+  }, [availableFonts])
 
   // Revoke blob URLs on unmount
   useEffect(() => {
@@ -443,8 +497,6 @@ function CardStudio() {
     }
     return JSON.parse(json)
   }
-
-  const isArtist = currentUser?.role === 'Artist'
 
   const c = cardObject
 
@@ -542,6 +594,11 @@ function CardStudio() {
 
   const handleSend = async () => {
     if (!currentUser) return
+    if (tierCost > 0 && (balance ?? 0) < tierCost) {
+      setSendResult({ ok: false, message: `You need ${tierCost} CC to send this card. Your balance: ${balance ?? 0} CC.` })
+      setShowSendModal(true)
+      return
+    }
     setIsSending(true)
 
     // Resolve backend card type from studioType
@@ -583,6 +640,7 @@ function CardStudio() {
         console.warn('Card created but no slug returned. Response shape:', d)
       }
       setSendResult({ ok: true, slug, message: result.message })
+      refreshBalance?.()
     } else {
       setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
     }
@@ -770,7 +828,7 @@ function CardStudio() {
             <Dropdown
               value={c.closedState.headingFont}
               onChange={(v) => update('closedState.headingFont', v)}
-              options={fontOptions.map(f => ({ value: f, label: f }))}
+              options={fontDropdownOptions}
             />
           </label>
           <label className="cs-field">
@@ -1072,8 +1130,36 @@ function CardStudio() {
             <Dropdown
               value={c.theme.fontFamily}
               onChange={(v) => update('theme.fontFamily', v)}
-              options={fontOptions.map(f => ({ value: f, label: f }))}
+              options={fontDropdownOptions}
             />
+          </label>
+          <p className="cs-field-hint">
+            {availableFonts.length} fonts available on {tierLabel} · {typeMeta.label}
+            {studioTier !== 'elite' && ' — upgrade to Elite for the full library'}
+          </p>
+          <label className="cs-field">
+            <span>Heading Size</span>
+            <input
+              type="range"
+              min="18"
+              max="48"
+              step="1"
+              value={c.theme.headingSize ?? 28}
+              onChange={e => update('theme.headingSize', Number(e.target.value))}
+            />
+            <span className="cs-range-val">{c.theme.headingSize ?? 28}px</span>
+          </label>
+          <label className="cs-field">
+            <span>Body Size</span>
+            <input
+              type="range"
+              min="12"
+              max="26"
+              step="1"
+              value={c.theme.bodySize ?? 16}
+              onChange={e => update('theme.bodySize', Number(e.target.value))}
+            />
+            <span className="cs-range-val">{c.theme.bodySize ?? 16}px</span>
           </label>
           <ColorInput label="Accent Color" value={c.theme.accentColor} onChange={e => update('theme.accentColor', e.target.value)} />
           <ColorInput label="Text Color" value={c.theme.textColor} onChange={e => update('theme.textColor', e.target.value)} />
@@ -1672,7 +1758,7 @@ function CardStudio() {
           ...cardBorderCss,
         }}>
           <div className="cs-preview-poll-head">
-            <p className="cs-preview-poll-eyebrow">Live Poll Experience</p>
+            <p className="cs-preview-poll-eyebrow">&#x1F4CA; Live Poll Experience</p>
             <span className="cs-preview-pill">Recipients vote</span>
           </div>
           <h3 style={{
@@ -1713,7 +1799,7 @@ function CardStudio() {
           ...cardBorderCss,
         }}>
           <div className="cs-preview-trivia-head">
-            <p className="cs-preview-trivia-eyebrow">Trivia Challenge</p>
+            <p className="cs-preview-trivia-eyebrow">&#x1F4A1; Trivia Challenge</p>
             <span className="cs-preview-pill">Score-based card</span>
           </div>
           <h3 style={{
@@ -1776,45 +1862,85 @@ function CardStudio() {
     }
 
     if (studioType === 'anon' || studioType === 'anonymous') {
+      const accent = c.theme.accentColor || '#7ef7ff'
+      const cardBg = c.card.backgroundColor || '#07111a'
       return (
         <div className={`cs-preview-anon ${compact ? 'compact' : ''}`}>
-          <div className="cs-preview-anon-template" style={{
-            backgroundColor: c.card.backgroundColor,
-            ...cardBorderCss,
-          }}>
-            <div className="cs-preview-anon-head">
-              <p className="cs-preview-anon-eyebrow">Anonymous Inbox</p>
-              <span className="cs-preview-pill">{anonTemplate.tier === 'premium' ? 'Premium' : 'Classic'} template</span>
-            </div>
-            <h3 style={{
-              color: c.card.headingColor,
-              fontFamily: `'${c.theme.fontFamily}', serif`,
-            }}>
-              {c.content.heading}
-            </h3>
-            <p style={{ color: c.card.textColor }}>
-              {c.content.body || 'Your inbox template message will greet every anonymous sender.'}
-            </p>
-            <div className="cs-preview-anon-message" style={{ borderColor: `${c.theme.accentColor}33` }}>
-              <p className="cs-preview-anon-message-label">Sample incoming note</p>
-              <p>"You make people feel seen. Keep going."</p>
-            </div>
-          </div>
-          <div className="cs-preview-anon-input-mock">
-            <p className="cs-preview-anon-input-label">What senders see</p>
-            <div className="cs-preview-anon-textarea-mock">
-              Write something honest, kind, or surprising…
-            </div>
-            <div
-              className="cs-preview-anon-send-mock"
-              style={{
-                backgroundColor: c.theme.accentColor,
-                color: c.card.backgroundColor,
-              }}
+          {/* View toggle */}
+          <div className="cs-anon-preview-tabs">
+            <button
+              type="button"
+              className={`cs-anon-preview-tab ${anonPreviewTab === 'sender' ? 'active' : ''}`}
+              onClick={() => setAnonPreviewTab('sender')}
             >
-              Send Anonymously
-            </div>
+              Sender view
+            </button>
+            <button
+              type="button"
+              className={`cs-anon-preview-tab ${anonPreviewTab === 'recipient' ? 'active' : ''}`}
+              onClick={() => setAnonPreviewTab('recipient')}
+            >
+              Recipient view
+            </button>
           </div>
+
+          {/* SENDER VIEW — what opens at /ask/@username */}
+          {anonPreviewTab === 'sender' && (
+            <div className="cs-preview-anon-sender" style={{ background: cardBg, borderColor: `${accent}1a`, ...cardBorderCss }}>
+              <div className="cs-preview-anon-sender-header">
+                <div className="cs-preview-anon-avatar-mock" style={{ borderColor: `${accent}44` }}>
+                  <span style={{ color: accent }}>U</span>
+                </div>
+                <div>
+                  <p className="cs-preview-anon-label" style={{ color: `${accent}99` }}>Anonymous message for</p>
+                  <p className="cs-preview-anon-username" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>@recipient</p>
+                </div>
+              </div>
+              {(c.content.heading || c.content.body) && (
+                <div className="cs-preview-anon-copy">
+                  {c.content.heading && <h4 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>{c.content.heading}</h4>}
+                  {c.content.body && <p style={{ color: c.card.textColor }}>{c.content.body}</p>}
+                </div>
+              )}
+              <div className="cs-preview-anon-textarea-mock" style={{ borderColor: `${accent}28`, color: `${c.card.textColor}88` }}>
+                Write something honest, kind, or surprising…
+              </div>
+              <div className="cs-preview-anon-meta-mock">
+                <span style={{ color: `${c.card.textColor}66` }}>0/500</span>
+                <span style={{ color: accent }}>&#x1F441;&#xFE0F; Anonymous</span>
+              </div>
+              <div className="cs-preview-anon-send-mock" style={{ background: accent, color: cardBg }}>
+                Send Anonymously
+              </div>
+            </div>
+          )}
+
+          {/* RECIPIENT VIEW — the card in their profile with messages */}
+          {anonPreviewTab === 'recipient' && (
+            <div className="cs-preview-anon-recipient" style={{ background: cardBg, borderColor: `${accent}1a`, ...cardBorderCss }}>
+              <div className="cs-preview-anon-head">
+                <p className="cs-preview-anon-eyebrow">&#x1F441;&#xFE0F; Anonymous Inbox</p>
+                <span className="cs-preview-pill">{anonTemplate.tier === 'premium' ? 'Premium' : 'Classic'}</span>
+              </div>
+              <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                {c.content.heading || 'Your inbox card'}
+              </h3>
+              {c.content.body && <p style={{ color: c.card.textColor, fontSize: '0.8rem', marginBottom: 10 }}>{c.content.body}</p>}
+              <div className="cs-preview-anon-messages">
+                {[
+                  '"You make people feel seen. Keep going."',
+                  '"That thing you did last week was genuinely kind."',
+                  '"Still thinking about how you handled that situation."',
+                ].map((msg, i) => (
+                  <div key={i} className="cs-preview-anon-msg-bubble" style={{ borderColor: `${accent}22`, background: `${accent}08` }}>
+                    <p style={{ color: c.card.textColor }}>{msg}</p>
+                    <span className="cs-preview-anon-msg-time" style={{ color: `${accent}66` }}>Anonymous · just now</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="cs-preview-watermark">
             <span>Made with </span>
             <a href="/" className="cs-preview-watermark-cta">Cardora</a>
@@ -1825,6 +1951,8 @@ function CardStudio() {
       )
     }
 
+    const headingSize = c.theme.headingSize ?? 28
+    const bodySize = c.theme.bodySize ?? 16
     return (
       <div className={`cs-preview-card ${compact ? 'compact' : ''}`} style={{
         backgroundColor: c.card.backgroundColor,
@@ -1845,12 +1973,13 @@ function CardStudio() {
         <h3 style={{
           color: c.card.headingColor,
           fontFamily: `'${c.theme.fontFamily}', serif`,
+          fontSize: `${headingSize}px`,
         }}>
           {c.content.heading}
         </h3>
-        <p style={{ color: c.card.textColor }}>{c.content.body}</p>
+        <p style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px` }}>{c.content.body}</p>
         {c.content.extendedBody && (
-          <p className="cs-extended" style={{ color: c.card.textColor }}>
+          <p className="cs-extended" style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px` }}>
             {c.content.extendedBody}
           </p>
         )}
@@ -1880,7 +2009,7 @@ function CardStudio() {
       <div className="cs-topbar">
         <div className="cs-top-left">
           <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
-          <span className="cs-type-badge">{typeMeta.label || 'Moment Card'}</span>
+          <span className="cs-type-badge">{typeMeta.label || 'Personal Card'}</span>
           <div className="cs-status">{savedState}</div>
         </div>
         <div className="cs-progress">
@@ -1913,7 +2042,7 @@ function CardStudio() {
           )}
           {!isArtist && (
             <span className="cs-cc-cost-badge">
-              {TIER_COST[studioTier] === 0 ? 'Free' : `${TIER_COST[studioTier]} CC`}
+              {tierCost === 0 ? 'Free' : `${tierCost} CC`}
             </span>
           )}
           <button type="button" className="cs-nav-btn accent" onClick={enterPreview}>
@@ -2133,6 +2262,9 @@ function CardStudio() {
         <CardPreviewModal
           cardObject={cardObject}
           studioType={studioType}
+          tier={studioTier}
+          allowedTools={allowedToolIds}
+          tierLimits={tierLimits}
           pollData={pollData}
           triviaData={triviaData}
           anonTemplate={anonTemplate}
@@ -2235,7 +2367,7 @@ function CardStudio() {
           <div className="cs-send-modal">
             <div className="cs-send-modal-header">
               <div className="cs-send-modal-header-left">
-                <span className="cs-send-modal-eyebrow">{TYPE_LABEL[studioType] || 'Moment Card'} · {tierLabel}</span>
+                <span className="cs-send-modal-eyebrow">{TYPE_LABEL[studioType] || 'Personal Card'} · {tierLabel}</span>
                 <h3>{sendResult?.ok ? 'Your card is ready to share!' : 'Share Your Card'}</h3>
               </div>
               <button
@@ -2248,13 +2380,13 @@ function CardStudio() {
               </button>
             </div>
 
-            {sendResult?.ok && TIER_COST[studioTier] > 0 && (
+            {sendResult?.ok && tierCost > 0 && (
               <div className="cs-send-modal-cc-deducted">
                 <span className="cs-send-modal-cc-icon">✓</span>
-                <span><strong>{TIER_COST[studioTier]} CC</strong> deducted from your balance</span>
+                <span><strong>{tierCost} CC</strong> deducted from your balance</span>
               </div>
             )}
-            {sendResult?.ok && TIER_COST[studioTier] === 0 && (
+            {sendResult?.ok && tierCost === 0 && (
               <div className="cs-send-modal-cc-deducted free">
                 <span className="cs-send-modal-cc-icon">✓</span>
                 <span>Sent free — Classic tier</span>
@@ -2262,7 +2394,7 @@ function CardStudio() {
             )}
             {!sendResult?.ok && (
               <p className="cs-send-modal-note">
-                {sendResult?.message || `This card costs ${TIER_COST[studioTier] === 0 ? 'nothing (free)' : `${TIER_COST[studioTier]} CC`} to send.`}
+                {sendResult?.message || `This card costs ${tierCost === 0 ? 'nothing (free)' : `${tierCost} CC`} to send.`}
               </p>
             )}
 

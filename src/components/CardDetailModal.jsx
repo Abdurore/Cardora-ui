@@ -46,12 +46,15 @@ function CardDetailModal({
   currentUser,
   onRequireAuth,
   onDeductCC,
+  onDeleteTemplate,
   openCardTypeModal,
 }) {
   const [view, setView] = useState('main') // 'main' | 'share'
   const [copied, setCopied] = useState(false)
   const [startY, setStartY] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
+  const isAdmin = currentUser?.role === 'Admin'
 
   useEffect(() => {
     if (!card) return undefined
@@ -106,10 +109,19 @@ function CardDetailModal({
 
   const handleUseTemplate = () => {
     onClose()
-    // Go directly to studio with the template preloaded — no card-type picker
     const type = card?.type || 'moment'
     const tier = card?.tier || 'classic'
     navigate(`/studio?type=${type}&tier=${tier}`, { state: { cardData: card } })
+  }
+
+  const handleAdminDelete = async () => {
+    if (!onDeleteTemplate || !card) return
+    if (!window.confirm(`Delete template "${card.title}"? This cannot be undone.`)) return
+    setDeleting(true)
+    const res = await onDeleteTemplate(card.templateId || card.id)
+    setDeleting(false)
+    if (res?.ok) onClose()
+    else window.alert(res?.message || 'Delete failed.')
   }
 
   return createPortal(
@@ -194,6 +206,19 @@ function CardDetailModal({
                 </svg>
                 Share Card
               </button>
+              {isAdmin && onDeleteTemplate && (
+                <button
+                  className="cdm-btn-admin-delete"
+                  type="button"
+                  onClick={handleAdminDelete}
+                  disabled={deleting}
+                >
+                  <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h14M8 6V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2M6 6l1 11a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2l1-11" />
+                  </svg>
+                  {deleting ? 'Deleting…' : 'Delete Template (Admin)'}
+                </button>
+              )}
               <button className="cdm-close-link" type="button" onClick={onClose}>Dismiss</button>
             </div>
           )}

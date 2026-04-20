@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const ABSENCE_THRESHOLD_MS = 6 * 60 * 60 * 1000 // 6 hours
-const LAST_ACTIVE_KEY = 'cardora:lastActive'
 const SESSION_SHOWN_KEY = 'cardora:bannerShownThisSession'
 const DISPLAY_DELAY_MS = 2200
 const AUTO_DISMISS_MS = 9000
@@ -17,12 +15,6 @@ function WelcomeBackBanner({ currentUser }) {
 
     const alreadyShown = sessionStorage.getItem(SESSION_SHOWN_KEY)
     if (alreadyShown) return
-
-    const lastActive = parseInt(localStorage.getItem(LAST_ACTIVE_KEY) || '0', 10)
-    const now = Date.now()
-    const wasAway = lastActive > 0 && now - lastActive > ABSENCE_THRESHOLD_MS
-
-    if (!wasAway) return
 
     const timer = setTimeout(() => {
       setVisible(true)

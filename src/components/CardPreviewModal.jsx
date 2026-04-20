@@ -4,6 +4,7 @@ import PremiumGiftReveal from './PremiumGiftReveal.jsx'
 import Envelope from './Envelope.jsx'
 import AmbientParticles from './AmbientParticles.jsx'
 import { fireOpenEffect } from '../lib/studioEffects.js'
+import { shouldShowEnvelope } from '../lib/tierLimits.js'
 
 const LEGACY_EMOJI_AMBIENTS = new Set(['floating', 'reverse'])
 
@@ -28,16 +29,25 @@ function CardPreviewModal({
   cardObject,
   onClose,
   tier = 'simple',
+  allowedTools = null,
+  tierLimits = null,
   recipientEmail = '',
   studioType = 'moment',
   pollData = null,
   triviaData = null,
   anonTemplate = null,
 }) {
-  const [stage, setStage] = useState('closed') // closed, opening, open, questions, end, giftIntro, giftReveal, giftReceive, pollVote, triviaQ, triviaResults, anonPreview
+  // `allowedTools` gates tool visibility; `tierLimits` caps the content a
+  // visible tool is allowed to contribute (e.g. music allowed, images > 1).
+  // Both null = public viewer, render everything the card has.
+  const toolAllowed = (id) => !allowedTools || allowedTools.includes(id)
+  const limit = (key, fallback = true) => (tierLimits ? !!tierLimits[key] : fallback)
+  const maxImages = tierLimits ? (tierLimits.maxImages ?? Infinity) : Infinity
+  const envelopeEnabled = shouldShowEnvelope(studioType)
+  const [stage, setStage] = useState(envelopeEnabled ? 'closed' : 'open')
   const [questionIdx, setQuestionIdx] = useState(0)
-  const [fadeBody, setFadeBody] = useState(false)
-  const [bodyVisible, setBodyVisible] = useState(false)
+  const [fadeBody, setFadeBody] = useState(!envelopeEnabled)
+  const [bodyVisible, setBodyVisible] = useState(!envelopeEnabled)
   const [revealStep, setRevealStep] = useState(0)
   const audioRef = useRef(null)
   const containerRef = useRef(null)
@@ -52,20 +62,22 @@ function CardPreviewModal({
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const c = cardObject
-  const hasQuestions = c.questions.items.length > 0
-  const hasGift = c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
-  const hasFadeIn = c.card.textBodyAnimation.fadeInDuration !== 'none'
-  const hasTypewriter = c.card.textBodyAnimation.selfTypeSpeed !== 'none'
+  const hasQuestions = toolAllowed('questions') && limit('allowQuestions') && c.questions.items.length > 0
+  const hasGift = toolAllowed('gifts') && limit('allowGifts') && c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
+  const hasFadeIn = toolAllowed('cardStyle') && limit('allowFadeIn') && c.card.textBodyAnimation.fadeInDuration !== 'none'
+  const hasTypewriter = toolAllowed('cardStyle') && limit('allowTypewriter') && c.card.textBodyAnimation.selfTypeSpeed !== 'none'
   const typeSpeed = hasTypewriter ? parseFloat(c.card.textBodyAnimation.selfTypeSpeed) || 2 : 2
   const fadeSpeed = hasFadeIn ? parseFloat(c.card.textBodyAnimation.fadeInDuration) || 2 : 0
-  const primaryImage = c.media.images[0] || null
+  const mediaAllowed = toolAllowed('media') && maxImages > 0
+  const primaryImage = mediaAllowed ? (c.media.images[0] || null) : null
 
   const typedBody = useTypewriter(c.content.body, typeSpeed, stage === 'open' && hasTypewriter)
   const typedExtended = useTypewriter(c.content.extendedBody, typeSpeed, stage === 'open' && hasTypewriter && typedBody === c.content.body)
 
-  // Music
+  // Music — gated by tier (Classic has no music)
+  const musicAllowed = limit('allowMusic') && !!c.background.music.url
   useEffect(() => {
-    if (!audioRef.current || !c.background.music.url) return undefined
+    if (!audioRef.current || !musicAllowed) return undefined
 
     audioRef.current.volume = c.background.music.volume
 
@@ -79,13 +91,14 @@ function CardPreviewModal({
     return () => {
       if (audioRef.current) audioRef.current.pause()
     }
-  }, [c.background.music.url, c.background.music.volume, stage])
+  }, [c.background.music.url, c.background.music.volume, stage, musicAllowed])
 
-  // Open effect dispatcher
+  // Open effect dispatcher — gated by tier cap
   const triggerOpenEffect = useCallback(() => {
+    if (!toolAllowed('animation') || !limit('allowOpenEffects')) return
     if (!c.animation.openEffect || c.animation.openEffect === 'none') return
     fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
-  }, [c.animation.openEffect, c.animation.confettiColors])
+  }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits])
 
   const handleOpen = () => {
     triggerOpenEffect()
@@ -135,10 +148,10 @@ function CardPreviewModal({
   }
 
   const handleReset = () => {
-    setStage('closed')
+    setStage(envelopeEnabled ? 'closed' : 'open')
     setQuestionIdx(0)
-    setFadeBody(false)
-    setBodyVisible(false)
+    setFadeBody(!envelopeEnabled)
+    setBodyVisible(!envelopeEnabled)
     setRevealStep(0)
     setPreviewPollVotes([])
     setPreviewPollSubmitted(false)
@@ -193,12 +206,13 @@ function CardPreviewModal({
     })),
   [])
 
-  // Background effect
+  // Background effect — gated by the `animation` tool AND tier ambient cap
   const renderBgEffect = () => {
+    if (!toolAllowed('animation') || !limit('allowAmbientEffects')) return null
     const eff = c.animation.backgroundEffect
     if (!eff || eff.type === 'none') return null
     if (LEGACY_EMOJI_AMBIENTS.has(eff.type)) {
-      const emojis = eff.emojis.length > 0 ? eff.emojis : ['âœ¨']
+      const emojis = eff.emojis.length > 0 ? eff.emojis : ['✨']
       return (
         <div className={`cp-bg-effect cp-bg-${eff.type}`}>
           {particlePositions.map((pos, i) => (
@@ -222,7 +236,11 @@ function CardPreviewModal({
   }
 
   const renderGradientBorder = (children, className = '') => {
-    if (c.card.cardBorder.type === 'gradient' || c.card.cardBorder.type === 'animated') {
+    if (!toolAllowed('cardStyle')) return children
+    const borderType = c.card.cardBorder.type
+    if (borderType === 'gradient' && !limit('allowGradientBorder')) return children
+    if (borderType === 'animated' && !limit('allowAnimatedBorder')) return children
+    if (borderType === 'gradient' || borderType === 'animated') {
       const gradColors = c.card.cardBorder.colors.length > 1
         ? c.card.cardBorder.colors.join(', ')
         : `${c.card.cardBorder.colors[0] || '#333'}, ${c.card.cardBorder.colors[0] || '#333'}`
@@ -273,13 +291,18 @@ function CardPreviewModal({
   return createPortal(
     <section className="cp-overlay" ref={containerRef}>
       <div className="cp-backdrop" style={bgStyle}>
-        {c.background.type === 'video' && c.background.videoUrl ? (
+        {c.background.type === 'video' && c.background.videoUrl && limit('allowVideoBackground') ? (
           <video className="cp-backdrop-video" src={c.background.videoUrl} autoPlay muted loop playsInline />
         ) : null}
-        {stage !== 'closed' && renderBgEffect()}
       </div>
 
-      {c.background.music.url && (
+      {stage !== 'closed' && (
+        <div className="cp-ambient-overlay" aria-hidden="true">
+          {renderBgEffect()}
+        </div>
+      )}
+
+      {musicAllowed && (
         <audio ref={audioRef} src={c.background.music.url} loop preload="auto" />
       )}
 
@@ -296,8 +319,8 @@ function CardPreviewModal({
         </button>
       )}
 
-      {/* ENVELOPE (closed state) */}
-      {stage === 'closed' && (
+      {/* ENVELOPE (closed state) — only Personal + Chain cards get the reveal metaphor */}
+      {stage === 'closed' && envelopeEnabled && (
         <Envelope
           cardObject={c}
           tier={tier}
@@ -325,6 +348,7 @@ function CardPreviewModal({
                   style={{
                     color: c.card.headingColor,
                     fontFamily: `'${c.theme.fontFamily}', serif`,
+                    fontSize: `${c.theme.headingSize ?? 28}px`,
                   }}
                 >
                   {c.content.heading}
@@ -350,6 +374,8 @@ function CardPreviewModal({
                   className={`cp-body cp-reveal-element ${fadeBody && revealStep >= 3 ? 'visible' : ''}`}
                   style={{
                     color: c.card.textColor,
+                    fontFamily: `'${c.theme.fontFamily}', sans-serif`,
+                    fontSize: `${c.theme.bodySize ?? 16}px`,
                     transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s',
                   }}
                 >
@@ -658,7 +684,7 @@ function CardPreviewModal({
             className="cp-card cp-card-full cp-end-card"
             style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
           >
-            <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>âœ“</div>
+            <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>✓</div>
             <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               Card Complete
             </h3>

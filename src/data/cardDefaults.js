@@ -15,6 +15,8 @@ export const defaultCardObject = {
 
   theme: {
     fontFamily: 'Cinzel',
+    headingSize: 28,
+    bodySize: 16,
     accentColor: '#76efff',
     textColor: '#ffffff',
     headingColor: '#ffffff',
@@ -132,18 +134,64 @@ export const musicPresets = [
   },
 ]
 
-// Font options
-export const fontOptions = [
+// Font options — tiered library
+export const FONTS_BASIC = [
   'Cinzel',
-  'Playfair Display',
   'Manrope',
+  'Playfair Display',
   'Inter',
   'Outfit',
+  'Poppins',
+]
+
+export const FONTS_PREMIUM = [
+  ...FONTS_BASIC,
+  'Lora',
+  'Merriweather',
+  'Montserrat',
+  'Raleway',
+  'Josefin Sans',
+  'Quicksand',
+  'Nunito',
   'Dancing Script',
   'Great Vibes',
-  'Poppins',
-  'Lora',
 ]
+
+export const FONTS_ELITE = [
+  ...FONTS_PREMIUM,
+  'Abril Fatface',
+  'Bebas Neue',
+  'DM Serif Display',
+  'EB Garamond',
+  'Cormorant Garamond',
+  'Pacifico',
+  'Lobster',
+  'Sacramento',
+  'Allura',
+  'Parisienne',
+  'Caveat',
+  'Amatic SC',
+  'Italianno',
+  'Satisfy',
+  'Tangerine',
+]
+
+/**
+ * Returns the list of fonts available for a given card type + tier.
+ * - Personal cards: classic & premium share the basic set; elite gets the full library.
+ * - Other types: classic → basic, premium → premium, elite → full library.
+ */
+export function getFontsForTier(cardType, tier) {
+  const t = (tier || 'classic').toLowerCase()
+  const type = (cardType || 'moment').toLowerCase()
+  if (t === 'elite') return FONTS_ELITE
+  if (type === 'moment') return FONTS_BASIC
+  if (t === 'premium') return FONTS_PREMIUM
+  return FONTS_BASIC
+}
+
+// Back-compat: legacy code still importing `fontOptions` gets the full list
+export const fontOptions = FONTS_ELITE
 
 // Template pre-fills that map to card objects for each template category
 export const templateCardObjects = {

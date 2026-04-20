@@ -13,7 +13,7 @@ const CARD_TYPES = [
     id: 'moment',
     icon: HiOutlineEnvelope,
     emoji: '💌',
-    label: 'Moment Card',
+    label: 'Personal Card',
     tagline: 'The full cinematic experience',
     description: 'Envelope reveals, background music, animations, images, gifts, questions — everything.',
     accent: 'warm',
@@ -67,22 +67,24 @@ const TIER_INFO = {
   elite: { label: 'Elite', note: 'Full effects + gifts · Costs CC' },
 }
 
-function CardTypeModal({ open, onClose, preselectedType }) {
+function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
   const navigate = useNavigate()
   const [selectedType, setSelectedType] = useState(null)
   const [selectedTier, setSelectedTier] = useState(null)
+  const isArtist = currentUser?.role === 'Artist'
 
   // Reset state when modal opens / closes or preselection changes
   useEffect(() => {
     if (open && preselectedType) {
       setSelectedType(preselectedType)
       const type = CARD_TYPES.find((t) => t.id === preselectedType)
-      setSelectedTier(type?.tiers[0] || 'classic')
+      // Artists default to Elite — they're building signature work
+      setSelectedTier(isArtist ? (type?.tiers.includes('elite') ? 'elite' : type?.tiers[type.tiers.length - 1]) : (type?.tiers[0] || 'classic'))
     } else if (open) {
       setSelectedType(null)
       setSelectedTier(null)
     }
-  }, [open, preselectedType])
+  }, [open, preselectedType, isArtist])
 
   if (!open) return null
 
@@ -111,7 +113,7 @@ function CardTypeModal({ open, onClose, preselectedType }) {
   }
 
   return (
-    <section className="ctm-overlay" role="dialog" aria-modal="true" aria-label="Choose card type">
+    <section className={`ctm-overlay ${isArtist ? 'ctm-artist' : ''}`} role="dialog" aria-modal="true" aria-label="Choose card type">
       <div className="ctm-backdrop" onClick={onClose} />
       <div className="ctm-shell">
         {/* Header */}
@@ -120,8 +122,18 @@ function CardTypeModal({ open, onClose, preselectedType }) {
             {selectedType ? '← Back' : '✕'}
           </button>
           <div className="ctm-header-text">
-            <p className="eyebrow">Create a Card</p>
-            <h2>{selectedType ? 'Choose your tier' : 'What are you creating?'}</h2>
+            <p className="eyebrow">{isArtist ? 'Artist Studio' : 'Create a Card'}</p>
+            <h2>
+              {selectedType
+                ? (isArtist ? 'Pick a tier to design for' : 'Choose your tier')
+                : (isArtist ? 'What signature piece are you designing?' : 'What are you creating?')}
+            </h2>
+            {isArtist && !selectedType && (
+              <p className="ctm-artist-sub">You're building for the marketplace — every tier is open to you, no CC cost. Design something people will save.</p>
+            )}
+            {isArtist && selectedType && (
+              <p className="ctm-artist-sub">Pick the tier of experience you want this template to showcase. Your studio won't be capped either way.</p>
+            )}
           </div>
         </div>
 
@@ -167,6 +179,11 @@ function CardTypeModal({ open, onClose, preselectedType }) {
             <div className="ctm-tier-grid">
               {activeType.tiers.map((tier) => {
                 const info = TIER_INFO[tier]
+                const artistNote = tier === 'classic'
+                  ? 'Free tier feel · Minimal reveal'
+                  : tier === 'premium'
+                  ? 'Music + richer visuals'
+                  : 'Full cinematic experience'
                 return (
                   <button
                     key={tier}
@@ -175,7 +192,7 @@ function CardTypeModal({ open, onClose, preselectedType }) {
                     onClick={() => setSelectedTier(tier)}
                   >
                     <span className="ctm-tier-name">{info.label}</span>
-                    <span className="ctm-tier-note">{info.note}</span>
+                    <span className="ctm-tier-note">{isArtist ? artistNote : info.note}</span>
                     {selectedTier === tier && <span className="ctm-tier-check">✓</span>}
                   </button>
                 )
@@ -188,7 +205,7 @@ function CardTypeModal({ open, onClose, preselectedType }) {
               disabled={!selectedTier}
               onClick={handleStart}
             >
-              Start Creating →
+              {isArtist ? 'Open the Artist Studio →' : 'Start Creating →'}
             </button>
           </div>
         )}

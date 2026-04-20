@@ -47,9 +47,11 @@ function Dropdown({ value, onChange, options, placeholder = 'Select…', disable
               role="option"
               aria-selected={opt.value === value}
               className={`dropdown-option ${opt.value === value ? 'selected' : ''}`}
-              onClick={() => {
-                onChange(opt.value)
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
                 setOpen(false)
+                onChange(opt.value)
               }}
             >
               {opt.label}

@@ -7,6 +7,7 @@ import { mapBackendCard, layoutDataToCardObject } from '../lib/backendMappers.js
 import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
 import Envelope from '../components/Envelope.jsx'
 import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
+import { shouldShowEnvelope } from '../lib/tierLimits.js'
 
 const fallbackMusic =
   'data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA='
@@ -318,7 +319,7 @@ function CardView() {
         <span className="tier-badge card-view-tier">{tierInfo.label}</span>
       </div>
       <AnimatePresence mode="wait">
-        {!isOpen ? (
+        {!isOpen && shouldShowEnvelope(cardType) ? (
           <motion.section
             key="entry"
             className="card-entry cinematic-entry"
@@ -376,7 +377,7 @@ function CardView() {
               <div className="card-open-content">
                 <div className="card-open-meta-row">
                   <p className="entry-sub">To {card.recipient || 'You'}</p>
-                  <span className="cv-type-chip">{cardType === 'moment' ? 'Moment Card' : cardType === 'poll' ? 'Poll Card' : cardType === 'trivia' ? 'Trivia Card' : cardType === 'chain' ? 'Chain Card' : 'Card Experience'}</span>
+                  <span className="cv-type-chip">{cardType === 'moment' ? 'Personal Card' : cardType === 'poll' ? 'Poll Card' : cardType === 'trivia' ? 'Trivia Card' : cardType === 'chain' ? 'Chain Card' : 'Card Experience'}</span>
                 </div>
                 <h3 style={{ color: cardHeadingColor }}>{card.subtitle || heading}</h3>
 

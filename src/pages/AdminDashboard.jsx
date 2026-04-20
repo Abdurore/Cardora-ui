@@ -143,7 +143,9 @@ function AdminDashboard() {
   const mediaVideoInputRef = useRef(null)
   const mediaMusicInputRef = useRef(null)
   // Ban form
-  const [banForm, setBanForm] = useState({ userId: '', durationDays: 7, reason: '' })
+  const [banForm, setBanForm] = useState({ identifier: '', durationDays: 7, reason: '' })
+  const [banConfirm, setBanConfirm] = useState(null) // { user, payload } | null
+  const [banSubmitting, setBanSubmitting] = useState(false)
   // Broadcast message
   const [broadcastMessage, setBroadcastMessage] = useState('')
 
@@ -264,15 +266,39 @@ function AdminDashboard() {
     }
   }
 
-  const handleBanUser = async () => {
-    if (!banForm.userId) { showMsg('User ID required', false); return }
+  const openBanConfirm = () => {
+    const id = banForm.identifier.trim()
+    if (!id) { showMsg('User ID or username required', false); return }
+    const lower = id.toLowerCase()
+    const match = users.find(u =>
+      (u._id && u._id.toString() === id) ||
+      (u.id && u.id.toString() === id) ||
+      (u.username && u.username.toLowerCase() === lower)
+    )
+    setBanConfirm({
+      user: match || null,
+      identifier: id,
+      payload: {
+        userId: id,
+        durationDays: banForm.durationDays,
+        reason: banForm.reason,
+      },
+    })
+  }
+
+  const confirmBanUser = async () => {
+    if (!banConfirm) return
+    setBanSubmitting(true)
     try {
-      await banUser(banForm)
+      await banUser(banConfirm.payload)
       showMsg('User banned.')
-      setBanForm({ userId: '', durationDays: 7, reason: '' })
+      setBanForm({ identifier: '', durationDays: 7, reason: '' })
+      setBanConfirm(null)
       loadTabData('Users')
     } catch (err) {
       showMsg(err.message || 'Ban failed', false)
+    } finally {
+      setBanSubmitting(false)
     }
   }
 
@@ -386,14 +412,28 @@ function AdminDashboard() {
     }
   }
 
+  const refreshMediaSilent = async () => {
+    try {
+      const [videosRes, musicRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic()])
+      if (videosRes.status === 'fulfilled') {
+        const list = videosRes.value?.data?.videos || videosRes.value?.videos || null
+        if (list) setMediaVideos(list)
+      }
+      if (musicRes.status === 'fulfilled') {
+        const list = musicRes.value?.data?.music || musicRes.value?.music || null
+        if (list) setMediaMusic(list)
+      }
+    } catch { /* ignore */ }
+  }
+
   const handleAddVideo = async () => {
     if (!newVideo.name || !newVideo.url) { showMsg('Name and video required.', false); return }
     try {
-      await uploadMediaVideo(newVideo)
+      await uploadMediaVideo({ name: newVideo.name, url: newVideo.url, videoUrl: newVideo.url })
       showMsg('Video added to library!')
       setNewVideo({ name: '', url: '' })
       if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
-      loadTabData('Media')
+      refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Failed.', false)
     }
@@ -403,8 +443,9 @@ function AdminDashboard() {
     if (!window.confirm('Delete this video?')) return
     try {
       await deleteMediaVideo(id)
+      setMediaVideos(prev => prev.filter(v => (v._id || v.id) !== id))
       showMsg('Video deleted.')
-      loadTabData('Media')
+      refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Delete failed.', false)
     }
@@ -427,11 +468,11 @@ function AdminDashboard() {
   const handleAddTrack = async () => {
     if (!newTrack.name || !newTrack.url) { showMsg('Name and audio required.', false); return }
     try {
-      await uploadMediaMusic(newTrack)
+      await uploadMediaMusic({ name: newTrack.name, url: newTrack.url, audioUrl: newTrack.url })
       showMsg('Track added to library!')
       setNewTrack({ name: '', url: '' })
       if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
-      loadTabData('Media')
+      refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Failed.', false)
     }
@@ -441,8 +482,9 @@ function AdminDashboard() {
     if (!window.confirm('Delete this track?')) return
     try {
       await deleteMediaMusic(id)
+      setMediaMusic(prev => prev.filter(t => (t._id || t.id) !== id))
       showMsg('Track deleted.')
-      loadTabData('Media')
+      refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Delete failed.', false)
     }
@@ -566,8 +608,8 @@ function AdminDashboard() {
               <h4>Ban User</h4>
               <div className="admin-inline-form">
                 <label className="admin-field">
-                  <span>User ID</span>
-                  <input placeholder="e.g. 65f3a2..." value={banForm.userId} onChange={e => setBanForm(p => ({ ...p, userId: e.target.value }))} />
+                  <span>User ID or Username</span>
+                  <input placeholder="user id (24-char) or username" value={banForm.identifier} onChange={e => setBanForm(p => ({ ...p, identifier: e.target.value }))} />
                 </label>
                 <label className="admin-field">
                   <span>Ban Duration (days)</span>
@@ -577,7 +619,7 @@ function AdminDashboard() {
                   <span>Reason</span>
                   <input placeholder="Why are they being banned?" value={banForm.reason} onChange={e => setBanForm(p => ({ ...p, reason: e.target.value }))} />
                 </label>
-                <button className="primary" type="button" onClick={handleBanUser}>Ban</button>
+                <button className="primary" type="button" onClick={openBanConfirm}>Ban</button>
               </div>
             </div>
 
@@ -1171,6 +1213,67 @@ function AdminDashboard() {
         )}
       </div>
       <ScreenNav />
+
+      {banConfirm && (
+        <div className="ban-confirm-overlay" role="dialog" aria-modal="true">
+          <div className="ban-confirm-backdrop" onClick={() => !banSubmitting && setBanConfirm(null)} />
+          <div className="ban-confirm-card">
+            <h3 className="ban-confirm-title">Confirm ban</h3>
+            {banConfirm.user ? (
+              <div className="ban-confirm-user">
+                <div className="ban-confirm-avatar">
+                  {banConfirm.user.profilePictureUrl
+                    ? <img src={banConfirm.user.profilePictureUrl} alt={banConfirm.user.username || ''} />
+                    : <span>{(banConfirm.user.username || '?').slice(0, 1).toUpperCase()}</span>}
+                </div>
+                <div className="ban-confirm-info">
+                  <div className="ban-confirm-username">{banConfirm.user.username || '—'}</div>
+                  <div className="ban-confirm-email">{banConfirm.user.email || '—'}</div>
+                  <div className="ban-confirm-meta">
+                    <span className={`admin-role-chip ${(banConfirm.user.role || 'user').toLowerCase()}`}>{banConfirm.user.role || 'User'}</span>
+                    <span>CC: {banConfirm.user.cc ?? banConfirm.user.balance ?? 0}</span>
+                    <span>{banConfirm.user.isVerified ? 'Verified' : 'Unverified'}</span>
+                  </div>
+                  {(banConfirm.user._id || banConfirm.user.id) && (
+                    <div className="ban-confirm-id">ID: {banConfirm.user._id || banConfirm.user.id}</div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="ban-confirm-user ban-confirm-user-missing">
+                <p>No matching user found in the loaded list. The ban will still be attempted using this value:</p>
+                <code>{banConfirm.identifier}</code>
+              </div>
+            )}
+
+            <div className="ban-confirm-details">
+              <div><span>Duration</span><strong>{banConfirm.payload.durationDays} day(s)</strong></div>
+              <div><span>Reason</span><strong>{banConfirm.payload.reason || '—'}</strong></div>
+            </div>
+
+            <p className="ban-confirm-warn">This will immediately suspend the account. Proceed?</p>
+
+            <div className="ban-confirm-actions">
+              <button
+                type="button"
+                className="ban-confirm-cancel"
+                onClick={() => setBanConfirm(null)}
+                disabled={banSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ban-confirm-submit"
+                onClick={confirmBanUser}
+                disabled={banSubmitting}
+              >
+                {banSubmitting ? 'Banning…' : 'Confirm ban'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -672,6 +672,7 @@ function MainLayout() {
         onRequireAuth={() => navigate('/login')}
         onDeductCC={deductCC}
         inventory={inventory}
+        onDeleteTemplate={deleteMarketplaceTemplate}
         openCardTypeModal={(preselect) => {
           setCardTypePreselect(preselect || null)
           setShowCardTypeModal(true)
@@ -689,6 +690,7 @@ function MainLayout() {
         open={showCardTypeModal}
         onClose={() => { setShowCardTypeModal(false); setCardTypePreselect(null) }}
         preselectedType={cardTypePreselect}
+        currentUser={hydratedUser}
       />
       <WelcomeBackBanner currentUser={hydratedUser} />
     </div>

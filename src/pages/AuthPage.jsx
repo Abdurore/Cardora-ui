@@ -81,7 +81,7 @@ function AuthPage({ mode = 'login' }) {
     intro: 'Sign in to return to your saved cards, gift balance, and the moments you are building for the people who matter.',
   }, [mode])
 
-  if (currentUser) return <Navigate to="/profile" replace />
+  if (currentUser) return <Navigate to="/" replace />
 
   // Clear error the moment the user starts correcting their input
   const handleChange = (event) => {

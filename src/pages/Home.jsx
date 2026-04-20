@@ -16,7 +16,7 @@ const FORMAT_CHIPS = [
 const CARD_FORMATS = [
   {
     icon: '💌',
-    title: 'Moment Cards',
+    title: 'Personal Cards',
     tagline: 'Cinematic reveals with music and effects.',
     description: 'Build a personalized experience that opens like a tiny film — envelope, music, glow, and all.',
     accent: 'warm',

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 const CARD_TYPES = [
   {
     id: 'moment',
-    label: 'Moment Card',
+    label: 'Personal Card',
     icon: '✉',
     desc: 'A cinematic card with envelope reveal, music, media, and effects.',
     accent: '#f0c060',
