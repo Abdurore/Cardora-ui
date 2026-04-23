@@ -11,6 +11,7 @@ import {
   createPaystackCheckout,
   createTemplate,
   deleteTemplate,
+  adminDeleteTemplate,
   extractToken,
   getCouponPackages,
   getCurrentUser,
@@ -444,17 +445,20 @@ function MainLayout() {
     }
   }
 
-  const publishTemplate = async ({ name, category, previewImage, layoutConfig }) => {
+  const publishTemplate = async ({ name, type, tier, previewImage, layoutConfig }) => {
     try {
       const resolvedPreviewImage = previewImage || layoutConfig?.previewImage || layoutConfig?.previewUrl || ''
       const normalizedLayoutConfig = structuredClone({
         ...layoutConfig,
+        type: type || layoutConfig?.type || 'personal',
+        tier: tier || layoutConfig?.tier || 'classic',
         previewImage: resolvedPreviewImage,
         previewUrl: resolvedPreviewImage,
       })
       const response = await createTemplate({
         name,
-        category,
+        type: type || 'personal',
+        tier: tier || 'classic',
         previewImage: resolvedPreviewImage,
         layoutConfig: normalizedLayoutConfig,
       })
@@ -469,7 +473,14 @@ function MainLayout() {
   const deleteMarketplaceTemplate = async (templateId) => {
     if (!templateId) return { ok: false, message: 'Missing template id.' }
     try {
-      await deleteTemplate({ templateId })
+      // Admins and artists use different endpoints — the artist path checks
+      // ownership, which rejects admin callers even though they should be able
+      // to moderate the marketplace.
+      if (currentUser?.role === 'Admin') {
+        await adminDeleteTemplate(templateId)
+      } else {
+        await deleteTemplate({ templateId })
+      }
       setMarketplaceTemplates((prev) => prev.filter((t) => (t.templateId || t.id) !== templateId))
       await loadPublicData()
       return { ok: true }
@@ -482,10 +493,13 @@ function MainLayout() {
   const handleCreateCard = async (cardObject, { title, templateId, type, couponType, useCoupons, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
       const layoutdata = cardObjectToLayoutData(cardObject)
+      // Backend card engine uses 'personal' for the standard card type. 'moment'
+      // is still the internal studio id — normalise at the API boundary.
+      const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : type
       const payload = {
         title: title || cardObject.content?.heading || 'Untitled Card',
         layoutdata,
-        type: type || 'standard',
+        type: resolvedType,
       }
       // Only include templateId when it's a real template id — omitting it signals "custom card"
       if (templateId && templateId !== 'custom') payload.templateId = templateId
@@ -498,7 +512,7 @@ function MainLayout() {
       // Route to the correct tier-specific endpoint
       let response
       const resolvedTier = (tier || 'classic').toLowerCase()
-      if (type === 'anonymous' || anonTemplate) {
+      if (resolvedType === 'anonymous' || anonTemplate) {
         payload.anonTemplate = anonTemplate
         response = await createCardAnonymous(payload)
       } else if (resolvedTier === 'elite') {
@@ -672,7 +686,6 @@ function MainLayout() {
         onRequireAuth={() => navigate('/login')}
         onDeductCC={deductCC}
         inventory={inventory}
-        onDeleteTemplate={deleteMarketplaceTemplate}
         openCardTypeModal={(preselect) => {
           setCardTypePreselect(preselect || null)
           setShowCardTypeModal(true)

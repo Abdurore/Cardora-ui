@@ -10,7 +10,7 @@ import {
 
 const CARD_TYPES = [
   {
-    id: 'moment',
+    id: 'personal',
     icon: HiOutlineEnvelope,
     emoji: '💌',
     label: 'Personal Card',

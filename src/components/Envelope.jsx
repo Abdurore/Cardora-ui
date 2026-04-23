@@ -32,9 +32,20 @@ function deriveRecipientName(explicit, email) {
     .join(' ')
 }
 
+const TIER_ALIASES = { simple: 'classic', special: 'premium', signature: 'elite' }
+function normaliseTier(tier) {
+  const key = String(tier || 'classic').toLowerCase()
+  return TIER_ALIASES[key] || key
+}
+
+function isTouchPointer() {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia?.('(hover: none), (pointer: coarse)')?.matches || false
+}
+
 function Envelope({
   cardObject,
-  tier = 'simple',
+  tier = 'classic',
   recipientEmail = '',
   onOpenComplete,
   onReplay,
@@ -43,7 +54,7 @@ function Envelope({
 }) {
   const envelope = cardObject?.closedState?.envelope || {}
   const closed = cardObject?.closedState || {}
-  const profile = useMemo(() => getEnvelopeTierProfile(tier), [tier])
+  const profile = useMemo(() => getEnvelopeTierProfile(normaliseTier(tier)), [tier])
   const pacing = getPacingMultiplier(envelope.pacing)
 
   const [stage, setStage] = useState('arriving')
@@ -54,14 +65,40 @@ function Envelope({
   const chimeRef = useRef(null)
   const rustleRef = useRef(null)
   const crackRef = useRef(null)
+  const mountedRef = useRef(true)
+  const timersRef = useRef([])
+
+  // Track mount so delayed setState calls from timers never fire after unmount
+  // (the consumer unmounts on onOpenComplete).
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      timersRef.current.forEach(clearTimeout)
+      timersRef.current = []
+    }
+  }, [])
+
+  const safeSetStage = useCallback((next) => {
+    if (mountedRef.current) setStage(next)
+  }, [])
+
+  const scheduleTimer = useCallback((fn, delay) => {
+    const id = setTimeout(() => {
+      timersRef.current = timersRef.current.filter((t) => t !== id)
+      if (mountedRef.current) fn()
+    }, delay)
+    timersRef.current.push(id)
+    return id
+  }, [])
 
   const recipientName = deriveRecipientName(envelope.recipientCaption, recipientEmail)
   const monogramLetter = recipientName ? recipientName.charAt(0).toUpperCase() : ''
 
   useEffect(() => {
-    const t = setTimeout(() => setStage('sealed'), 900 * pacing)
-    return () => clearTimeout(t)
-  }, [pacing])
+    const id = scheduleTimer(() => safeSetStage('sealed'), 900 * pacing)
+    return () => clearTimeout(id)
+  }, [pacing, safeSetStage, scheduleTimer])
 
   useEffect(() => {
     if (stage !== 'sealed') return
@@ -71,6 +108,9 @@ function Envelope({
 
   useEffect(() => {
     if (!profile.parallax) return
+    // Skip parallax entirely on touch devices — mousemove never fires reliably
+    // there and the listener still runs, wasting cycles.
+    if (isTouchPointer()) return
     const handler = (e) => {
       if (!sceneRef.current) return
       const rect = sceneRef.current.getBoundingClientRect()
@@ -81,7 +121,7 @@ function Envelope({
       pendingTilt.current = { x: Math.max(-1, Math.min(1, dx)) * 10, y: Math.max(-1, Math.min(1, dy)) * -8 }
       if (rafRef.current == null) {
         rafRef.current = requestAnimationFrame(() => {
-          setTilt(pendingTilt.current)
+          if (mountedRef.current) setTilt(pendingTilt.current)
           rafRef.current = null
         })
       }
@@ -96,25 +136,26 @@ function Envelope({
 
   useEffect(() => {
     if (!closing || !profile.closingFold) return
-    setStage('closing')
-    const t1 = setTimeout(() => setStage('resealed'), 1200 * pacing)
-    const t2 = setTimeout(() => onClosingComplete?.(), 1800 * pacing)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [closing, profile.closingFold, pacing, onClosingComplete])
+    safeSetStage('closing')
+    scheduleTimer(() => safeSetStage('resealed'), 1200 * pacing)
+    scheduleTimer(() => onClosingComplete?.(), 1800 * pacing)
+  }, [closing, profile.closingFold, pacing, onClosingComplete, safeSetStage, scheduleTimer])
 
   const handleUnseal = useCallback(() => {
-    if (stage !== 'sealed') return
-    setStage('unsealing')
+    // Allow early tap during 'arriving' — reads as eager rather than unresponsive.
+    if (stage !== 'sealed' && stage !== 'arriving') return
+    safeSetStage('unsealing')
     if (profile.ambientAudio) {
       crackRef.current?.play?.().catch(() => {})
-      setTimeout(() => rustleRef.current?.play?.().catch(() => {}), 150)
+      scheduleTimer(() => rustleRef.current?.play?.().catch(() => {}), 150)
     }
-    setTimeout(() => setStage('opening'), 800 * pacing)
-    setTimeout(() => {
-      setStage('letterOut')
+    scheduleTimer(() => safeSetStage('opening'), 800 * pacing)
+    scheduleTimer(() => {
+      // Don't setStage here — the consumer typically unmounts on onOpenComplete.
+      // Stage is irrelevant after the letter is out.
       onOpenComplete?.()
     }, 1500 * pacing)
-  }, [stage, profile.ambientAudio, pacing, onOpenComplete])
+  }, [stage, profile.ambientAudio, pacing, onOpenComplete, safeSetStage, scheduleTimer])
 
   const sceneClass = [
     'envelope-scene',
@@ -175,11 +216,11 @@ function Envelope({
           <div className="envelope-flap" />
           <button
             type="button"
-            className={`envelope-seal ${stage === 'sealed' ? 'pulsing' : ''}`}
+            className={`envelope-seal ${stage === 'sealed' || stage === 'arriving' ? 'pulsing' : ''}`}
             style={{ '--seal-color': envelope.sealColor || '#b03030' }}
             onClick={handleUnseal}
             aria-label="Open envelope"
-            disabled={stage !== 'sealed'}
+            disabled={stage !== 'sealed' && stage !== 'arriving'}
           >
             {sealContent}
           </button>

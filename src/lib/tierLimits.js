@@ -19,6 +19,7 @@ const CLASSIC = {
   allowQuestions: false,
   allowTypewriter: false,
   allowFadeIn: true,
+  allowCustomPalette: false, // Elite+ can hand-pick palette colors
   envelopeProfile: 'basic',
 }
 
@@ -35,6 +36,7 @@ const PREMIUM = {
   allowQuestions: false,
   allowTypewriter: true,
   allowFadeIn: true,
+  allowCustomPalette: false,
   envelopeProfile: 'premium',
 }
 
@@ -51,6 +53,7 @@ const ELITE = {
   allowQuestions: true,
   allowTypewriter: true,
   allowFadeIn: true,
+  allowCustomPalette: true,
   envelopeProfile: 'elite',
 }
 
@@ -67,6 +70,7 @@ const ARTIST = {
   allowQuestions: true,
   allowTypewriter: true,
   allowFadeIn: true,
+  allowCustomPalette: true,
   envelopeProfile: 'elite',
 }
 
@@ -74,7 +78,7 @@ export const TIER_LIMITS = { classic: CLASSIC, premium: PREMIUM, elite: ELITE }
 
 // Personal + Chain are the narrative formats — they keep the envelope reveal.
 // Poll, Trivia, Anonymous jump straight to content (no envelope metaphor).
-const ENVELOPE_TYPES = new Set(['moment', 'chain'])
+const ENVELOPE_TYPES = new Set(['personal', 'chain'])
 
 export function shouldShowEnvelope(studioType) {
   return ENVELOPE_TYPES.has(studioType)

@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
-import { homeCards } from '../data/catalog.js'
 
 const FORMAT_CHIPS = [
   { icon: '✉', label: 'Greeting', cls: 'chip-greeting' },
@@ -21,7 +20,7 @@ const CARD_FORMATS = [
     description: 'Build a personalized experience that opens like a tiny film — envelope, music, glow, and all.',
     accent: 'warm',
     cta: 'Try it',
-    typePreselect: 'moment',
+    typePreselect: 'personal',
   },
   {
     icon: '📊',
@@ -123,10 +122,11 @@ function Home() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
 
   const highlightCards = useMemo(() => {
-    if (marketplaceTemplates?.length) {
-      return marketplaceTemplates.slice(0, 8)
-    }
-    return homeCards
+    // Only real, live artist-published templates. No placeholder catalog.
+    const live = (marketplaceTemplates || []).filter(
+      (t) => !t.status || t.status === 'approved' || t.status === 'live',
+    )
+    return live.slice(0, 8)
   }, [marketplaceTemplates])
 
   const visibleCards = useMemo(() => {

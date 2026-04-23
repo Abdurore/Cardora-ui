@@ -1,5 +1,11 @@
 // Default card object matching the backend schema exactly
 export const defaultCardObject = {
+  // Palette anchor — the currently applied color palette. Non-artist users
+  // pick a palette and it cascades across theme, card, closedState, envelope,
+  // and questions.button colors. null means no palette has been applied yet
+  // (either a blank draft or an artist-authored template using per-field colors).
+  palette: null,
+
   background: {
     type: 'color',
     colors: ['#0a0a0a'],
@@ -114,25 +120,39 @@ export const defaultCardObject = {
   },
 }
 
-// Free ambient music URLs (royalty-free)
+// Free ambient music URLs (royalty-free). Each preset declares a minimum tier —
+// Classic never sees music; Premium gets the first two lighter moods; Elite gets
+// the full library + any admin-curated tracks.
 export const musicPresets = [
   {
     label: 'Soft Piano',
     url: 'https://cdn.pixabay.com/audio/2024/11/29/audio_a0727dc75c.mp3',
-  },
-  {
-    label: 'Romantic Strings',
-    url: 'https://cdn.pixabay.com/audio/2024/02/14/audio_8ceb40cf47.mp3',
+    tier: 'premium',
   },
   {
     label: 'Gentle Ambience',
     url: 'https://cdn.pixabay.com/audio/2022/02/23/audio_ea70ad31a4.mp3',
+    tier: 'premium',
+  },
+  {
+    label: 'Romantic Strings',
+    url: 'https://cdn.pixabay.com/audio/2024/02/14/audio_8ceb40cf47.mp3',
+    tier: 'elite',
   },
   {
     label: 'Celebration',
     url: 'https://cdn.pixabay.com/audio/2021/11/10/audio_f4c1282990.mp3',
+    tier: 'elite',
   },
 ]
+
+const MUSIC_TIER_RANK = { classic: 0, premium: 1, elite: 2 }
+
+export function getMusicPresetsForTier(tier, { isArtist = false } = {}) {
+  if (isArtist) return musicPresets
+  const rank = MUSIC_TIER_RANK[tier] || 0
+  return musicPresets.filter((p) => (MUSIC_TIER_RANK[p.tier] || 0) <= rank)
+}
 
 // Font options — tiered library
 export const FONTS_BASIC = [
@@ -183,9 +203,9 @@ export const FONTS_ELITE = [
  */
 export function getFontsForTier(cardType, tier) {
   const t = (tier || 'classic').toLowerCase()
-  const type = (cardType || 'moment').toLowerCase()
+  const type = (cardType || 'personal').toLowerCase()
   if (t === 'elite') return FONTS_ELITE
-  if (type === 'moment') return FONTS_BASIC
+  if (type === 'personal') return FONTS_BASIC
   if (t === 'premium') return FONTS_PREMIUM
   return FONTS_BASIC
 }
@@ -541,14 +561,31 @@ export function backfillEnvelope(card) {
 export function resolveTemplateCardObject(cardData) {
   if (!cardData) return backfillEnvelope(structuredClone(defaultCardObject))
 
-  const category = cardData.category || 'scratch'
-  const base = templateCardObjects[category]
-    ? structuredClone(templateCardObjects[category])
-    : structuredClone(defaultCardObject)
+  // When an artist template carries its own layout, use it verbatim — the
+  // artist already designed exactly what users should see. Never replace it
+  // with a category preset.
+  const layoutConfig =
+    cardData.layoutConfig ||
+    cardData.layoutdata ||
+    cardData.backendTemplate?.layoutConfig ||
+    cardData.backendTemplate?.layoutdata ||
+    null
 
+  if (layoutConfig && typeof layoutConfig === 'object' && Object.keys(layoutConfig).length > 0) {
+    const base = structuredClone(layoutConfig)
+    // Defensive fill: make sure required shape exists so downstream code doesn't crash.
+    base.content = base.content || structuredClone(defaultCardObject.content)
+    base.theme = base.theme || structuredClone(defaultCardObject.theme)
+    base.closedState = base.closedState || structuredClone(defaultCardObject.closedState)
+    return backfillEnvelope(base)
+  }
+
+  // No layout to clone (e.g. user starting from scratch) — fall back to the
+  // blank default. Category-based presets are intentionally no longer used as
+  // a fallback layout for personal cards.
+  const base = structuredClone(defaultCardObject)
   if (cardData.title) base.content.heading = cardData.title
   if (cardData.message) base.content.body = cardData.message
   if (cardData.subtitle) base.closedState.bodyText = cardData.subtitle
-
   return backfillEnvelope(base)
 }

@@ -35,7 +35,12 @@ import {
   getMediaMusic,
   uploadMediaMusic,
   deleteMediaMusic,
+  getAdminTemplates,
+  getTemplates,
+  approveTemplate,
+  rejectTemplate,
 } from '../lib/api.js'
+import { mapTemplateToCard } from '../lib/backendMappers.js'
 
 const TABS = ['Overview', 'Users', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
 
@@ -123,6 +128,7 @@ function AdminDashboard() {
   const [referralStats, setReferralStats] = useState(null)
   const [mediaVideos, setMediaVideos] = useState([])
   const [mediaMusic, setMediaMusic] = useState([])
+  const [allTemplates, setAllTemplates] = useState([])
   const [loading, setLoading] = useState(false)
   const [actionMsg, setActionMsg] = useState({ text: '', ok: false })
 
@@ -210,7 +216,20 @@ function AdminDashboard() {
           break
         }
         case 'Templates': {
-          // Templates are already loaded into marketplaceTemplates via outlet context.
+          // Admin endpoint returns every template (pending + approved + rejected).
+          // Fall back to the public /templates list if the admin endpoint isn't
+          // available — that at least surfaces the live marketplace.
+          let templates = []
+          try {
+            const res = await getAdminTemplates('page=1&limit=200')
+            templates = res?.data?.templates || res?.templates || []
+          } catch {
+            try {
+              const res = await getTemplates('page=1&limit=200')
+              templates = res?.data?.templates || res?.templates || []
+            } catch { /* leave empty */ }
+          }
+          setAllTemplates(templates.map(mapTemplateToCard))
           break
         }
         case 'Artists': {
@@ -399,14 +418,19 @@ function AdminDashboard() {
   }
 
   const handleMediaVideoFile = async (file) => {
-    if (!file || !file.type.startsWith('video/')) { showMsg('Please select a video file.', false); return }
+    if (!file) { showMsg('No file selected.', false); return }
+    if (!file.type.startsWith('video/')) {
+      showMsg(`Please select a video file. Got "${file.type || 'unknown'}".`, false)
+      return
+    }
     setMediaVideoUploading(true)
     try {
       const url = await uploadToCloudinary(file, 'video')
       setNewVideo(p => ({ ...p, url }))
-      showMsg('Video uploaded!')
+      showMsg('Video uploaded — click "Add" to save.')
     } catch (err) {
-      showMsg(err.message || 'Upload failed.', false)
+      console.error('[Admin] Cloudinary video upload failed', err)
+      showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
     } finally {
       setMediaVideoUploading(false)
     }
@@ -429,21 +453,29 @@ function AdminDashboard() {
   const handleAddVideo = async () => {
     if (!newVideo.name || !newVideo.url) { showMsg('Name and video required.', false); return }
     try {
-      await uploadMediaVideo({ name: newVideo.name, url: newVideo.url, videoUrl: newVideo.url })
+      await uploadMediaVideo({
+        name: newVideo.name,
+        title: newVideo.name,
+        url: newVideo.url,
+        videoUrl: newVideo.url,
+      })
       showMsg('Video added to library!')
       setNewVideo({ name: '', url: '' })
       if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
       refreshMediaSilent()
     } catch (err) {
-      showMsg(err.message || 'Failed.', false)
+      console.error('[Admin] uploadMediaVideo failed', err)
+      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
     }
   }
 
-  const handleDeleteVideo = async (id) => {
+  const handleDeleteVideo = async (video) => {
     if (!window.confirm('Delete this video?')) return
+    const nameKey = video?.nameKey || video?.title || video?.name
+    if (!nameKey) { showMsg('Missing video identifier.', false); return }
     try {
-      await deleteMediaVideo(id)
-      setMediaVideos(prev => prev.filter(v => (v._id || v.id) !== id))
+      await deleteMediaVideo(nameKey)
+      setMediaVideos(prev => prev.filter(v => (v._id || v.id) !== (video._id || video.id)))
       showMsg('Video deleted.')
       refreshMediaSilent()
     } catch (err) {
@@ -452,14 +484,22 @@ function AdminDashboard() {
   }
 
   const handleMediaMusicFile = async (file) => {
-    if (!file || !file.type.startsWith('audio/')) { showMsg('Please select an audio file.', false); return }
+    if (!file) { showMsg('No file selected.', false); return }
+    if (!file.type.startsWith('audio/')) {
+      showMsg(`Please select an audio file. Got "${file.type || 'unknown'}".`, false)
+      return
+    }
     setMediaMusicUploading(true)
     try {
-      const url = await uploadToCloudinary(file, 'auto')
+      // Cloudinary stores audio under the `video` resource type — 'auto' can
+      // misclassify some codecs and return 4xx. Use 'video' explicitly so mp3
+      // and wav uploads work consistently.
+      const url = await uploadToCloudinary(file, 'video')
       setNewTrack(p => ({ ...p, url }))
-      showMsg('Audio uploaded!')
+      showMsg('Audio uploaded — click "Add" to save.')
     } catch (err) {
-      showMsg(err.message || 'Upload failed.', false)
+      console.error('[Admin] Cloudinary audio upload failed', err)
+      showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
     } finally {
       setMediaMusicUploading(false)
     }
@@ -468,21 +508,68 @@ function AdminDashboard() {
   const handleAddTrack = async () => {
     if (!newTrack.name || !newTrack.url) { showMsg('Name and audio required.', false); return }
     try {
-      await uploadMediaMusic({ name: newTrack.name, url: newTrack.url, audioUrl: newTrack.url })
+      await uploadMediaMusic({
+        name: newTrack.name,
+        title: newTrack.name,
+        url: newTrack.url,
+        audioUrl: newTrack.url,
+      })
       showMsg('Track added to library!')
       setNewTrack({ name: '', url: '' })
       if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
       refreshMediaSilent()
     } catch (err) {
-      showMsg(err.message || 'Failed.', false)
+      console.error('[Admin] uploadMediaMusic failed', err)
+      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
     }
   }
 
-  const handleDeleteTrack = async (id) => {
-    if (!window.confirm('Delete this track?')) return
+  const handleApproveTemplate = async (tpl) => {
+    const id = tpl.templateId || tpl.id
+    if (!id) return
     try {
-      await deleteMediaMusic(id)
-      setMediaMusic(prev => prev.filter(t => (t._id || t.id) !== id))
+      await approveTemplate(id)
+      showMsg(`Approved "${tpl.title}".`)
+      loadTabData('Templates')
+    } catch (err) {
+      showMsg(err.message || 'Approve failed.', false)
+    }
+  }
+
+  const handleRejectTemplate = async (tpl) => {
+    const id = tpl.templateId || tpl.id
+    if (!id) return
+    const reason = window.prompt(`Reject "${tpl.title}"? Optional reason:`, '')
+    if (reason === null) return
+    try {
+      await rejectTemplate(id, reason)
+      showMsg(`Rejected "${tpl.title}".`)
+      loadTabData('Templates')
+    } catch (err) {
+      showMsg(err.message || 'Reject failed.', false)
+    }
+  }
+
+  const handleAdminDeleteTemplate = async (tpl) => {
+    const id = tpl.templateId || tpl.id
+    if (!id) return
+    if (!window.confirm(`Delete template "${tpl.title}"? This cannot be undone.`)) return
+    const res = await deleteMarketplaceTemplate?.(id)
+    if (res?.ok) {
+      showMsg('Template deleted.')
+      setAllTemplates(prev => prev.filter(t => (t.templateId || t.id) !== id))
+    } else {
+      showMsg(res?.message || 'Delete failed.', false)
+    }
+  }
+
+  const handleDeleteTrack = async (track) => {
+    if (!window.confirm('Delete this track?')) return
+    const nameKey = track?.nameKey || track?.name || track?.title
+    if (!nameKey) { showMsg('Missing track identifier.', false); return }
+    try {
+      await deleteMediaMusic(nameKey)
+      setMediaMusic(prev => prev.filter(t => (t._id || t.id) !== (track._id || track.id)))
       showMsg('Track deleted.')
       refreshMediaSilent()
     } catch (err) {
@@ -652,73 +739,117 @@ function AdminDashboard() {
         )}
 
         {/* TEMPLATES — review & delete */}
-        {activeTab === 'Templates' && !loading && (
-          <div className="admin-section">
-            <h3 className="admin-section-title">Marketplace Templates</h3>
-            {(marketplaceTemplates?.length || 0) > 0 ? (
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Preview</th>
-                      <th>Name</th>
-                      <th>Category</th>
-                      <th>Tier</th>
-                      <th>Likes</th>
-                      <th>Views</th>
-                      <th>Status</th>
-                      <th>Actions</th>
+        {activeTab === 'Templates' && !loading && (() => {
+          const pending = allTemplates.filter(t => t.status === 'pending')
+          const live = allTemplates.filter(t => t.status === 'approved' || t.status === 'live' || !t.status || t.status === '')
+          const rejected = allTemplates.filter(t => t.status === 'rejected')
+
+          const renderTable = (rows, showReviewActions) => (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Preview</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Tier</th>
+                    <th>Likes</th>
+                    <th>Views</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((tpl) => (
+                    <tr key={tpl.id}>
+                      <td>
+                        {tpl.previewImage ? (
+                          <img
+                            src={tpl.previewImage}
+                            alt={tpl.title || ''}
+                            style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 6 }}
+                          />
+                        ) : '—'}
+                      </td>
+                      <td>{tpl.title || '-'}</td>
+                      <td>{tpl.type || '-'}</td>
+                      <td>{tpl.tier || '-'}</td>
+                      <td>{tpl.likeCount ?? tpl.likes ?? 0}</td>
+                      <td>{tpl.userCount ?? 0}</td>
+                      <td>
+                        <span className={`admin-template-status ${(tpl.status || 'live').toLowerCase()}`}>
+                          {tpl.tag || 'Live'}
+                        </span>
+                      </td>
+                      <td style={{ display: 'flex', gap: 6 }}>
+                        {showReviewActions && (
+                          <>
+                            <button
+                              type="button"
+                              className="admin-action-btn accept"
+                              onClick={() => handleApproveTemplate(tpl)}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-action-btn reject"
+                              onClick={() => handleRejectTemplate(tpl)}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          className="admin-action-btn reject"
+                          onClick={() => handleAdminDeleteTemplate(tpl)}
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {marketplaceTemplates.map((tpl) => (
-                      <tr key={tpl.id}>
-                        <td>
-                          {tpl.previewImage ? (
-                            <img
-                              src={tpl.previewImage}
-                              alt={tpl.title || ''}
-                              style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 6 }}
-                            />
-                          ) : '—'}
-                        </td>
-                        <td>{tpl.title || '-'}</td>
-                        <td>{tpl.occasion || '-'}</td>
-                        <td>{tpl.tier || '-'}</td>
-                        <td>{tpl.likeCount ?? tpl.likes ?? 0}</td>
-                        <td>{tpl.userCount ?? 0}</td>
-                        <td>
-                          <span className={`admin-template-status ${(tpl.tag || 'live').toLowerCase()}`}>
-                            {tpl.tag || 'Live'}
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="admin-action-btn reject"
-                            onClick={async () => {
-                              if (!window.confirm(`Delete template "${tpl.title}"? This cannot be undone.`)) return
-                              const res = await deleteMarketplaceTemplate?.(tpl.templateId || tpl.id)
-                              if (res?.ok) showMsg('Template deleted.')
-                              else showMsg(res?.message || 'Delete failed.', false)
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+
+          return (
+            <>
+              <div className="admin-section">
+                <h3 className="admin-section-title">
+                  Pending Review {pending.length > 0 ? `(${pending.length})` : ''}
+                </h3>
+                {pending.length > 0 ? renderTable(pending, true) : (
+                  <div className="admin-empty">
+                    <span className="admin-empty-icon">{"\u{1F4E5}"}</span>
+                    <p>No templates awaiting review.</p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="admin-empty">
-                <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
-                <p>No templates in the marketplace yet.</p>
+
+              <div className="admin-section">
+                <h3 className="admin-section-title">
+                  Live Marketplace {live.length > 0 ? `(${live.length})` : ''}
+                </h3>
+                {live.length > 0 ? renderTable(live, false) : (
+                  <div className="admin-empty">
+                    <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
+                    <p>No approved templates in the marketplace yet.</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
+
+              {rejected.length > 0 && (
+                <div className="admin-section">
+                  <h3 className="admin-section-title">Rejected ({rejected.length})</h3>
+                  {renderTable(rejected, false)}
+                </div>
+              )}
+            </>
+          )
+        })()}
 
         {/* ARTISTS — applications */}
         {activeTab === 'Artists' && !loading && (
@@ -1056,11 +1187,11 @@ function AdminDashboard() {
                         <div className="admin-media-video-play-hint">▶</div>
                       </div>
                       <div className="admin-media-video-footer">
-                        <span className="admin-media-video-title">{v.title || 'Untitled'}</span>
+                        <span className="admin-media-video-title">{v.title || v.name || 'Untitled'}</span>
                         <button
                           type="button"
                           className="admin-media-delete-btn"
-                          onClick={() => handleDeleteVideo(v._id || v.id)}
+                          onClick={() => handleDeleteVideo(v)}
                           aria-label="Delete"
                         >
                           ✕
@@ -1137,13 +1268,13 @@ function AdminDashboard() {
                     <div key={track._id || track.id} className="admin-media-music-item">
                       <div className="admin-media-music-icon">♫</div>
                       <div className="admin-media-music-info">
-                        <span className="admin-media-music-name">{track.title || 'Untitled'}</span>
+                        <span className="admin-media-music-name">{track.title || track.name || 'Untitled'}</span>
                         <audio controls src={track.url || track.audioUrl} className="admin-media-music-player" />
                       </div>
                       <button
                         type="button"
                         className="admin-media-delete-btn"
-                        onClick={() => handleDeleteTrack(track._id || track.id)}
+                        onClick={() => handleDeleteTrack(track)}
                         aria-label="Delete"
                       >
                         ✕

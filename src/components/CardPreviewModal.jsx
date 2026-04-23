@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import PremiumGiftReveal from './PremiumGiftReveal.jsx'
 import Envelope from './Envelope.jsx'
@@ -32,7 +32,7 @@ function CardPreviewModal({
   allowedTools = null,
   tierLimits = null,
   recipientEmail = '',
-  studioType = 'moment',
+  studioType = 'personal',
   pollData = null,
   triviaData = null,
   anonTemplate = null,

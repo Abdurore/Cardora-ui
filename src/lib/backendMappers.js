@@ -71,6 +71,28 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
   }
 }
 
+const TYPE_ALIASES = {
+  standard: 'personal',
+  moment: 'personal',
+  anon: 'anonymous',
+}
+
+const TIER_ALIASES = {
+  simple: 'classic',
+  special: 'premium',
+  signature: 'elite',
+}
+
+function normaliseType(value) {
+  const key = String(value || '').toLowerCase()
+  return TYPE_ALIASES[key] || key || 'personal'
+}
+
+function normaliseTier(value) {
+  const key = String(value || '').toLowerCase()
+  return TIER_ALIASES[key] || key || 'classic'
+}
+
 export function mapTemplateToCard(template, index = 0) {
   const layout = template.layoutConfig || template.layoutdata || {}
   const content = layout.content || {}
@@ -105,15 +127,17 @@ export function mapTemplateToCard(template, index = 0) {
     likeCount,
     userCount,
     category: (template.category || 'scratch').toLowerCase(),
-    type: (template.type || layout.type || 'standard').toLowerCase(),
-    tier: (template.couponType || template.tier || layout.couponType || 'simple').toLowerCase(),
+    type: normaliseType(template.type || layout.type),
+    tier: normaliseTier(template.tier || template.couponType || layout.tier || layout.couponType),
     previewImage: template.previewImage || layout.previewImage || layout.media?.images?.[0] || '',
+    status: (template.status || 'approved').toLowerCase(),
     tag: template.status ? capitalize(template.status) : '',
     ownerId,
     poll: template.poll || layout.poll || null,
     trivia: template.trivia || layout.trivia || null,
     chain: template.chain || layout.chain || null,
     anonTier: template.anonTier || layout.anonTier || null,
+    layoutConfig: layout,
     backendTemplate: template,
   }
 }
@@ -215,22 +239,23 @@ export function mapBackendCard(card) {
   const layout = card.layoutdata || card.layoutData || {}
   const content = layout.content || {}
 
+  const type = normaliseType(card.type || layout.type)
   return {
     id: card.cardId || card._id || slug,
     slug,
     title: card.title || content.heading || 'Untitled Card',
     subtitle: content.body || '',
     message: content.body || '',
-    type: card.type || 'standard',
+    type,
     templateId: card.templateId || '',
-    tier: (card.couponType || layout.couponType || 'simple').toLowerCase(),
+    tier: normaliseTier(card.tier || card.couponType || layout.tier || layout.couponType),
     createdAt: card.createdAt || '',
     poll: card.poll || null,
     chain: card.chain || null,
     trivia: card.trivia || null,
     layoutdata: layout,
     cardObject: layoutDataToCardObject(layout),
-    tag: card.type === 'standard' ? '' : capitalize(card.type || ''),
+    tag: type === 'personal' ? '' : capitalize(type),
     interaction: layout.interaction || {},
     locked: layout.interaction?.lock?.type === 'password' || layout.interaction?.lock?.type === 'time',
     lockType: layout.interaction?.lock?.type || 'none',

@@ -187,7 +187,9 @@ function WorldChat() {
     }
   }
 
-  const canSend = Boolean(currentUser && isOnline && connected && !cooldown)
+  // User can always type while signed in + online; cooldown only gates the actual send.
+  const canType = Boolean(currentUser && isOnline && connected)
+  const canSend = Boolean(canType && !cooldown)
 
   return (
     <div className="page-body chat-page">
@@ -286,10 +288,10 @@ function WorldChat() {
               placeholder={
                 !isOnline ? 'You\'re offline…'
                 : !connected ? 'Reconnecting…'
-                : cooldown > 0 ? `Wait ${cooldown}s…`
+                : cooldown > 0 ? `Ready in ${cooldown}s — type now`
                 : 'Type a message…'
               }
-              disabled={!canSend}
+              disabled={!canType}
               maxLength={500}
             />
             <button

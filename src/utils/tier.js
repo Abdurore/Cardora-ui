@@ -1,46 +1,59 @@
+// Tier keys now match the backend card engine: classic | premium | elite.
+// Legacy frontend keys (simple/special/signature) are kept as aliases so any
+// older draft or cached payload still resolves to the correct tier info.
+
 export const TIER_INFO = {
-  simple: {
-    key: 'simple',
+  classic: {
+    key: 'classic',
     label: 'Classic',
-    cost: 5,
-    badgeClass: 'tier-simple',
+    cost: 0,
+    badgeClass: 'tier-classic',
     features: [
-      'Simple card animation',
+      'Free tier',
+      'Clean animated reveal',
       'Standard border',
-      'No background music',
-      'Classic text reveal',
+      'No music or ambient effects',
     ],
   },
-  special: {
-    key: 'special',
+  premium: {
+    key: 'premium',
     label: 'Premium',
-    cost: 15,
-    badgeClass: 'tier-special',
+    cost: 25,
+    badgeClass: 'tier-premium',
     features: [
-      'Music + signature sound',
+      'Background music + video',
       'Gradient card borders',
-      'Better visual effects',
-      'Interactive questions',
+      'Ambient particles + open effects',
       'Fade & typewriter text',
     ],
   },
-  signature: {
-    key: 'signature',
+  elite: {
+    key: 'elite',
     label: 'Elite',
-    cost: 30,
-    badgeClass: 'tier-signature',
+    cost: 35,
+    badgeClass: 'tier-elite',
     features: [
-      'Full confetti & particle effects',
+      'Full cinematic experience',
       'Animated glowing borders',
-      'Premium background music',
-      'Gift effect animations',
-      'All interaction modes',
-      'Priority send delivery',
+      'Gifts + interactive questions',
+      'Premium music + video',
+      'All effects unlocked',
     ],
   },
 }
 
-export const getTierInfo = (tier = 'simple') => TIER_INFO[tier] || TIER_INFO.simple
+const TIER_ALIASES = {
+  simple: 'classic',
+  special: 'premium',
+  signature: 'elite',
+}
+
+function normaliseKey(tier) {
+  if (!tier) return 'classic'
+  const key = String(tier).toLowerCase()
+  return TIER_ALIASES[key] || key
+}
+
+export const getTierInfo = (tier = 'classic') => TIER_INFO[normaliseKey(tier)] || TIER_INFO.classic
 
 export const getTierCost = (tier) => getTierInfo(tier).cost
-

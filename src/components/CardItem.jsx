@@ -1,9 +1,15 @@
 import { getTierInfo } from '../utils/tier.js'
 
 const TYPE_BADGE = {
-  poll:   { label: 'Poll',   cls: 'type-badge-poll' },
-  trivia: { label: 'Trivia', cls: 'type-badge-trivia' },
-  chain:  { label: 'Chain',  cls: 'type-badge-chain' },
+  personal:  { label: 'Personal',  cls: 'type-badge-personal' },
+  poll:      { label: 'Poll',      cls: 'type-badge-poll' },
+  trivia:    { label: 'Trivia',    cls: 'type-badge-trivia' },
+  chain:     { label: 'Chain',     cls: 'type-badge-chain' },
+  anonymous: { label: 'Anonymous', cls: 'type-badge-anonymous' },
+  // Legacy aliases — older cached template payloads may still use these keys.
+  standard: { label: 'Personal', cls: 'type-badge-personal' },
+  moment:   { label: 'Personal', cls: 'type-badge-personal' },
+  anon:     { label: 'Anonymous', cls: 'type-badge-anonymous' },
 }
 
 function CardItem({
@@ -13,7 +19,7 @@ function CardItem({
   occasion,
   meta,
   likes,
-  tier = 'simple',
+  tier = 'classic',
   type,
   variant = 'one',
   showOccasion = true,

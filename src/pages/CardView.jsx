@@ -1,10 +1,9 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { getTierInfo } from '../utils/tier.js'
 import { getCardBySlug, submitCardResponse, submitPollVote, submitChainReply, submitTriviaAnswer } from '../lib/api.js'
 import { mapBackendCard, layoutDataToCardObject } from '../lib/backendMappers.js'
-import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
 import Envelope from '../components/Envelope.jsx'
 import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
@@ -63,34 +62,15 @@ function CardView() {
         // Fall through to local lookup
       }
 
-      // Fallback: check localStorage + local catalog
+      // Fallback: check localStorage for any locally-sent cards (e.g. drafts
+      // rendered from the studio before backend save).
       const stored = JSON.parse(localStorage.getItem('cardora:sentCards') || '[]')
       const match = stored.find((item) => item.id === id)
       if (match) {
         if (!cancelled) { setCard(match); setLoading(false) }
         return
       }
-      const templateMatch = [...homeCards, ...exploreCards, ...profileCreations].find(
-        (item) => item.id === id,
-      )
-      if (templateMatch) {
-        if (!cancelled) {
-          setCard({
-            id: templateMatch.id,
-            templateId: templateMatch.id,
-            title: templateMatch.title,
-            subtitle: templateMatch.subtitle,
-            message: templateMatch.message,
-            recipient: 'You',
-            sender: 'Cardora',
-            tier: templateMatch.tier || 'simple',
-            gift: null,
-          })
-          setLoading(false)
-        }
-      } else {
-        if (!cancelled) { setCard(null); setLoading(false) }
-      }
+      if (!cancelled) { setCard(null); setLoading(false) }
     })()
     return () => { cancelled = true }
   }, [id])
@@ -135,8 +115,8 @@ function CardView() {
   const chain = card?.chain || null
   const trivia = card?.trivia || null
   const primaryImage = layout?.media?.images?.[0] || null
-  const rawCardType = (card?.type || layout?.type || (poll ? 'poll' : trivia ? 'trivia' : chain ? 'chain' : 'moment')).toLowerCase()
-  const cardType = rawCardType === 'standard' ? 'moment' : rawCardType
+  const rawCardType = (card?.type || layout?.type || (poll ? 'poll' : trivia ? 'trivia' : chain ? 'chain' : 'personal')).toLowerCase()
+  const cardType = rawCardType === 'standard' || rawCardType === 'moment' ? 'personal' : rawCardType
   const accentColor = layout?.theme?.accentColor || '#76efff'
   const cardTextColor = layout?.card?.textColor || '#edf8ff'
   const cardHeadingColor = layout?.card?.headingColor || '#ffffff'
@@ -377,7 +357,7 @@ function CardView() {
               <div className="card-open-content">
                 <div className="card-open-meta-row">
                   <p className="entry-sub">To {card.recipient || 'You'}</p>
-                  <span className="cv-type-chip">{cardType === 'moment' ? 'Personal Card' : cardType === 'poll' ? 'Poll Card' : cardType === 'trivia' ? 'Trivia Card' : cardType === 'chain' ? 'Chain Card' : 'Card Experience'}</span>
+                  <span className="cv-type-chip">{cardType === 'personal' ? 'Personal Card' : cardType === 'poll' ? 'Poll Card' : cardType === 'trivia' ? 'Trivia Card' : cardType === 'chain' ? 'Chain Card' : 'Card Experience'}</span>
                 </div>
                 <h3 style={{ color: cardHeadingColor }}>{card.subtitle || heading}</h3>
 

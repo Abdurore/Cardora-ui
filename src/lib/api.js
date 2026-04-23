@@ -283,6 +283,34 @@ export async function deleteTemplate(payload) {
   return request('/delete-template', { method: 'DELETE', auth: true, body: payload })
 }
 
+// Admin-only template delete. Backend enforces role === 'admin' here so the
+// artist-owned /delete-template endpoint doesn't reject the request.
+export async function adminDeleteTemplate(templateId) {
+  return request(`/admin/templates/${templateId}`, { method: 'DELETE', auth: true })
+}
+
+// Admin template review — list everything, approve, or reject a submission.
+export async function getAdminTemplates(query = 'page=1&limit=100') {
+  return request(`/admin/templates?${query}`, { auth: true })
+}
+
+export async function approveTemplate(templateId) {
+  return request(`/admin/templates/${templateId}/approve`, { method: 'PATCH', auth: true })
+}
+
+export async function rejectTemplate(templateId, reason = '') {
+  return request(`/admin/templates/${templateId}/reject`, {
+    method: 'PATCH',
+    auth: true,
+    body: { reason },
+  })
+}
+
+// Per-template analytics for the owning artist.
+export async function getTemplateAnalytics(templateId) {
+  return request(`/templates/${templateId}/analytics`, { auth: true })
+}
+
 /* ═══════════════════════════════════════════════
    ANONYMOUS INBOX
    ═══════════════════════════════════════════════ */
@@ -413,6 +441,10 @@ export async function getAdminRedeemCodes(query = 'page=1&limit=50') {
   return request(`/admin/redeem-codes?${query}`, { auth: true })
 }
 
+export async function disableAdminRedeemCode(code) {
+  return request('/admin/redeem-codes/disable', { method: 'PATCH', auth: true, body: { code } })
+}
+
 export async function sendSeasonalReminder(payload) {
   return request('/admin/send-seasonal-reminder', { method: 'POST', auth: true, body: payload })
 }
@@ -506,8 +538,8 @@ export async function uploadMediaVideo(payload) {
   return request('/media/videos', { method: 'POST', auth: true, body: payload })
 }
 
-export async function deleteMediaVideo(videoId) {
-  return request(`/media/videos/${videoId}`, { method: 'DELETE', auth: true })
+export async function deleteMediaVideo(nameKey) {
+  return request('/media/videos', { method: 'DELETE', auth: true, body: { nameKey } })
 }
 
 export async function getMediaMusic() {
@@ -518,8 +550,8 @@ export async function uploadMediaMusic(payload) {
   return request('/media/music', { method: 'POST', auth: true, body: payload })
 }
 
-export async function deleteMediaMusic(musicId) {
-  return request(`/media/music/${musicId}`, { method: 'DELETE', auth: true })
+export async function deleteMediaMusic(nameKey) {
+  return request('/media/music', { method: 'DELETE', auth: true, body: { nameKey } })
 }
 
 export { API_BASE }

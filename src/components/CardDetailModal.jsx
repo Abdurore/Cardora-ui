@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { getTierInfo } from '../utils/tier.js'
+import { getTemplateById } from '../lib/api.js'
 
 const SHARE_PLATFORMS = [
   {
@@ -46,15 +47,12 @@ function CardDetailModal({
   currentUser,
   onRequireAuth,
   onDeductCC,
-  onDeleteTemplate,
   openCardTypeModal,
 }) {
   const [view, setView] = useState('main') // 'main' | 'share'
   const [copied, setCopied] = useState(false)
   const [startY, setStartY] = useState(null)
-  const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
-  const isAdmin = currentUser?.role === 'Admin'
 
   useEffect(() => {
     if (!card) return undefined
@@ -76,7 +74,7 @@ function CardDetailModal({
   if (!card) return null
 
   const tierInfo = getTierInfo(card?.tier)
-  const isPremium = tierInfo.key !== 'simple'
+  const isPremium = tierInfo.key !== 'classic'
 
   const handleTouchStart = (e) => setStartY(e.touches[0].clientY)
   const handleTouchMove = (e) => {
@@ -107,21 +105,28 @@ function CardDetailModal({
     } catch { /* cancelled */ }
   }
 
-  const handleUseTemplate = () => {
-    onClose()
-    const type = card?.type || 'moment'
+  const handleUseTemplate = async () => {
+    const rawType = (card?.type || 'personal').toLowerCase()
+    // Pass the type directly — studio now uses backend-aligned type names
+    const type = rawType
     const tier = card?.tier || 'classic'
-    navigate(`/studio?type=${type}&tier=${tier}`, { state: { cardData: card } })
-  }
 
-  const handleAdminDelete = async () => {
-    if (!onDeleteTemplate || !card) return
-    if (!window.confirm(`Delete template "${card.title}"? This cannot be undone.`)) return
-    setDeleting(true)
-    const res = await onDeleteTemplate(card.templateId || card.id)
-    setDeleting(false)
-    if (res?.ok) onClose()
-    else window.alert(res?.message || 'Delete failed.')
+    // Ensure we carry the artist's full layoutConfig into the studio. Listing
+    // endpoints sometimes omit it; fetch the full template on demand.
+    let fullCard = card
+    const hasLayout = card?.layoutConfig && Object.keys(card.layoutConfig).length > 0
+    if (!hasLayout && (card?.templateId || card?.id)) {
+      try {
+        const tid = card.templateId || card.id
+        const res = await getTemplateById(tid)
+        const tmpl = res?.template || res?.data || res || null
+        const layout = tmpl?.layoutConfig || tmpl?.layoutdata || null
+        if (layout) fullCard = { ...card, layoutConfig: layout }
+      } catch { /* fall through with what we have */ }
+    }
+
+    onClose()
+    navigate(`/studio?type=${type}&tier=${tier}`, { state: { cardData: fullCard } })
   }
 
   return createPortal(
@@ -206,19 +211,6 @@ function CardDetailModal({
                 </svg>
                 Share Card
               </button>
-              {isAdmin && onDeleteTemplate && (
-                <button
-                  className="cdm-btn-admin-delete"
-                  type="button"
-                  onClick={handleAdminDelete}
-                  disabled={deleting}
-                >
-                  <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 6h14M8 6V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2M6 6l1 11a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2l1-11" />
-                  </svg>
-                  {deleting ? 'Deleting…' : 'Delete Template (Admin)'}
-                </button>
-              )}
               <button className="cdm-close-link" type="button" onClick={onClose}>Dismiss</button>
             </div>
           )}
