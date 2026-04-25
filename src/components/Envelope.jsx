@@ -197,11 +197,24 @@ function Envelope({
 
       <div className="envelope-parallax-wrap" style={parallaxStyle}>
         <div
-          className={`envelope-body ${paperTextureClass}`}
+          className={`envelope-body ${paperTextureClass} ${stage === 'sealed' || stage === 'arriving' ? 'is-tappable' : ''}`}
           style={{
             '--envelope-body': envelope.bodyColor || '#1a1f2c',
             '--envelope-flap': envelope.flapColor || '#242a38',
             '--envelope-border': closed.borderColor || 'rgba(126, 247, 255, 0.25)',
+          }}
+          // Whole-envelope hit target: tap anywhere to open, not only the seal.
+          // The button below stays as the accessible/keyboard control; both
+          // call handleUnseal which is idempotent (gated by stage).
+          role="button"
+          tabIndex={stage === 'sealed' || stage === 'arriving' ? 0 : -1}
+          aria-label="Open envelope"
+          onClick={handleUnseal}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              handleUnseal()
+            }
           }}
         >
           <div className="envelope-inside-glow" />
@@ -214,16 +227,13 @@ function Envelope({
             </p>
           </div>
           <div className="envelope-flap" />
-          <button
-            type="button"
+          <span
             className={`envelope-seal ${stage === 'sealed' || stage === 'arriving' ? 'pulsing' : ''}`}
             style={{ '--seal-color': envelope.sealColor || '#b03030' }}
-            onClick={handleUnseal}
-            aria-label="Open envelope"
-            disabled={stage !== 'sealed' && stage !== 'arriving'}
+            aria-hidden="true"
           >
             {sealContent}
-          </button>
+          </span>
         </div>
       </div>
 

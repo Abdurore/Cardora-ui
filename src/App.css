@@ -24,6 +24,11 @@
 
 .envelope-letterbox {
   position: absolute;
+  /* Without `top: 0` the parent's `place-items: center` (grid) anchors this
+     bar in the middle of the scene, so `translateY(-100%)` only shifts it up
+     by its own 48px height — producing a visible black band across the
+     viewport instead of an off-screen bar. Anchor explicitly. */
+  top: 0;
   left: 0;
   right: 0;
   height: 48px;
@@ -125,6 +130,25 @@
   animation: envelopeArrive 0.9s cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
 }
 
+.envelope-body.is-tappable {
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.envelope-body.is-tappable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 36px 90px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.envelope-body.is-tappable:active {
+  transform: translateY(-1px) scale(0.995);
+}
+
+.envelope-body.is-tappable:focus-visible {
+  outline: 2px solid rgba(126, 247, 255, 0.6);
+  outline-offset: 4px;
+}
+
 
 .envelope-body.paper-linen {
   background:
@@ -212,19 +236,36 @@
   left: 0;
   right: 0;
   height: 62%;
-  background: linear-gradient(160deg, var(--envelope-flap, #242a38), var(--envelope-body, #1a1f2c));
+  /* Subtle top-down sheen. End color matches the body so the seam where the
+     flap meets the body disappears — previously the gradient terminated mid-
+     way through the triangle, producing a visible horizontal band at 62%. */
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--envelope-flap, #242a38) 92%, white 8%) 0%,
+    var(--envelope-flap, #242a38) 55%,
+    var(--envelope-body, #1a1f2c) 100%);
   clip-path: polygon(0 0, 100% 0, 50% 100%);
   transform-origin: top center;
   transform: rotateX(0deg);
   transition: transform 1s cubic-bezier(0.6, 0, 0.2, 1);
-  /* `box-shadow` draws from the element's rectangle, not the triangular
-     clip-path — producing a straight dark line across the middle of the
-     envelope. `filter: drop-shadow` traces the actual clipped shape. */
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+  /* No shadow: every shadow rendering mode (box-shadow, drop-shadow) on a
+     triangular clip-path leaves a visible artifact at the fold seam. Use the
+     dedicated .envelope-flap-fold pseudo below for fold depth. */
   z-index: 4;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   will-change: transform;
+}
+
+/* Crease highlights along the flap's two diagonal fold lines — gives the
+   illusion of paper folding without producing a horizontal band. */
+.envelope-flap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(225deg, transparent 49.5%, rgba(255, 255, 255, 0.06) 50%, transparent 50.5%),
+    linear-gradient(135deg, transparent 49.5%, rgba(255, 255, 255, 0.06) 50%, transparent 50.5%);
+  pointer-events: none;
 }
 
 .envelope-scene.stage-unsealing .envelope-flap,
@@ -7762,6 +7803,113 @@ a {
   padding: 0 14px 12px;
 }
 
+/* Border palette presets */
+.cs-border-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.cs-border-preset {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(118, 239, 255, 0.12);
+  background: rgba(8, 14, 18, 0.55);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.cs-border-preset:hover:not(:disabled) {
+  border-color: rgba(118, 239, 255, 0.32);
+  transform: translateY(-1px);
+}
+
+.cs-border-preset.active {
+  border-color: rgba(118, 239, 255, 0.5);
+  background: rgba(118, 239, 255, 0.08);
+}
+
+.cs-border-preset.locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-style: dashed;
+  padding-right: 56px;
+}
+
+.cs-border-preset-swatch {
+  width: 100%;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cs-border-preset-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(220, 240, 246, 0.85);
+}
+
+.cs-border-preset .cs-chip-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  transform: none;
+}
+
+/* Question presets */
+.cs-q-presets {
+  display: grid;
+  gap: 6px;
+}
+
+.cs-q-preset {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(118, 239, 255, 0.12);
+  background: rgba(8, 14, 18, 0.55);
+  color: rgba(220, 240, 246, 0.85);
+  text-align: left;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.cs-q-preset:hover:not(:disabled) {
+  border-color: rgba(118, 239, 255, 0.32);
+  background: rgba(118, 239, 255, 0.06);
+  transform: translateY(-1px);
+}
+
+.cs-q-preset.used {
+  opacity: 0.55;
+  cursor: default;
+  border-style: dashed;
+}
+
+.cs-q-preset-emoji {
+  font-size: 1.1rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.cs-q-preset-text {
+  font-style: italic;
+  color: rgba(220, 240, 246, 0.92);
+}
+
+.cs-q-preset-check {
+  color: #9ef6cf;
+  font-weight: 700;
+}
+
 /* Question cards */
 .cs-question-card {
   padding: 12px;
@@ -8181,6 +8329,182 @@ a {
   overflow: hidden;
 }
 
+/* Device frame toolbar */
+.cp-device-toolbar {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10003;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(8, 14, 18, 0.7);
+  border: 1px solid rgba(118, 239, 255, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.cp-device-tab {
+  padding: 6px 14px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(220, 240, 246, 0.6);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.cp-device-tab:hover {
+  color: #ddf8ff;
+}
+
+.cp-device-tab.active {
+  background: rgba(118, 239, 255, 0.16);
+  color: #ecfdff;
+}
+
+@media (max-width: 600px) {
+  .cp-device-toolbar { display: none; }
+}
+
+/* Lock & reveal gate */
+.cp-lock-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10004;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at center, rgba(8, 14, 18, 0.85), rgba(0, 0, 0, 0.95));
+  backdrop-filter: blur(14px);
+  padding: 24px;
+}
+
+.cp-lock-card {
+  width: min(380px, 100%);
+  padding: 32px 28px 28px;
+  border-radius: 22px;
+  background: rgba(8, 14, 18, 0.85);
+  border: 1px solid rgba(118, 239, 255, 0.18);
+  text-align: center;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.cp-lock-icon {
+  font-size: 2.4rem;
+  margin-bottom: 10px;
+}
+
+.cp-lock-card h3 {
+  margin: 0 0 8px;
+  font-family: 'Cinzel', serif;
+  font-size: 1.4rem;
+  color: #eafdff;
+}
+
+.cp-lock-sub {
+  margin: 0 0 20px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: rgba(220, 240, 246, 0.75);
+}
+
+.cp-lock-form {
+  display: grid;
+  gap: 10px;
+}
+
+.cp-lock-form input {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(118, 239, 255, 0.2);
+  background: rgba(0, 0, 0, 0.4);
+  color: #ecfdff;
+  font-size: 0.92rem;
+  text-align: center;
+  letter-spacing: 0.18em;
+}
+
+.cp-lock-form input:focus {
+  outline: 2px solid rgba(126, 247, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.cp-lock-form button {
+  padding: 12px;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.cp-lock-error {
+  margin: 10px 0 0;
+  color: #ff9dab;
+  font-size: 0.82rem;
+}
+
+.cp-lock-countdown {
+  margin: 4px 0 0;
+  font-family: 'Cinzel', serif;
+  font-size: 1.6rem;
+  color: #c9f7ff;
+  letter-spacing: 0.06em;
+}
+
+/* Reveal hint above the envelope */
+.cp-reveal-hint {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  margin: 0;
+  padding: 6px 14px;
+  font-family: 'Great Vibes', 'Cinzel', cursive;
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  color: rgba(234, 252, 255, 0.92);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Constrain the live card content to a device-shaped frame.
+   Targets the open-card wrap and the envelope scene; the backdrop and
+   ambient layers stay full-bleed so the surrounding stage still feels right. */
+.cp-overlay:not(.cp-device-fullscreen) .cp-card-wrap-full,
+.cp-overlay:not(.cp-device-fullscreen) .envelope-scene {
+  border-radius: 28px;
+  outline: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+.cp-overlay.cp-device-phone .cp-card-wrap-full,
+.cp-overlay.cp-device-phone .envelope-scene {
+  width: min(92vw, 380px);
+  height: min(80vh, 740px);
+  aspect-ratio: 9 / 19;
+}
+
+.cp-overlay.cp-device-tablet .cp-card-wrap-full,
+.cp-overlay.cp-device-tablet .envelope-scene {
+  width: min(95vw, 720px);
+  height: min(84vh, 980px);
+  aspect-ratio: 4 / 5.5;
+}
+
+.cp-overlay.cp-device-desktop .cp-card-wrap-full,
+.cp-overlay.cp-device-desktop .envelope-scene {
+  width: min(96vw, 1100px);
+  height: min(82vh, 700px);
+  aspect-ratio: 16 / 10;
+}
+
 .cp-backdrop {
   position: absolute;
   inset: 0;
@@ -8335,6 +8659,26 @@ a {
   min-height: min(820px, 86vh);
   border-radius: 26px;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  position: relative;
+  isolation: isolate;
+}
+
+/* Coloured surface layer. Drives `card.backgroundColor` and
+   `card.backgroundOpacity` independently of content opacity, so when the user
+   adds transparency the page background bleeds through but text and images
+   stay at full opacity. backdrop-filter adds a soft frosted feel when the
+   card is partly see-through. */
+.cp-card-full::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--card-bg, #111);
+  opacity: var(--card-bg-opacity, 1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .cp-card-inner {
@@ -16686,6 +17030,21 @@ a {
   flex-wrap: wrap;
 }
 
+.admin-media-hint {
+  margin: 10px 2px 0;
+  font-size: 0.72rem;
+  color: rgba(220, 240, 246, 0.55);
+  font-style: italic;
+}
+
+.admin-media-title-field > span small {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: rgba(220, 240, 246, 0.5);
+  margin-left: 4px;
+}
+
 .admin-media-title-field {
   flex: 1;
   min-width: 160px;
@@ -16886,9 +17245,348 @@ a {
 
 /* Music list */
 .admin-media-music-list {
+  display: grid;
+  gap: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AdminMusicTrack (amt-*)  — themed audio editor with trim
+   ════════════════════════════════════════════════════════════════ */
+.amt-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(126, 247, 255, 0.04), rgba(98, 255, 162, 0.03)),
+    rgba(8, 14, 18, 0.7);
+  border: 1px solid rgba(126, 247, 255, 0.16);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.amt-card:hover {
+  border-color: rgba(126, 247, 255, 0.28);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.38);
+}
+
+.amt-head {
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.amt-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(126, 247, 255, 0.12);
+  border: 1px solid rgba(126, 247, 255, 0.28);
+  color: #c7f7ff;
+  font-size: 1.05rem;
+}
+
+.amt-name-input {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  color: #ecfdff;
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 4px 0;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.18s ease;
+}
+
+.amt-name-input:hover {
+  border-bottom-color: rgba(126, 247, 255, 0.2);
+}
+
+.amt-name-input:focus {
+  border-bottom-color: rgba(126, 247, 255, 0.55);
+}
+
+.amt-delete {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 100, 120, 0.08);
+  border: 1px solid rgba(255, 100, 120, 0.22);
+  color: #ff9dab;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.amt-delete:hover {
+  background: rgba(255, 100, 120, 0.18);
+  transform: scale(1.05);
+}
+
+/* Playback row */
+.amt-controls {
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.amt-play {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #76efff, #62ffa2);
+  border: 0;
+  color: #051218;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(118, 239, 255, 0.32);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.amt-play:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 18px rgba(118, 239, 255, 0.45);
+}
+
+.amt-play svg {
+  fill: #051218;
+}
+
+.amt-timeline {
+  position: relative;
+  height: 38px;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+}
+
+.amt-timeline-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(126, 247, 255, 0.1);
+  overflow: hidden;
+}
+
+.amt-timeline-active {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(118, 239, 255, 0.4), rgba(98, 255, 162, 0.4));
+  border-radius: inherit;
+}
+
+.amt-timeline-pos {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: #ecfdff;
+  box-shadow: 0 0 10px rgba(236, 253, 255, 0.7);
+  transform: translateX(-50%);
+}
+
+.amt-scrub {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  appearance: none;
+  background: transparent;
+  margin: 0;
+  cursor: pointer;
+}
+
+.amt-scrub::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ecfdff;
+  border: 2px solid #76efff;
+  box-shadow: 0 0 8px rgba(118, 239, 255, 0.4);
+  cursor: grab;
+}
+
+.amt-scrub::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ecfdff;
+  border: 2px solid #76efff;
+  cursor: grab;
+}
+
+.amt-scrub::-webkit-slider-runnable-track,
+.amt-scrub::-moz-range-track {
+  background: transparent;
+  height: 100%;
+}
+
+.amt-time {
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(220, 242, 247, 0.65);
+  min-width: 78px;
+  text-align: right;
+}
+
+/* Trim section */
+.amt-trim {
+  border-top: 1px dashed rgba(126, 247, 255, 0.14);
+  padding-top: 12px;
+  display: grid;
   gap: 10px;
+}
+
+.amt-trim-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.amt-trim-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(220, 242, 247, 0.55);
+  font-weight: 700;
+}
+
+.amt-trim-toggle {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(126, 247, 255, 0.06);
+  border: 1px solid rgba(126, 247, 255, 0.18);
+  color: rgba(199, 247, 255, 0.85);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.amt-trim-toggle:hover {
+  background: rgba(126, 247, 255, 0.12);
+  color: #ecfdff;
+}
+
+.amt-trim-toggle.on {
+  background: linear-gradient(135deg, rgba(118, 239, 255, 0.22), rgba(98, 255, 162, 0.16));
+  border-color: rgba(118, 239, 255, 0.45);
+  color: #ecfdff;
+  box-shadow: 0 0 12px rgba(118, 239, 255, 0.22);
+}
+
+.amt-trim-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.amt-trim-field {
+  display: grid;
+  grid-template-columns: 44px 1fr 56px;
+  align-items: center;
+  gap: 8px;
+}
+
+.amt-trim-field span {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(220, 242, 247, 0.55);
+  font-weight: 700;
+}
+
+.amt-trim-field input[type='range'] {
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(126, 247, 255, 0.12);
+  outline: none;
+}
+
+.amt-trim-field input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ecfdff;
+  border: 2px solid #62ffa2;
+  cursor: grab;
+}
+
+.amt-trim-field input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ecfdff;
+  border: 2px solid #62ffa2;
+  cursor: grab;
+}
+
+.amt-trim-field em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.74rem;
+  color: rgba(199, 247, 255, 0.85);
+  text-align: right;
+}
+
+@media (max-width: 540px) {
+  .amt-trim-grid { grid-template-columns: 1fr; }
+}
+
+/* Footer actions */
+.amt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px dashed rgba(126, 247, 255, 0.14);
+  padding-top: 10px;
+}
+
+.amt-status {
+  font-size: 0.72rem;
+  color: rgba(220, 242, 247, 0.5);
+  font-style: italic;
+}
+
+.amt-save {
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #76efff, #62ffa2);
+  border: 0;
+  color: #051218;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  box-shadow: 0 4px 14px rgba(118, 239, 255, 0.32);
+}
+
+.amt-save:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(118, 239, 255, 0.42);
+}
+
+.amt-save:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .admin-media-music-item {

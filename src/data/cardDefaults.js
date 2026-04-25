@@ -30,6 +30,9 @@ export const defaultCardObject = {
 
   card: {
     backgroundColor: '#111111',
+    // 0 = fully opaque, 1 = fully transparent. Renders through a separate
+    // background layer so content (text, images) stays at 100% opacity.
+    backgroundOpacity: 0,
     textColor: '#ffffff',
     headingColor: '#ffffff',
     cardBorder: {

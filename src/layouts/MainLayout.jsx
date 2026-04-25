@@ -462,6 +462,31 @@ function MainLayout() {
         previewImage: resolvedPreviewImage,
         layoutConfig: normalizedLayoutConfig,
       })
+
+      // Optimistically add the newly-published template to local state so the
+      // artist sees it immediately under "Pending review" in their Profile —
+      // public /templates only returns approved entries, so a refetch alone
+      // leaves the artist staring at no feedback after submission.
+      const created = response?.template || response?.data?.template || response?.data || response
+      if (created && (created._id || created.templateId || created.id)) {
+        const ownerId = currentUser?.id || null
+        const optimisticTemplate = {
+          ...created,
+          status: created.status || 'pending',
+          createdBy: created.createdBy || ownerId,
+          name: created.name || name,
+          type: created.type || type || 'personal',
+          tier: created.tier || tier || 'classic',
+          previewImage: created.previewImage || resolvedPreviewImage,
+          layoutConfig: created.layoutConfig || normalizedLayoutConfig,
+        }
+        setMarketplaceTemplates((prev) => {
+          const id = optimisticTemplate._id || optimisticTemplate.templateId || optimisticTemplate.id
+          const next = prev.filter((t) => (t.templateId || t.id) !== id)
+          return [mapTemplateToCard(optimisticTemplate), ...next]
+        })
+      }
+
       await loadPublicData()
       return { ok: true, message: response?.message || 'Template submitted successfully.' }
     } catch (error) {

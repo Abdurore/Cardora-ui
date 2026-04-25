@@ -554,4 +554,11 @@ export async function deleteMediaMusic(nameKey) {
   return request('/media/music', { method: 'DELETE', auth: true, body: { nameKey } })
 }
 
+// Patch a music track — currently used to persist trim points (startSec /
+// endSec) and rename. Backend may store these as extra fields on the record;
+// the FE audio player honours them when present.
+export async function updateMediaMusic(id, payload) {
+  return request(`/media/music/${id}`, { method: 'PATCH', auth: true, body: payload })
+}
+
 export { API_BASE }

@@ -34,6 +34,7 @@ import {
   deleteMediaVideo,
   getMediaMusic,
   uploadMediaMusic,
+  updateMediaMusic,
   deleteMediaMusic,
   getAdminTemplates,
   getTemplates,
@@ -41,6 +42,7 @@ import {
   rejectTemplate,
 } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
+import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
 const TABS = ['Overview', 'Users', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
 
@@ -177,6 +179,20 @@ function AdminDashboard() {
     setTimeout(() => setActionMsg({ text: '', ok: false }), 3000)
   }
 
+  // Backend response shapes drift across endpoints. This helper looks for a
+  // list under any of the candidate keys (or returns the body if it's already
+  // an array). Returns null if nothing array-shaped is found.
+  const pickList = (res, ...keys) => {
+    if (!res) return null
+    for (const key of keys) {
+      if (Array.isArray(res?.[key])) return res[key]
+      if (Array.isArray(res?.data?.[key])) return res.data[key]
+    }
+    if (Array.isArray(res)) return res
+    if (Array.isArray(res?.data)) return res.data
+    return null
+  }
+
   const loadTabData = async (tab) => {
     setLoading(true)
     try {
@@ -216,20 +232,36 @@ function AdminDashboard() {
           break
         }
         case 'Templates': {
-          // Admin endpoint returns every template (pending + approved + rejected).
-          // Fall back to the public /templates list if the admin endpoint isn't
-          // available — that at least surfaces the live marketplace.
-          let templates = []
-          try {
-            const res = await getAdminTemplates('page=1&limit=200')
-            templates = res?.data?.templates || res?.templates || []
-          } catch {
-            try {
-              const res = await getTemplates('page=1&limit=200')
-              templates = res?.data?.templates || res?.templates || []
-            } catch { /* leave empty */ }
+          // Try the admin endpoint (returns pending + approved + rejected) AND
+          // the public endpoint (live only) in parallel. Merge by id so we
+          // surface what we can even if one source is empty or unavailable —
+          // most commonly the admin endpoint isn't deployed yet, in which case
+          // we still want to show the live marketplace to the admin.
+          const [adminRes, publicRes] = await Promise.allSettled([
+            getAdminTemplates('page=1&limit=200'),
+            getTemplates('page=1&limit=200'),
+          ])
+          const fromAdmin =
+            adminRes.status === 'fulfilled'
+              ? (adminRes.value?.data?.templates || adminRes.value?.templates || [])
+              : []
+          const fromPublic =
+            publicRes.status === 'fulfilled'
+              ? (publicRes.value?.data?.templates || publicRes.value?.templates || [])
+              : []
+          if (adminRes.status === 'rejected') {
+            console.warn('[Admin] /admin/templates failed, using public list', adminRes.reason)
           }
-          setAllTemplates(templates.map(mapTemplateToCard))
+          // De-dupe by id; admin entries win because they carry status info.
+          const seen = new Set()
+          const merged = []
+          for (const t of [...fromAdmin, ...fromPublic]) {
+            const id = t._id || t.templateId || t.id
+            if (!id || seen.has(id)) continue
+            seen.add(id)
+            merged.push(t)
+          }
+          setAllTemplates(merged.map(mapTemplateToCard))
           break
         }
         case 'Artists': {
@@ -255,8 +287,18 @@ function AdminDashboard() {
         }
         case 'Media': {
           const [videosRes, musicRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic()])
-          if (videosRes.status === 'fulfilled') setMediaVideos(videosRes.value?.data?.videos || videosRes.value?.videos || [])
-          if (musicRes.status === 'fulfilled') setMediaMusic(musicRes.value?.data?.music || musicRes.value?.music || [])
+          if (videosRes.status === 'fulfilled') {
+            setMediaVideos(pickList(videosRes.value, 'videos', 'items', 'media') || [])
+          } else {
+            console.warn('[Admin] /media/videos failed', videosRes.reason)
+            setMediaVideos([])
+          }
+          if (musicRes.status === 'fulfilled') {
+            setMediaMusic(pickList(musicRes.value, 'music', 'tracks', 'items', 'media') || [])
+          } else {
+            console.warn('[Admin] /media/music failed', musicRes.reason)
+            setMediaMusic([])
+          }
           break
         }
         case 'Logs': {
@@ -426,8 +468,25 @@ function AdminDashboard() {
     setMediaVideoUploading(true)
     try {
       const url = await uploadToCloudinary(file, 'video')
-      setNewVideo(p => ({ ...p, url }))
-      showMsg('Video uploaded — click "Add" to save.')
+      // Auto-derive a name from the filename so we can post to the backend
+      // immediately. Otherwise users frequently leave the Cloudinary upload
+      // hanging without ever clicking "Add", wasting the cloud storage.
+      const fallbackName = file.name.replace(/\.[^.]+$/, '').slice(0, 80)
+      const finalName = (newVideo.name || '').trim() || fallbackName
+      try {
+        // Backend validator strictly allows { name, url } — extra fields like
+        // `title` or `videoUrl` are rejected with "is not allowed".
+        await uploadMediaVideo({ name: finalName, url })
+        showMsg('Video added to library!')
+        setNewVideo({ name: '', url: '' })
+        if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
+        await refreshMediaSilent()
+      } catch (postErr) {
+        console.error('[Admin] uploadMediaVideo POST failed', postErr)
+        // Cloudinary URL still in state so the admin can retry without re-uploading.
+        setNewVideo({ name: finalName, url })
+        showMsg(`Save failed (file uploaded): ${postErr.message || 'unknown error'}`, false)
+      }
     } catch (err) {
       console.error('[Admin] Cloudinary video upload failed', err)
       showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
@@ -440,25 +499,26 @@ function AdminDashboard() {
     try {
       const [videosRes, musicRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic()])
       if (videosRes.status === 'fulfilled') {
-        const list = videosRes.value?.data?.videos || videosRes.value?.videos || null
-        if (list) setMediaVideos(list)
+        const list = pickList(videosRes.value, 'videos', 'items', 'media')
+        if (list !== null) setMediaVideos(list)
+      } else {
+        console.warn('[Admin] getMediaVideos failed', videosRes.reason)
       }
       if (musicRes.status === 'fulfilled') {
-        const list = musicRes.value?.data?.music || musicRes.value?.music || null
-        if (list) setMediaMusic(list)
+        const list = pickList(musicRes.value, 'music', 'tracks', 'items', 'media')
+        if (list !== null) setMediaMusic(list)
+      } else {
+        console.warn('[Admin] getMediaMusic failed', musicRes.reason)
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('[Admin] refreshMediaSilent failed', err)
+    }
   }
 
   const handleAddVideo = async () => {
     if (!newVideo.name || !newVideo.url) { showMsg('Name and video required.', false); return }
     try {
-      await uploadMediaVideo({
-        name: newVideo.name,
-        title: newVideo.name,
-        url: newVideo.url,
-        videoUrl: newVideo.url,
-      })
+      await uploadMediaVideo({ name: newVideo.name, url: newVideo.url })
       showMsg('Video added to library!')
       setNewVideo({ name: '', url: '' })
       if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
@@ -495,8 +555,21 @@ function AdminDashboard() {
       // misclassify some codecs and return 4xx. Use 'video' explicitly so mp3
       // and wav uploads work consistently.
       const url = await uploadToCloudinary(file, 'video')
-      setNewTrack(p => ({ ...p, url }))
-      showMsg('Audio uploaded — click "Add" to save.')
+      const fallbackName = file.name.replace(/\.[^.]+$/, '').slice(0, 80)
+      const finalName = (newTrack.name || '').trim() || fallbackName
+      try {
+        // Backend validator strictly allows { name, url } — extra fields like
+        // `title` or `audioUrl` are rejected with "is not allowed".
+        await uploadMediaMusic({ name: finalName, url })
+        showMsg('Track added to library!')
+        setNewTrack({ name: '', url: '' })
+        if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
+        await refreshMediaSilent()
+      } catch (postErr) {
+        console.error('[Admin] uploadMediaMusic POST failed', postErr)
+        setNewTrack({ name: finalName, url })
+        showMsg(`Save failed (file uploaded): ${postErr.message || 'unknown error'}`, false)
+      }
     } catch (err) {
       console.error('[Admin] Cloudinary audio upload failed', err)
       showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
@@ -508,12 +581,7 @@ function AdminDashboard() {
   const handleAddTrack = async () => {
     if (!newTrack.name || !newTrack.url) { showMsg('Name and audio required.', false); return }
     try {
-      await uploadMediaMusic({
-        name: newTrack.name,
-        title: newTrack.name,
-        url: newTrack.url,
-        audioUrl: newTrack.url,
-      })
+      await uploadMediaMusic({ name: newTrack.name, url: newTrack.url })
       showMsg('Track added to library!')
       setNewTrack({ name: '', url: '' })
       if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
@@ -560,6 +628,34 @@ function AdminDashboard() {
       setAllTemplates(prev => prev.filter(t => (t.templateId || t.id) !== id))
     } else {
       showMsg(res?.message || 'Delete failed.', false)
+    }
+  }
+
+  const handleSaveTrack = async (updated) => {
+    const id = updated._id || updated.id
+    if (!id) {
+      showMsg('Cannot save: missing track id.', false)
+      return
+    }
+    try {
+      // Only send the fields the editor controls. Backend may reject unknown
+      // keys (the same way it does for /media/music POST).
+      await updateMediaMusic(id, {
+        name: updated.name,
+        startSec: updated.startSec,
+        endSec: updated.endSec,
+        duration: updated.duration,
+      })
+      // Optimistically update the local list so the editor exits the dirty
+      // state immediately even if the silent refresh races.
+      setMediaMusic((prev) =>
+        prev.map((t) => ((t._id || t.id) === id ? { ...t, ...updated } : t)),
+      )
+      showMsg('Track saved.')
+      refreshMediaSilent()
+    } catch (err) {
+      console.error('[Admin] updateMediaMusic failed', err)
+      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
     }
   }
 
@@ -1137,7 +1233,7 @@ function AdminDashboard() {
                 />
                 <div className="admin-media-add-row">
                   <label className="admin-field admin-media-title-field">
-                    <span>Video Name</span>
+                    <span>Video Name <small>(optional — defaults to filename)</small></span>
                     <input
                       placeholder="e.g. Ocean Waves"
                       value={newVideo.name}
@@ -1153,20 +1249,24 @@ function AdminDashboard() {
                     {mediaVideoUploading ? (
                       <><span className="admin-media-file-spinner" />Uploading…</>
                     ) : newVideo.url ? (
-                      <><span>✓</span> Video ready</>
+                      <><span>✓</span> Replace file</>
                     ) : (
-                      <><span className="admin-media-file-icon">↑</span> Choose file</>
+                      <><span className="admin-media-file-icon">↑</span> Upload &amp; save</>
                     )}
                   </button>
-                  <button
-                    className="primary admin-media-add-btn"
-                    type="button"
-                    onClick={handleAddVideo}
-                    disabled={mediaVideoUploading || !newVideo.url || !newVideo.name.trim()}
-                  >
-                    Add
-                  </button>
+                  {newVideo.url && (
+                    <button
+                      className="primary admin-media-add-btn"
+                      type="button"
+                      onClick={handleAddVideo}
+                      disabled={mediaVideoUploading || !newVideo.name.trim()}
+                      title="Retry saving the previous upload"
+                    >
+                      Retry save
+                    </button>
+                  )}
                 </div>
+                <p className="admin-media-hint">Files save to the library automatically once uploaded.</p>
               </div>
 
               {/* Video grid */}
@@ -1229,7 +1329,7 @@ function AdminDashboard() {
                 />
                 <div className="admin-media-add-row">
                   <label className="admin-field admin-media-title-field">
-                    <span>Track Name</span>
+                    <span>Track Name <small>(optional — defaults to filename)</small></span>
                     <input
                       placeholder="e.g. Soft Piano"
                       value={newTrack.name}
@@ -1245,41 +1345,36 @@ function AdminDashboard() {
                     {mediaMusicUploading ? (
                       <><span className="admin-media-file-spinner" />Uploading…</>
                     ) : newTrack.url ? (
-                      <><span>✓</span> Audio ready</>
+                      <><span>✓</span> Replace file</>
                     ) : (
-                      <><span className="admin-media-file-icon">↑</span> Choose file</>
+                      <><span className="admin-media-file-icon">↑</span> Upload &amp; save</>
                     )}
                   </button>
-                  <button
-                    className="primary admin-media-add-btn"
-                    type="button"
-                    onClick={handleAddTrack}
-                    disabled={mediaMusicUploading || !newTrack.url || !newTrack.name.trim()}
-                  >
-                    Add
-                  </button>
+                  {newTrack.url && (
+                    <button
+                      className="primary admin-media-add-btn"
+                      type="button"
+                      onClick={handleAddTrack}
+                      disabled={mediaMusicUploading || !newTrack.name.trim()}
+                      title="Retry saving the previous upload"
+                    >
+                      Retry save
+                    </button>
+                  )}
                 </div>
+                <p className="admin-media-hint">Tracks save to the library automatically once uploaded.</p>
               </div>
 
-              {/* Music list */}
+              {/* Music list — themed editor with playback + trim controls */}
               {mediaMusic.length > 0 ? (
                 <div className="admin-media-music-list">
                   {mediaMusic.map(track => (
-                    <div key={track._id || track.id} className="admin-media-music-item">
-                      <div className="admin-media-music-icon">♫</div>
-                      <div className="admin-media-music-info">
-                        <span className="admin-media-music-name">{track.title || track.name || 'Untitled'}</span>
-                        <audio controls src={track.url || track.audioUrl} className="admin-media-music-player" />
-                      </div>
-                      <button
-                        type="button"
-                        className="admin-media-delete-btn"
-                        onClick={() => handleDeleteTrack(track)}
-                        aria-label="Delete"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                    <AdminMusicTrack
+                      key={track._id || track.id}
+                      track={track}
+                      onSave={handleSaveTrack}
+                      onDelete={handleDeleteTrack}
+                    />
                   ))}
                 </div>
               ) : (

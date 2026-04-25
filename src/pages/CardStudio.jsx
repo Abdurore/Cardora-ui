@@ -46,6 +46,32 @@ const ALL_TOOLS = [
 
 const TOOL_GROUP_ORDER = ['Content', 'Style', 'Effects', 'Interactive']
 
+// Curated question prompts. Senders rarely come in with a question already
+// written — these turn the questions panel from a blank array builder into a
+// "pick & remix" surface.
+const QUESTION_PRESETS = [
+  { id: 'one-thing', emoji: '💌', text: 'What\'s one thing you\'ll always remember about us?' },
+  { id: 'feel-now', emoji: '✨', text: 'How do you feel reading this right now?' },
+  { id: 'reply-back', emoji: '🎈', text: 'If you could send one word back, what would it be?' },
+  { id: 'gratitude', emoji: '🌷', text: 'What\'s something you\'ve been grateful for lately?' },
+  { id: 'next-meet', emoji: '📍', text: 'When are we seeing each other next?' },
+  { id: 'secret', emoji: '🔒', text: 'Tell me a secret only you and I would know.' },
+]
+
+// Named gradient/animated border presets. `tier` decides minimum tier. The
+// `mode` field hints whether the preset is best paired with `gradient` or
+// `animated` border type — clicking it writes both `colors` and `type`.
+const BORDER_PRESETS = [
+  { id: 'aurora',      label: 'Aurora',     tier: 'premium', mode: 'animated', colors: ['#7ef7ff', '#62ffa2', '#a78bfa'] },
+  { id: 'sunset',      label: 'Sunset',     tier: 'premium', mode: 'gradient', colors: ['#ff9bd2', '#ffd166', '#ff7a59'] },
+  { id: 'ocean',       label: 'Ocean',      tier: 'premium', mode: 'gradient', colors: ['#0ea5e9', '#76efff', '#a5f3fc'] },
+  { id: 'monochrome',  label: 'Monochrome', tier: 'premium', mode: 'gradient', colors: ['#1f2937', '#9ca3af', '#f3f4f6'] },
+  { id: 'neon',        label: 'Neon',       tier: 'elite',   mode: 'animated', colors: ['#ff00ea', '#00f5ff', '#39ff14', '#ff8a00'] },
+  { id: 'gold-foil',   label: 'Gold Foil',  tier: 'elite',   mode: 'animated', colors: ['#fff7c2', '#ffd166', '#b8860b', '#ffd166'] },
+  { id: 'rosegold',    label: 'Rose Gold',  tier: 'elite',   mode: 'gradient', colors: ['#ffc8a2', '#e8a3a3', '#c97b84', '#ffe4d6'] },
+  { id: 'midnight',    label: 'Midnight',   tier: 'elite',   mode: 'animated', colors: ['#0b1d51', '#7b2cbf', '#3a86ff', '#caf0f8'] },
+]
+
 // Tools available per type + tier — aligned to home page tier promises:
 // Classic  = simple animated reveal, no music/media ("Simple animation, No music")
 // Premium  = music + better visuals ("Music + better visuals, Richer motion")
@@ -1270,20 +1296,79 @@ function CardStudio() {
             </>
           )}
 
+          <label className="cs-field">
+            <span>Surface Transparency</span>
+            <input
+              type="range"
+              min="0"
+              max="0.6"
+              step="0.05"
+              value={c.card.backgroundOpacity ?? 0}
+              onChange={e => update('card.backgroundOpacity', Number(e.target.value))}
+            />
+            <span className="cs-range-val">
+              {Math.round((c.card.backgroundOpacity ?? 0) * 100)}%
+            </span>
+          </label>
+
           <div className="cs-sub-section">
             <p className="cs-sub-label">Card Border</p>
             <div className="cs-choice-row">
-              {['solid', 'gradient', 'animated'].map(type => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`cs-chip ${c.card.cardBorder.type === type ? 'active' : ''}`}
-                  onClick={() => update('card.cardBorder.type', type)}
-                >
-                  {type}
-                </button>
-              ))}
+              {['solid', 'gradient', 'animated'].map(type => {
+                const lockedAnimated = type === 'animated' && !isArtist && !tierLimits.allowAnimatedBorder
+                const lockedGradient = type === 'gradient' && !isArtist && !tierLimits.allowGradientBorder
+                const locked = lockedAnimated || lockedGradient
+                const reqTier = lockedAnimated ? 'Elite' : 'Premium'
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    className={`cs-chip ${c.card.cardBorder.type === type ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                    onClick={() => !locked && update('card.cardBorder.type', type)}
+                    disabled={locked}
+                    title={locked ? `Requires ${reqTier}` : undefined}
+                  >
+                    {type}
+                    {locked && <span className="cs-chip-badge">{reqTier}</span>}
+                  </button>
+                )
+              })}
             </div>
+
+            {c.card.cardBorder.type !== 'solid' && (
+              <div className="cs-sub-section">
+                <p className="cs-sub-label">Quick palettes</p>
+                <div className="cs-border-presets">
+                  {BORDER_PRESETS.map((preset) => {
+                    const locked = !isArtist && !tierHasPresetAccess(studioTier, preset.tier)
+                    const active = JSON.stringify(c.card.cardBorder.colors) === JSON.stringify(preset.colors)
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        className={`cs-border-preset ${active ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                        onClick={() => {
+                          if (locked) return
+                          update('card.cardBorder.colors', [...preset.colors])
+                          // Honour the preset's intended mode unless the user is
+                          // capped (animated requires Elite for non-artists).
+                          const wantsAnimated = preset.mode === 'animated'
+                          const canAnimated = isArtist || tierLimits.allowAnimatedBorder
+                          update('card.cardBorder.type', wantsAnimated && canAnimated ? 'animated' : 'gradient')
+                        }}
+                        title={locked ? `Requires ${preset.tier === 'elite' ? 'Elite' : 'Premium'}` : preset.label}
+                        disabled={locked}
+                      >
+                        <span className="cs-border-preset-swatch" style={{ background: `linear-gradient(120deg, ${preset.colors.join(', ')})` }} />
+                        <span className="cs-border-preset-label">{preset.label}</span>
+                        {locked && <span className="cs-chip-badge">{preset.tier === 'elite' ? 'Elite' : 'Premium'}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {c.card.cardBorder.colors.map((color, i) => (
               <div key={i} className="cs-color-row">
                 <ColorInput label={`Border ${i + 1}`} value={color} onChange={e => {
@@ -1462,10 +1547,39 @@ function CardStudio() {
 
     // QUESTIONS
     if (activeTool === 'questions') {
+      const usedTexts = new Set(c.questions.items.map(q => (q.text || '').trim()))
       return (
         <>
           <p className="cs-panel-eyebrow">Questions</p>
           <h3>Receiver interaction flow</h3>
+
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Quick-add presets</p>
+            <div className="cs-q-presets">
+              {QUESTION_PRESETS.map((preset) => {
+                const used = usedTexts.has(preset.text)
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    className={`cs-q-preset ${used ? 'used' : ''}`}
+                    onClick={() => {
+                      if (used) return
+                      const items = [...c.questions.items, { text: preset.text }]
+                      update('questions.items', items)
+                    }}
+                    disabled={used}
+                    title={used ? 'Already added' : 'Add this prompt'}
+                  >
+                    <span className="cs-q-preset-emoji">{preset.emoji}</span>
+                    <span className="cs-q-preset-text">{preset.text}</span>
+                    {used && <span className="cs-q-preset-check">✓</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {c.questions.items.map((q, i) => (
             <div key={i} className="cs-question-card">
               <label className="cs-field">
@@ -1475,7 +1589,7 @@ function CardStudio() {
               <button type="button" className="cs-remove-btn" onClick={() => removeQuestion(i)}>Remove</button>
             </div>
           ))}
-          <button type="button" className="cs-button" onClick={addQuestion}>+ Add Question</button>
+          <button type="button" className="cs-button" onClick={addQuestion}>+ Add custom question</button>
 
           {(tierLimits.allowCustomPalette || isArtist) && (
             <div className="cs-sub-section">
