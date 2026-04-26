@@ -137,22 +137,48 @@ function CardPreviewModal({
 
   // Music — gated by tier (Classic has no music)
   const musicAllowed = limit('allowMusic') && !!c.background.music.url
+  const musicStartSec = Number(c.background.music.startSec) || 0
+  const musicEndSec = Number(c.background.music.endSec) || 0
+  const musicTrimmed = musicEndSec > 0 && musicEndSec > musicStartSec
+
   useEffect(() => {
     if (!audioRef.current || !musicAllowed) return undefined
 
     audioRef.current.volume = c.background.music.volume
 
     if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview') {
+      // Honour trim window: jump to start point if we're outside the segment.
+      if (musicTrimmed) {
+        const t = audioRef.current.currentTime
+        if (t < musicStartSec || t >= musicEndSec) {
+          audioRef.current.currentTime = musicStartSec
+        }
+      }
       audioRef.current.play().catch(() => {})
     } else {
       audioRef.current.pause()
-      audioRef.current.currentTime = 0
+      audioRef.current.currentTime = musicTrimmed ? musicStartSec : 0
     }
 
     return () => {
       if (audioRef.current) audioRef.current.pause()
     }
-  }, [c.background.music.url, c.background.music.volume, stage, musicAllowed])
+  }, [c.background.music.url, c.background.music.volume, stage, musicAllowed, musicTrimmed, musicStartSec, musicEndSec])
+
+  // While trimmed playback is active, loop within [startSec, endSec] manually.
+  // Native <audio loop> covers the file end; we also need to loop at the
+  // user-defined endSec.
+  useEffect(() => {
+    if (!audioRef.current || !musicAllowed || !musicTrimmed) return undefined
+    const el = audioRef.current
+    const onTime = () => {
+      if (el.currentTime >= musicEndSec) {
+        el.currentTime = musicStartSec
+      }
+    }
+    el.addEventListener('timeupdate', onTime)
+    return () => el.removeEventListener('timeupdate', onTime)
+  }, [musicAllowed, musicTrimmed, musicStartSec, musicEndSec])
 
   // Open effect dispatcher — gated by tier cap
   const triggerOpenEffect = useCallback(() => {

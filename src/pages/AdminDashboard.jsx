@@ -148,6 +148,10 @@ function AdminDashboard() {
   const [newTrack, setNewTrack] = useState({ name: '', url: '' })
   const [mediaVideoUploading, setMediaVideoUploading] = useState(false)
   const [mediaMusicUploading, setMediaMusicUploading] = useState(false)
+  // Just-uploaded music clip awaiting trim + save. Holds the Cloudinary URL
+  // and a default name; backend POST happens once when the admin clicks Save
+  // in the trim editor — no two-step "upload then save" dance.
+  const [musicDraft, setMusicDraft] = useState(null) // { url, name } | null
   const mediaVideoInputRef = useRef(null)
   const mediaMusicInputRef = useRef(null)
   // Ban form
@@ -157,22 +161,12 @@ function AdminDashboard() {
   // Broadcast message
   const [broadcastMessage, setBroadcastMessage] = useState('')
 
-  // Gate: only Admin role
-  if (!currentUser || currentUser.role !== 'Admin') {
-    return (
-      <div className="page-body">
-        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
-        <div className="screen-body">
-          <div className="admin-restricted">
-            <h2>Access Restricted</h2>
-            <p>This dashboard is only available to Admin users.</p>
-            <button className="primary" type="button" onClick={() => navigate('/')}>Go Home</button>
-          </div>
-        </div>
-        <ScreenNav />
-      </div>
-    )
-  }
+  // Whether we're allowed to render the dashboard. Rendered as a guard variable
+  // (not an early return) so every hook below — including loadTabData's
+  // useEffect — runs on every render. Without this, currentUser flipping from
+  // null to Admin during auth hydration changes the hook count between renders
+  // and React silently aborts the load effects, leaving the dashboard empty.
+  const isAdminGate = currentUser && currentUser.role === 'Admin'
 
   const showMsg = (text, ok = true) => {
     setActionMsg({ text, ok })
@@ -314,8 +308,9 @@ function AdminDashboard() {
   }
 
   useEffect(() => {
+    if (!isAdminGate) return
     loadTabData(activeTab)
-  }, [activeTab])
+  }, [activeTab, isAdminGate])
 
   const handleAcceptApplication = async (appId) => {
     try {
@@ -451,7 +446,10 @@ function AdminDashboard() {
   const handleBroadcast = async () => {
     if (!broadcastMessage.trim()) { showMsg('Message cannot be empty.', false); return }
     try {
-      await sendAdminBroadcast({ message: broadcastMessage.trim() })
+      // /admin/broadcast-message route returns 404 — backend never deployed it.
+      // Reuse the working /admin/send-seasonal-reminder endpoint which already
+      // handles "send a custom message to all users" semantics.
+      await sendSeasonalReminder({ message: broadcastMessage.trim() })
       showMsg('Broadcast sent to all users!')
       setBroadcastMessage('')
     } catch (err) {
@@ -555,27 +553,53 @@ function AdminDashboard() {
       // misclassify some codecs and return 4xx. Use 'video' explicitly so mp3
       // and wav uploads work consistently.
       const url = await uploadToCloudinary(file, 'video')
-      const fallbackName = file.name.replace(/\.[^.]+$/, '').slice(0, 80)
-      const finalName = (newTrack.name || '').trim() || fallbackName
-      try {
-        // Backend validator strictly allows { name, url } — extra fields like
-        // `title` or `audioUrl` are rejected with "is not allowed".
-        await uploadMediaMusic({ name: finalName, url })
-        showMsg('Track added to library!')
-        setNewTrack({ name: '', url: '' })
-        if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
-        await refreshMediaSilent()
-      } catch (postErr) {
-        console.error('[Admin] uploadMediaMusic POST failed', postErr)
-        setNewTrack({ name: finalName, url })
-        showMsg(`Save failed (file uploaded): ${postErr.message || 'unknown error'}`, false)
-      }
+      const defaultName = (newTrack.name || '').trim() ||
+        file.name.replace(/\.[^.]+$/, '').slice(0, 80)
+      // Park as a draft. The admin will trim + name, then save once.
+      setMusicDraft({ url, name: defaultName })
+      setNewTrack({ name: '', url: '' })
+      if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
+      showMsg('Trim and name your clip, then save to the library.')
     } catch (err) {
       console.error('[Admin] Cloudinary audio upload failed', err)
       showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
     } finally {
       setMediaMusicUploading(false)
     }
+  }
+
+  // Single-shot save for a freshly-uploaded clip. The backend's validator
+  // currently only accepts { name, url, duration:int } — startSec/endSec are
+  // rejected as "not allowed". Until the backend extends the schema, trim
+  // metadata is held client-side only (the studio music picker honours it via
+  // the in-memory record but it won't survive a page reload).
+  const handleSaveDraftTrack = async (draft) => {
+    try {
+      const startSec = Number(draft.startSec || 0)
+      const endSec = Number(draft.endSec || 0)
+      const trimmed = endSec > 0 && (startSec > 0 || endSec < Number(draft.duration || 0) - 0.5)
+      await uploadMediaMusic({
+        name: draft.name,
+        url: draft.url,
+        duration: Math.round(Number(draft.duration || 0)),
+      })
+      showMsg(
+        trimmed
+          ? 'Track added — trim is local only until the backend supports startSec/endSec.'
+          : 'Track added to library!',
+      )
+      setMusicDraft(null)
+      await refreshMediaSilent()
+    } catch (err) {
+      console.error('[Admin] uploadMediaMusic (draft) failed', err)
+      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
+      throw err
+    }
+  }
+
+  const handleDiscardDraft = () => {
+    if (!window.confirm('Discard this upload? The Cloudinary file will not be added to the library.')) return
+    setMusicDraft(null)
   }
 
   const handleAddTrack = async () => {
@@ -638,20 +662,19 @@ function AdminDashboard() {
       return
     }
     try {
-      // Only send the fields the editor controls. Backend may reject unknown
-      // keys (the same way it does for /media/music POST).
+      // Backend POST validator accepts only { name, url, duration:int } and
+      // rejects startSec/endSec — assume the same is true for PATCH until the
+      // schema is extended. Send only the safe fields.
       await updateMediaMusic(id, {
         name: updated.name,
-        startSec: updated.startSec,
-        endSec: updated.endSec,
-        duration: updated.duration,
+        duration: Math.round(Number(updated.duration || 0)),
       })
-      // Optimistically update the local list so the editor exits the dirty
-      // state immediately even if the silent refresh races.
+      // Keep trim metadata in the local record so the studio picker can still
+      // use it during this session. (It won't survive a page reload.)
       setMediaMusic((prev) =>
         prev.map((t) => ((t._id || t.id) === id ? { ...t, ...updated } : t)),
       )
-      showMsg('Track saved.')
+      showMsg('Track saved (trim metadata is local-only until backend supports it).')
       refreshMediaSilent()
     } catch (err) {
       console.error('[Admin] updateMediaMusic failed', err)
@@ -671,6 +694,22 @@ function AdminDashboard() {
     } catch (err) {
       showMsg(err.message || 'Delete failed.', false)
     }
+  }
+
+  if (!isAdminGate) {
+    return (
+      <div className="page-body">
+        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
+        <div className="screen-body">
+          <div className="admin-restricted">
+            <h2>Access Restricted</h2>
+            <p>This dashboard is only available to Admin users.</p>
+            <button className="primary" type="button" onClick={() => navigate('/')}>Go Home</button>
+          </div>
+        </div>
+        <ScreenNav />
+      </div>
+    )
   }
 
   return (
@@ -1318,52 +1357,60 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Upload form */}
-              <div className="admin-media-add-form">
-                <input
-                  ref={mediaMusicInputRef}
-                  type="file"
-                  accept="audio/*"
-                  style={{ display: 'none' }}
-                  onChange={e => handleMediaMusicFile(e.target.files?.[0])}
-                />
-                <div className="admin-media-add-row">
-                  <label className="admin-field admin-media-title-field">
-                    <span>Track Name <small>(optional — defaults to filename)</small></span>
-                    <input
-                      placeholder="e.g. Soft Piano"
-                      value={newTrack.name}
-                      onChange={e => setNewTrack(p => ({ ...p, name: e.target.value }))}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className={`admin-media-file-btn${newTrack.url ? ' ready' : ''}${mediaMusicUploading ? ' uploading' : ''}`}
-                    onClick={() => !mediaMusicUploading && mediaMusicInputRef.current?.click()}
-                    disabled={mediaMusicUploading}
-                  >
-                    {mediaMusicUploading ? (
-                      <><span className="admin-media-file-spinner" />Uploading…</>
-                    ) : newTrack.url ? (
-                      <><span>✓</span> Replace file</>
-                    ) : (
-                      <><span className="admin-media-file-icon">↑</span> Upload &amp; save</>
-                    )}
-                  </button>
-                  {newTrack.url && (
+              {/* Upload form — hidden while a draft is being trimmed so the
+                  admin focuses on saving the current clip first. */}
+              {!musicDraft && (
+                <div className="admin-media-add-form">
+                  <input
+                    ref={mediaMusicInputRef}
+                    type="file"
+                    accept="audio/*"
+                    style={{ display: 'none' }}
+                    onChange={e => handleMediaMusicFile(e.target.files?.[0])}
+                  />
+                  <div className="admin-media-add-row">
+                    <label className="admin-field admin-media-title-field">
+                      <span>Track Name <small>(optional — defaults to filename)</small></span>
+                      <input
+                        placeholder="e.g. Soft Piano"
+                        value={newTrack.name}
+                        onChange={e => setNewTrack(p => ({ ...p, name: e.target.value }))}
+                      />
+                    </label>
                     <button
-                      className="primary admin-media-add-btn"
                       type="button"
-                      onClick={handleAddTrack}
-                      disabled={mediaMusicUploading || !newTrack.name.trim()}
-                      title="Retry saving the previous upload"
+                      className={`admin-media-file-btn${mediaMusicUploading ? ' uploading' : ''}`}
+                      onClick={() => !mediaMusicUploading && mediaMusicInputRef.current?.click()}
+                      disabled={mediaMusicUploading}
                     >
-                      Retry save
+                      {mediaMusicUploading ? (
+                        <><span className="admin-media-file-spinner" />Uploading…</>
+                      ) : (
+                        <><span className="admin-media-file-icon">↑</span> Upload audio</>
+                      )}
                     </button>
-                  )}
+                  </div>
+                  <p className="admin-media-hint">Pick a file → trim &amp; name → save once.</p>
                 </div>
-                <p className="admin-media-hint">Tracks save to the library automatically once uploaded.</p>
-              </div>
+              )}
+
+              {/* Draft editor — shown while a freshly-uploaded clip awaits trim+save */}
+              {musicDraft && (
+                <div className="admin-media-draft-wrap">
+                  <div className="admin-media-draft-banner">
+                    <span>New upload — set the play span, then save it once.</span>
+                    <button type="button" className="admin-media-draft-discard" onClick={handleDiscardDraft}>
+                      Discard
+                    </button>
+                  </div>
+                  <AdminMusicTrack
+                    mode="draft"
+                    track={musicDraft}
+                    onSave={handleSaveDraftTrack}
+                    onDelete={handleDiscardDraft}
+                  />
+                </div>
+              )}
 
               {/* Music list — themed editor with playback + trim controls */}
               {mediaMusic.length > 0 ? (

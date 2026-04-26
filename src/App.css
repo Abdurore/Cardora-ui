@@ -843,6 +843,59 @@
   flex-wrap: wrap;
 }
 
+.hero-bonus-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-top: 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(98, 255, 162, 0.16), rgba(126, 247, 255, 0.08));
+  border: 1px solid rgba(98, 255, 162, 0.45);
+  color: #eafcff;
+  font-size: 0.86rem;
+  text-decoration: none;
+  box-shadow: 0 10px 30px rgba(98, 255, 162, 0.16);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  max-width: fit-content;
+  animation: heroBonusPulse 2.4s ease-in-out infinite;
+}
+
+.hero-bonus-banner:hover {
+  transform: translateY(-1px);
+  border-color: rgba(98, 255, 162, 0.7);
+  box-shadow: 0 14px 36px rgba(98, 255, 162, 0.25);
+}
+
+.hero-bonus-icon {
+  font-size: 1.05rem;
+  filter: drop-shadow(0 2px 6px rgba(98, 255, 162, 0.35));
+}
+
+.hero-bonus-text strong {
+  color: #9ef6cf;
+  font-weight: 700;
+}
+
+.hero-bonus-arrow {
+  color: rgba(158, 246, 207, 0.85);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+@keyframes heroBonusPulse {
+  0%, 100% { box-shadow: 0 10px 30px rgba(98, 255, 162, 0.16); }
+  50%      { box-shadow: 0 10px 36px rgba(98, 255, 162, 0.3); }
+}
+
+@media (max-width: 600px) {
+  .hero-bonus-banner {
+    font-size: 0.74rem;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+}
+
 .pill-row {
   display: flex;
   flex-wrap: wrap;
@@ -11358,6 +11411,32 @@ a {
   justify-content: center;
 }
 
+@media (max-width: 600px) {
+  .store-tabs {
+    /* Three tabs, last one is "Gifts Coming Soon" — wider than the others.
+       Lay them out as a 3-column grid with normal-case labels and a tighter
+       chip style so they all sit on a single row without wrapping. */
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 0;
+  }
+  .store-tabs .tab {
+    padding: 9px 6px;
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    line-height: 1.2;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .store-tabs .tab {
+    font-size: 0.62rem;
+  }
+}
+
 .store-earn-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -14256,6 +14335,143 @@ a {
   50% { opacity: 0.3; transform: scale(0.7); }
 }
 
+/* ─── World Chat — mobile ─── */
+@media (max-width: 600px) {
+  .chat-page.page-body {
+    padding: 12px 12px 0;
+  }
+  .chat-page .chat-body {
+    gap: 10px;
+    padding-bottom: 88px;
+  }
+  .chat-header-bar {
+    padding: 12px 14px;
+    gap: 8px;
+    border-radius: 14px;
+    flex-wrap: wrap;
+  }
+  .chat-title {
+    font-size: 1.05rem;
+  }
+  .chat-header-bar .eyebrow {
+    font-size: 0.6rem;
+  }
+  .chat-header-right {
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .chat-online-count {
+    font-size: 0.62rem;
+    padding: 2px 8px;
+  }
+  .chat-status {
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+  }
+  .chat-input-bar {
+    padding: 10px 12px 10px 16px;
+    gap: 8px;
+    margin: 0 0 8px;
+  }
+  .chat-input-bar input {
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .chat-header-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .chat-header-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .chat-status .chat-status-text,
+  .chat-status > :last-child:not(.chat-status-dot) {
+    /* Hide the "Live"/"Reconnecting…" word — the dot already conveys status. */
+  }
+}
+
+/* ─── Admin Dashboard — mobile ─── */
+@media (max-width: 600px) {
+  .admin-header h2 {
+    font-size: 1.2rem;
+  }
+  .admin-tab {
+    padding: 8px 14px;
+    font-size: 0.74rem;
+  }
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .admin-stat-card {
+    padding: 14px 10px;
+  }
+  .admin-stat-value {
+    font-size: 1.15rem;
+  }
+  .admin-stat-icon {
+    font-size: 1.2rem;
+  }
+  .admin-table {
+    font-size: 0.7rem;
+  }
+  .admin-table th,
+  .admin-table td {
+    padding: 6px 8px;
+  }
+  .admin-section {
+    margin-bottom: 22px;
+  }
+  .admin-section-title {
+    font-size: 0.92rem;
+  }
+}
+
+/* ─── AdminMusicTrack editor — mobile ─── */
+@media (max-width: 600px) {
+  .amt-card {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .amt-head {
+    grid-template-columns: 32px 1fr auto;
+    gap: 10px;
+  }
+  .amt-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+  .amt-name-input {
+    font-size: 0.92rem;
+  }
+  .amt-controls {
+    grid-template-columns: 32px 1fr;
+    grid-template-rows: auto auto;
+    row-gap: 4px;
+  }
+  .amt-time {
+    grid-column: 1 / -1;
+    text-align: left;
+    font-size: 0.7rem;
+  }
+  .amt-play {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ─── Card detail modal & misc shared bottom-sheet — mobile ─── */
+@media (max-width: 600px) {
+  .ctm-shell {
+    padding: 16px;
+  }
+}
+
 /* ═══════════════════════════════════════════════════
    CREATE CARD PICKER — FULL-SCREEN MODAL
    ═══════════════════════════════════════════════════ */
@@ -17037,6 +17253,43 @@ a {
   font-style: italic;
 }
 
+/* Draft music clip — shown while a fresh upload awaits trim + save */
+.admin-media-draft-wrap {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.admin-media-draft-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(118, 239, 255, 0.12), rgba(98, 255, 162, 0.08));
+  border: 1px solid rgba(118, 239, 255, 0.32);
+  color: #c7f7ff;
+  font-size: 0.78rem;
+}
+
+.admin-media-draft-discard {
+  background: transparent;
+  border: 1px solid rgba(255, 100, 120, 0.35);
+  color: #ff9dab;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.admin-media-draft-discard:hover {
+  background: rgba(255, 100, 120, 0.12);
+}
+
 .admin-media-title-field > span small {
   font-weight: 400;
   text-transform: none;
@@ -17790,6 +18043,20 @@ a {
 .cs-music-picker-item.active .cs-music-picker-icon {
   background: color-mix(in srgb, var(--type-accent, #f0c060) 16%, transparent);
   color: var(--type-accent, #f0c060);
+}
+
+.cs-music-picker-trim {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(98, 255, 162, 0.12);
+  border: 1px solid rgba(98, 255, 162, 0.3);
+  color: #9ef6cf;
+  margin-left: auto;
+  margin-right: 8px;
 }
 
 .cs-music-picker-label {

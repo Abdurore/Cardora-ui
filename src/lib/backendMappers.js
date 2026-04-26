@@ -93,6 +93,29 @@ function normaliseTier(value) {
   return TIER_ALIASES[key] || key || 'classic'
 }
 
+// Try every field the backend might have used for the template's tier. The
+// new schema stripped many fields during template create, so the value can
+// end up nested inside layoutConfig, config, or as an alias key. Returns
+// undefined if nothing usable found, letting downstream code apply its
+// preferred fallback.
+function findTier(template) {
+  const layout = template?.layoutConfig || template?.layoutdata || {}
+  const candidates = [
+    template?.tier,
+    template?.couponType,
+    template?.cardTier,
+    layout.tier,
+    layout.couponType,
+    layout.config?.tier,
+    template?.config?.tier,
+    template?.enhancements?.tier,
+  ]
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c
+  }
+  return undefined
+}
+
 export function mapTemplateToCard(template, index = 0) {
   const layout = template.layoutConfig || template.layoutdata || {}
   const content = layout.content || {}
@@ -128,7 +151,7 @@ export function mapTemplateToCard(template, index = 0) {
     userCount,
     category: (template.category || 'scratch').toLowerCase(),
     type: normaliseType(template.type || layout.type),
-    tier: normaliseTier(template.tier || template.couponType || layout.tier || layout.couponType),
+    tier: normaliseTier(findTier(template)),
     previewImage: template.previewImage || layout.previewImage || layout.media?.images?.[0] || '',
     status: (template.status || 'approved').toLowerCase(),
     tag: template.status ? capitalize(template.status) : '',
@@ -211,6 +234,149 @@ export function cardObjectToLayoutData(cardObject) {
 }
 
 /**
+ * Split a full cardObject into the backend card-engine's three top-level
+ * payload keys: { config, enhancements, state }.
+ *
+ * Schema rules learned so far (from validator errors):
+ *   - top-level `tier` is NOT allowed (tier comes from the endpoint path)
+ *   - config.colors must be an OBJECT, not an array — uses palette anchors
+ *     { primary, surface, ink, accent }
+ *   - enhancements.background only accepts { type } so far; `type` must be
+ *     one of [color, video, animated]
+ *   - enhancements.media must be an ARRAY of URL strings (not {images:[...]})
+ *   - enhancements.animation rejects {openEffect, confettiColors, backgroundEffect}
+ *     — backend uses different keys; we send {} until we know them
+ *   - enhancements rejects: theme, card, closedState, giftEffect, previewImage,
+ *     previewUrl — these have no bucket in the schema yet (FE-only)
+ *
+ * Anything FE-only is preserved in the cardObject for the studio preview but
+ * not transmitted; the recipient's rendered card is reconstructed from
+ * { colors, font, content, background.type, media, interaction, questions }.
+ */
+
+// FE background.type → backend background.type
+const BG_TYPE_MAP = {
+  color: 'color',
+  video: 'video',
+  gradient: 'animated',
+  animated: 'animated',
+  image: 'color', // backend has no 'image' option; send a flat color as a fallback
+}
+
+// Backend custom validators sometimes reject short-hex (#fff) or rgb()/named
+// colors. Normalise everything to 7-char #rrggbb. Falls back to a sentinel
+// when input is unrecognisable.
+function normaliseHex(input, fallback = '#76efff') {
+  if (typeof input !== 'string') return fallback
+  let v = input.trim().toLowerCase()
+  if (!v.startsWith('#')) return fallback
+  if (v.length === 4) {
+    // #abc → #aabbcc
+    v = `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}`
+  }
+  if (/^#[0-9a-f]{6}$/.test(v)) return v
+  return fallback
+}
+
+export function cardObjectToBackendPayload(cardObject) {
+  // Backend `config.colors` schema (validator-confirmed):
+  //   background : string  (required)
+  //   gradient   : array of strings (required)
+  //   accent     : string  (required)
+  // Mapping from our palette anchors:
+  //   background ← palette.surface
+  //   gradient   ← background.colors[] from FE (gradient stops) or [primary, accent]
+  //   accent     ← palette.primary (the hero/eye-catching color)
+  const fallbackColors = {
+    background: '#0b0f12',
+    gradient: ['#76efff', '#62ffa2'],
+    accent: '#76efff',
+  }
+  if (!cardObject) {
+    return {
+      config: { colors: fallbackColors, font: 'Cinzel' },
+      enhancements: {},
+      state: {},
+    }
+  }
+
+  // ── config.colors (REQUIRED: { background, gradient[2], accent })
+  // All values must be valid 7-char hex strings; gradient[0] !== gradient[1].
+  const palette = cardObject.palette || {}
+  const feGradientStops = Array.isArray(cardObject.background?.colors)
+    ? cardObject.background.colors
+    : []
+  const rawStop1 =
+    feGradientStops[0] ||
+    palette.primary ||
+    cardObject.theme?.accentColor
+  const rawStop2 =
+    feGradientStops[feGradientStops.length - 1] ||
+    palette.accent ||
+    cardObject.theme?.headingColor
+  const stop1 = normaliseHex(rawStop1, fallbackColors.gradient[0])
+  let stop2 = normaliseHex(rawStop2, fallbackColors.gradient[1])
+  if (stop2 === stop1) stop2 = fallbackColors.gradient[1] === stop1 ? fallbackColors.gradient[0] : fallbackColors.gradient[1]
+  const gradient = [stop1, stop2]
+
+  const colors = {
+    background: normaliseHex(
+      palette.surface || cardObject.card?.backgroundColor || feGradientStops[0],
+      fallbackColors.background,
+    ),
+    gradient,
+    accent: normaliseHex(
+      palette.primary || cardObject.theme?.accentColor || stop1,
+      fallbackColors.accent,
+    ),
+  }
+  const font = cardObject.theme?.fontFamily || 'Cinzel'
+
+  // ── enhancements.media: ARRAY OF OBJECTS, each requires { url, type }.
+  // We only have image media on the FE today; type is always 'image'.
+  const mediaItems = Array.isArray(cardObject.media?.images)
+    ? cardObject.media.images
+        .map((img) => {
+          if (!img) return null
+          if (typeof img === 'string') return { url: img, type: 'image' }
+          if (img.url) return { url: img.url, type: img.type || 'image' }
+          return null
+        })
+        .filter(Boolean)
+    : []
+
+  // ── enhancements.background: only `type` is accepted right now
+  const bgType = BG_TYPE_MAP[cardObject.background?.type] || 'color'
+
+  // Build the payload. Always include `media` (as empty array if no images)
+  // since some schemas require the key to be present. Same for any other
+  // optional buckets — empty is safer than absent for strict validators.
+  const payload = {
+    config: {
+      colors,
+      font,
+      // content is REQUIRED. Send heading/body/extendedBody.
+      content: {
+        heading: cardObject.content?.heading || '',
+        body: cardObject.content?.body || '',
+        extendedBody: cardObject.content?.extendedBody || '',
+      },
+    },
+    enhancements: {
+      background: { type: bgType },
+      media: mediaItems, // always send (empty array if no images)
+    },
+  }
+
+  return payload
+}
+
+// Back-compat shim — older call sites still import the old name.
+export function cardObjectToBackendConfig(cardObject) {
+  return cardObjectToBackendPayload(cardObject).config
+}
+
+/**
  * Transform backend layoutdata → frontend cardObject
  * Backend sends media.images as string[], frontend expects object[]
  */
@@ -248,7 +414,7 @@ export function mapBackendCard(card) {
     message: content.body || '',
     type,
     templateId: card.templateId || '',
-    tier: normaliseTier(card.tier || card.couponType || layout.tier || layout.couponType),
+    tier: normaliseTier(findTier({ ...card, layoutConfig: layout, layoutdata: layout })),
     createdAt: card.createdAt || '',
     poll: card.poll || null,
     chain: card.chain || null,

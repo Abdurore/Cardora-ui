@@ -1,8 +1,9 @@
 import { Link, useOutletContext } from 'react-router-dom'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
+import { getSignupBonusAvailability } from '../lib/api.js'
 
 const FORMAT_CHIPS = [
   { icon: '✉', label: 'Greeting', cls: 'chip-greeting' },
@@ -120,6 +121,22 @@ function Home() {
     openCardTypeModal,
   } = useOutletContext()
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+  const [signupBonus, setSignupBonus] = useState(null)
+
+  // Surface the "first 200 users get free CC" offer for logged-out visitors
+  // so they see it before bouncing off the hero. Logged-in users have already
+  // claimed (or missed) the bonus so we hide it for them.
+  useEffect(() => {
+    if (currentUser) return
+    let cancelled = false
+    getSignupBonusAvailability()
+      .then((res) => {
+        if (cancelled) return
+        if (res?.available) setSignupBonus(res)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [currentUser])
 
   const highlightCards = useMemo(() => {
     // Only real, live artist-published templates. No placeholder catalog.
@@ -175,6 +192,17 @@ function Home() {
               Explore Templates
             </Link>
           </div>
+          {signupBonus && !currentUser && (
+            <Link to="/signup" className="hero-bonus-banner" aria-label="Claim free Cardora Credits">
+              <span className="hero-bonus-icon">🎁</span>
+              <span className="hero-bonus-text">
+                {signupBonus.bonusAmount
+                  ? <>First sign-ups get <strong>{signupBonus.bonusAmount} free CC</strong> — claim before it's gone</>
+                  : (signupBonus.message || 'New accounts get free Cardora Credits — claim now')}
+              </span>
+              <span className="hero-bonus-arrow">→</span>
+            </Link>
+          )}
         </div>
         <div className="hero-preview" aria-hidden="true">
           <div className="hero-preview-orbit orbit-one" />

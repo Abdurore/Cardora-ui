@@ -11,7 +11,12 @@ function formatSec(seconds) {
 // slider. Plays the trimmed segment only when the user hits the loop button —
 // the raw audio still plays end-to-end if they hit play, so they can hear
 // where to set the bounds.
-export default function AdminMusicTrack({ track, onSave, onDelete }) {
+//
+// `mode` defaults to 'edit' (existing track in the library). Use 'draft' for
+// a freshly-uploaded clip not yet saved — the action buttons relabel and the
+// track is always dirty until the first save.
+export default function AdminMusicTrack({ track, onSave, onDelete, mode = 'edit' }) {
+  const isDraft = mode === 'draft'
   const audioRef = useRef(null)
   const [duration, setDuration] = useState(Number(track.duration) || 0)
   const [position, setPosition] = useState(0)
@@ -30,14 +35,20 @@ export default function AdminMusicTrack({ track, onSave, onDelete }) {
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
-  // Mark dirty when name or trim points diverge from the saved record.
+  // Mark dirty when name or trim points diverge from the saved record. Drafts
+  // are always dirty until the first save lands — there's nothing in the
+  // backend yet to compare against.
   useEffect(() => {
+    if (isDraft) {
+      setDirty(true)
+      return
+    }
     const same =
       name === (track.name || track.title || '') &&
       Math.abs(startSec - (Number(track.startSec) || 0)) < 0.05 &&
       Math.abs(endSec - (Number(track.endSec) || duration || 0)) < 0.05
     setDirty(!same)
-  }, [name, startSec, endSec, duration, track])
+  }, [name, startSec, endSec, duration, track, isDraft])
 
   const handleLoaded = () => {
     const d = audioRef.current?.duration || 0
@@ -209,7 +220,11 @@ export default function AdminMusicTrack({ track, onSave, onDelete }) {
 
       <div className="amt-actions">
         <span className="amt-status">
-          {dirty ? 'Unsaved changes' : 'Saved'}
+          {isDraft
+            ? 'Trim and name your clip, then save it to the library.'
+            : dirty
+            ? 'Unsaved changes'
+            : 'Saved'}
         </span>
         <button
           type="button"
@@ -217,7 +232,9 @@ export default function AdminMusicTrack({ track, onSave, onDelete }) {
           onClick={handleSave}
           disabled={!dirty || saving || !name.trim()}
         >
-          {saving ? 'Saving…' : 'Save'}
+          {saving
+            ? (isDraft ? 'Adding…' : 'Saving…')
+            : (isDraft ? 'Save to library' : 'Save')}
         </button>
       </div>
     </div>

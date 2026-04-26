@@ -16,6 +16,11 @@ export const defaultCardObject = {
       url: '',
       isUploaded: false,
       volume: 0.8,
+      // Trim points in seconds. 0/0 means play the full track. When endSec > 0
+      // the player loops the [startSec, endSec] window only — set by the admin
+      // when curating tracks for the studio library.
+      startSec: 0,
+      endSec: 0,
     },
   },
 

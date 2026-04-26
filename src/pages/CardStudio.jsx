@@ -1126,6 +1126,10 @@ function CardStudio() {
                   const url = track.url || track.audioUrl || track.src || ''
                   const label = track.title || track.name || track.label || 'Track'
                   const selected = c.background.music.url === url
+                  // Carry the admin-configured trim points onto the card so the
+                  // recipient hears only the segment the admin curated.
+                  const startSec = Number(track.startSec) || 0
+                  const endSec = Number(track.endSec) || 0
                   return (
                     <button
                       key={track._id || track.id || url}
@@ -1134,10 +1138,15 @@ function CardStudio() {
                       onClick={() => {
                         update('background.music.url', url)
                         update('background.music.isUploaded', false)
+                        update('background.music.startSec', startSec)
+                        update('background.music.endSec', endSec)
                       }}
                     >
                       <span className="cs-music-picker-icon">♫</span>
                       <span className="cs-music-picker-label">{label}</span>
+                      {endSec > 0 && endSec - startSec < (Number(track.duration) || Infinity) && (
+                        <span className="cs-music-picker-trim">trimmed</span>
+                      )}
                       {selected && <span className="cs-music-picker-check">✓</span>}
                     </button>
                   )

@@ -11,6 +11,13 @@ function readJsonSafely(text) {
   try {
     return JSON.parse(text)
   } catch {
+    // Some servers return an HTML 404/500 page when a route doesn't exist or
+    // crashes. Don't pipe the entire HTML body into a toast — surface a short
+    // marker that makes the cause obvious without the wall of markup.
+    const trimmed = text.trim()
+    if (/^<(?:!doctype|html|head|body|div|h1|p|span|table)/i.test(trimmed)) {
+      return { message: 'Server returned a non-JSON response (likely a 404 or crash page).', _isHtml: true }
+    }
     return { message: text }
   }
 }
@@ -96,7 +103,13 @@ async function request(path, { method = 'GET', body, auth = false, headers = {},
   const payload = readJsonSafely(text)
 
   if (!response.ok) {
-    const error = new Error(getErrorMessage(payload, 'Request failed.'))
+    let baseMessage = getErrorMessage(payload, 'Request failed.')
+    // For HTML responses, suffix the URL/method/status so the toast still
+    // identifies which call failed without dumping the page body.
+    if (payload?._isHtml) {
+      baseMessage = `${response.status} ${method} ${path} — backend returned an HTML page (route may not exist).`
+    }
+    const error = new Error(baseMessage)
     error.status = response.status
     error.payload = payload
     error.debug = {

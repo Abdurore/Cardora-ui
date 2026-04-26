@@ -47,6 +47,7 @@ import {
   mapTemplateToCard,
   normalizeUser,
   cardObjectToLayoutData,
+  cardObjectToBackendPayload,
   mapBackendCard,
 } from '../lib/backendMappers.js'
 
@@ -517,17 +518,22 @@ function MainLayout() {
 
   const handleCreateCard = async (cardObject, { title, templateId, type, couponType, useCoupons, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
-      const layoutdata = cardObjectToLayoutData(cardObject)
       // Backend card engine uses 'personal' for the standard card type. 'moment'
       // is still the internal studio id — normalise at the API boundary.
       const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : type
+      // Backend schema { type, tier, config, enhancements, state } — the FE
+      // splits the cardObject into all three sibling keys. If a field gets
+      // rejected under one bucket the validator error tells us which other
+      // bucket to move it to (and the helper updates in one place).
+      const backendPayload = cardObjectToBackendPayload(cardObject)
+      // tier is encoded in the endpoint path (/create-card/elite etc.) and
+      // rejected as a top-level field by the validator. Spread only the
+      // buckets the helper actually populated (state/etc. omitted while
+      // backend shape is unknown).
       const payload = {
-        title: title || cardObject.content?.heading || 'Untitled Card',
-        layoutdata,
         type: resolvedType,
+        ...backendPayload,
       }
-      // Only include templateId when it's a real template id — omitting it signals "custom card"
-      if (templateId && templateId !== 'custom') payload.templateId = templateId
       if (couponType) payload.couponType = couponType
       if (useCoupons) payload.useCoupons = useCoupons
       if (poll) payload.poll = poll
