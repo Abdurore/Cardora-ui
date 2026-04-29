@@ -16,6 +16,43 @@ function extractNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+export function unwrapData(payload) {
+  if (!payload || typeof payload !== 'object') return payload
+  return payload?.data && typeof payload.data === 'object' ? payload.data : payload
+}
+
+export function getResponseMessage(payload, fallback = '') {
+  if (!payload || typeof payload !== 'object') return fallback
+  return (
+    payload.message ||
+    payload.data?.message ||
+    payload.result?.message ||
+    payload.statusMessage ||
+    fallback
+  )
+}
+
+export function getPrimaryUser(payload) {
+  const root = unwrapData(payload)
+  return (
+    root?.user ||
+    root?.currentUser ||
+    root?.profile ||
+    root?.account ||
+    root ||
+    {}
+  )
+}
+
+export function getCollection(payload, keys = []) {
+  const root = unwrapData(payload)
+  if (Array.isArray(root)) return root
+  for (const key of keys) {
+    if (Array.isArray(root?.[key])) return root[key]
+  }
+  return []
+}
+
 export function resolveBalance(...sources) {
   const candidateKeys = [
     'couponBalance',
@@ -45,7 +82,7 @@ export function resolveBalance(...sources) {
 }
 
 export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
-  const user = userPayload?.user || userPayload?.data?.user || userPayload?.data || userPayload || {}
+  const user = getPrimaryUser(userPayload) || {}
   const roleValue = String(user.role || user.accountType || 'user').toLowerCase()
   const userId = user._id || user.id || user.userId || user.email || `u-${Date.now()}`
 
@@ -65,10 +102,55 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     isVerified: user.isVerified ?? true,
     createdAt: user.createdAt || '',
     avatarColor: extras.avatarColor || 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
-    avatarUrl: extras.avatarUrl || user.profilePictureUrl || '',
+    avatarUrl: user.profilePictureUrl || extras.avatarUrl || '',
     favorites: extras.favorites || [],
     inventory: extras.inventory || [],
   }
+}
+
+const TYPE_ALIASES = {
+  standard: 'personal',
+  moment: 'personal',
+  anon: 'anonymous',
+}
+
+const TIER_ALIASES = {
+  simple: 'classic',
+  special: 'premium',
+  signature: 'elite',
+}
+
+function normaliseType(value) {
+  const key = String(value || '').toLowerCase()
+  return TYPE_ALIASES[key] || key || 'personal'
+}
+
+function normaliseTier(value) {
+  const key = String(value || '').toLowerCase()
+  return TIER_ALIASES[key] || key || 'classic'
+}
+
+// Try every field the backend might have used for the template's tier. The
+// new schema stripped many fields during template create, so the value can
+// end up nested inside layoutConfig, config, or as an alias key. Returns
+// undefined if nothing usable found, letting downstream code apply its
+// preferred fallback.
+function findTier(template) {
+  const layout = template?.layoutConfig || template?.layoutdata || {}
+  const candidates = [
+    template?.tier,
+    template?.couponType,
+    template?.cardTier,
+    layout.tier,
+    layout.couponType,
+    layout.config?.tier,
+    template?.config?.tier,
+    template?.enhancements?.tier,
+  ]
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c
+  }
+  return undefined
 }
 
 export function mapTemplateToCard(template, index = 0) {
@@ -105,15 +187,17 @@ export function mapTemplateToCard(template, index = 0) {
     likeCount,
     userCount,
     category: (template.category || 'scratch').toLowerCase(),
-    type: (template.type || layout.type || 'standard').toLowerCase(),
-    tier: (template.couponType || template.tier || layout.couponType || 'simple').toLowerCase(),
+    type: normaliseType(template.type || layout.type),
+    tier: normaliseTier(findTier(template)),
     previewImage: template.previewImage || layout.previewImage || layout.media?.images?.[0] || '',
+    status: (template.status || 'approved').toLowerCase(),
     tag: template.status ? capitalize(template.status) : '',
     ownerId,
     poll: template.poll || layout.poll || null,
     trivia: template.trivia || layout.trivia || null,
     chain: template.chain || layout.chain || null,
     anonTier: template.anonTier || layout.anonTier || null,
+    layoutConfig: layout,
     backendTemplate: template,
   }
 }
@@ -142,7 +226,13 @@ export function mapCouponPackage(pack, targetCurrency) {
 }
 
 export function extractCheckoutUrl(payload) {
+  const root = unwrapData(payload)
   return (
+    root?.authorization_url ||
+    root?.authorizationUrl ||
+    root?.checkoutUrl ||
+    root?.url ||
+    root?.sessionUrl ||
     payload?.authorization_url ||
     payload?.authorizationUrl ||
     payload?.data?.authorization_url ||
@@ -153,6 +243,79 @@ export function extractCheckoutUrl(payload) {
     payload?.data?.url ||
     null
   )
+}
+
+export function normalizeCheckoutSession(payload) {
+  const root = unwrapData(payload) || {}
+  return {
+    checkoutUrl: extractCheckoutUrl(payload),
+    reference:
+      root.reference ||
+      root.paymentReference ||
+      root.checkoutReference ||
+      root.transactionRef ||
+      '',
+    message: getResponseMessage(payload, ''),
+    raw: payload,
+  }
+}
+
+export function normalizeAuthResponse(payload) {
+  const root = unwrapData(payload) || {}
+  const token =
+    payload?.token ||
+    root?.token ||
+    payload?.accessToken ||
+    root?.accessToken ||
+    payload?.jwt ||
+    root?.jwt ||
+    payload?.user?.token ||
+    root?.user?.token ||
+    payload?.result?.token ||
+    root?.result?.token ||
+    null
+
+  return {
+    token,
+    user: getPrimaryUser(payload),
+    message: getResponseMessage(payload, ''),
+    requiresVerification:
+      Boolean(root?.requiresVerification) ||
+      Boolean(payload?.requiresVerification) ||
+      (!token && /verify/i.test(getResponseMessage(payload, ''))),
+    requiresLogin:
+      Boolean(root?.requiresLogin) ||
+      Boolean(payload?.requiresLogin),
+    raw: payload,
+  }
+}
+
+export function normalizeUserSession(userPayload, couponPayload = null, extras = {}) {
+  const user = getPrimaryUser(userPayload)
+  const normalized = normalizeUser(userPayload, extras, couponPayload)
+  return {
+    user,
+    normalized,
+    balance: normalized.balance,
+    currency: normalized.currency,
+    raw: userPayload,
+  }
+}
+
+export function normalizeCouponPackagesResponse(payload, targetCurrency) {
+  const packages = getCollection(payload, ['packages', 'couponPackages', 'items'])
+  return {
+    packages: packages.map((pack) => mapCouponPackage(pack, targetCurrency)),
+    raw: payload,
+  }
+}
+
+export function normalizeTemplatesResponse(payload) {
+  const templates = getCollection(payload, ['templates', 'items', 'results'])
+  return {
+    templates: templates.map(mapTemplateToCard),
+    raw: payload,
+  }
 }
 
 /* ═══════════════════════════════════════════════
@@ -187,6 +350,149 @@ export function cardObjectToLayoutData(cardObject) {
 }
 
 /**
+ * Split a full cardObject into the backend card-engine's three top-level
+ * payload keys: { config, enhancements, state }.
+ *
+ * Schema rules learned so far (from validator errors):
+ *   - top-level `tier` is NOT allowed (tier comes from the endpoint path)
+ *   - config.colors must be an OBJECT, not an array — uses palette anchors
+ *     { primary, surface, ink, accent }
+ *   - enhancements.background only accepts { type } so far; `type` must be
+ *     one of [color, video, animated]
+ *   - enhancements.media must be an ARRAY of URL strings (not {images:[...]})
+ *   - enhancements.animation rejects {openEffect, confettiColors, backgroundEffect}
+ *     — backend uses different keys; we send {} until we know them
+ *   - enhancements rejects: theme, card, closedState, giftEffect, previewImage,
+ *     previewUrl — these have no bucket in the schema yet (FE-only)
+ *
+ * Anything FE-only is preserved in the cardObject for the studio preview but
+ * not transmitted; the recipient's rendered card is reconstructed from
+ * { colors, font, content, background.type, media, interaction, questions }.
+ */
+
+// FE background.type → backend background.type
+const BG_TYPE_MAP = {
+  color: 'color',
+  video: 'video',
+  gradient: 'animated',
+  animated: 'animated',
+  image: 'color', // backend has no 'image' option; send a flat color as a fallback
+}
+
+// Backend custom validators sometimes reject short-hex (#fff) or rgb()/named
+// colors. Normalise everything to 7-char #rrggbb. Falls back to a sentinel
+// when input is unrecognisable.
+function normaliseHex(input, fallback = '#76efff') {
+  if (typeof input !== 'string') return fallback
+  let v = input.trim().toLowerCase()
+  if (!v.startsWith('#')) return fallback
+  if (v.length === 4) {
+    // #abc → #aabbcc
+    v = `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}`
+  }
+  if (/^#[0-9a-f]{6}$/.test(v)) return v
+  return fallback
+}
+
+export function cardObjectToBackendPayload(cardObject) {
+  // Backend `config.colors` schema (validator-confirmed):
+  //   background : string  (required)
+  //   gradient   : array of strings (required)
+  //   accent     : string  (required)
+  // Mapping from our palette anchors:
+  //   background ← palette.surface
+  //   gradient   ← background.colors[] from FE (gradient stops) or [primary, accent]
+  //   accent     ← palette.primary (the hero/eye-catching color)
+  const fallbackColors = {
+    background: '#0b0f12',
+    gradient: ['#76efff', '#62ffa2'],
+    accent: '#76efff',
+  }
+  if (!cardObject) {
+    return {
+      config: { colors: fallbackColors, font: 'Cinzel' },
+      enhancements: {},
+      state: {},
+    }
+  }
+
+  // ── config.colors (REQUIRED: { background, gradient[2], accent })
+  // All values must be valid 7-char hex strings; gradient[0] !== gradient[1].
+  const palette = cardObject.palette || {}
+  const feGradientStops = Array.isArray(cardObject.background?.colors)
+    ? cardObject.background.colors
+    : []
+  const rawStop1 =
+    feGradientStops[0] ||
+    palette.primary ||
+    cardObject.theme?.accentColor
+  const rawStop2 =
+    feGradientStops[feGradientStops.length - 1] ||
+    palette.accent ||
+    cardObject.theme?.headingColor
+  const stop1 = normaliseHex(rawStop1, fallbackColors.gradient[0])
+  let stop2 = normaliseHex(rawStop2, fallbackColors.gradient[1])
+  if (stop2 === stop1) stop2 = fallbackColors.gradient[1] === stop1 ? fallbackColors.gradient[0] : fallbackColors.gradient[1]
+  const gradient = [stop1, stop2]
+
+  const colors = {
+    background: normaliseHex(
+      palette.surface || cardObject.card?.backgroundColor || feGradientStops[0],
+      fallbackColors.background,
+    ),
+    gradient,
+    accent: normaliseHex(
+      palette.primary || cardObject.theme?.accentColor || stop1,
+      fallbackColors.accent,
+    ),
+  }
+  const font = cardObject.theme?.fontFamily || 'Cinzel'
+
+  // ── enhancements.media: ARRAY OF OBJECTS, each requires { url, type }.
+  // We only have image media on the FE today; type is always 'image'.
+  const mediaItems = Array.isArray(cardObject.media?.images)
+    ? cardObject.media.images
+        .map((img) => {
+          if (!img) return null
+          if (typeof img === 'string') return { url: img, type: 'image' }
+          if (img.url) return { url: img.url, type: img.type || 'image' }
+          return null
+        })
+        .filter(Boolean)
+    : []
+
+  // ── enhancements.background: only `type` is accepted right now
+  const bgType = BG_TYPE_MAP[cardObject.background?.type] || 'color'
+
+  // Build the payload. Always include `media` (as empty array if no images)
+  // since some schemas require the key to be present. Same for any other
+  // optional buckets — empty is safer than absent for strict validators.
+  const payload = {
+    config: {
+      colors,
+      font,
+      // content is REQUIRED. Send heading/body/extendedBody.
+      content: {
+        heading: cardObject.content?.heading || '',
+        body: cardObject.content?.body || '',
+        extendedBody: cardObject.content?.extendedBody || '',
+      },
+    },
+    enhancements: {
+      background: { type: bgType },
+      media: mediaItems, // always send (empty array if no images)
+    },
+  }
+
+  return payload
+}
+
+// Back-compat shim — older call sites still import the old name.
+export function cardObjectToBackendConfig(cardObject) {
+  return cardObjectToBackendPayload(cardObject).config
+}
+
+/**
  * Transform backend layoutdata → frontend cardObject
  * Backend sends media.images as string[], frontend expects object[]
  */
@@ -215,22 +521,23 @@ export function mapBackendCard(card) {
   const layout = card.layoutdata || card.layoutData || {}
   const content = layout.content || {}
 
+  const type = normaliseType(card.type || layout.type)
   return {
     id: card.cardId || card._id || slug,
     slug,
     title: card.title || content.heading || 'Untitled Card',
     subtitle: content.body || '',
     message: content.body || '',
-    type: card.type || 'standard',
+    type,
     templateId: card.templateId || '',
-    tier: (card.couponType || layout.couponType || 'simple').toLowerCase(),
+    tier: normaliseTier(findTier({ ...card, layoutConfig: layout, layoutdata: layout })),
     createdAt: card.createdAt || '',
     poll: card.poll || null,
     chain: card.chain || null,
     trivia: card.trivia || null,
     layoutdata: layout,
     cardObject: layoutDataToCardObject(layout),
-    tag: card.type === 'standard' ? '' : capitalize(card.type || ''),
+    tag: type === 'personal' ? '' : capitalize(type),
     interaction: layout.interaction || {},
     locked: layout.interaction?.lock?.type === 'password' || layout.interaction?.lock?.type === 'time',
     lockType: layout.interaction?.lock?.type || 'none',

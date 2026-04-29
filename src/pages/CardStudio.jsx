@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import {
@@ -9,89 +9,118 @@ import {
   HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash
 } from 'react-icons/hi2'
 import { IoColorPaletteOutline } from 'react-icons/io5'
-import logo from '../assets/icons/logo.png'
-import { defaultCardObject, resolveTemplateCardObject, musicPresets, fontOptions } from '../data/cardDefaults.js'
+import { defaultCardObject, resolveTemplateCardObject, musicPresets, getFontsForTier } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
 import { dataUrlToBlob, uploadToCloudinary } from '../lib/cloudinary.js'
-import { createCardClassic, createCardPremium, createCardElite, createCardAnonymous, getMediaVideos, getMediaMusic } from '../lib/api.js'
+import { getMediaVideos, getMediaMusic } from '../lib/api.js'
 import html2canvas from 'html2canvas'
 import TemplatePreviewSnapshot from '../components/TemplatePreviewSnapshot.jsx'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
+import { getMusicPresetsForTier } from '../data/cardDefaults.js'
+import { getTierLimits } from '../lib/tierLimits.js'
+import { getPalettesForTier, applyPalette, getPaletteById } from '../lib/palettes.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
+const BRAND_LOGO = '/cardora-logo.png?v=4'
 
 const steps = ['closed', 'card', 'questions', 'preview']
 
 const ALL_TOOLS = [
-  { id: 'closedState', icon: HiOutlineEnvelope, label: 'Envelope', hint: 'Sealed reveal & first impression' },
-  { id: 'content', icon: HiOutlineDocumentText, label: 'Content', hint: 'Heading, body, extended' },
-  { id: 'media', icon: HiOutlinePhoto, label: 'Media', hint: 'Images & captions' },
-  { id: 'background', icon: HiOutlinePaintBrush, label: 'Background', hint: 'Colors, gradients, music' },
-  { id: 'theme', icon: IoColorPaletteOutline, label: 'Theme', hint: 'Fonts & palette' },
-  { id: 'cardStyle', icon: HiOutlineSparkles, label: 'Card Style', hint: 'Border, scrollbar, text FX' },
-  { id: 'animation', icon: HiOutlineSparkles, label: 'Animation', hint: 'Confetti & effects' },
-  { id: 'gifts', icon: HiOutlineGift, label: 'Gifts', hint: 'End-of-card gift reveal' },
-  { id: 'questions', icon: HiOutlineChatBubbleLeft, label: 'Questions', hint: 'Receiver interaction' },
-  { id: 'interaction', icon: HiOutlineLockClosed, label: 'Interaction', hint: 'Lock & reveal' },
-  { id: 'poll', icon: HiOutlineChartBarSquare, label: 'Poll', hint: 'Question with selectable choices' },
-  { id: 'trivia', icon: HiOutlineLightBulb, label: 'Trivia', hint: 'Scored quiz with correct answers' },
-  { id: 'chain', icon: HiOutlineArrowPathRoundedSquare, label: 'Chain', hint: 'Invite recipient to reply with a card' },
-  { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template' },
+  { id: 'closedState', icon: HiOutlineEnvelope, label: 'Envelope', hint: 'Sealed reveal & first impression', group: 'Content' },
+  { id: 'content', icon: HiOutlineDocumentText, label: 'Content', hint: 'Heading, body, extended', group: 'Content' },
+  { id: 'media', icon: HiOutlinePhoto, label: 'Media', hint: 'Images & captions', group: 'Content' },
+  { id: 'theme', icon: IoColorPaletteOutline, label: 'Theme', hint: 'Palette, fonts, sizing', group: 'Style' },
+  { id: 'background', icon: HiOutlinePaintBrush, label: 'Background', hint: 'Colors, gradients, music', group: 'Style' },
+  { id: 'cardStyle', icon: HiOutlineSparkles, label: 'Card Style', hint: 'Border, scrollbar, text FX', group: 'Style' },
+  { id: 'animation', icon: HiOutlineSparkles, label: 'Animation', hint: 'Confetti & effects', group: 'Effects' },
+  { id: 'gifts', icon: HiOutlineGift, label: 'Gifts', hint: 'End-of-card gift reveal', group: 'Interactive' },
+  { id: 'questions', icon: HiOutlineChatBubbleLeft, label: 'Questions', hint: 'Receiver interaction', group: 'Interactive' },
+  { id: 'interaction', icon: HiOutlineLockClosed, label: 'Interaction', hint: 'Lock & reveal', group: 'Interactive' },
+  { id: 'poll', icon: HiOutlineChartBarSquare, label: 'Poll', hint: 'Question with selectable choices', group: 'Interactive' },
+  { id: 'trivia', icon: HiOutlineLightBulb, label: 'Trivia', hint: 'Scored quiz with correct answers', group: 'Interactive' },
+  { id: 'chain', icon: HiOutlineArrowPathRoundedSquare, label: 'Chain', hint: 'Invite recipient to reply with a card', group: 'Interactive' },
+  { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template', group: 'Interactive' },
+]
+
+const TOOL_GROUP_ORDER = ['Content', 'Style', 'Effects', 'Interactive']
+
+// Curated question prompts. Senders rarely come in with a question already
+// written — these turn the questions panel from a blank array builder into a
+// "pick & remix" surface.
+const QUESTION_PRESETS = [
+  { id: 'one-thing', emoji: '💌', text: 'What\'s one thing you\'ll always remember about us?' },
+  { id: 'feel-now', emoji: '✨', text: 'How do you feel reading this right now?' },
+  { id: 'reply-back', emoji: '🎈', text: 'If you could send one word back, what would it be?' },
+  { id: 'gratitude', emoji: '🌷', text: 'What\'s something you\'ve been grateful for lately?' },
+  { id: 'next-meet', emoji: '📍', text: 'When are we seeing each other next?' },
+  { id: 'secret', emoji: '🔒', text: 'Tell me a secret only you and I would know.' },
+]
+
+// Named gradient/animated border presets. `tier` decides minimum tier. The
+// `mode` field hints whether the preset is best paired with `gradient` or
+// `animated` border type — clicking it writes both `colors` and `type`.
+const BORDER_PRESETS = [
+  { id: 'aurora',      label: 'Aurora',     tier: 'premium', mode: 'animated', colors: ['#7ef7ff', '#62ffa2', '#a78bfa'] },
+  { id: 'sunset',      label: 'Sunset',     tier: 'premium', mode: 'gradient', colors: ['#ff9bd2', '#ffd166', '#ff7a59'] },
+  { id: 'ocean',       label: 'Ocean',      tier: 'premium', mode: 'gradient', colors: ['#0ea5e9', '#76efff', '#a5f3fc'] },
+  { id: 'monochrome',  label: 'Monochrome', tier: 'premium', mode: 'gradient', colors: ['#1f2937', '#9ca3af', '#f3f4f6'] },
+  { id: 'neon',        label: 'Neon',       tier: 'elite',   mode: 'animated', colors: ['#ff00ea', '#00f5ff', '#39ff14', '#ff8a00'] },
+  { id: 'gold-foil',   label: 'Gold Foil',  tier: 'elite',   mode: 'animated', colors: ['#fff7c2', '#ffd166', '#b8860b', '#ffd166'] },
+  { id: 'rosegold',    label: 'Rose Gold',  tier: 'elite',   mode: 'gradient', colors: ['#ffc8a2', '#e8a3a3', '#c97b84', '#ffe4d6'] },
+  { id: 'midnight',    label: 'Midnight',   tier: 'elite',   mode: 'animated', colors: ['#0b1d51', '#7b2cbf', '#3a86ff', '#caf0f8'] },
 ]
 
 // Tools available per type + tier — aligned to home page tier promises:
 // Classic  = simple animated reveal, no music/media ("Simple animation, No music")
 // Premium  = music + better visuals ("Music + better visuals, Richer motion")
-// Elite    = full experience + gifts ("Full animations + effects, gifts") — Moment Card only
+// Elite    = full experience + gifts ("Full animations + effects, gifts") — Personal Card only
 const TOOLS_BY_TYPE_TIER = {
-  'moment:classic': ['closedState', 'content', 'background', 'theme'],
-  'moment:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
-  'moment:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
+  'personal:classic': ['closedState', 'content', 'background', 'theme'],
+  'personal:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
+  'personal:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
   'poll:classic':   ['closedState', 'content', 'background', 'theme', 'poll'],
   'poll:premium':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'poll'],
   'trivia:classic': ['closedState', 'content', 'background', 'theme', 'trivia'],
   'trivia:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'trivia'],
   'chain:classic':  ['closedState', 'content', 'background', 'theme', 'chain'],
   'chain:premium':  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'chain'],
-  'anon:classic':   ['closedState', 'content', 'background', 'theme', 'anon'],
-  'anon:premium':   ['closedState', 'content', 'media', 'background', 'theme', 'animation', 'anon'],
+  'anonymous:classic':   ['closedState', 'content', 'background', 'theme', 'anon'],
+  'anonymous:premium':   ['closedState', 'content', 'media', 'background', 'theme', 'animation', 'anon'],
 }
 
 const STUDIO_TYPE_META = {
-  moment:    { emoji: '💌', label: 'Moment Card', badge: 'badge-moment' },
+  personal:  { emoji: '💌', label: 'Personal Card', badge: 'badge-moment' },
   poll:      { emoji: '📊', label: 'Poll Card',   badge: 'badge-poll' },
   trivia:    { emoji: '💡', label: 'Trivia Card', badge: 'badge-trivia' },
   chain:     { emoji: '🔗', label: 'Chain Card',  badge: 'badge-chain' },
-  anon:      { emoji: '👁', label: 'Anonymous',   badge: 'badge-anon' },
+  anonymous: { emoji: '👁', label: 'Anonymous',   badge: 'badge-anon' },
 }
 
 const TYPE_ACCENT = {
-  moment: '#f0c060',
-  poll:   '#60a5fa',
-  trivia: '#a78bfa',
-  chain:  '#f97316',
-  anon:   '#7ef7ff',
+  personal:  '#f0c060',
+  poll:      '#60a5fa',
+  trivia:    '#a78bfa',
+  chain:     '#f97316',
+  anonymous: '#7ef7ff',
 }
 
 const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
 
 const TIER_COST_BY_TYPE = {
-  moment:    { classic: 0, premium: 10, elite: 25 },
+  personal:  { classic: 0, premium: 10, elite: 25 },
   poll:      { classic: 0, premium: 25, elite: 25 },
   trivia:    { classic: 0, premium: 25, elite: 25 },
   chain:     { classic: 0, premium: 25, elite: 25 },
-  anon:      { classic: 0, premium: 45, elite: 45 },
   anonymous: { classic: 0, premium: 45, elite: 45 },
 }
 
 const TYPE_LABEL = {
-  moment: 'Moment Card',
-  poll: 'Poll Card',
-  trivia: 'Trivia Card',
-  chain: 'Chain Card',
-  anon: 'Anonymous',
+  personal:  'Personal Card',
+  poll:      'Poll Card',
+  trivia:    'Trivia Card',
+  chain:     'Chain Card',
   anonymous: 'Anonymous',
 }
 
@@ -365,18 +394,58 @@ function CardStudio() {
     : `${STUDIO_DRAFT_PREFIX}guest`
 
   // -- Card type + tier from URL --
-  const studioType = searchParams.get('type') || 'moment'
+  const studioType = searchParams.get('type') || 'personal'
   const studioTier = searchParams.get('tier') || 'classic'
-  const typeMeta = STUDIO_TYPE_META[studioType] || STUDIO_TYPE_META.moment
+  const typeMeta = STUDIO_TYPE_META[studioType] || STUDIO_TYPE_META.personal
   const tierLabel = TIER_LABELS[studioTier] || 'Classic'
-  const tierCost = (TIER_COST_BY_TYPE[studioType] || TIER_COST_BY_TYPE.moment)[studioTier] ?? 0
+  const tierCost = (TIER_COST_BY_TYPE[studioType] || TIER_COST_BY_TYPE.personal)[studioTier] ?? 0
 
   // Filter tools by type + tier — aligned to home page tier promises
-  const activeTools = useMemo(() => {
+  const isArtist = currentUser?.role === 'Artist'
+  const allowedToolIds = useMemo(() => {
+    if (isArtist) {
+      // Artists bypass tool visibility gating — they can use every tool the type supports.
+      const anyTierForType = Object.keys(TOOLS_BY_TYPE_TIER)
+        .filter((k) => k.startsWith(`${studioType}:`))
+        .reduce((acc, k) => {
+          TOOLS_BY_TYPE_TIER[k].forEach((id) => acc.add(id))
+          return acc
+        }, new Set())
+      if (anyTierForType.size) return Array.from(anyTierForType)
+    }
     const key = `${studioType}:${studioTier}`
-    const allowed = TOOLS_BY_TYPE_TIER[key] || TOOLS_BY_TYPE_TIER[`${studioType}:classic`] || TOOLS_BY_TYPE_TIER['moment:classic']
-    return ALL_TOOLS.filter(t => allowed.includes(t.id))
-  }, [studioType, studioTier])
+    return TOOLS_BY_TYPE_TIER[key] || TOOLS_BY_TYPE_TIER[`${studioType}:classic`] || TOOLS_BY_TYPE_TIER['personal:classic']
+  }, [studioType, studioTier, isArtist])
+  const tierLimits = useMemo(
+    () => getTierLimits(studioTier, { isArtist }),
+    [studioTier, isArtist],
+  )
+  const availablePalettes = useMemo(
+    () => (isArtist ? getPalettesForTier('elite') : getPalettesForTier(studioTier)),
+    [studioTier, isArtist],
+  )
+
+  // Shared gate helper for tier-scoped presets (open effects, ambient, music).
+  // `requiredTier` is one of 'premium' | 'elite'. Returns true when the current
+  // studio tier meets or exceeds that requirement.
+  const TIER_ORDER = { classic: 0, premium: 1, elite: 2 }
+  const tierHasPresetAccess = (tier, requiredTier) => {
+    return (TIER_ORDER[tier] || 0) >= (TIER_ORDER[requiredTier] || 0)
+  }
+  const activeTools = useMemo(
+    () => ALL_TOOLS.filter(t => allowedToolIds.includes(t.id)),
+    [allowedToolIds],
+  )
+
+  // Tier-gated font library. Labels render in the actual typeface so users can preview them.
+  const availableFonts = useMemo(() => getFontsForTier(studioType, studioTier), [studioType, studioTier])
+  const fontDropdownOptions = useMemo(
+    () => availableFonts.map((f) => ({
+      value: f,
+      label: <span style={{ fontFamily: `'${f}', serif`, fontSize: '1rem' }}>{f}</span>,
+    })),
+    [availableFonts],
+  )
   const defaultToolId = activeTools[0]?.id || 'content'
 
   const [cardObject, setCardObject] = useState(() =>
@@ -388,11 +457,11 @@ function CardStudio() {
   const [savedState, setSavedState] = useState('Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
   const [publishForm, setPublishForm] = useState({
-    category: cardData?.category || 'proposal',
     name: cardData?.title || existingDraftObject?.content?.heading || resolveTemplateCardObject(cardData).content.heading,
   })
   const [publishError, setPublishError] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
+  const [publishSuccess, setPublishSuccess] = useState(null) // { name, previewImage } | null
   const [emojiInput, setEmojiInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState(null) // { ok, slug?, message }
@@ -429,8 +498,24 @@ function CardStudio() {
     if (studioType === 'poll') setActiveTool('poll')
     else if (studioType === 'trivia') setActiveTool('trivia')
     else if (studioType === 'chain') { setChainData(prev => ({ ...prev, enabled: true })); setActiveTool('chain') }
-    else if (studioType === 'anon' || studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
+    else if (studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Snap font to a tier-allowed family when the current pick isn't available at this tier.
+  useEffect(() => {
+    const fallback = availableFonts[0] || 'Cinzel'
+    setCardObject(prev => {
+      const themeFont = prev.theme?.fontFamily
+      const closedFont = prev.closedState?.headingFont
+      const themeOk = availableFonts.includes(themeFont)
+      const closedOk = availableFonts.includes(closedFont)
+      if (themeOk && closedOk) return prev
+      const next = structuredClone(prev)
+      if (!themeOk) next.theme.fontFamily = fallback
+      if (!closedOk) next.closedState.headingFont = fallback
+      return next
+    })
+  }, [availableFonts])
 
   // Revoke blob URLs on unmount
   useEffect(() => {
@@ -452,8 +537,6 @@ function CardStudio() {
     }
     return JSON.parse(json)
   }
-
-  const isArtist = currentUser?.role === 'Artist'
 
   const c = cardObject
 
@@ -491,12 +574,16 @@ function CardStudio() {
         throw new Error('Could not generate a preview image for this template.')
       }
 
+      const publishedType = studioType === 'moment' ? 'personal' : studioType
       const result = await publishTemplate?.({
         name: publishForm.name.trim(),
-        category: publishForm.category,
+        type: publishedType,
+        tier: studioTier,
         previewImage,
         layoutConfig: structuredClone({
           ...flushedForPublish,
+          type: publishedType,
+          tier: studioTier,
           previewImage,
           previewUrl: previewImage,
         }),
@@ -508,7 +595,8 @@ function CardStudio() {
       }
 
       setShowPublish(false)
-      setSavedState('Template submitted to backend')
+      setSavedState('Template submitted for review')
+      setPublishSuccess({ name: publishForm.name.trim(), previewImage })
     } catch (error) {
       setPublishError(error.message || 'Could not submit the template.')
     } finally {
@@ -558,10 +646,6 @@ function CardStudio() {
     }
     setIsSending(true)
 
-    // Resolve backend card type from studioType
-    const typeMap = { moment: 'standard', poll: 'poll', trivia: 'trivia', chain: 'chain', anon: 'anonymous', anonymous: 'anonymous' }
-    const derivedType = typeMap[studioType] || 'standard'
-
     let flushedCardObject
     try {
       flushedCardObject = await flushPendingUploads(cardObject)
@@ -575,18 +659,27 @@ function CardStudio() {
     const extras = {
       title: flushedCardObject.content?.heading || 'Untitled Card',
       templateId: cardData?.id || 'custom',
-      type: derivedType,
+      type: studioType,
       tier: studioTier,
       poll: studioType === 'poll' ? pollData : undefined,
       trivia: studioType === 'trivia' ? triviaData : undefined,
       chain: chainData.enabled ? chainData : undefined,
-      anonTemplate: (studioType === 'anon' || studioType === 'anonymous') ? { enabled: true, tier: studioTier } : undefined,
+      anonTemplate: studioType === 'anonymous' ? { enabled: true, tier: studioTier } : undefined,
     }
 
     const result = await createCardOnBackend?.(flushedCardObject, extras)
     setIsSending(false)
     if (result?.ok) {
-      const slug = result.data?.card?.slug || result.data?.slug || result.data?.data?.slug || ''
+      // Backend returns a unique slug per created card — check every possible shape
+      const d = result.data || {}
+      const slug =
+        d.card?.slug || d.card?.shareSlug || d.card?.cardId || d.card?._id ||
+        d.slug || d.shareSlug || d.cardId || d._id ||
+        d.data?.card?.slug || d.data?.slug || d.data?.cardId || d.data?._id ||
+        ''
+      if (!slug) {
+        console.warn('Card created but no slug returned. Response shape:', d)
+      }
       setSendResult({ ok: true, slug, message: result.message })
       refreshBalance?.()
     } else {
@@ -612,9 +705,8 @@ function CardStudio() {
         title: c.content?.heading || cardData?.title || 'Untitled Draft',
         subtitle: c.closedState?.bodyText || c.content?.body || 'Card draft',
         message: c.content?.body || '',
-        occasion: publishForm.category,
-        category: publishForm.category,
-        tier: cardData?.tier || 'simple',
+        tier: cardData?.tier || studioTier || 'classic',
+        type: studioType,
         likes: '0',
         meta: 'Draft',
         updatedAt: new Date().toISOString(),
@@ -714,11 +806,20 @@ function CardStudio() {
         <>
           <p className="cs-panel-eyebrow">Envelope</p>
           <h3>Sealed reveal & first impression</h3>
+          {!isArtist && !tierLimits.allowCustomPalette && c.palette?.id && (
+            <p className="cs-panel-palette-badge">
+              Colors cascading from "{getPaletteById(c.palette.id)?.label || 'palette'}" — change in Theme.
+            </p>
+          )}
           <div className="cs-sub-section">
             <p className="cs-sub-label">Envelope</p>
-            <ColorInput label="Body Color" value={env.bodyColor || '#1a1f2c'} onChange={e => update('closedState.envelope.bodyColor', e.target.value)} />
-            <ColorInput label="Flap Color" value={env.flapColor || '#242a38'} onChange={e => update('closedState.envelope.flapColor', e.target.value)} />
-            <ColorInput label="Seal Color" value={env.sealColor || '#b03030'} onChange={e => update('closedState.envelope.sealColor', e.target.value)} />
+            {(tierLimits.allowCustomPalette || isArtist) && (
+              <>
+                <ColorInput label="Body Color" value={env.bodyColor || '#1a1f2c'} onChange={e => update('closedState.envelope.bodyColor', e.target.value)} />
+                <ColorInput label="Flap Color" value={env.flapColor || '#242a38'} onChange={e => update('closedState.envelope.flapColor', e.target.value)} />
+                <ColorInput label="Seal Color" value={env.sealColor || '#b03030'} onChange={e => update('closedState.envelope.sealColor', e.target.value)} />
+              </>
+            )}
             <label className="cs-field">
               <span>Paper Texture</span>
               <Dropdown
@@ -767,16 +868,20 @@ function CardStudio() {
           </div>
           <div className="cs-sub-section">
             <p className="cs-sub-label">Inner Letter Peek</p>
-            <ColorInput label="Background" value={c.closedState.backgroundColor} onChange={e => update('closedState.backgroundColor', e.target.value)} />
-            <ColorInput label="Border" value={c.closedState.borderColor} onChange={e => update('closedState.borderColor', e.target.value)} />
-          <ColorInput label="Text Color" value={c.closedState.textColor} onChange={e => update('closedState.textColor', e.target.value)} />
-          <ColorInput label="Heading Color" value={c.closedState.headingColor} onChange={e => update('closedState.headingColor', e.target.value)} />
+            {(tierLimits.allowCustomPalette || isArtist) && (
+              <>
+                <ColorInput label="Background" value={c.closedState.backgroundColor} onChange={e => update('closedState.backgroundColor', e.target.value)} />
+                <ColorInput label="Border" value={c.closedState.borderColor} onChange={e => update('closedState.borderColor', e.target.value)} />
+                <ColorInput label="Text Color" value={c.closedState.textColor} onChange={e => update('closedState.textColor', e.target.value)} />
+                <ColorInput label="Heading Color" value={c.closedState.headingColor} onChange={e => update('closedState.headingColor', e.target.value)} />
+              </>
+            )}
           <label className="cs-field">
             <span>Heading Font</span>
             <Dropdown
               value={c.closedState.headingFont}
               onChange={(v) => update('closedState.headingFont', v)}
-              options={fontOptions.map(f => ({ value: f, label: f }))}
+              options={fontDropdownOptions}
             />
           </label>
           <label className="cs-field">
@@ -794,9 +899,13 @@ function CardStudio() {
               <span>Button Text</span>
               <input value={c.closedState.button.text} onChange={e => update('closedState.button.text', e.target.value)} />
             </label>
-            <ColorInput label="Button BG" value={c.closedState.button.backgroundColor} onChange={e => update('closedState.button.backgroundColor', e.target.value)} />
-            <ColorInput label="Button Text" value={c.closedState.button.textColor} onChange={e => update('closedState.button.textColor', e.target.value)} />
-            <ColorInput label="Button Border" value={c.closedState.button.borderColor} onChange={e => update('closedState.button.borderColor', e.target.value)} />
+            {(tierLimits.allowCustomPalette || isArtist) && (
+              <>
+                <ColorInput label="Button BG" value={c.closedState.button.backgroundColor} onChange={e => update('closedState.button.backgroundColor', e.target.value)} />
+                <ColorInput label="Button Text" value={c.closedState.button.textColor} onChange={e => update('closedState.button.textColor', e.target.value)} />
+                <ColorInput label="Button Border" value={c.closedState.button.borderColor} onChange={e => update('closedState.button.borderColor', e.target.value)} />
+              </>
+            )}
             <div className="cs-choice-row">
               {['rounded', 'pill', 'square', 'sharp'].map(shape => (
                 <button
@@ -1017,6 +1126,10 @@ function CardStudio() {
                   const url = track.url || track.audioUrl || track.src || ''
                   const label = track.title || track.name || track.label || 'Track'
                   const selected = c.background.music.url === url
+                  // Carry the admin-configured trim points onto the card so the
+                  // recipient hears only the segment the admin curated.
+                  const startSec = Number(track.startSec) || 0
+                  const endSec = Number(track.endSec) || 0
                   return (
                     <button
                       key={track._id || track.id || url}
@@ -1025,10 +1138,15 @@ function CardStudio() {
                       onClick={() => {
                         update('background.music.url', url)
                         update('background.music.isUploaded', false)
+                        update('background.music.startSec', startSec)
+                        update('background.music.endSec', endSec)
                       }}
                     >
                       <span className="cs-music-picker-icon">♫</span>
                       <span className="cs-music-picker-label">{label}</span>
+                      {endSec > 0 && endSec - startSec < (Number(track.duration) || Infinity) && (
+                        <span className="cs-music-picker-trim">trimmed</span>
+                      )}
                       {selected && <span className="cs-music-picker-check">✓</span>}
                     </button>
                   )
@@ -1036,19 +1154,26 @@ function CardStudio() {
               </div>
             ) : (
               <div className="cs-preset-list">
-                {musicPresets.map(preset => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    className={`cs-chip small ${c.background.music.url === preset.url ? 'active' : ''}`}
-                    onClick={() => {
-                      update('background.music.url', preset.url)
-                      update('background.music.isUploaded', false)
-                    }}
-                  >
-                    ♫ {preset.label}
-                  </button>
-                ))}
+                {musicPresets.map(preset => {
+                  const locked = !isArtist && preset.tier && !tierHasPresetAccess(studioTier, preset.tier)
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      className={`cs-chip small ${c.background.music.url === preset.url ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                      onClick={() => {
+                        if (locked) return
+                        update('background.music.url', preset.url)
+                        update('background.music.isUploaded', false)
+                      }}
+                      title={locked ? `Requires ${preset.tier === 'elite' ? 'Elite' : 'Premium'}` : undefined}
+                      disabled={locked}
+                    >
+                      ♫ {preset.label}
+                      {locked && <span className="cs-chip-badge">{preset.tier === 'elite' ? 'Elite' : 'Premium'}</span>}
+                    </button>
+                  )
+                })}
               </div>
             )}
             {c.background.music.url ? (
@@ -1069,21 +1194,93 @@ function CardStudio() {
 
     // THEME
     if (activeTool === 'theme') {
+      const activePaletteId = c.palette?.id || null
       return (
         <>
           <p className="cs-panel-eyebrow">Theme</p>
           <h3>Global look & feel</h3>
-          <label className="cs-field">
-            <span>Font Family</span>
-            <Dropdown
-              value={c.theme.fontFamily}
-              onChange={(v) => update('theme.fontFamily', v)}
-              options={fontOptions.map(f => ({ value: f, label: f }))}
-            />
-          </label>
-          <ColorInput label="Accent Color" value={c.theme.accentColor} onChange={e => update('theme.accentColor', e.target.value)} />
-          <ColorInput label="Text Color" value={c.theme.textColor} onChange={e => update('theme.textColor', e.target.value)} />
-          <ColorInput label="Heading Color" value={c.theme.headingColor} onChange={e => update('theme.headingColor', e.target.value)} />
+
+          {/* Palette picker — one selection cascades across the whole card */}
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Color Palette</p>
+            <p className="cs-field-hint">
+              Pick a palette — it applies across the envelope, card, buttons and borders in one go.
+            </p>
+            <div className="cs-palette-grid">
+              {availablePalettes.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`cs-palette-chip ${activePaletteId === p.id ? 'active' : ''}`}
+                  onClick={() => setCardObject((prev) => applyPalette(prev, p))}
+                  title={p.label}
+                >
+                  <span className="cs-palette-swatches" aria-hidden="true">
+                    <span style={{ background: p.surface }} />
+                    <span style={{ background: p.primary }} />
+                    <span style={{ background: p.accent }} />
+                    <span style={{ background: p.ink }} />
+                  </span>
+                  <span className="cs-palette-label">{p.label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="cs-field-hint">
+              {availablePalettes.length} palettes on {tierLabel}
+              {studioTier !== 'elite' && !isArtist && ' — upgrade to Elite for the full set + custom picker'}
+            </p>
+          </div>
+
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Typography</p>
+            <label className="cs-field">
+              <span>Font Family</span>
+              <Dropdown
+                value={c.theme.fontFamily}
+                onChange={(v) => update('theme.fontFamily', v)}
+                options={fontDropdownOptions}
+              />
+            </label>
+            <p className="cs-field-hint">
+              {availableFonts.length} fonts available on {tierLabel} · {typeMeta.label}
+              {studioTier !== 'elite' && ' — upgrade to Elite for the full library'}
+            </p>
+            <label className="cs-field">
+              <span>Heading Size</span>
+              <input
+                type="range"
+                min="18"
+                max="48"
+                step="1"
+                value={c.theme.headingSize ?? 28}
+                onChange={e => update('theme.headingSize', Number(e.target.value))}
+              />
+              <span className="cs-range-val">{c.theme.headingSize ?? 28}px</span>
+            </label>
+            <label className="cs-field">
+              <span>Body Size</span>
+              <input
+                type="range"
+                min="12"
+                max="26"
+                step="1"
+                value={c.theme.bodySize ?? 16}
+                onChange={e => update('theme.bodySize', Number(e.target.value))}
+              />
+              <span className="cs-range-val">{c.theme.bodySize ?? 16}px</span>
+            </label>
+          </div>
+
+          {/* Advanced per-field colors — only Elite + Artists can fine-tune past the palette */}
+          {(tierLimits.allowCustomPalette || isArtist) && (
+            <details className="cs-sub-section cs-advanced-colors">
+              <summary className="cs-sub-label">Advanced colors (Elite)</summary>
+              <p className="cs-field-hint">These override the palette. Use sparingly.</p>
+              <ColorInput label="Accent Color" value={c.theme.accentColor} onChange={e => update('theme.accentColor', e.target.value)} />
+              <ColorInput label="Text Color" value={c.theme.textColor} onChange={e => update('theme.textColor', e.target.value)} />
+              <ColorInput label="Heading Color" value={c.theme.headingColor} onChange={e => update('theme.headingColor', e.target.value)} />
+            </details>
+          )}
         </>
       )
     }
@@ -1094,25 +1291,93 @@ function CardStudio() {
         <>
           <p className="cs-panel-eyebrow">Card Style</p>
           <h3>Surface, border & text animation</h3>
-          <ColorInput label="Card Background" value={c.card.backgroundColor} onChange={e => update('card.backgroundColor', e.target.value)} />
-          <ColorInput label="Card Text Color" value={c.card.textColor} onChange={e => update('card.textColor', e.target.value)} />
-          <ColorInput label="Card Heading Color" value={c.card.headingColor} onChange={e => update('card.headingColor', e.target.value)} />
-          <ColorInput label="Scrollbar Color" value={c.card.scrollbarColor} onChange={e => update('card.scrollbarColor', e.target.value)} />
+          {!isArtist && !tierLimits.allowCustomPalette && c.palette?.id && (
+            <p className="cs-panel-palette-badge">
+              Surface colors cascading from "{getPaletteById(c.palette.id)?.label || 'palette'}" — change in Theme.
+            </p>
+          )}
+          {(tierLimits.allowCustomPalette || isArtist) && (
+            <>
+              <ColorInput label="Card Background" value={c.card.backgroundColor} onChange={e => update('card.backgroundColor', e.target.value)} />
+              <ColorInput label="Card Text Color" value={c.card.textColor} onChange={e => update('card.textColor', e.target.value)} />
+              <ColorInput label="Card Heading Color" value={c.card.headingColor} onChange={e => update('card.headingColor', e.target.value)} />
+              <ColorInput label="Scrollbar Color" value={c.card.scrollbarColor} onChange={e => update('card.scrollbarColor', e.target.value)} />
+            </>
+          )}
+
+          <label className="cs-field">
+            <span>Surface Transparency</span>
+            <input
+              type="range"
+              min="0"
+              max="0.6"
+              step="0.05"
+              value={c.card.backgroundOpacity ?? 0}
+              onChange={e => update('card.backgroundOpacity', Number(e.target.value))}
+            />
+            <span className="cs-range-val">
+              {Math.round((c.card.backgroundOpacity ?? 0) * 100)}%
+            </span>
+          </label>
 
           <div className="cs-sub-section">
             <p className="cs-sub-label">Card Border</p>
             <div className="cs-choice-row">
-              {['solid', 'gradient', 'animated'].map(type => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`cs-chip ${c.card.cardBorder.type === type ? 'active' : ''}`}
-                  onClick={() => update('card.cardBorder.type', type)}
-                >
-                  {type}
-                </button>
-              ))}
+              {['solid', 'gradient', 'animated'].map(type => {
+                const lockedAnimated = type === 'animated' && !isArtist && !tierLimits.allowAnimatedBorder
+                const lockedGradient = type === 'gradient' && !isArtist && !tierLimits.allowGradientBorder
+                const locked = lockedAnimated || lockedGradient
+                const reqTier = lockedAnimated ? 'Elite' : 'Premium'
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    className={`cs-chip ${c.card.cardBorder.type === type ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                    onClick={() => !locked && update('card.cardBorder.type', type)}
+                    disabled={locked}
+                    title={locked ? `Requires ${reqTier}` : undefined}
+                  >
+                    {type}
+                    {locked && <span className="cs-chip-badge">{reqTier}</span>}
+                  </button>
+                )
+              })}
             </div>
+
+            {c.card.cardBorder.type !== 'solid' && (
+              <div className="cs-sub-section">
+                <p className="cs-sub-label">Quick palettes</p>
+                <div className="cs-border-presets">
+                  {BORDER_PRESETS.map((preset) => {
+                    const locked = !isArtist && !tierHasPresetAccess(studioTier, preset.tier)
+                    const active = JSON.stringify(c.card.cardBorder.colors) === JSON.stringify(preset.colors)
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        className={`cs-border-preset ${active ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                        onClick={() => {
+                          if (locked) return
+                          update('card.cardBorder.colors', [...preset.colors])
+                          // Honour the preset's intended mode unless the user is
+                          // capped (animated requires Elite for non-artists).
+                          const wantsAnimated = preset.mode === 'animated'
+                          const canAnimated = isArtist || tierLimits.allowAnimatedBorder
+                          update('card.cardBorder.type', wantsAnimated && canAnimated ? 'animated' : 'gradient')
+                        }}
+                        title={locked ? `Requires ${preset.tier === 'elite' ? 'Elite' : 'Premium'}` : preset.label}
+                        disabled={locked}
+                      >
+                        <span className="cs-border-preset-swatch" style={{ background: `linear-gradient(120deg, ${preset.colors.join(', ')})` }} />
+                        <span className="cs-border-preset-label">{preset.label}</span>
+                        {locked && <span className="cs-chip-badge">{preset.tier === 'elite' ? 'Elite' : 'Premium'}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {c.card.cardBorder.colors.map((color, i) => (
               <div key={i} className="cs-color-row">
                 <ColorInput label={`Border ${i + 1}`} value={color} onChange={e => {
@@ -1188,16 +1453,22 @@ function CardStudio() {
           <div className="cs-sub-section">
             <p className="cs-sub-label">Open Effect</p>
             <div className="cs-choice-row">
-              {OPEN_EFFECTS.map(eff => (
-                <button
-                  key={eff.value}
-                  type="button"
-                  className={`cs-chip ${c.animation.openEffect === eff.value ? 'active' : ''}`}
-                  onClick={() => update('animation.openEffect', eff.value)}
-                >
-                  {eff.label}
-                </button>
-              ))}
+              {OPEN_EFFECTS.map(eff => {
+                const locked = !isArtist && eff.tier !== 'none' && !tierHasPresetAccess(studioTier, eff.tier)
+                return (
+                  <button
+                    key={eff.value}
+                    type="button"
+                    className={`cs-chip ${c.animation.openEffect === eff.value ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                    onClick={() => !locked && update('animation.openEffect', eff.value)}
+                    title={locked ? `Requires ${eff.tier === 'elite' ? 'Elite' : 'Premium'}` : undefined}
+                    disabled={locked}
+                  >
+                    {eff.label}
+                    {locked && <span className="cs-chip-badge">{eff.tier === 'elite' ? 'Elite' : 'Premium'}</span>}
+                  </button>
+                )
+              })}
             </div>
             {c.animation.openEffect !== 'none' && (
               <>
@@ -1220,16 +1491,22 @@ function CardStudio() {
           <div className="cs-sub-section">
             <p className="cs-sub-label">Ambient Effect</p>
             <div className="cs-choice-row">
-              {AMBIENT_EFFECTS.map(eff => (
-                <button
-                  key={eff.value}
-                  type="button"
-                  className={`cs-chip ${c.animation.backgroundEffect.type === eff.value ? 'active' : ''}`}
-                  onClick={() => update('animation.backgroundEffect.type', eff.value)}
-                >
-                  {eff.label}
-                </button>
-              ))}
+              {AMBIENT_EFFECTS.map(eff => {
+                const locked = !isArtist && eff.tier !== 'none' && !tierHasPresetAccess(studioTier, eff.tier)
+                return (
+                  <button
+                    key={eff.value}
+                    type="button"
+                    className={`cs-chip ${c.animation.backgroundEffect.type === eff.value ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                    onClick={() => !locked && update('animation.backgroundEffect.type', eff.value)}
+                    title={locked ? `Requires ${eff.tier === 'elite' ? 'Elite' : 'Premium'}` : undefined}
+                    disabled={locked}
+                  >
+                    {eff.label}
+                    {locked && <span className="cs-chip-badge">{eff.tier === 'elite' ? 'Elite' : 'Premium'}</span>}
+                  </button>
+                )
+              })}
             </div>
             {c.animation.backgroundEffect.type === 'floating' && (
               <div className="cs-sub-section">
@@ -1279,10 +1556,39 @@ function CardStudio() {
 
     // QUESTIONS
     if (activeTool === 'questions') {
+      const usedTexts = new Set(c.questions.items.map(q => (q.text || '').trim()))
       return (
         <>
           <p className="cs-panel-eyebrow">Questions</p>
           <h3>Receiver interaction flow</h3>
+
+          <div className="cs-sub-section">
+            <p className="cs-sub-label">Quick-add presets</p>
+            <div className="cs-q-presets">
+              {QUESTION_PRESETS.map((preset) => {
+                const used = usedTexts.has(preset.text)
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    className={`cs-q-preset ${used ? 'used' : ''}`}
+                    onClick={() => {
+                      if (used) return
+                      const items = [...c.questions.items, { text: preset.text }]
+                      update('questions.items', items)
+                    }}
+                    disabled={used}
+                    title={used ? 'Already added' : 'Add this prompt'}
+                  >
+                    <span className="cs-q-preset-emoji">{preset.emoji}</span>
+                    <span className="cs-q-preset-text">{preset.text}</span>
+                    {used && <span className="cs-q-preset-check">✓</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {c.questions.items.map((q, i) => (
             <div key={i} className="cs-question-card">
               <label className="cs-field">
@@ -1292,14 +1598,16 @@ function CardStudio() {
               <button type="button" className="cs-remove-btn" onClick={() => removeQuestion(i)}>Remove</button>
             </div>
           ))}
-          <button type="button" className="cs-button" onClick={addQuestion}>+ Add Question</button>
+          <button type="button" className="cs-button" onClick={addQuestion}>+ Add custom question</button>
 
-          <div className="cs-sub-section">
-            <p className="cs-sub-label">Button Style</p>
-            <ColorInput label="Text Color" value={c.questions.button.textColor} onChange={e => update('questions.button.textColor', e.target.value)} />
-            <ColorInput label="Border Color" value={c.questions.button.borderColor} onChange={e => update('questions.button.borderColor', e.target.value)} />
-            <ColorInput label="Background" value={c.questions.button.backgroundColor} onChange={e => update('questions.button.backgroundColor', e.target.value)} />
-          </div>
+          {(tierLimits.allowCustomPalette || isArtist) && (
+            <div className="cs-sub-section">
+              <p className="cs-sub-label">Button Style</p>
+              <ColorInput label="Text Color" value={c.questions.button.textColor} onChange={e => update('questions.button.textColor', e.target.value)} />
+              <ColorInput label="Border Color" value={c.questions.button.borderColor} onChange={e => update('questions.button.borderColor', e.target.value)} />
+              <ColorInput label="Background" value={c.questions.button.backgroundColor} onChange={e => update('questions.button.backgroundColor', e.target.value)} />
+            </div>
+          )}
 
           <label className="cs-field">
             <span>Deny Behavior</span>
@@ -1871,6 +2179,8 @@ function CardStudio() {
       )
     }
 
+    const headingSize = c.theme.headingSize ?? 28
+    const bodySize = c.theme.bodySize ?? 16
     return (
       <div className={`cs-preview-card ${compact ? 'compact' : ''}`} style={{
         backgroundColor: c.card.backgroundColor,
@@ -1891,12 +2201,13 @@ function CardStudio() {
         <h3 style={{
           color: c.card.headingColor,
           fontFamily: `'${c.theme.fontFamily}', serif`,
+          fontSize: `${headingSize}px`,
         }}>
           {c.content.heading}
         </h3>
-        <p style={{ color: c.card.textColor }}>{c.content.body}</p>
+        <p style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px` }}>{c.content.body}</p>
         {c.content.extendedBody && (
-          <p className="cs-extended" style={{ color: c.card.textColor }}>
+          <p className="cs-extended" style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px` }}>
             {c.content.extendedBody}
           </p>
         )}
@@ -1921,17 +2232,17 @@ function CardStudio() {
   }
 
   return (
-    <div className="page-body cs-shell" style={{ '--type-accent': TYPE_ACCENT[studioType] || TYPE_ACCENT.moment }}>
+    <div className="page-body cs-shell" style={{ '--type-accent': TYPE_ACCENT[studioType] || TYPE_ACCENT.personal }}>
       {/* TOPBAR */}
       <div className="cs-topbar">
         <div className="cs-top-left">
           <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
-          <span className="cs-type-badge">{typeMeta.label || 'Moment Card'}</span>
+          <span className="cs-type-badge">{typeMeta.label || 'Personal Card'}</span>
           <div className="cs-status">{savedState}</div>
         </div>
         <div className="cs-progress">
           <div className="cs-wordmark">
-            <img src={logo} alt="Cardora" className="cs-top-logo" />
+            <img src={BRAND_LOGO} alt="Cardora" className="cs-top-logo" />
             <span>Cardora Studio</span>
             <span className={`cs-type-badge ${typeMeta.badge}`}>
               <span className="cs-type-badge-emoji">{typeMeta.emoji}</span>
@@ -1958,9 +2269,33 @@ function CardStudio() {
             </button>
           )}
           {!isArtist && (
-            <span className="cs-cc-cost-badge">
-              {tierCost === 0 ? 'Free' : `${tierCost} CC`}
-            </span>
+            (() => {
+              const bal = balance ?? 0
+              const short = tierCost > 0 && bal < tierCost
+              return (
+                <span
+                  className={`cs-cc-cost-badge ${tierCost === 0 ? 'free' : ''} ${short ? 'short' : ''}`}
+                  title={
+                    tierCost === 0
+                      ? 'Classic tier — free to send'
+                      : short
+                      ? `Need ${tierCost - bal} more CC`
+                      : `Your balance: ${bal} CC`
+                  }
+                >
+                  {tierCost === 0 ? (
+                    'Free to send'
+                  ) : (
+                    <>
+                      <strong>{tierCost} CC</strong>
+                      <span className="cs-cc-cost-sub">
+                        {short ? `${tierCost - bal} short` : `${bal} in balance`}
+                      </span>
+                    </>
+                  )}
+                </span>
+              )
+            })()
           )}
           <button type="button" className="cs-nav-btn accent" onClick={enterPreview}>
             <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
@@ -1978,29 +2313,38 @@ function CardStudio() {
 
       {/* LAYOUT */}
       <div className="cs-layout">
-        {/* TOOL RAIL */}
+        {/* TOOL RAIL — grouped */}
         <aside className="cs-toolrail">
-          {activeTools.map(tool => {
-            const Icon = tool.icon
+          {TOOL_GROUP_ORDER.map((group) => {
+            const tools = activeTools.filter(t => t.group === group)
+            if (tools.length === 0) return null
             return (
-              <button
-                key={tool.id}
-                type="button"
-                className={`cs-tool ${activeTool === tool.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveTool(tool.id)
-                  if (tool.id === 'closedState') setActiveStep('closed')
-                  else if (tool.id === 'questions') setActiveStep('questions')
-                  else setActiveStep('card')
-                }}
-                title={tool.label}
-              >
-                <span className="cs-tool-icon"><Icon size={20} /></span>
-                <span className="cs-tool-meta">
-                  <span className="cs-tool-label">{tool.label}</span>
-                  <small>{tool.hint}</small>
-                </span>
-              </button>
+              <div key={group} className="cs-toolgroup">
+                <p className="cs-toolgroup-label">{group}</p>
+                {tools.map(tool => {
+                  const Icon = tool.icon
+                  return (
+                    <button
+                      key={tool.id}
+                      type="button"
+                      className={`cs-tool ${activeTool === tool.id ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveTool(tool.id)
+                        if (tool.id === 'closedState') setActiveStep('closed')
+                        else if (tool.id === 'questions') setActiveStep('questions')
+                        else setActiveStep('card')
+                      }}
+                      title={tool.label}
+                    >
+                      <span className="cs-tool-icon"><Icon size={20} /></span>
+                      <span className="cs-tool-meta">
+                        <span className="cs-tool-label">{tool.label}</span>
+                        <small>{tool.hint}</small>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             )
           })}
         </aside>
@@ -2117,7 +2461,9 @@ function CardStudio() {
             </div>
 
             <div className="cs-mobile-tools">
-              {activeTools.map(tool => {
+              {TOOL_GROUP_ORDER.flatMap((group) =>
+                activeTools.filter(t => t.group === group)
+              ).map(tool => {
                 const Icon = tool.icon
                 return (
                   <button
@@ -2179,6 +2525,9 @@ function CardStudio() {
         <CardPreviewModal
           cardObject={cardObject}
           studioType={studioType}
+          tier={studioTier}
+          allowedTools={allowedToolIds}
+          tierLimits={tierLimits}
           pollData={pollData}
           triviaData={triviaData}
           anonTemplate={anonTemplate}
@@ -2228,19 +2577,6 @@ function CardStudio() {
                   placeholder="Give your template a memorable name"
                 />
               </label>
-              <label className="cs-field cs-publish-field">
-                <span className="cs-publish-field-label">Category</span>
-                <Dropdown
-                  value={publishForm.category}
-                  onChange={(v) => setPublishForm((prev) => ({ ...prev, category: v }))}
-                  options={[
-                    { value: 'proposal', label: 'Proposal' },
-                    { value: 'anniversary', label: 'Anniversary' },
-                    { value: 'birthday', label: 'Birthday' },
-                    { value: 'scratch', label: 'General / Other' },
-                  ]}
-                />
-              </label>
             </div>
             <div className="cs-publish-preview-note">
               <span className="cs-publish-preview-note-icon">👁</span>
@@ -2271,6 +2607,57 @@ function CardStudio() {
         </div>
       )}
 
+      {/* Submission Success Modal — shown after artist successfully publishes */}
+      {publishSuccess && (
+        <div className="cs-publish-overlay">
+          <div
+            className="cs-publish-backdrop"
+            onClick={() => setPublishSuccess(null)}
+          />
+          <div className="cs-publish-modal cs-publish-success">
+            <div className="cs-publish-success-icon-wrap">
+              <div className="cs-publish-success-icon">{"✓"}</div>
+            </div>
+            <h3 className="cs-publish-success-title">Template submitted!</h3>
+            <p className="cs-publish-success-desc">
+              <strong>"{publishSuccess.name}"</strong> has been sent to the Cardora team for review.
+              You'll see it appear in the marketplace once it's approved.
+            </p>
+            {publishSuccess.previewImage && (
+              <img
+                src={publishSuccess.previewImage}
+                alt="Submitted template preview"
+                className="cs-publish-success-preview"
+              />
+            )}
+            <ul className="cs-publish-success-list">
+              <li>Track review status under <strong>Profile → Published Templates</strong></li>
+              <li>You can delete or edit it there at any time</li>
+              <li>Approved templates earn CC every time someone uses them</li>
+            </ul>
+            <div className="cs-publish-actions">
+              <button
+                type="button"
+                className="cs-nav-btn publish cs-publish-submit-btn"
+                onClick={() => {
+                  setPublishSuccess(null)
+                  navigate('/profile')
+                }}
+              >
+                Go to My Profile →
+              </button>
+              <button
+                type="button"
+                className="cs-nav-btn"
+                onClick={() => setPublishSuccess(null)}
+              >
+                Keep Designing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Send / Share Modal */}
       {showSendModal && createPortal(
         <div className="cs-send-modal-overlay">
@@ -2281,7 +2668,7 @@ function CardStudio() {
           <div className="cs-send-modal">
             <div className="cs-send-modal-header">
               <div className="cs-send-modal-header-left">
-                <span className="cs-send-modal-eyebrow">{TYPE_LABEL[studioType] || 'Moment Card'} · {tierLabel}</span>
+                <span className="cs-send-modal-eyebrow">{TYPE_LABEL[studioType] || 'Personal Card'} · {tierLabel}</span>
                 <h3>{sendResult?.ok ? 'Your card is ready to share!' : 'Share Your Card'}</h3>
               </div>
               <button
@@ -2312,30 +2699,36 @@ function CardStudio() {
               </p>
             )}
 
-            <div className="cs-send-link-wrap">
-              <p className="cs-send-link-label">Card link</p>
-              <span className="detail-share-link-pill cs-send-link-pill">
-                {`${window.location.origin}/card/${sendResult?.slug || 'preview'}`.replace(/^https?:\/\//, '')}
-              </span>
-              <button
-                type="button"
-                className={`detail-share-copy-btn ${sendCopied ? 'copied' : ''}`}
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(`${window.location.origin}/card/${sendResult?.slug || 'preview'}`)
-                    setSendCopied(true)
-                    setTimeout(() => setSendCopied(false), 1600)
-                  } catch { /* ignore */ }
-                }}
-              >
-                {sendCopied ? '✓ Copied' : 'Copy Link'}
-              </button>
-            </div>
+            {sendResult?.ok && sendResult?.slug ? (
+              <div className="cs-send-link-wrap">
+                <p className="cs-send-link-label">Your unique card link</p>
+                <span className="detail-share-link-pill cs-send-link-pill">
+                  {`${window.location.origin}/card/${sendResult.slug}`.replace(/^https?:\/\//, '')}
+                </span>
+                <button
+                  type="button"
+                  className={`detail-share-copy-btn ${sendCopied ? 'copied' : ''}`}
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(`${window.location.origin}/card/${sendResult.slug}`)
+                      setSendCopied(true)
+                      setTimeout(() => setSendCopied(false), 1600)
+                    } catch { /* ignore */ }
+                  }}
+                >
+                  {sendCopied ? '✓ Copied' : 'Copy Link'}
+                </button>
+              </div>
+            ) : sendResult?.ok ? (
+              <p className="cs-send-modal-note" style={{ color: '#ffb4b4' }}>
+                Card created but no link was returned by the server. Please refresh your profile to find it.
+              </p>
+            ) : null}
 
-            <p className="detail-share-label">Share via</p>
-            <div className="detail-share-platforms cs-send-modal-platforms">
+            {sendResult?.ok && sendResult?.slug && <p className="detail-share-label">Share via</p>}
+            {sendResult?.ok && sendResult?.slug && <div className="detail-share-platforms cs-send-modal-platforms">
               {SHARE_PLATFORMS.map((p) => {
-                const shareUrl = `${window.location.origin}/card/${sendResult?.slug || 'preview'}`
+                const shareUrl = `${window.location.origin}/card/${sendResult.slug}`
                 const shareTitle = `Check out this card I made on Cardora`
                 return (
                   <a
@@ -2351,7 +2744,7 @@ function CardStudio() {
                   </a>
                 )
               })}
-            </div>
+            </div>}
 
             <div className="cs-send-modal-email-row">
               <p className="cs-send-link-label">Send via Email</p>
@@ -2363,16 +2756,13 @@ function CardStudio() {
                   value={sendEmail}
                   onChange={(e) => setSendEmail(e.target.value)}
                 />
-                <button
-                  type="button"
+                <a
                   className="cs-nav-btn accent"
-                  onClick={() => {
-                    // TODO: wire to backend
-                    alert(`Email to ${sendEmail} — coming soon!`)
-                  }}
+                  href={`mailto:${encodeURIComponent(sendEmail)}?subject=${encodeURIComponent('You\'ve got a Cardora card!')}&body=${encodeURIComponent(`Check out this card I made for you on Cardora:\n\n${window.location.origin}/card/${sendResult?.slug || ''}`)}`}
+                  style={{ textDecoration: 'none', textAlign: 'center' }}
                 >
                   Send
-                </button>
+                </a>
               </div>
             </div>
 

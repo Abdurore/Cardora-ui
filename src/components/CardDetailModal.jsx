@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { getTierInfo } from '../utils/tier.js'
+import { getTemplateById } from '../lib/api.js'
 
 const SHARE_PLATFORMS = [
   {
@@ -73,7 +74,7 @@ function CardDetailModal({
   if (!card) return null
 
   const tierInfo = getTierInfo(card?.tier)
-  const isPremium = tierInfo.key !== 'simple'
+  const isPremium = tierInfo.key !== 'classic'
 
   const handleTouchStart = (e) => setStartY(e.touches[0].clientY)
   const handleTouchMove = (e) => {
@@ -104,9 +105,28 @@ function CardDetailModal({
     } catch { /* cancelled */ }
   }
 
-  const handleUseTemplate = () => {
+  const handleUseTemplate = async () => {
+    const rawType = (card?.type || 'personal').toLowerCase()
+    // Pass the type directly — studio now uses backend-aligned type names
+    const type = rawType
+    const tier = card?.tier || 'classic'
+
+    // Ensure we carry the artist's full layoutConfig into the studio. Listing
+    // endpoints sometimes omit it; fetch the full template on demand.
+    let fullCard = card
+    const hasLayout = card?.layoutConfig && Object.keys(card.layoutConfig).length > 0
+    if (!hasLayout && (card?.templateId || card?.id)) {
+      try {
+        const tid = card.templateId || card.id
+        const res = await getTemplateById(tid)
+        const tmpl = res?.template || res?.data || res || null
+        const layout = tmpl?.layoutConfig || tmpl?.layoutdata || null
+        if (layout) fullCard = { ...card, layoutConfig: layout }
+      } catch { /* fall through with what we have */ }
+    }
+
     onClose()
-    navigate('/studio', { state: { cardData: card } })
+    navigate(`/studio?type=${type}&tier=${tier}`, { state: { cardData: fullCard } })
   }
 
   return createPortal(

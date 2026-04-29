@@ -34,8 +34,15 @@ import {
   deleteMediaVideo,
   getMediaMusic,
   uploadMediaMusic,
+  updateMediaMusic,
   deleteMediaMusic,
+  getAdminTemplates,
+  getTemplates,
+  approveTemplate,
+  rejectTemplate,
 } from '../lib/api.js'
+import { mapTemplateToCard } from '../lib/backendMappers.js'
+import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
 const TABS = ['Overview', 'Users', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
 
@@ -123,6 +130,7 @@ function AdminDashboard() {
   const [referralStats, setReferralStats] = useState(null)
   const [mediaVideos, setMediaVideos] = useState([])
   const [mediaMusic, setMediaMusic] = useState([])
+  const [allTemplates, setAllTemplates] = useState([])
   const [loading, setLoading] = useState(false)
   const [actionMsg, setActionMsg] = useState({ text: '', ok: false })
 
@@ -136,37 +144,47 @@ function AdminDashboard() {
   const [adVideoDragOver, setAdVideoDragOver] = useState(false)
   const adVideoInputRef = useRef(null)
   // Media library forms
-  const [newVideo, setNewVideo] = useState({ title: '', url: '' })
-  const [newTrack, setNewTrack] = useState({ title: '', url: '' })
+  const [newVideo, setNewVideo] = useState({ name: '', url: '' })
+  const [newTrack, setNewTrack] = useState({ name: '', url: '' })
   const [mediaVideoUploading, setMediaVideoUploading] = useState(false)
   const [mediaMusicUploading, setMediaMusicUploading] = useState(false)
+  // Just-uploaded music clip awaiting trim + save. Holds the Cloudinary URL
+  // and a default name; backend POST happens once when the admin clicks Save
+  // in the trim editor — no two-step "upload then save" dance.
+  const [musicDraft, setMusicDraft] = useState(null) // { url, name } | null
   const mediaVideoInputRef = useRef(null)
   const mediaMusicInputRef = useRef(null)
   // Ban form
-  const [banForm, setBanForm] = useState({ userId: '', durationDays: 7, reason: '' })
+  const [banForm, setBanForm] = useState({ identifier: '', durationDays: 7, reason: '' })
+  const [banConfirm, setBanConfirm] = useState(null) // { user, payload } | null
+  const [banSubmitting, setBanSubmitting] = useState(false)
   // Broadcast message
   const [broadcastMessage, setBroadcastMessage] = useState('')
 
-  // Gate: only Admin role
-  if (!currentUser || currentUser.role !== 'Admin') {
-    return (
-      <div className="page-body">
-        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
-        <div className="screen-body">
-          <div className="admin-restricted">
-            <h2>Access Restricted</h2>
-            <p>This dashboard is only available to Admin users.</p>
-            <button className="primary" type="button" onClick={() => navigate('/')}>Go Home</button>
-          </div>
-        </div>
-        <ScreenNav />
-      </div>
-    )
-  }
+  // Whether we're allowed to render the dashboard. Rendered as a guard variable
+  // (not an early return) so every hook below — including loadTabData's
+  // useEffect — runs on every render. Without this, currentUser flipping from
+  // null to Admin during auth hydration changes the hook count between renders
+  // and React silently aborts the load effects, leaving the dashboard empty.
+  const isAdminGate = currentUser && currentUser.role === 'Admin'
 
   const showMsg = (text, ok = true) => {
     setActionMsg({ text, ok })
     setTimeout(() => setActionMsg({ text: '', ok: false }), 3000)
+  }
+
+  // Backend response shapes drift across endpoints. This helper looks for a
+  // list under any of the candidate keys (or returns the body if it's already
+  // an array). Returns null if nothing array-shaped is found.
+  const pickList = (res, ...keys) => {
+    if (!res) return null
+    for (const key of keys) {
+      if (Array.isArray(res?.[key])) return res[key]
+      if (Array.isArray(res?.data?.[key])) return res.data[key]
+    }
+    if (Array.isArray(res)) return res
+    if (Array.isArray(res?.data)) return res.data
+    return null
   }
 
   const loadTabData = async (tab) => {
@@ -208,7 +226,36 @@ function AdminDashboard() {
           break
         }
         case 'Templates': {
-          // Templates are already loaded into marketplaceTemplates via outlet context.
+          // Try the admin endpoint (returns pending + approved + rejected) AND
+          // the public endpoint (live only) in parallel. Merge by id so we
+          // surface what we can even if one source is empty or unavailable —
+          // most commonly the admin endpoint isn't deployed yet, in which case
+          // we still want to show the live marketplace to the admin.
+          const [adminRes, publicRes] = await Promise.allSettled([
+            getAdminTemplates('page=1&limit=200'),
+            getTemplates('page=1&limit=200'),
+          ])
+          const fromAdmin =
+            adminRes.status === 'fulfilled'
+              ? (adminRes.value?.data?.templates || adminRes.value?.templates || [])
+              : []
+          const fromPublic =
+            publicRes.status === 'fulfilled'
+              ? (publicRes.value?.data?.templates || publicRes.value?.templates || [])
+              : []
+          if (adminRes.status === 'rejected') {
+            console.warn('[Admin] /admin/templates failed, using public list', adminRes.reason)
+          }
+          // De-dupe by id; admin entries win because they carry status info.
+          const seen = new Set()
+          const merged = []
+          for (const t of [...fromAdmin, ...fromPublic]) {
+            const id = t._id || t.templateId || t.id
+            if (!id || seen.has(id)) continue
+            seen.add(id)
+            merged.push(t)
+          }
+          setAllTemplates(merged.map(mapTemplateToCard))
           break
         }
         case 'Artists': {
@@ -234,8 +281,18 @@ function AdminDashboard() {
         }
         case 'Media': {
           const [videosRes, musicRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic()])
-          if (videosRes.status === 'fulfilled') setMediaVideos(videosRes.value?.data?.videos || videosRes.value?.videos || [])
-          if (musicRes.status === 'fulfilled') setMediaMusic(musicRes.value?.data?.music || musicRes.value?.music || [])
+          if (videosRes.status === 'fulfilled') {
+            setMediaVideos(pickList(videosRes.value, 'videos', 'items', 'media') || [])
+          } else {
+            console.warn('[Admin] /media/videos failed', videosRes.reason)
+            setMediaVideos([])
+          }
+          if (musicRes.status === 'fulfilled') {
+            setMediaMusic(pickList(musicRes.value, 'music', 'tracks', 'items', 'media') || [])
+          } else {
+            console.warn('[Admin] /media/music failed', musicRes.reason)
+            setMediaMusic([])
+          }
           break
         }
         case 'Logs': {
@@ -251,8 +308,9 @@ function AdminDashboard() {
   }
 
   useEffect(() => {
+    if (!isAdminGate) return
     loadTabData(activeTab)
-  }, [activeTab])
+  }, [activeTab, isAdminGate])
 
   const handleAcceptApplication = async (appId) => {
     try {
@@ -264,15 +322,39 @@ function AdminDashboard() {
     }
   }
 
-  const handleBanUser = async () => {
-    if (!banForm.userId) { showMsg('User ID required', false); return }
+  const openBanConfirm = () => {
+    const id = banForm.identifier.trim()
+    if (!id) { showMsg('User ID or username required', false); return }
+    const lower = id.toLowerCase()
+    const match = users.find(u =>
+      (u._id && u._id.toString() === id) ||
+      (u.id && u.id.toString() === id) ||
+      (u.username && u.username.toLowerCase() === lower)
+    )
+    setBanConfirm({
+      user: match || null,
+      identifier: id,
+      payload: {
+        userId: id,
+        durationDays: banForm.durationDays,
+        reason: banForm.reason,
+      },
+    })
+  }
+
+  const confirmBanUser = async () => {
+    if (!banConfirm) return
+    setBanSubmitting(true)
     try {
-      await banUser(banForm)
+      await banUser(banConfirm.payload)
       showMsg('User banned.')
-      setBanForm({ userId: '', durationDays: 7, reason: '' })
+      setBanForm({ identifier: '', durationDays: 7, reason: '' })
+      setBanConfirm(null)
       loadTabData('Users')
     } catch (err) {
       showMsg(err.message || 'Ban failed', false)
+    } finally {
+      setBanSubmitting(false)
     }
   }
 
@@ -364,7 +446,10 @@ function AdminDashboard() {
   const handleBroadcast = async () => {
     if (!broadcastMessage.trim()) { showMsg('Message cannot be empty.', false); return }
     try {
-      await sendAdminBroadcast({ message: broadcastMessage.trim() })
+      // /admin/broadcast-message route returns 404 — backend never deployed it.
+      // Reuse the working /admin/send-seasonal-reminder endpoint which already
+      // handles "send a custom message to all users" semantics.
+      await sendSeasonalReminder({ message: broadcastMessage.trim() })
       showMsg('Broadcast sent to all users!')
       setBroadcastMessage('')
     } catch (err) {
@@ -373,14 +458,36 @@ function AdminDashboard() {
   }
 
   const handleMediaVideoFile = async (file) => {
-    if (!file || !file.type.startsWith('video/')) { showMsg('Please select a video file.', false); return }
+    if (!file) { showMsg('No file selected.', false); return }
+    if (!file.type.startsWith('video/')) {
+      showMsg(`Please select a video file. Got "${file.type || 'unknown'}".`, false)
+      return
+    }
     setMediaVideoUploading(true)
     try {
       const url = await uploadToCloudinary(file, 'video')
-      setNewVideo(p => ({ ...p, url }))
-      showMsg('Video uploaded!')
+      // Auto-derive a name from the filename so we can post to the backend
+      // immediately. Otherwise users frequently leave the Cloudinary upload
+      // hanging without ever clicking "Add", wasting the cloud storage.
+      const fallbackName = file.name.replace(/\.[^.]+$/, '').slice(0, 80)
+      const finalName = (newVideo.name || '').trim() || fallbackName
+      try {
+        // Backend validator strictly allows { name, url } — extra fields like
+        // `title` or `videoUrl` are rejected with "is not allowed".
+        await uploadMediaVideo({ name: finalName, url })
+        showMsg('Video added to library!')
+        setNewVideo({ name: '', url: '' })
+        if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
+        await refreshMediaSilent()
+      } catch (postErr) {
+        console.error('[Admin] uploadMediaVideo POST failed', postErr)
+        // Cloudinary URL still in state so the admin can retry without re-uploading.
+        setNewVideo({ name: finalName, url })
+        showMsg(`Save failed (file uploaded): ${postErr.message || 'unknown error'}`, false)
+      }
     } catch (err) {
-      showMsg(err.message || 'Upload failed.', false)
+      console.error('[Admin] Cloudinary video upload failed', err)
+      showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
     } finally {
       setMediaVideoUploading(false)
     }
@@ -390,35 +497,43 @@ function AdminDashboard() {
     try {
       const [videosRes, musicRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic()])
       if (videosRes.status === 'fulfilled') {
-        const list = videosRes.value?.data?.videos || videosRes.value?.videos || null
-        if (list) setMediaVideos(list)
+        const list = pickList(videosRes.value, 'videos', 'items', 'media')
+        if (list !== null) setMediaVideos(list)
+      } else {
+        console.warn('[Admin] getMediaVideos failed', videosRes.reason)
       }
       if (musicRes.status === 'fulfilled') {
-        const list = musicRes.value?.data?.music || musicRes.value?.music || null
-        if (list) setMediaMusic(list)
+        const list = pickList(musicRes.value, 'music', 'tracks', 'items', 'media')
+        if (list !== null) setMediaMusic(list)
+      } else {
+        console.warn('[Admin] getMediaMusic failed', musicRes.reason)
       }
-    } catch { /* ignore */ }
-  }
-
-  const handleAddVideo = async () => {
-    if (!newVideo.title || !newVideo.url) { showMsg('Title and video required.', false); return }
-    try {
-      await uploadMediaVideo({ title: newVideo.title, url: newVideo.url, videoUrl: newVideo.url })
-      showMsg('Video added to library!')
-      setMediaVideos(prev => [...prev, { title: newVideo.title, url: newVideo.url, _id: `tmp-${Date.now()}` }])
-      setNewVideo({ title: '', url: '' })
-      if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
-      refreshMediaSilent()
     } catch (err) {
-      showMsg(err.message || 'Failed.', false)
+      console.error('[Admin] refreshMediaSilent failed', err)
     }
   }
 
-  const handleDeleteVideo = async (id) => {
-    if (!window.confirm('Delete this video?')) return
+  const handleAddVideo = async () => {
+    if (!newVideo.name || !newVideo.url) { showMsg('Name and video required.', false); return }
     try {
-      await deleteMediaVideo(id)
-      setMediaVideos(prev => prev.filter(v => (v._id || v.id) !== id))
+      await uploadMediaVideo({ name: newVideo.name, url: newVideo.url })
+      showMsg('Video added to library!')
+      setNewVideo({ name: '', url: '' })
+      if (mediaVideoInputRef.current) mediaVideoInputRef.current.value = ''
+      refreshMediaSilent()
+    } catch (err) {
+      console.error('[Admin] uploadMediaVideo failed', err)
+      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
+    }
+  }
+
+  const handleDeleteVideo = async (video) => {
+    if (!window.confirm('Delete this video?')) return
+    const nameKey = video?.nameKey || video?.title || video?.name
+    if (!nameKey) { showMsg('Missing video identifier.', false); return }
+    try {
+      await deleteMediaVideo(nameKey)
+      setMediaVideos(prev => prev.filter(v => (v._id || v.id) !== (video._id || video.id)))
       showMsg('Video deleted.')
       refreshMediaSilent()
     } catch (err) {
@@ -427,43 +542,174 @@ function AdminDashboard() {
   }
 
   const handleMediaMusicFile = async (file) => {
-    if (!file || !file.type.startsWith('audio/')) { showMsg('Please select an audio file.', false); return }
+    if (!file) { showMsg('No file selected.', false); return }
+    if (!file.type.startsWith('audio/')) {
+      showMsg(`Please select an audio file. Got "${file.type || 'unknown'}".`, false)
+      return
+    }
     setMediaMusicUploading(true)
     try {
-      const url = await uploadToCloudinary(file, 'auto')
-      setNewTrack(p => ({ ...p, url }))
-      showMsg('Audio uploaded!')
+      // Cloudinary stores audio under the `video` resource type — 'auto' can
+      // misclassify some codecs and return 4xx. Use 'video' explicitly so mp3
+      // and wav uploads work consistently.
+      const url = await uploadToCloudinary(file, 'video')
+      const defaultName = (newTrack.name || '').trim() ||
+        file.name.replace(/\.[^.]+$/, '').slice(0, 80)
+      // Park as a draft. The admin will trim + name, then save once.
+      setMusicDraft({ url, name: defaultName })
+      setNewTrack({ name: '', url: '' })
+      if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
+      showMsg('Trim and name your clip, then save to the library.')
     } catch (err) {
-      showMsg(err.message || 'Upload failed.', false)
+      console.error('[Admin] Cloudinary audio upload failed', err)
+      showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
     } finally {
       setMediaMusicUploading(false)
     }
   }
 
-  const handleAddTrack = async () => {
-    if (!newTrack.title || !newTrack.url) { showMsg('Title and audio required.', false); return }
+  // Single-shot save for a freshly-uploaded clip. The backend's validator
+  // currently only accepts { name, url, duration:int } — startSec/endSec are
+  // rejected as "not allowed". Until the backend extends the schema, trim
+  // metadata is held client-side only (the studio music picker honours it via
+  // the in-memory record but it won't survive a page reload).
+  const handleSaveDraftTrack = async (draft) => {
     try {
-      await uploadMediaMusic({ title: newTrack.title, url: newTrack.url, audioUrl: newTrack.url })
-      showMsg('Track added to library!')
-      setMediaMusic(prev => [...prev, { title: newTrack.title, url: newTrack.url, _id: `tmp-${Date.now()}` }])
-      setNewTrack({ title: '', url: '' })
-      if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
-      refreshMediaSilent()
+      const startSec = Number(draft.startSec || 0)
+      const endSec = Number(draft.endSec || 0)
+      const trimmed = endSec > 0 && (startSec > 0 || endSec < Number(draft.duration || 0) - 0.5)
+      await uploadMediaMusic({
+        name: draft.name,
+        url: draft.url,
+        duration: Math.round(Number(draft.duration || 0)),
+      })
+      showMsg(
+        trimmed
+          ? 'Track added — trim is local only until the backend supports startSec/endSec.'
+          : 'Track added to library!',
+      )
+      setMusicDraft(null)
+      await refreshMediaSilent()
     } catch (err) {
-      showMsg(err.message || 'Failed.', false)
+      console.error('[Admin] uploadMediaMusic (draft) failed', err)
+      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
+      throw err
     }
   }
 
-  const handleDeleteTrack = async (id) => {
-    if (!window.confirm('Delete this track?')) return
+  const handleDiscardDraft = () => {
+    if (!window.confirm('Discard this upload? The Cloudinary file will not be added to the library.')) return
+    setMusicDraft(null)
+  }
+
+  const handleAddTrack = async () => {
+    if (!newTrack.name || !newTrack.url) { showMsg('Name and audio required.', false); return }
     try {
-      await deleteMediaMusic(id)
-      setMediaMusic(prev => prev.filter(t => (t._id || t.id) !== id))
+      await uploadMediaMusic({ name: newTrack.name, url: newTrack.url })
+      showMsg('Track added to library!')
+      setNewTrack({ name: '', url: '' })
+      if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
+      refreshMediaSilent()
+    } catch (err) {
+      console.error('[Admin] uploadMediaMusic failed', err)
+      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
+    }
+  }
+
+  const handleApproveTemplate = async (tpl) => {
+    const id = tpl.templateId || tpl.id
+    if (!id) return
+    try {
+      await approveTemplate(id)
+      showMsg(`Approved "${tpl.title}".`)
+      loadTabData('Templates')
+    } catch (err) {
+      showMsg(err.message || 'Approve failed.', false)
+    }
+  }
+
+  const handleRejectTemplate = async (tpl) => {
+    const id = tpl.templateId || tpl.id
+    if (!id) return
+    const reason = window.prompt(`Reject "${tpl.title}"? Optional reason:`, '')
+    if (reason === null) return
+    try {
+      await rejectTemplate(id, reason)
+      showMsg(`Rejected "${tpl.title}".`)
+      loadTabData('Templates')
+    } catch (err) {
+      showMsg(err.message || 'Reject failed.', false)
+    }
+  }
+
+  const handleAdminDeleteTemplate = async (tpl) => {
+    const id = tpl.templateId || tpl.id
+    if (!id) return
+    if (!window.confirm(`Delete template "${tpl.title}"? This cannot be undone.`)) return
+    const res = await deleteMarketplaceTemplate?.(id)
+    if (res?.ok) {
+      showMsg('Template deleted.')
+      setAllTemplates(prev => prev.filter(t => (t.templateId || t.id) !== id))
+    } else {
+      showMsg(res?.message || 'Delete failed.', false)
+    }
+  }
+
+  const handleSaveTrack = async (updated) => {
+    const id = updated._id || updated.id
+    if (!id) {
+      showMsg('Cannot save: missing track id.', false)
+      return
+    }
+    try {
+      // Backend POST validator accepts only { name, url, duration:int } and
+      // rejects startSec/endSec — assume the same is true for PATCH until the
+      // schema is extended. Send only the safe fields.
+      await updateMediaMusic(id, {
+        name: updated.name,
+        duration: Math.round(Number(updated.duration || 0)),
+      })
+      // Keep trim metadata in the local record so the studio picker can still
+      // use it during this session. (It won't survive a page reload.)
+      setMediaMusic((prev) =>
+        prev.map((t) => ((t._id || t.id) === id ? { ...t, ...updated } : t)),
+      )
+      showMsg('Track saved (trim metadata is local-only until backend supports it).')
+      refreshMediaSilent()
+    } catch (err) {
+      console.error('[Admin] updateMediaMusic failed', err)
+      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
+    }
+  }
+
+  const handleDeleteTrack = async (track) => {
+    if (!window.confirm('Delete this track?')) return
+    const nameKey = track?.nameKey || track?.name || track?.title
+    if (!nameKey) { showMsg('Missing track identifier.', false); return }
+    try {
+      await deleteMediaMusic(nameKey)
+      setMediaMusic(prev => prev.filter(t => (t._id || t.id) !== (track._id || track.id)))
       showMsg('Track deleted.')
       refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Delete failed.', false)
     }
+  }
+
+  if (!isAdminGate) {
+    return (
+      <div className="page-body">
+        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
+        <div className="screen-body">
+          <div className="admin-restricted">
+            <h2>Access Restricted</h2>
+            <p>This dashboard is only available to Admin users.</p>
+            <button className="primary" type="button" onClick={() => navigate('/')}>Go Home</button>
+          </div>
+        </div>
+        <ScreenNav />
+      </div>
+    )
   }
 
   return (
@@ -584,8 +830,8 @@ function AdminDashboard() {
               <h4>Ban User</h4>
               <div className="admin-inline-form">
                 <label className="admin-field">
-                  <span>User ID</span>
-                  <input placeholder="e.g. 65f3a2..." value={banForm.userId} onChange={e => setBanForm(p => ({ ...p, userId: e.target.value }))} />
+                  <span>User ID or Username</span>
+                  <input placeholder="user id (24-char) or username" value={banForm.identifier} onChange={e => setBanForm(p => ({ ...p, identifier: e.target.value }))} />
                 </label>
                 <label className="admin-field">
                   <span>Ban Duration (days)</span>
@@ -595,7 +841,7 @@ function AdminDashboard() {
                   <span>Reason</span>
                   <input placeholder="Why are they being banned?" value={banForm.reason} onChange={e => setBanForm(p => ({ ...p, reason: e.target.value }))} />
                 </label>
-                <button className="primary" type="button" onClick={handleBanUser}>Ban</button>
+                <button className="primary" type="button" onClick={openBanConfirm}>Ban</button>
               </div>
             </div>
 
@@ -628,73 +874,117 @@ function AdminDashboard() {
         )}
 
         {/* TEMPLATES — review & delete */}
-        {activeTab === 'Templates' && !loading && (
-          <div className="admin-section">
-            <h3 className="admin-section-title">Marketplace Templates</h3>
-            {(marketplaceTemplates?.length || 0) > 0 ? (
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Preview</th>
-                      <th>Name</th>
-                      <th>Category</th>
-                      <th>Tier</th>
-                      <th>Likes</th>
-                      <th>Views</th>
-                      <th>Status</th>
-                      <th>Actions</th>
+        {activeTab === 'Templates' && !loading && (() => {
+          const pending = allTemplates.filter(t => t.status === 'pending')
+          const live = allTemplates.filter(t => t.status === 'approved' || t.status === 'live' || !t.status || t.status === '')
+          const rejected = allTemplates.filter(t => t.status === 'rejected')
+
+          const renderTable = (rows, showReviewActions) => (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Preview</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Tier</th>
+                    <th>Likes</th>
+                    <th>Views</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((tpl) => (
+                    <tr key={tpl.id}>
+                      <td>
+                        {tpl.previewImage ? (
+                          <img
+                            src={tpl.previewImage}
+                            alt={tpl.title || ''}
+                            style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 6 }}
+                          />
+                        ) : '—'}
+                      </td>
+                      <td>{tpl.title || '-'}</td>
+                      <td>{tpl.type || '-'}</td>
+                      <td>{tpl.tier || '-'}</td>
+                      <td>{tpl.likeCount ?? tpl.likes ?? 0}</td>
+                      <td>{tpl.userCount ?? 0}</td>
+                      <td>
+                        <span className={`admin-template-status ${(tpl.status || 'live').toLowerCase()}`}>
+                          {tpl.tag || 'Live'}
+                        </span>
+                      </td>
+                      <td style={{ display: 'flex', gap: 6 }}>
+                        {showReviewActions && (
+                          <>
+                            <button
+                              type="button"
+                              className="admin-action-btn accept"
+                              onClick={() => handleApproveTemplate(tpl)}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-action-btn reject"
+                              onClick={() => handleRejectTemplate(tpl)}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          className="admin-action-btn reject"
+                          onClick={() => handleAdminDeleteTemplate(tpl)}
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {marketplaceTemplates.map((tpl) => (
-                      <tr key={tpl.id}>
-                        <td>
-                          {tpl.previewImage ? (
-                            <img
-                              src={tpl.previewImage}
-                              alt={tpl.title || ''}
-                              style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 6 }}
-                            />
-                          ) : '—'}
-                        </td>
-                        <td>{tpl.title || '-'}</td>
-                        <td>{tpl.occasion || '-'}</td>
-                        <td>{tpl.tier || '-'}</td>
-                        <td>{tpl.likeCount ?? tpl.likes ?? 0}</td>
-                        <td>{tpl.userCount ?? 0}</td>
-                        <td>
-                          <span className={`admin-template-status ${(tpl.tag || 'live').toLowerCase()}`}>
-                            {tpl.tag || 'Live'}
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="admin-action-btn reject"
-                            onClick={async () => {
-                              if (!window.confirm(`Delete template "${tpl.title}"? This cannot be undone.`)) return
-                              const res = await deleteMarketplaceTemplate?.(tpl.templateId || tpl.id)
-                              if (res?.ok) showMsg('Template deleted.')
-                              else showMsg(res?.message || 'Delete failed.', false)
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+
+          return (
+            <>
+              <div className="admin-section">
+                <h3 className="admin-section-title">
+                  Pending Review {pending.length > 0 ? `(${pending.length})` : ''}
+                </h3>
+                {pending.length > 0 ? renderTable(pending, true) : (
+                  <div className="admin-empty">
+                    <span className="admin-empty-icon">{"\u{1F4E5}"}</span>
+                    <p>No templates awaiting review.</p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="admin-empty">
-                <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
-                <p>No templates in the marketplace yet.</p>
+
+              <div className="admin-section">
+                <h3 className="admin-section-title">
+                  Live Marketplace {live.length > 0 ? `(${live.length})` : ''}
+                </h3>
+                {live.length > 0 ? renderTable(live, false) : (
+                  <div className="admin-empty">
+                    <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
+                    <p>No approved templates in the marketplace yet.</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
+
+              {rejected.length > 0 && (
+                <div className="admin-section">
+                  <h3 className="admin-section-title">Rejected ({rejected.length})</h3>
+                  {renderTable(rejected, false)}
+                </div>
+              )}
+            </>
+          )
+        })()}
 
         {/* ARTISTS — applications */}
         {activeTab === 'Artists' && !loading && (
@@ -982,11 +1272,11 @@ function AdminDashboard() {
                 />
                 <div className="admin-media-add-row">
                   <label className="admin-field admin-media-title-field">
-                    <span>Video Title</span>
+                    <span>Video Name <small>(optional — defaults to filename)</small></span>
                     <input
                       placeholder="e.g. Ocean Waves"
-                      value={newVideo.title}
-                      onChange={e => setNewVideo(p => ({ ...p, title: e.target.value }))}
+                      value={newVideo.name}
+                      onChange={e => setNewVideo(p => ({ ...p, name: e.target.value }))}
                     />
                   </label>
                   <button
@@ -998,20 +1288,24 @@ function AdminDashboard() {
                     {mediaVideoUploading ? (
                       <><span className="admin-media-file-spinner" />Uploading…</>
                     ) : newVideo.url ? (
-                      <><span>✓</span> Video ready</>
+                      <><span>✓</span> Replace file</>
                     ) : (
-                      <><span className="admin-media-file-icon">↑</span> Choose file</>
+                      <><span className="admin-media-file-icon">↑</span> Upload &amp; save</>
                     )}
                   </button>
-                  <button
-                    className="primary admin-media-add-btn"
-                    type="button"
-                    onClick={handleAddVideo}
-                    disabled={mediaVideoUploading || !newVideo.url || !newVideo.title.trim()}
-                  >
-                    Add
-                  </button>
+                  {newVideo.url && (
+                    <button
+                      className="primary admin-media-add-btn"
+                      type="button"
+                      onClick={handleAddVideo}
+                      disabled={mediaVideoUploading || !newVideo.name.trim()}
+                      title="Retry saving the previous upload"
+                    >
+                      Retry save
+                    </button>
+                  )}
                 </div>
+                <p className="admin-media-hint">Files save to the library automatically once uploaded.</p>
               </div>
 
               {/* Video grid */}
@@ -1032,11 +1326,11 @@ function AdminDashboard() {
                         <div className="admin-media-video-play-hint">▶</div>
                       </div>
                       <div className="admin-media-video-footer">
-                        <span className="admin-media-video-title">{v.title || 'Untitled'}</span>
+                        <span className="admin-media-video-title">{v.title || v.name || 'Untitled'}</span>
                         <button
                           type="button"
                           className="admin-media-delete-btn"
-                          onClick={() => handleDeleteVideo(v._id || v.id)}
+                          onClick={() => handleDeleteVideo(v)}
                           aria-label="Delete"
                         >
                           ✕
@@ -1063,68 +1357,71 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Upload form */}
-              <div className="admin-media-add-form">
-                <input
-                  ref={mediaMusicInputRef}
-                  type="file"
-                  accept="audio/*"
-                  style={{ display: 'none' }}
-                  onChange={e => handleMediaMusicFile(e.target.files?.[0])}
-                />
-                <div className="admin-media-add-row">
-                  <label className="admin-field admin-media-title-field">
-                    <span>Track Title</span>
-                    <input
-                      placeholder="e.g. Soft Piano"
-                      value={newTrack.title}
-                      onChange={e => setNewTrack(p => ({ ...p, title: e.target.value }))}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className={`admin-media-file-btn${newTrack.url ? ' ready' : ''}${mediaMusicUploading ? ' uploading' : ''}`}
-                    onClick={() => !mediaMusicUploading && mediaMusicInputRef.current?.click()}
-                    disabled={mediaMusicUploading}
-                  >
-                    {mediaMusicUploading ? (
-                      <><span className="admin-media-file-spinner" />Uploading…</>
-                    ) : newTrack.url ? (
-                      <><span>✓</span> Audio ready</>
-                    ) : (
-                      <><span className="admin-media-file-icon">↑</span> Choose file</>
-                    )}
-                  </button>
-                  <button
-                    className="primary admin-media-add-btn"
-                    type="button"
-                    onClick={handleAddTrack}
-                    disabled={mediaMusicUploading || !newTrack.url || !newTrack.title.trim()}
-                  >
-                    Add
-                  </button>
+              {/* Upload form — hidden while a draft is being trimmed so the
+                  admin focuses on saving the current clip first. */}
+              {!musicDraft && (
+                <div className="admin-media-add-form">
+                  <input
+                    ref={mediaMusicInputRef}
+                    type="file"
+                    accept="audio/*"
+                    style={{ display: 'none' }}
+                    onChange={e => handleMediaMusicFile(e.target.files?.[0])}
+                  />
+                  <div className="admin-media-add-row">
+                    <label className="admin-field admin-media-title-field">
+                      <span>Track Name <small>(optional — defaults to filename)</small></span>
+                      <input
+                        placeholder="e.g. Soft Piano"
+                        value={newTrack.name}
+                        onChange={e => setNewTrack(p => ({ ...p, name: e.target.value }))}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className={`admin-media-file-btn${mediaMusicUploading ? ' uploading' : ''}`}
+                      onClick={() => !mediaMusicUploading && mediaMusicInputRef.current?.click()}
+                      disabled={mediaMusicUploading}
+                    >
+                      {mediaMusicUploading ? (
+                        <><span className="admin-media-file-spinner" />Uploading…</>
+                      ) : (
+                        <><span className="admin-media-file-icon">↑</span> Upload audio</>
+                      )}
+                    </button>
+                  </div>
+                  <p className="admin-media-hint">Pick a file → trim &amp; name → save once.</p>
                 </div>
-              </div>
+              )}
 
-              {/* Music list */}
+              {/* Draft editor — shown while a freshly-uploaded clip awaits trim+save */}
+              {musicDraft && (
+                <div className="admin-media-draft-wrap">
+                  <div className="admin-media-draft-banner">
+                    <span>New upload — set the play span, then save it once.</span>
+                    <button type="button" className="admin-media-draft-discard" onClick={handleDiscardDraft}>
+                      Discard
+                    </button>
+                  </div>
+                  <AdminMusicTrack
+                    mode="draft"
+                    track={musicDraft}
+                    onSave={handleSaveDraftTrack}
+                    onDelete={handleDiscardDraft}
+                  />
+                </div>
+              )}
+
+              {/* Music list — themed editor with playback + trim controls */}
               {mediaMusic.length > 0 ? (
                 <div className="admin-media-music-list">
                   {mediaMusic.map(track => (
-                    <div key={track._id || track.id} className="admin-media-music-item">
-                      <div className="admin-media-music-icon">♫</div>
-                      <div className="admin-media-music-info">
-                        <span className="admin-media-music-name">{track.title || 'Untitled'}</span>
-                        <audio controls src={track.url || track.audioUrl} className="admin-media-music-player" />
-                      </div>
-                      <button
-                        type="button"
-                        className="admin-media-delete-btn"
-                        onClick={() => handleDeleteTrack(track._id || track.id)}
-                        aria-label="Delete"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                    <AdminMusicTrack
+                      key={track._id || track.id}
+                      track={track}
+                      onSave={handleSaveTrack}
+                      onDelete={handleDeleteTrack}
+                    />
                   ))}
                 </div>
               ) : (
@@ -1189,6 +1486,67 @@ function AdminDashboard() {
         )}
       </div>
       <ScreenNav />
+
+      {banConfirm && (
+        <div className="ban-confirm-overlay" role="dialog" aria-modal="true">
+          <div className="ban-confirm-backdrop" onClick={() => !banSubmitting && setBanConfirm(null)} />
+          <div className="ban-confirm-card">
+            <h3 className="ban-confirm-title">Confirm ban</h3>
+            {banConfirm.user ? (
+              <div className="ban-confirm-user">
+                <div className="ban-confirm-avatar">
+                  {banConfirm.user.profilePictureUrl
+                    ? <img src={banConfirm.user.profilePictureUrl} alt={banConfirm.user.username || ''} />
+                    : <span>{(banConfirm.user.username || '?').slice(0, 1).toUpperCase()}</span>}
+                </div>
+                <div className="ban-confirm-info">
+                  <div className="ban-confirm-username">{banConfirm.user.username || '—'}</div>
+                  <div className="ban-confirm-email">{banConfirm.user.email || '—'}</div>
+                  <div className="ban-confirm-meta">
+                    <span className={`admin-role-chip ${(banConfirm.user.role || 'user').toLowerCase()}`}>{banConfirm.user.role || 'User'}</span>
+                    <span>CC: {banConfirm.user.cc ?? banConfirm.user.balance ?? 0}</span>
+                    <span>{banConfirm.user.isVerified ? 'Verified' : 'Unverified'}</span>
+                  </div>
+                  {(banConfirm.user._id || banConfirm.user.id) && (
+                    <div className="ban-confirm-id">ID: {banConfirm.user._id || banConfirm.user.id}</div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="ban-confirm-user ban-confirm-user-missing">
+                <p>No matching user found in the loaded list. The ban will still be attempted using this value:</p>
+                <code>{banConfirm.identifier}</code>
+              </div>
+            )}
+
+            <div className="ban-confirm-details">
+              <div><span>Duration</span><strong>{banConfirm.payload.durationDays} day(s)</strong></div>
+              <div><span>Reason</span><strong>{banConfirm.payload.reason || '—'}</strong></div>
+            </div>
+
+            <p className="ban-confirm-warn">This will immediately suspend the account. Proceed?</p>
+
+            <div className="ban-confirm-actions">
+              <button
+                type="button"
+                className="ban-confirm-cancel"
+                onClick={() => setBanConfirm(null)}
+                disabled={banSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ban-confirm-submit"
+                onClick={confirmBanUser}
+                disabled={banSubmitting}
+              >
+                {banSubmitting ? 'Banning…' : 'Confirm ban'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

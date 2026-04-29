@@ -6,7 +6,7 @@ import CardItem from '../components/CardItem.jsx'
 import InventoryCard from '../components/InventoryCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
-import { exploreCards, homeCards, profileCreations } from '../data/catalog.js'
+import ShareCardModal from '../components/ShareCardModal.jsx'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
@@ -31,7 +31,6 @@ function Profile() {
     balance,
     currentUser,
     openAuthModal,
-    updateAvatar,
     updateProfile,
     getUserCardsFromBackend,
     deleteCardOnBackend,
@@ -39,6 +38,7 @@ function Profile() {
     onLogout,
     artistApplyAction,
     marketplaceTemplates,
+    deleteMarketplaceTemplate,
     onCurrencyChange,
   } = useOutletContext()
   const navigate = useNavigate()
@@ -68,6 +68,7 @@ function Profile() {
   const [codeCopied, setCodeCopied] = useState(false)
   const [cardAnalytics, setCardAnalytics] = useState({}) // keyed by slug
   const [loadingCardAnalytics, setLoadingCardAnalytics] = useState({}) // keyed by slug
+  const [shareTarget, setShareTarget] = useState(null) // { url, title } | null
 
   const fetchCardAnalytics = async (slug) => {
     if (!slug || cardAnalytics[slug] !== undefined) return
@@ -82,8 +83,9 @@ function Profile() {
     }
   }
 
-  const allCards = [...homeCards, ...exploreCards, ...profileCreations]
-  const favoriteCards = allCards.filter((card) => favorites.includes(card.id))
+  // Favorites resolve against whatever the user has favorited from the live
+  // marketplace — no demo-data fallback.
+  const favoriteCards = (marketplaceTemplates || []).filter((card) => favorites.includes(card.id))
   const giftInventory = currentUser?.inventory || []
   const roleName = currentUser?.role || 'Visitor'
   const totalCardCount = userCards.length + savedDrafts.length
@@ -458,7 +460,7 @@ function Profile() {
           </div>
         ) : null}
 
-        {/* Published Templates (artists only, read-only — deletion is admin-only) */}
+        {/* Published Templates (artists only) — owner-scoped: deletion happens here only */}
         {isArtist && (
           <div>
             <h4 className="section-title">
@@ -468,14 +470,44 @@ function Profile() {
             {publishedTemplates.length > 0 ? (
               <div className="card-grid compact">
                 {publishedTemplates.map((card, index) => (
-                  <CardItem
-                    key={card.id}
-                    {...card}
-                    variant={`v${(index % 4) + 1}`}
-                    isFavorite={favorites.includes(card.id)}
-                    onToggleFavorite={toggleFavorite}
-                    onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
-                  />
+                  <div key={card.id} className="profile-card-wrap">
+                    <CardItem
+                      {...card}
+                      variant={`v${(index % 4) + 1}`}
+                      isFavorite={favorites.includes(card.id)}
+                      onToggleFavorite={toggleFavorite}
+                      onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
+                    />
+                    <div className="profile-template-analytics">
+                      <span className={`profile-template-status profile-template-status-${(card.status || 'approved')}`}>
+                        {card.tag || 'Live'}
+                      </span>
+                      <span className="profile-template-stat">
+                        <strong>{card.userCount ?? 0}</strong> views
+                      </span>
+                      <span className="profile-template-stat">
+                        <strong>{card.likeCount ?? 0}</strong> likes
+                      </span>
+                    </div>
+                    <div className="profile-card-actions">
+                      <button
+                        type="button"
+                        className="profile-card-action-btn delete"
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          if (!window.confirm(`Delete template "${card.title}"? This cannot be undone.`)) return
+                          const res = await deleteMarketplaceTemplate?.(card.templateId || card.id)
+                          if (!res?.ok) window.alert(res?.message || 'Delete failed.')
+                        }}
+                        title="Delete template"
+                        aria-label="Delete template"
+                      >
+                        <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h14M8 6V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2M6 6l1 11a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2l1-11" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -511,11 +543,11 @@ function Profile() {
                         <button
                           className="profile-card-action-btn share"
                           type="button"
-                          onClick={() => {
-                            const url = `${window.location.origin}/card/${card.slug}`
-                            navigator.clipboard?.writeText(url)
-                          }}
-                          title="Copy link"
+                          onClick={() => setShareTarget({
+                            url: `${window.location.origin}/card/${card.slug}`,
+                            title: `Check out this "${card.title || 'card'}" I made on Cardora`,
+                          })}
+                          title="Share card"
                         >
                           🔗
                         </button>
@@ -646,8 +678,10 @@ function Profile() {
           try {
             const blob = dataUrlToBlob(dataUrl)
             const cloudUrl = await uploadToCloudinary(blob, 'image')
-            updateAvatar(cloudUrl)
-            updateProfile({ profilePictureUrl: cloudUrl })
+            const result = await updateProfile({ profilePictureUrl: cloudUrl })
+            if (!result?.ok) {
+              throw new Error(result?.message || 'Avatar sync failed.')
+            }
           } catch (err) {
             setAvatarUploadError('Avatar upload failed. Please try again.')
             console.error('Avatar upload error:', err)
@@ -657,6 +691,12 @@ function Profile() {
         }}
       />
 
+      <ShareCardModal
+        open={Boolean(shareTarget)}
+        onClose={() => setShareTarget(null)}
+        url={shareTarget?.url || ''}
+        title={shareTarget?.title || 'Check out this card I made on Cardora'}
+      />
 
       {/* Edit Profile Modal */}
       {showEditProfile && (

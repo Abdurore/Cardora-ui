@@ -2,27 +2,46 @@ import confetti from 'canvas-confetti'
 
 const DEFAULT_COLORS = ['#76efff', '#62ffa2', '#ff9bd2', '#ffd166', '#f4fdff']
 
+// Each effect carries its minimum tier. Classic = none. Premium unlocks the
+// lighter set. Elite unlocks everything. `tier: 'none'` means the option is
+// available to all (e.g. the 'None' off-state).
 export const OPEN_EFFECTS = [
-  { value: 'none', label: 'None' },
-  { value: 'confetti', label: '🎉 Confetti' },
-  { value: 'fireworks', label: '🎆 Fireworks' },
-  { value: 'hearts', label: '💖 Hearts Burst' },
-  { value: 'stars', label: '⭐ Star Shower' },
-  { value: 'balloons', label: '🎈 Balloons' },
-  { value: 'emojiRain', label: '✨ Emoji Rain' },
+  { value: 'none',      label: 'None',              tier: 'none' },
+  { value: 'confetti',  label: '🎉 Confetti',        tier: 'premium' },
+  { value: 'hearts',    label: '💖 Hearts Burst',    tier: 'premium' },
+  { value: 'stars',     label: '⭐ Star Shower',     tier: 'premium' },
+  { value: 'fireworks', label: '🎆 Fireworks',       tier: 'elite' },
+  { value: 'balloons',  label: '🎈 Balloons',        tier: 'elite' },
+  { value: 'emojiRain', label: '✨ Emoji Rain',      tier: 'elite' },
 ]
 
 export const AMBIENT_EFFECTS = [
-  { value: 'none', label: 'None' },
-  { value: 'sparkle', label: 'Sparkle' },
-  { value: 'stars', label: 'Starfield' },
-  { value: 'snow', label: 'Snow' },
-  { value: 'bubbles', label: 'Bubbles' },
-  { value: 'fountain', label: 'Fountain' },
-  { value: 'hearts', label: 'Floating Hearts' },
-  { value: 'fireflies', label: 'Fireflies' },
-  { value: 'floating', label: 'Floating (emoji)' },
+  { value: 'none',      label: 'None',              tier: 'none' },
+  { value: 'sparkle',   label: 'Sparkle',           tier: 'premium' },
+  { value: 'stars',     label: 'Starfield',         tier: 'premium' },
+  { value: 'bubbles',   label: 'Bubbles',           tier: 'premium' },
+  { value: 'snow',      label: 'Snow',              tier: 'elite' },
+  { value: 'fountain',  label: 'Fountain',          tier: 'elite' },
+  { value: 'hearts',    label: 'Floating Hearts',   tier: 'elite' },
+  { value: 'fireflies', label: 'Fireflies',         tier: 'elite' },
+  { value: 'floating',  label: 'Floating (emoji)',  tier: 'elite' },
 ]
+
+const TIER_RANK = { classic: 0, premium: 1, elite: 2 }
+
+function effectAllowed(effect, tier, { isArtist = false } = {}) {
+  if (isArtist) return true
+  if (!effect.tier || effect.tier === 'none') return true
+  return (TIER_RANK[tier] || 0) >= (TIER_RANK[effect.tier] || 0)
+}
+
+export function getOpenEffectsForTier(tier, opts) {
+  return OPEN_EFFECTS.filter((e) => effectAllowed(e, tier, opts))
+}
+
+export function getAmbientEffectsForTier(tier, opts) {
+  return AMBIENT_EFFECTS.filter((e) => effectAllowed(e, tier, opts))
+}
 
 function resolveColors(colors) {
   return Array.isArray(colors) && colors.length ? colors : DEFAULT_COLORS

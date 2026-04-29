@@ -4,7 +4,6 @@ import { HiOutlineMagnifyingGlass, HiOutlineFire } from 'react-icons/hi2'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
-import { exploreCards } from '../data/catalog.js'
 import { getPopularTemplates } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
 
@@ -22,11 +21,13 @@ function Explore() {
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [activeTag, setActiveTag] = useState(searchParams.get('tag') || 'all')
   const [activeType, setActiveType] = useState(searchParams.get('type') || 'all')
-  const [activeCategory, setActiveCategory] = useState(searchParams.get('cat') || 'all')
   const [visibleCount, setVisibleCount] = useState(12)
   const [trendingTemplates, setTrendingTemplates] = useState([])
   const CARDS_PER_PAGE = 12
-  const cardSource = marketplaceTemplates?.length ? marketplaceTemplates : exploreCards
+  // Only show real, live artist-published templates. No catalog placeholders.
+  const cardSource = (marketplaceTemplates || []).filter(
+    (t) => !t.status || t.status === 'approved' || t.status === 'live',
+  )
 
   useEffect(() => {
     getPopularTemplates('days=7&page=1&limit=8')
@@ -42,56 +43,41 @@ function Explore() {
     if (query) params.q = query
     if (activeTag && activeTag !== 'all') params.tag = activeTag
     if (activeType && activeType !== 'all') params.type = activeType
-    if (activeCategory && activeCategory !== 'all') params.cat = activeCategory
     setSearchParams(params, { replace: true })
-  }, [activeTag, activeType, activeCategory, query, setSearchParams])
-
-  // Derive unique categories from card source
-  const categories = useMemo(() => {
-    const seen = new Set()
-    for (const card of cardSource) {
-      const cat = (card.category || card.occasion || '').toLowerCase().trim()
-      if (cat && cat !== 'general' && cat !== 'scratch') seen.add(cat)
-    }
-    return Array.from(seen).sort()
-  }, [cardSource])
+  }, [activeTag, activeType, query, setSearchParams])
 
   const filteredCards = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return cardSource.filter((card) => {
       const matchesQuery = normalizedQuery
         ? card.title.toLowerCase().includes(normalizedQuery)
-          || (card.category || '').toLowerCase().includes(normalizedQuery)
-          || (card.occasion || '').toLowerCase().includes(normalizedQuery)
         : true
       const matchesFavorites = activeTag === 'favorites' ? favorites.includes(card.id) : true
+      const cardType = (card.type || '').toLowerCase()
       const matchesType =
         activeType === 'all'
           ? true
-          : activeType === 'greeting'
-            ? !card.type || card.type === 'standard'
-            : card.type === activeType
-      const matchesCategory =
-        activeCategory === 'all'
-          ? true
-          : (card.category || card.occasion || '').toLowerCase() === activeCategory
-      return matchesQuery && matchesFavorites && matchesType && matchesCategory
+          : activeType === 'personal'
+            ? !cardType || cardType === 'personal' || cardType === 'standard' || cardType === 'moment'
+            : cardType === activeType
+      return matchesQuery && matchesFavorites && matchesType
     })
-  }, [activeTag, activeType, activeCategory, cardSource, favorites, query])
+  }, [activeTag, activeType, cardSource, favorites, query])
 
   useEffect(() => {
     setVisibleCount(CARDS_PER_PAGE)
-  }, [activeTag, activeType, activeCategory, query])
+  }, [activeTag, activeType, query])
 
   const pagedCards = filteredCards.slice(0, visibleCount)
   const hasMore = filteredCards.length > visibleCount
 
   const cardTypes = [
     { id: 'all', label: 'All' },
-    { id: 'greeting', label: 'Greeting' },
+    { id: 'personal', label: 'Personal' },
     { id: 'poll', label: 'Poll' },
     { id: 'trivia', label: 'Trivia' },
     { id: 'chain', label: 'Chain' },
+    { id: 'anonymous', label: 'Anonymous' },
   ]
 
   return (
@@ -191,7 +177,11 @@ function Explore() {
             ) : null}
           </>
         ) : (
-          <p className="empty-state">No cards match that search yet.</p>
+          <p className="empty-state">
+            {cardSource.length === 0
+              ? 'The marketplace is waiting for its first templates. Check back soon.'
+              : 'No cards match that search yet.'}
+          </p>
         )}
       </div>
       <ScreenNav />

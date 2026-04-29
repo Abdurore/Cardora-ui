@@ -1,9 +1,10 @@
-﻿import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import PremiumGiftReveal from './PremiumGiftReveal.jsx'
 import Envelope from './Envelope.jsx'
 import AmbientParticles from './AmbientParticles.jsx'
 import { fireOpenEffect } from '../lib/studioEffects.js'
+import { shouldShowEnvelope } from '../lib/tierLimits.js'
 
 const LEGACY_EMOJI_AMBIENTS = new Set(['floating', 'reverse'])
 
@@ -28,19 +29,89 @@ function CardPreviewModal({
   cardObject,
   onClose,
   tier = 'simple',
+  allowedTools = null,
+  tierLimits = null,
   recipientEmail = '',
-  studioType = 'moment',
+  studioType = 'personal',
   pollData = null,
   triviaData = null,
   anonTemplate = null,
 }) {
-  const [stage, setStage] = useState('closed') // closed, opening, open, questions, end, giftIntro, giftReveal, giftReceive, pollVote, triviaQ, triviaResults, anonPreview
+  // `allowedTools` gates tool visibility; `tierLimits` caps the content a
+  // visible tool is allowed to contribute (e.g. music allowed, images > 1).
+  // Both null = public viewer, render everything the card has.
+  const toolAllowed = (id) => !allowedTools || allowedTools.includes(id)
+  const limit = (key, fallback = true) => (tierLimits ? !!tierLimits[key] : fallback)
+  const maxImages = tierLimits ? (tierLimits.maxImages ?? Infinity) : Infinity
+  const envelopeEnabled = shouldShowEnvelope(studioType)
+  const [stage, setStage] = useState(envelopeEnabled ? 'closed' : 'open')
   const [questionIdx, setQuestionIdx] = useState(0)
-  const [fadeBody, setFadeBody] = useState(false)
-  const [bodyVisible, setBodyVisible] = useState(false)
+  const [fadeBody, setFadeBody] = useState(!envelopeEnabled)
+  const [bodyVisible, setBodyVisible] = useState(!envelopeEnabled)
   const [revealStep, setRevealStep] = useState(0)
   const audioRef = useRef(null)
   const containerRef = useRef(null)
+
+  // Device-frame preview. Fullscreen by default; lets the sender see how the
+  // card scales on phone / tablet / desktop without leaving the modal.
+  const [previewDevice, setPreviewDevice] = useState('fullscreen')
+
+  // Card surface style. The colored layer is rendered as a `::before` pseudo
+  // so adjusting opacity reveals the page background without dimming the card
+  // text or images.
+  const cardSurfaceStyle = (extra = {}) => ({
+    backgroundColor: 'transparent',
+    '--card-bg': cardObject?.card?.backgroundColor || '#111111',
+    '--card-bg-opacity': String(1 - (Number(cardObject?.card?.backgroundOpacity) || 0)),
+    ...extra,
+  })
+
+  // Lock & reveal gate — honours `interaction.lock` so the studio preview
+  // matches what the recipient will actually experience.
+  const lockSpec = cardObject?.interaction?.lock || { type: 'none', value: '' }
+  const revealSpec = cardObject?.interaction?.reveal || { type: 'tap', hint: '' }
+  const [unlocked, setUnlocked] = useState(lockSpec.type === 'none')
+  const [pwInput, setPwInput] = useState('')
+  const [pwError, setPwError] = useState('')
+  const [now, setNow] = useState(() => Date.now())
+  // Tick once per second while the time-lock is active so the countdown updates.
+  useEffect(() => {
+    if (lockSpec.type !== 'time' || unlocked) return undefined
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [lockSpec.type, unlocked])
+  // Auto-unlock when the configured time arrives.
+  const unlockAt = lockSpec.type === 'time' && lockSpec.value ? new Date(lockSpec.value).getTime() : null
+  useEffect(() => {
+    if (lockSpec.type === 'time' && unlockAt && now >= unlockAt) setUnlocked(true)
+  }, [lockSpec.type, unlockAt, now])
+
+  const handlePasswordSubmit = (e) => {
+    e?.preventDefault?.()
+    if (!lockSpec.value) {
+      setUnlocked(true)
+      return
+    }
+    if (pwInput.trim() === String(lockSpec.value).trim()) {
+      setUnlocked(true)
+      setPwError('')
+    } else {
+      setPwError('That doesn\'t match. Try again.')
+    }
+  }
+
+  function formatCountdown(ms) {
+    if (ms <= 0) return 'Unlocking…'
+    const total = Math.floor(ms / 1000)
+    const days = Math.floor(total / 86400)
+    const hours = Math.floor((total % 86400) / 3600)
+    const mins = Math.floor((total % 3600) / 60)
+    const secs = total % 60
+    if (days > 0) return `${days}d ${hours}h ${mins}m`
+    if (hours > 0) return `${hours}h ${mins}m ${secs}s`
+    if (mins > 0) return `${mins}m ${secs}s`
+    return `${secs}s`
+  }
 
   // Poll preview state
   const [previewPollVotes, setPreviewPollVotes] = useState([])
@@ -52,40 +123,69 @@ function CardPreviewModal({
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const c = cardObject
-  const hasQuestions = c.questions.items.length > 0
-  const hasGift = c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
-  const hasFadeIn = c.card.textBodyAnimation.fadeInDuration !== 'none'
-  const hasTypewriter = c.card.textBodyAnimation.selfTypeSpeed !== 'none'
+  const hasQuestions = toolAllowed('questions') && limit('allowQuestions') && c.questions.items.length > 0
+  const hasGift = toolAllowed('gifts') && limit('allowGifts') && c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
+  const hasFadeIn = toolAllowed('cardStyle') && limit('allowFadeIn') && c.card.textBodyAnimation.fadeInDuration !== 'none'
+  const hasTypewriter = toolAllowed('cardStyle') && limit('allowTypewriter') && c.card.textBodyAnimation.selfTypeSpeed !== 'none'
   const typeSpeed = hasTypewriter ? parseFloat(c.card.textBodyAnimation.selfTypeSpeed) || 2 : 2
   const fadeSpeed = hasFadeIn ? parseFloat(c.card.textBodyAnimation.fadeInDuration) || 2 : 0
-  const primaryImage = c.media.images[0] || null
+  const mediaAllowed = toolAllowed('media') && maxImages > 0
+  const primaryImage = mediaAllowed ? (c.media.images[0] || null) : null
 
   const typedBody = useTypewriter(c.content.body, typeSpeed, stage === 'open' && hasTypewriter)
   const typedExtended = useTypewriter(c.content.extendedBody, typeSpeed, stage === 'open' && hasTypewriter && typedBody === c.content.body)
 
-  // Music
+  // Music — gated by tier (Classic has no music)
+  const musicAllowed = limit('allowMusic') && !!c.background.music.url
+  const musicStartSec = Number(c.background.music.startSec) || 0
+  const musicEndSec = Number(c.background.music.endSec) || 0
+  const musicTrimmed = musicEndSec > 0 && musicEndSec > musicStartSec
+
   useEffect(() => {
-    if (!audioRef.current || !c.background.music.url) return undefined
+    if (!audioRef.current || !musicAllowed) return undefined
 
     audioRef.current.volume = c.background.music.volume
 
     if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview') {
+      // Honour trim window: jump to start point if we're outside the segment.
+      if (musicTrimmed) {
+        const t = audioRef.current.currentTime
+        if (t < musicStartSec || t >= musicEndSec) {
+          audioRef.current.currentTime = musicStartSec
+        }
+      }
       audioRef.current.play().catch(() => {})
     } else {
       audioRef.current.pause()
-      audioRef.current.currentTime = 0
+      audioRef.current.currentTime = musicTrimmed ? musicStartSec : 0
     }
 
     return () => {
       if (audioRef.current) audioRef.current.pause()
     }
-  }, [c.background.music.url, c.background.music.volume, stage])
+  }, [c.background.music.url, c.background.music.volume, stage, musicAllowed, musicTrimmed, musicStartSec, musicEndSec])
 
-  // Open effect dispatcher
+  // While trimmed playback is active, loop within [startSec, endSec] manually.
+  // Native <audio loop> covers the file end; we also need to loop at the
+  // user-defined endSec.
+  useEffect(() => {
+    if (!audioRef.current || !musicAllowed || !musicTrimmed) return undefined
+    const el = audioRef.current
+    const onTime = () => {
+      if (el.currentTime >= musicEndSec) {
+        el.currentTime = musicStartSec
+      }
+    }
+    el.addEventListener('timeupdate', onTime)
+    return () => el.removeEventListener('timeupdate', onTime)
+  }, [musicAllowed, musicTrimmed, musicStartSec, musicEndSec])
+
+  // Open effect dispatcher — gated by tier cap
   const triggerOpenEffect = useCallback(() => {
+    if (!toolAllowed('animation') || !limit('allowOpenEffects')) return
     if (!c.animation.openEffect || c.animation.openEffect === 'none') return
     fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
-  }, [c.animation.openEffect, c.animation.confettiColors])
+  }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits])
 
   const handleOpen = () => {
     triggerOpenEffect()
@@ -135,10 +235,10 @@ function CardPreviewModal({
   }
 
   const handleReset = () => {
-    setStage('closed')
+    setStage(envelopeEnabled ? 'closed' : 'open')
     setQuestionIdx(0)
-    setFadeBody(false)
-    setBodyVisible(false)
+    setFadeBody(!envelopeEnabled)
+    setBodyVisible(!envelopeEnabled)
     setRevealStep(0)
     setPreviewPollVotes([])
     setPreviewPollSubmitted(false)
@@ -193,12 +293,13 @@ function CardPreviewModal({
     })),
   [])
 
-  // Background effect
+  // Background effect — gated by the `animation` tool AND tier ambient cap
   const renderBgEffect = () => {
+    if (!toolAllowed('animation') || !limit('allowAmbientEffects')) return null
     const eff = c.animation.backgroundEffect
     if (!eff || eff.type === 'none') return null
     if (LEGACY_EMOJI_AMBIENTS.has(eff.type)) {
-      const emojis = eff.emojis.length > 0 ? eff.emojis : ['âœ¨']
+      const emojis = eff.emojis.length > 0 ? eff.emojis : ['✨']
       return (
         <div className={`cp-bg-effect cp-bg-${eff.type}`}>
           {particlePositions.map((pos, i) => (
@@ -222,7 +323,11 @@ function CardPreviewModal({
   }
 
   const renderGradientBorder = (children, className = '') => {
-    if (c.card.cardBorder.type === 'gradient' || c.card.cardBorder.type === 'animated') {
+    if (!toolAllowed('cardStyle')) return children
+    const borderType = c.card.cardBorder.type
+    if (borderType === 'gradient' && !limit('allowGradientBorder')) return children
+    if (borderType === 'animated' && !limit('allowAnimatedBorder')) return children
+    if (borderType === 'gradient' || borderType === 'animated') {
       const gradColors = c.card.cardBorder.colors.length > 1
         ? c.card.cardBorder.colors.join(', ')
         : `${c.card.cardBorder.colors[0] || '#333'}, ${c.card.cardBorder.colors[0] || '#333'}`
@@ -271,15 +376,39 @@ function CardPreviewModal({
     : hasQuestions ? 'Continue' : 'Done'
 
   return createPortal(
-    <section className="cp-overlay" ref={containerRef}>
+    <section className={`cp-overlay cp-device-${previewDevice}`} ref={containerRef}>
+      <div className="cp-device-toolbar" role="tablist" aria-label="Preview device">
+        {[
+          { id: 'fullscreen', label: 'Full' },
+          { id: 'phone', label: 'Phone' },
+          { id: 'tablet', label: 'Tablet' },
+          { id: 'desktop', label: 'Desktop' },
+        ].map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={previewDevice === id}
+            className={`cp-device-tab ${previewDevice === id ? 'active' : ''}`}
+            onClick={() => setPreviewDevice(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="cp-backdrop" style={bgStyle}>
-        {c.background.type === 'video' && c.background.videoUrl ? (
+        {c.background.type === 'video' && c.background.videoUrl && limit('allowVideoBackground') ? (
           <video className="cp-backdrop-video" src={c.background.videoUrl} autoPlay muted loop playsInline />
         ) : null}
-        {stage !== 'closed' && renderBgEffect()}
       </div>
 
-      {c.background.music.url && (
+      {stage !== 'closed' && (
+        <div className="cp-ambient-overlay" aria-hidden="true">
+          {renderBgEffect()}
+        </div>
+      )}
+
+      {musicAllowed && (
         <audio ref={audioRef} src={c.background.music.url} loop preload="auto" />
       )}
 
@@ -296,27 +425,73 @@ function CardPreviewModal({
         </button>
       )}
 
-      {/* ENVELOPE (closed state) */}
-      {stage === 'closed' && (
-        <Envelope
-          cardObject={c}
-          tier={tier}
-          recipientEmail={recipientEmail}
-          onOpenComplete={handleOpen}
-        />
+      {/* LOCK GATE — runs before the envelope. Honours interaction.lock so the
+          preview matches what the recipient will see. */}
+      {!unlocked && lockSpec.type === 'password' && (
+        <div className="cp-lock-gate">
+          <div className="cp-lock-card">
+            <div className="cp-lock-icon">🔒</div>
+            <h3>This card is locked</h3>
+            <p className="cp-lock-sub">
+              {revealSpec.hint?.trim()
+                ? revealSpec.hint
+                : 'Enter the password the sender shared with you.'}
+            </p>
+            <form className="cp-lock-form" onSubmit={handlePasswordSubmit}>
+              <input
+                type="password"
+                autoFocus
+                value={pwInput}
+                onChange={(e) => { setPwInput(e.target.value); setPwError('') }}
+                placeholder="Password"
+                aria-label="Password"
+              />
+              <button type="submit" className="primary">Unlock</button>
+            </form>
+            {pwError && <p className="cp-lock-error">{pwError}</p>}
+          </div>
+        </div>
       )}
 
-      {/* OPEN CARD */}
-      {stage === 'open' && (
+      {!unlocked && lockSpec.type === 'time' && unlockAt && (
+        <div className="cp-lock-gate">
+          <div className="cp-lock-card">
+            <div className="cp-lock-icon">⏳</div>
+            <h3>Sealed until later</h3>
+            <p className="cp-lock-sub">
+              {revealSpec.hint?.trim()
+                ? revealSpec.hint
+                : `This card unlocks on ${new Date(unlockAt).toLocaleString()}.`}
+            </p>
+            <p className="cp-lock-countdown">{formatCountdown(unlockAt - now)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ENVELOPE (closed state) — only Personal + Chain cards get the reveal metaphor */}
+      {unlocked && stage === 'closed' && envelopeEnabled && (
+        <>
+          {revealSpec.hint?.trim() && (
+            <p className="cp-reveal-hint" aria-hidden="true">
+              {revealSpec.hint}
+            </p>
+          )}
+          <Envelope
+            cardObject={c}
+            tier={tier}
+            recipientEmail={recipientEmail}
+            onOpenComplete={handleOpen}
+          />
+        </>
+      )}
+
+      {/* OPEN CARD — also gated by lock for non-envelope card types. */}
+      {unlocked && stage === 'open' && (
         <div className="cp-card-wrap cp-card-wrap-full">
           {renderGradientBorder(
             <article
               className="cp-card cp-card-full"
-              style={{
-                backgroundColor: c.card.backgroundColor,
-                ...borderStyle,
-                '--scrollbar-color': c.card.scrollbarColor,
-              }}
+              style={cardSurfaceStyle({ ...borderStyle, '--scrollbar-color': c.card.scrollbarColor })}
             >
               <div className="cp-card-inner cp-card-inner-full" style={{ '--scrollbar-color': c.card.scrollbarColor }}>
                 {/* Heading */}
@@ -325,6 +500,7 @@ function CardPreviewModal({
                   style={{
                     color: c.card.headingColor,
                     fontFamily: `'${c.theme.fontFamily}', serif`,
+                    fontSize: `${c.theme.headingSize ?? 28}px`,
                   }}
                 >
                   {c.content.heading}
@@ -350,6 +526,8 @@ function CardPreviewModal({
                   className={`cp-body cp-reveal-element ${fadeBody && revealStep >= 3 ? 'visible' : ''}`}
                   style={{
                     color: c.card.textColor,
+                    fontFamily: `'${c.theme.fontFamily}', sans-serif`,
+                    fontSize: `${c.theme.bodySize ?? 16}px`,
                     transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s',
                   }}
                 >
@@ -385,7 +563,7 @@ function CardPreviewModal({
           {renderGradientBorder(
             <article
               className="cp-card cp-card-full"
-              style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
+              style={cardSurfaceStyle(borderStyle)}
             >
               <div className="cp-card-inner cp-card-inner-full">
                 <div className="cp-poll-stage">
@@ -451,7 +629,7 @@ function CardPreviewModal({
           {renderGradientBorder(
             <article
               className="cp-card cp-card-full"
-              style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
+              style={cardSurfaceStyle(borderStyle)}
             >
               <div className="cp-card-inner cp-card-inner-full">
                 <div className="cp-trivia-stage">
@@ -518,7 +696,7 @@ function CardPreviewModal({
           {renderGradientBorder(
             <article
               className="cp-card cp-card-full"
-              style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
+              style={cardSurfaceStyle(borderStyle)}
             >
               <div className="cp-card-inner cp-card-inner-full">
                 <div className="cp-trivia-results">
@@ -556,7 +734,7 @@ function CardPreviewModal({
           {renderGradientBorder(
             <article
               className="cp-card cp-card-full"
-              style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
+              style={cardSurfaceStyle(borderStyle)}
             >
               <div className="cp-card-inner cp-card-inner-full">
                 <div className="cp-anon-stage">
@@ -599,10 +777,7 @@ function CardPreviewModal({
           {renderGradientBorder(
             <article
               className="cp-card cp-card-full cp-question-card"
-              style={{
-                backgroundColor: c.card.backgroundColor,
-                ...borderStyle,
-              }}
+              style={cardSurfaceStyle(borderStyle)}
             >
               <p className="cp-q-label" style={{ color: c.theme.accentColor }}>
                 Question {questionIdx + 1} of {c.questions.items.length}
@@ -656,9 +831,9 @@ function CardPreviewModal({
         <div className="cp-card-wrap cp-card-wrap-full">
           <article
             className="cp-card cp-card-full cp-end-card"
-            style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}
+            style={cardSurfaceStyle(borderStyle)}
           >
-            <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>âœ“</div>
+            <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>✓</div>
             <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               Card Complete
             </h3>
@@ -685,7 +860,7 @@ function CardPreviewModal({
       {/* GIFT INTRO */}
       {stage === 'giftIntro' && (
         <div className="cp-card-wrap cp-card-wrap-full">
-          <article className="cp-card cp-card-full cp-gift-intro" style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}>
+          <article className="cp-card cp-card-full cp-gift-intro" style={cardSurfaceStyle(borderStyle)}>
             <div className="cp-gift-sparkle">ðŸŽ</div>
             <h3 className="cp-gift-intro-heading" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               Wait... there's more
@@ -718,7 +893,7 @@ function CardPreviewModal({
       {/* GIFT RECEIVE */}
       {stage === 'giftReceive' && (
         <div className="cp-card-wrap cp-card-wrap-full">
-          <article className="cp-card cp-card-full cp-gift-receive" style={{ backgroundColor: c.card.backgroundColor, ...borderStyle }}>
+          <article className="cp-card cp-card-full cp-gift-receive" style={cardSurfaceStyle(borderStyle)}>
             <div className="cp-gift-received-icon">ðŸŽ‰</div>
             <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               You received a gift!

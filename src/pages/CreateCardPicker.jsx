@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 const CARD_TYPES = [
   {
-    id: 'moment',
-    label: 'Moment Card',
+    id: 'personal',
+    label: 'Personal Card',
     icon: '✉',
     desc: 'A cinematic card with envelope reveal, music, media, and effects.',
     accent: '#f0c060',
@@ -48,7 +48,7 @@ const CARD_TYPES = [
     ],
   },
   {
-    id: 'anon',
+    id: 'anonymous',
     label: 'Anonymous',
     icon: '👁',
     desc: 'Let anyone send you anonymous messages wrapped in a designed card.',
