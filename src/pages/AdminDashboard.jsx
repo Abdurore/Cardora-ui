@@ -25,9 +25,12 @@ import {
   deleteAdminPackage,
   getAdminRedeemCodes,
   createAdminRedeemCode,
+  disableAdminRedeemCode,
+  deleteAdminRedeemCode,
   getAdminAds,
   createAdminAd,
   updateAdminAd,
+  deleteAdminAd,
   getAdminAdsAnalytics,
   getAdminActionLogs,
   sendSeasonalReminder,
@@ -163,7 +166,9 @@ function AdminDashboard() {
   // New redeem code form
   const [newCode, setNewCode] = useState({ numberOfCC: 10, maxUses: 200, isActive: true })
   // New ad form
-  const [newAd, setNewAd] = useState({ name: '', type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+  const [newAd, setNewAd] = useState({ name: '', type: 'external', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1 })
+  // Broadcast subject
+  const [broadcastSubject, setBroadcastSubject] = useState('')
   const [adVideoUploading, setAdVideoUploading] = useState(false)
   const [adVideoDragOver, setAdVideoDragOver] = useState(false)
   const adVideoInputRef = useRef(null)
@@ -362,7 +367,7 @@ function AdminDashboard() {
     try {
       await acceptArtistApplication(appId)
       showMsg('Application accepted!')
-      loadTabData('Templates')
+      loadTabData('Artists')
     } catch (err) {
       showMsg(err.message || 'Failed', false)
     }
@@ -432,7 +437,52 @@ function AdminDashboard() {
     }
   }
 
-  const handleLoadReports = () => loadTabData('Reports')
+  const handleLoadReports = async (overrides = {}) => {
+    const f = { ...reportFilter, ...overrides }
+    setLoading(true)
+    try {
+      const q = `type=${f.type}&status=${f.status}&page=1&limit=100`
+      const res = await getAdminReports(q)
+      setReports(res?.data?.reports || res?.reports || [])
+    } catch (err) {
+      console.error('Reports load failed', err)
+    }
+    setLoading(false)
+  }
+
+  const handleDeleteAd = async (ad) => {
+    if (!window.confirm(`Delete ad "${ad.name || 'this ad'}"? This cannot be undone.`)) return
+    const id = ad._id || ad.id
+    try {
+      await deleteAdminAd(id)
+      showMsg('Ad deleted.')
+      setAds(prev => prev.filter(a => (a._id || a.id) !== id))
+    } catch (err) {
+      showMsg(err.message || 'Delete failed.', false)
+    }
+  }
+
+  const handleDisableCode = async (code) => {
+    if (!window.confirm(`Disable code "${code.code}"?`)) return
+    try {
+      await disableAdminRedeemCode(code.code)
+      showMsg('Code disabled.')
+      loadTabData('Codes')
+    } catch (err) {
+      showMsg(err.message || 'Disable failed.', false)
+    }
+  }
+
+  const handleDeleteCode = async (code) => {
+    if (!window.confirm(`Delete code "${code.code}"? This cannot be undone.`)) return
+    try {
+      await deleteAdminRedeemCode(code.code)
+      showMsg('Code deleted.')
+      setRedeemCodes(prev => prev.filter(c => c.code !== code.code))
+    } catch (err) {
+      showMsg(err.message || 'Delete failed.', false)
+    }
+  }
 
   const handleCreatePackage = async () => {
     if (!newPkg.name) { showMsg('Package name required', false); return }
@@ -509,9 +559,13 @@ function AdminDashboard() {
   const handleCreateAd = async () => {
     if (!newAd.videoUrl) { showMsg('Video URL required — please upload a video.', false); return }
     try {
-      await createAdminAd(newAd)
+      const payload = { ...newAd }
+      if (!payload.linkUrl) delete payload.linkUrl
+      if (!payload.maxViews) delete payload.maxViews
+      else payload.maxViews = Number(payload.maxViews)
+      await createAdminAd(payload)
       showMsg('Ad created!')
-      setNewAd({ name: '', type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+      setNewAd({ name: '', type: 'external', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1 })
       if (adVideoInputRef.current) adVideoInputRef.current.value = ''
       loadTabData('Ads')
     } catch (err) {
@@ -521,13 +575,12 @@ function AdminDashboard() {
 
   const handleBroadcast = async () => {
     if (!broadcastMessage.trim()) { showMsg('Message cannot be empty.', false); return }
+    if (!broadcastSubject.trim()) { showMsg('Subject line is required.', false); return }
     try {
-      // /admin/broadcast-message route returns 404 — backend never deployed it.
-      // Reuse the working /admin/send-seasonal-reminder endpoint which already
-      // handles "send a custom message to all users" semantics.
-      await sendSeasonalReminder({ message: broadcastMessage.trim() })
+      await sendSeasonalReminder({ subject: broadcastSubject.trim(), message: broadcastMessage.trim() })
       showMsg('Broadcast sent to all users!')
       setBroadcastMessage('')
+      setBroadcastSubject('')
     } catch (err) {
       showMsg(err.message || 'Failed', false)
     }
@@ -889,8 +942,15 @@ function AdminDashboard() {
             {/* Broadcast Message */}
             <div className="admin-sub-section">
               <h4>Send Message to All Users</h4>
-              <p className="admin-section-note">This will notify every registered user with your message.</p>
+              <p className="admin-section-note">This will email every registered user. Both subject and message are required.</p>
               <div className="admin-broadcast-form">
+                <input
+                  className="admin-broadcast-subject"
+                  placeholder="Email subject line…"
+                  value={broadcastSubject}
+                  onChange={e => setBroadcastSubject(e.target.value)}
+                  maxLength={150}
+                />
                 <textarea
                   className="admin-broadcast-textarea"
                   placeholder="Write your message to all users…"
@@ -901,7 +961,7 @@ function AdminDashboard() {
                 />
                 <div className="admin-broadcast-footer">
                   <span className="admin-broadcast-count">{broadcastMessage.length}/500</span>
-                  <button className="primary" type="button" onClick={handleBroadcast} disabled={!broadcastMessage.trim()}>
+                  <button className="primary" type="button" onClick={handleBroadcast} disabled={!broadcastMessage.trim() || !broadcastSubject.trim()}>
                     Send to All
                   </button>
                 </div>
@@ -984,19 +1044,47 @@ function AdminDashboard() {
                     <th>Role</th>
                     <th>CC</th>
                     <th>Verified</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(user => (
-                    <tr key={user._id || user.id}>
-                      <td>{user.username || user.name}</td>
-                      <td>{user.email}</td>
-                      <td><span className={`admin-role-chip ${(user.role || 'user').toLowerCase()}`}>{user.role || 'User'}</span></td>
-                      <td>{user.cc ?? user.balance ?? 0}</td>
-                      <td>{user.isVerified ? 'Yes' : 'No'}</td>
-                    </tr>
-                  ))}
-                  {users.length === 0 && <tr><td colSpan={5}>No users found.</td></tr>}
+                  {users.map(user => {
+                    const uid = user._id || user.id
+                    const uname = user.username || user.name || uid
+                    return (
+                      <tr key={uid}>
+                        <td>{uname}</td>
+                        <td>{user.email}</td>
+                        <td><span className={`admin-role-chip ${(user.role || 'user').toLowerCase()}`}>{user.role || 'User'}</span></td>
+                        <td>{user.cc ?? user.balance ?? 0}</td>
+                        <td>{user.isVerified ? 'Yes' : 'No'}</td>
+                        <td style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            type="button"
+                            className="admin-action-btn reject"
+                            onClick={() => {
+                              setBanForm(p => ({ ...p, identifier: uname }))
+                              openBanConfirm()
+                            }}
+                          >
+                            Ban
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-action-btn approve"
+                            onClick={async () => {
+                              if (!window.confirm(`Unban "${uname}"?`)) return
+                              try { await unbanUser({ userId: uid || uname }); showMsg(`"${uname}" unbanned.`); loadTabData('Users') }
+                              catch (err) { showMsg(err.message || 'Failed', false) }
+                            }}
+                          >
+                            Unban
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {users.length === 0 && <tr><td colSpan={6}>No users found.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -1011,7 +1099,14 @@ function AdminDashboard() {
             <div className="admin-inline-form admin-reports-filters">
               <label className="admin-field">
                 <span>Type</span>
-                <select value={reportFilter.type} onChange={e => { setReportFilter(p => ({ ...p, type: e.target.value })); }}>
+                <select
+                  value={reportFilter.type}
+                  onChange={e => {
+                    const val = e.target.value
+                    setReportFilter(p => ({ ...p, type: val }))
+                    handleLoadReports({ type: val })
+                  }}
+                >
                   <option value="">All types</option>
                   <option value="user">User</option>
                   <option value="card">Card</option>
@@ -1020,14 +1115,21 @@ function AdminDashboard() {
               </label>
               <label className="admin-field">
                 <span>Status</span>
-                <select value={reportFilter.status} onChange={e => { setReportFilter(p => ({ ...p, status: e.target.value })); }}>
+                <select
+                  value={reportFilter.status}
+                  onChange={e => {
+                    const val = e.target.value
+                    setReportFilter(p => ({ ...p, status: val }))
+                    handleLoadReports({ status: val })
+                  }}
+                >
                   <option value="open">Open</option>
                   <option value="reviewed">Reviewed</option>
                   <option value="resolved">Resolved</option>
                   <option value="dismissed">Dismissed</option>
                 </select>
               </label>
-              <button className="primary" type="button" onClick={handleLoadReports}>Filter</button>
+              <button className="primary" type="button" onClick={() => handleLoadReports()}>Refresh</button>
             </div>
 
             <div className="admin-table-wrap">
@@ -1305,18 +1407,41 @@ function AdminDashboard() {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Code</th><th>CC</th><th>Uses</th><th>Active</th></tr>
+                  <tr><th>Code</th><th>CC</th><th>Uses</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {redeemCodes.map(code => (
                     <tr key={code._id || code.code}>
-                      <td><code>{code.code}</code></td>
+                      <td>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <code>{code.code}</code>
+                          <button
+                            type="button"
+                            className="admin-action-btn"
+                            style={{ padding: '2px 7px', fontSize: '0.65rem' }}
+                            onClick={() => navigator.clipboard?.writeText(code.code).then(() => showMsg('Copied!'))}
+                            title="Copy code"
+                          >
+                            Copy
+                          </button>
+                        </span>
+                      </td>
                       <td>{code.numberOfCC}</td>
-                      <td>{code.usedCount ?? 0}/{code.maxUses ?? 'Unlimited'}</td>
-                      <td>{code.isActive ? 'Yes' : 'No'}</td>
+                      <td>{code.usedCount ?? 0}/{code.maxUses ?? '∞'}</td>
+                      <td>{code.isActive !== false ? 'Active' : 'Inactive'}</td>
+                      <td style={{ display: 'flex', gap: 4 }}>
+                        {code.isActive !== false && (
+                          <button type="button" className="admin-action-btn warn" onClick={() => handleDisableCode(code)}>
+                            Disable
+                          </button>
+                        )}
+                        <button type="button" className="admin-action-btn reject" onClick={() => handleDeleteCode(code)}>
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
-                  {redeemCodes.length === 0 && <tr><td colSpan={4}>No codes.</td></tr>}
+                  {redeemCodes.length === 0 && <tr><td colSpan={5}>No codes.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -1395,6 +1520,14 @@ function AdminDashboard() {
                   <input type="number" placeholder="30" value={newAd.duration} onChange={e => setNewAd(p => ({ ...p, duration: Number(e.target.value) }))} />
                 </label>
                 <label className="admin-field">
+                  <span>CTA Link URL <small>(optional — shown as a button after the ad)</small></span>
+                  <input type="url" placeholder="https://example.com" value={newAd.linkUrl} onChange={e => setNewAd(p => ({ ...p, linkUrl: e.target.value }))} />
+                </label>
+                <label className="admin-field">
+                  <span>Max Views <small>(optional — ad auto-disables when reached)</small></span>
+                  <input type="number" placeholder="unlimited" value={newAd.maxViews} onChange={e => setNewAd(p => ({ ...p, maxViews: e.target.value }))} />
+                </label>
+                <label className="admin-field">
                   <span>Display Priority (higher = shown first)</span>
                   <input type="number" placeholder="1" value={newAd.priority} onChange={e => setNewAd(p => ({ ...p, priority: Number(e.target.value) }))} />
                 </label>
@@ -1425,7 +1558,7 @@ function AdminDashboard() {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Name</th><th>Type</th><th>Reward</th><th>Duration</th><th>Active</th><th>Actions</th></tr>
+                  <tr><th>Name</th><th>Type</th><th>Reward</th><th>Duration</th><th>Views</th><th>CTA</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {ads.map(ad => (
@@ -1434,15 +1567,20 @@ function AdminDashboard() {
                       <td>{ad.type}</td>
                       <td>{ad.rewardCC} CC</td>
                       <td>{ad.duration}s</td>
+                      <td>{ad.currentViews ?? 0}{ad.maxViews ? `/${ad.maxViews}` : ''}</td>
+                      <td>{ad.linkUrl ? <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7ef7ff', fontSize: '0.75rem' }}>Link</a> : '—'}</td>
                       <td>{ad.isActive ? 'Yes' : 'No'}</td>
-                      <td>
+                      <td style={{ display: 'flex', gap: 4 }}>
                         <button type="button" className="admin-action-btn approve" onClick={() => handleToggleAd(ad)}>
                           {ad.isActive ? 'Disable' : 'Enable'}
+                        </button>
+                        <button type="button" className="admin-action-btn reject" onClick={() => handleDeleteAd(ad)}>
+                          Delete
                         </button>
                       </td>
                     </tr>
                   ))}
-                  {ads.length === 0 && <tr><td colSpan={5}>No ads.</td></tr>}
+                  {ads.length === 0 && <tr><td colSpan={8}>No ads.</td></tr>}
                 </tbody>
               </table>
             </div>

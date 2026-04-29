@@ -503,6 +503,10 @@ export async function disableAdminRedeemCode(code) {
   return request('/admin/redeem-codes/disable', { method: 'PATCH', auth: true, body: { code } })
 }
 
+export async function deleteAdminRedeemCode(code) {
+  return request('/admin/redeem-codes', { method: 'DELETE', auth: true, body: { code } })
+}
+
 export async function sendSeasonalReminder(payload) {
   return request('/admin/send-seasonal-reminder', { method: 'POST', auth: true, body: payload })
 }
