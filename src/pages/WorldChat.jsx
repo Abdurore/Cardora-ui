@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useOutletContext, useNavigate, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -29,6 +30,7 @@ function WorldChat() {
   const [joinLeave, setJoinLeave] = useState([])
   const [onlineCount, setOnlineCount] = useState(0)
   const [, setTick] = useState(0)
+  const [profileCard, setProfileCard] = useState(null) // { userId, username, avatarUrl, role }
   const socketRef = useRef(null)
   const messagesEndRef = useRef(null)
   const cooldownRef = useRef(null)
@@ -261,16 +263,29 @@ function WorldChat() {
               return (
                 <div key={msg.id} className={`chat-msg ${isMe ? 'me' : ''}`}>
                   {!isMe && (
-                    <div className="chat-msg-avatar">
+                    <button
+                      type="button"
+                      className="chat-msg-avatar chat-msg-avatar-btn"
+                      onClick={() => setProfileCard({ userId: msg.userId, username: msg.username, avatarUrl: msg.profilePictureUrl, role: msg.role })}
+                      title={`View ${msg.username}'s profile`}
+                    >
                       {msg.profilePictureUrl ? (
                         <img src={msg.profilePictureUrl} alt="" />
                       ) : (
                         <span>{msg.username?.charAt(0)?.toUpperCase() || '?'}</span>
                       )}
-                    </div>
+                    </button>
                   )}
                   <div className="chat-msg-body">
-                    {!isMe && <span className="chat-msg-name">{msg.username}</span>}
+                    {!isMe && (
+                      <button
+                        type="button"
+                        className="chat-msg-name chat-msg-name-btn"
+                        onClick={() => setProfileCard({ userId: msg.userId, username: msg.username, avatarUrl: msg.profilePictureUrl, role: msg.role })}
+                      >
+                        {msg.username}
+                      </button>
+                    )}
                     <div className="chat-msg-bubble">
                       {msg.content}
                     </div>
@@ -331,6 +346,28 @@ function WorldChat() {
         )}
       </div>
       <ScreenNav />
+
+      {profileCard && createPortal(
+        <div className="chat-profile-overlay" role="dialog" aria-modal="true">
+          <div className="chat-profile-backdrop" onClick={() => setProfileCard(null)} />
+          <div className="chat-profile-card">
+            <button type="button" className="chat-profile-close" onClick={() => setProfileCard(null)} aria-label="Close">×</button>
+            <div className="chat-profile-avatar-wrap">
+              {profileCard.avatarUrl
+                ? <img src={profileCard.avatarUrl} alt="" className="chat-profile-avatar" />
+                : <span className="chat-profile-avatar-initial">{(profileCard.username || 'U')[0].toUpperCase()}</span>}
+            </div>
+            <p className="chat-profile-name">@{profileCard.username}</p>
+            {profileCard.role && (
+              <span className={`profile-role-badge ${profileCard.role === 'Artist' ? 'role-artist' : profileCard.role === 'Admin' ? 'role-admin' : profileCard.role === 'Moderator' ? 'role-moderator' : profileCard.role === 'Enterprise' ? 'role-enterprise' : 'role-user'}`} style={{ marginTop: 8, display: 'inline-flex' }}>
+                {profileCard.role === 'Artist' ? '🎨' : profileCard.role === 'Admin' ? '⚡' : profileCard.role === 'Moderator' ? '🛡' : profileCard.role === 'Enterprise' ? '🏢' : '✨'}{' '}
+                {profileCard.role}
+              </span>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }

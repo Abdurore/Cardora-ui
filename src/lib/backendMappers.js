@@ -598,6 +598,7 @@ export function mapChatMessage(msg) {
     username: msg.username || 'Anonymous',
     content: msg.content || '',
     profilePictureUrl: msg.profilePictureUrl || null,
+    role: msg.role || '',
     createdAt: msg.createdAt || new Date().toISOString(),
   }
 }
