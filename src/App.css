@@ -16939,20 +16939,108 @@ a {
   color: rgba(200, 226, 238, 0.5);
 }
 
-.cs-publish-preview-note {
+/* Screenshot upload zone */
+.cs-publish-screenshot-section {
+  padding: 0 24px 4px;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 24px;
-  background: rgba(118, 239, 255, 0.04);
-  border-top: 1px solid rgba(118, 239, 255, 0.06);
-  border-bottom: 1px solid rgba(118, 239, 255, 0.06);
-  font-size: 0.76rem;
-  color: rgba(180, 210, 222, 0.5);
+  flex-direction: column;
+  gap: 6px;
 }
 
-.cs-publish-preview-note-icon {
-  font-size: 0.9rem;
+.cs-publish-required {
+  font-size: 0.68rem;
+  color: rgba(255, 140, 100, 0.8);
+  font-weight: 500;
+  margin-left: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cs-publish-screenshot-hint-text {
+  font-size: 0.74rem;
+  color: rgba(148, 163, 184, 0.55);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.cs-publish-screenshot-zone {
+  position: relative;
+  border: 1.5px dashed rgba(118, 239, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(118, 239, 255, 0.03);
+  min-height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  overflow: hidden;
+}
+.cs-publish-screenshot-zone:hover,
+.cs-publish-screenshot-zone:focus-visible {
+  border-color: rgba(118, 239, 255, 0.42);
+  background: rgba(118, 239, 255, 0.06);
+  outline: none;
+}
+.cs-publish-screenshot-zone.has-image {
+  min-height: 160px;
+  border-style: solid;
+  border-color: rgba(118, 239, 255, 0.3);
+}
+.cs-publish-screenshot-zone.uploading {
+  cursor: default;
+  border-color: rgba(118, 239, 255, 0.15);
+}
+
+.cs-publish-screenshot-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px;
+  width: 100%;
+}
+
+.cs-publish-screenshot-icon {
+  font-size: 1.6rem;
+  opacity: 0.7;
+}
+.cs-publish-screenshot-label {
+  font-size: 0.82rem;
+  color: rgba(180, 210, 222, 0.75);
+  font-weight: 500;
+}
+.cs-publish-screenshot-sub {
+  font-size: 0.7rem;
+  color: rgba(148, 163, 184, 0.4);
+}
+
+.cs-publish-screenshot-done {
+  padding: 0;
+  position: relative;
+}
+.cs-publish-screenshot-thumb {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+}
+.cs-publish-screenshot-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  font-size: 0.78rem;
+  color: #e2eaf0;
+}
+.cs-publish-screenshot-zone:hover .cs-publish-screenshot-overlay {
+  opacity: 1;
 }
 
 .cs-publish-modal--polished .cs-publish-actions {

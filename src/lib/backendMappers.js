@@ -464,9 +464,26 @@ export function cardObjectToBackendPayload(cardObject) {
   // ── enhancements.background: only `type` is accepted right now
   const bgType = BG_TYPE_MAP[cardObject.background?.type] || 'color'
 
+  // ── enhancements.interaction: lock, password, reveal behaviour
+  const interaction = cardObject.interaction && Object.keys(cardObject.interaction).length
+    ? cardObject.interaction
+    : undefined
+
+  // ── enhancements.questions: Q&A array attached to a card
+  const questions = Array.isArray(cardObject.questions) && cardObject.questions.length
+    ? cardObject.questions
+    : undefined
+
   // Build the payload. Always include `media` (as empty array if no images)
   // since some schemas require the key to be present. Same for any other
   // optional buckets — empty is safer than absent for strict validators.
+  const enhancements = {
+    background: { type: bgType },
+    media: mediaItems,
+  }
+  if (interaction) enhancements.interaction = interaction
+  if (questions)   enhancements.questions   = questions
+
   const payload = {
     config: {
       colors,
@@ -478,11 +495,14 @@ export function cardObjectToBackendPayload(cardObject) {
         extendedBody: cardObject.content?.extendedBody || '',
       },
     },
-    enhancements: {
-      background: { type: bgType },
-      media: mediaItems, // always send (empty array if no images)
-    },
+    enhancements,
   }
+
+  // Poll / trivia / chain data live at the top level of the card payload
+  // (alongside config + enhancements), not nested inside enhancements.
+  if (cardObject.poll    && cardObject.poll.question)    payload.poll    = cardObject.poll
+  if (cardObject.trivia  && cardObject.trivia.questions) payload.trivia  = cardObject.trivia
+  if (cardObject.chain   !== undefined)                  payload.chain   = cardObject.chain
 
   return payload
 }
@@ -495,6 +515,8 @@ export function cardObjectToBackendConfig(cardObject) {
 /**
  * Transform backend layoutdata → frontend cardObject
  * Backend sends media.images as string[], frontend expects object[]
+ * Also reconstructs palette/theme from config.colors so the Studio
+ * theme panel shows the correct colors when editing a saved card.
  */
 export function layoutDataToCardObject(layoutdata) {
   if (!layoutdata) return {}
@@ -506,6 +528,26 @@ export function layoutDataToCardObject(layoutdata) {
         ? { url: img, caption: '', fit: 'cover', positionX: 50, positionY: 50 }
         : img
     )
+  }
+
+  // Reconstruct palette, theme and background.colors from backend config.colors
+  // so the Studio colour pickers are pre-filled when a card is re-opened.
+  if (obj.config?.colors) {
+    const c = obj.config.colors
+    if (!obj.palette) obj.palette = {}
+    if (!obj.palette.surface && c.background)   obj.palette.surface = c.background
+    if (!obj.palette.primary && c.accent)        obj.palette.primary = c.accent
+    if (!obj.palette.accent  && c.gradient?.[1]) obj.palette.accent  = c.gradient[1]
+    if (!obj.theme) obj.theme = {}
+    if (!obj.theme.accentColor && c.accent)         obj.theme.accentColor  = c.accent
+    if (!obj.theme.fontFamily  && obj.config?.font) obj.theme.fontFamily   = obj.config.font
+    if (!obj.background) obj.background = {}
+    if ((!obj.background.colors || !obj.background.colors.length) && c.gradient?.length) {
+      obj.background.colors = [...c.gradient]
+    }
+    if (!obj.background.primaryColor && c.background) {
+      obj.background.primaryColor = c.background
+    }
   }
 
   backfillEnvelope(obj)
