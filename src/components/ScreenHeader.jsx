@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
-import logo from '../assets/icons/logo.png'
+
+const BRAND_LOGO = '/cardora-logo.png?v=4'
 
 function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
   return (
     <header className="screen-header">
       <div className="brand">
         <div className="brand-lockup">
-          <img src={logo} alt="Cardora logo" className="brand-logo" />
+          <img src={BRAND_LOGO} alt="Cardora logo" className="brand-logo" />
           <span className="brand-wordmark">Cardora</span>
         </div>
       </div>

@@ -12,7 +12,6 @@ import {
   createTemplate,
   deleteTemplate,
   adminDeleteTemplate,
-  extractToken,
   getCouponPackages,
   getCurrentUser,
   getStoredToken,
@@ -26,7 +25,6 @@ import {
   signup,
   updateProfile,
   verifyEmail,
-  createCard,
   createCardClassic,
   createCardPremium,
   createCardElite,
@@ -42,11 +40,14 @@ import {
   updateCurrency,
 } from '../lib/api.js'
 import {
-  extractCheckoutUrl,
-  mapCouponPackage,
+  getPrimaryUser,
+  getResponseMessage,
   mapTemplateToCard,
-  normalizeUser,
-  cardObjectToLayoutData,
+  normalizeAuthResponse,
+  normalizeCheckoutSession,
+  normalizeCouponPackagesResponse,
+  normalizeTemplatesResponse,
+  normalizeUserSession,
   cardObjectToBackendPayload,
   mapBackendCard,
 } from '../lib/backendMappers.js'
@@ -54,11 +55,16 @@ import {
 const USER_META_PREFIX = 'cardora:userMeta:'
 
 function readUserMeta(userId) {
-  if (!userId) return { favorites: [], inventory: [], avatarUrl: '', avatarColor: '' }
+  if (!userId) return { favorites: [], inventory: [], avatarColor: '' }
   try {
-    return JSON.parse(localStorage.getItem(`${USER_META_PREFIX}${userId}`) || '{}')
+    const parsed = JSON.parse(localStorage.getItem(`${USER_META_PREFIX}${userId}`) || '{}')
+    return {
+      favorites: Array.isArray(parsed?.favorites) ? parsed.favorites : [],
+      inventory: Array.isArray(parsed?.inventory) ? parsed.inventory : [],
+      avatarColor: parsed?.avatarColor || '',
+    }
   } catch {
-    return { favorites: [], inventory: [], avatarUrl: '', avatarColor: '' }
+    return { favorites: [], inventory: [], avatarColor: '' }
   }
 }
 
@@ -132,9 +138,10 @@ function MainLayout() {
       }
 
       const couponsData = couponPayload.status === 'fulfilled' ? couponPayload.value : null
-      const rawUser = userData?.user || userData?.data?.user || userData?.data || userData
+      const rawUser = getPrimaryUser(userData)
       const meta = readUserMeta(rawUser?._id || rawUser?.id || rawUser?.userId || rawUser?.email)
-      const normalized = normalizeUser(userData, meta, couponsData)
+      const session = normalizeUserSession(userData, couponsData, meta)
+      const normalized = session.normalized
       setCurrentUser(normalized)
       setBalance(normalized.balance)
       setFavorites(meta.favorites || [])
@@ -159,14 +166,13 @@ function MainLayout() {
       ])
 
       if (packagePayload.status === 'fulfilled') {
-        const packs = packagePayload.value?.packages || packagePayload.value?.data?.packages || []
-        setCouponPackages(packs.map((p) => mapCouponPackage(p, currencyParam)))
+        const normalizedPackages = normalizeCouponPackagesResponse(packagePayload.value, currencyParam)
+        setCouponPackages(normalizedPackages.packages)
       }
 
       if (templatePayload.status === 'fulfilled') {
-        const templates =
-          templatePayload.value?.templates || templatePayload.value?.data?.templates || []
-        setMarketplaceTemplates(templates.map(mapTemplateToCard))
+        const normalizedTemplates = normalizeTemplatesResponse(templatePayload.value)
+        setMarketplaceTemplates(normalizedTemplates.templates)
       }
     } catch (error) {
       console.error('Public data load failed', error)
@@ -205,7 +211,6 @@ function MainLayout() {
     const payload = {
       favorites,
       inventory,
-      avatarUrl,
       avatarColor,
     }
 
@@ -214,12 +219,11 @@ function MainLayout() {
     } catch (error) {
       console.warn('Failed to persist user meta, retrying without avatar image.', error)
       try {
-        localStorage.setItem(
+      localStorage.setItem(
           storageKey,
           JSON.stringify({
             favorites,
             inventory,
-            avatarUrl: '',
             avatarColor,
           }),
         )
@@ -273,9 +277,9 @@ function MainLayout() {
           throw paystackError
         }
       }
-      const checkoutUrl = extractCheckoutUrl(response)
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl
+      const checkout = normalizeCheckoutSession(response)
+      if (checkout.checkoutUrl) {
+        window.location.href = checkout.checkoutUrl
         return { ok: true, checkout: true }
       }
       await hydrateSession()
@@ -310,11 +314,14 @@ function MainLayout() {
   const handleLogin = async (email, password) => {
     try {
       const response = await login({ email, password })
-      const token = extractToken(response)
-      if (!token) {
-        return { ok: false, message: response?.message || 'Login succeeded but no session token was returned.' }
+      const auth = normalizeAuthResponse(response)
+      if (!auth.token) {
+        return {
+          ok: false,
+          message: auth.message || 'Login succeeded but no session token was returned.',
+        }
       }
-      setStoredToken(token)
+      setStoredToken(auth.token)
       await hydrateSession()
       // Seed lastActive on first-ever login so beforeunload tracking can start
       if (!localStorage.getItem('cardora:lastActive')) {
@@ -354,16 +361,16 @@ function MainLayout() {
         signupPayload.referralCode = referralCode
       }
       const response = await signup(signupPayload)
-      const token = extractToken(response)
-      if (token) {
-        setStoredToken(token)
+      const auth = normalizeAuthResponse(response)
+      if (auth.token) {
+        setStoredToken(auth.token)
         await hydrateSession()
         return { ok: true, verified: true }
       }
       return {
         ok: true,
         verified: false,
-        message: response?.message || 'Signup successful. Check your email for the verification code.',
+        message: auth.message || 'Signup successful. Check your email for the verification code.',
       }
     } catch (error) {
       return {
@@ -378,16 +385,16 @@ function MainLayout() {
   const handleVerifyEmail = async (email, otp) => {
     try {
       const response = await verifyEmail({ email, otp })
-      const token = extractToken(response)
-      if (token) {
-        setStoredToken(token)
+      const auth = normalizeAuthResponse(response)
+      if (auth.token) {
+        setStoredToken(auth.token)
         await hydrateSession()
-        return { ok: true, session: true, message: response?.message || 'Email verified successfully.' }
+        return { ok: true, session: true, message: auth.message || 'Email verified successfully.' }
       }
       return {
         ok: true,
         session: false,
-        message: response?.message || 'Email verified. Please log in to continue.',
+        message: auth.message || 'Email verified. Please log in to continue.',
       }
     } catch (error) {
       return {
@@ -402,7 +409,7 @@ function MainLayout() {
   const handleRequestOtp = async (email) => {
     try {
       const response = await requestOtp({ email })
-      return { ok: true, message: response?.message || 'A new code has been sent.' }
+      return { ok: true, message: getResponseMessage(response, 'A new code has been sent.') }
     } catch (error) {
       return {
         ok: false,
@@ -428,11 +435,6 @@ function MainLayout() {
       setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
       setCart([])
     }
-  }
-
-  const updateAvatar = (nextAvatar) => {
-    setAvatarUrl(nextAvatar)
-    setAvatarColor('')
   }
 
   const handleProfileUpdate = async (payload) => {
@@ -489,7 +491,7 @@ function MainLayout() {
       }
 
       await loadPublicData()
-      return { ok: true, message: response?.message || 'Template submitted successfully.' }
+      return { ok: true, message: getResponseMessage(response, 'Template submitted successfully.') }
     } catch (error) {
       console.error('Template publish failed', error)
       return { ok: false, message: error.message || 'Could not publish template.' }
@@ -516,7 +518,7 @@ function MainLayout() {
     }
   }
 
-  const handleCreateCard = async (cardObject, { title, templateId, type, couponType, useCoupons, poll, chain, trivia, tier, anonTemplate } = {}) => {
+  const handleCreateCard = async (cardObject, { type, couponType, useCoupons, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
       // Backend card engine uses 'personal' for the standard card type. 'moment'
       // is still the internal studio id — normalise at the API boundary.
@@ -554,7 +556,7 @@ function MainLayout() {
         response = await createCardClassic(payload)
       }
 
-      return { ok: true, data: response, message: response?.message || 'Card created!' }
+      return { ok: true, data: response, message: getResponseMessage(response, 'Card created!') }
     } catch (error) {
       return { ok: false, message: error.message || 'Card creation failed.' }
     }
@@ -563,7 +565,7 @@ function MainLayout() {
   const handleGetUserCards = async (query) => {
     try {
       const response = await getUserCards(query)
-      const cards = response?.cards || response?.data?.cards || []
+      const cards = response?.cards || response?.data?.cards || response?.data?.items || []
       return { ok: true, cards: cards.map(mapBackendCard) }
     } catch (error) {
       return { ok: false, cards: [], message: error.message }
@@ -583,7 +585,7 @@ function MainLayout() {
     try {
       const response = await claimDailyFreeCoupon()
       await hydrateSession()
-      return { ok: true, message: response?.message || 'Daily coupon claimed!' }
+      return { ok: true, message: getResponseMessage(response, 'Daily coupon claimed!') }
     } catch (error) {
       return { ok: false, message: error.message || 'Could not claim daily coupon.' }
     }
@@ -593,7 +595,7 @@ function MainLayout() {
     try {
       const response = await redeemCode({ code })
       await hydrateSession()
-      return { ok: true, message: response?.message || 'Code redeemed!' }
+      return { ok: true, message: getResponseMessage(response, 'Code redeemed!') }
     } catch (error) {
       return { ok: false, message: error.message || 'Invalid or expired code.' }
     }
@@ -602,7 +604,7 @@ function MainLayout() {
   const handleArtistApply = async (payload) => {
     try {
       const response = await artistApply(payload)
-      return { ok: true, message: response?.message || 'Application submitted!' }
+      return { ok: true, message: getResponseMessage(response, 'Application submitted!') }
     } catch (error) {
       return { ok: false, message: error.message || 'Artist application failed.' }
     }
@@ -611,7 +613,7 @@ function MainLayout() {
   const handleForgotPassword = async (email) => {
     try {
       const response = await forgotPassword({ email })
-      return { ok: true, message: response?.message || 'Reset code sent to your email.' }
+      return { ok: true, message: getResponseMessage(response, 'Reset code sent to your email.') }
     } catch (error) {
       return { ok: false, message: error.message || 'Could not send reset code.' }
     }
@@ -620,7 +622,7 @@ function MainLayout() {
   const handleResetPassword = async (email, otp, newPassword) => {
     try {
       const response = await resetPassword({ email, otp, newPassword })
-      return { ok: true, message: response?.message || 'Password reset successfully.' }
+      return { ok: true, message: getResponseMessage(response, 'Password reset successfully.') }
     } catch (error) {
       return { ok: false, message: error.message || 'Password reset failed.' }
     }
@@ -670,7 +672,6 @@ function MainLayout() {
               navigate('/login')
             }
           },
-          updateAvatar,
           updateProfile: handleProfileUpdate,
           deductCC,
           addGift,

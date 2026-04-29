@@ -31,7 +31,6 @@ function Profile() {
     balance,
     currentUser,
     openAuthModal,
-    updateAvatar,
     updateProfile,
     getUserCardsFromBackend,
     deleteCardOnBackend,
@@ -679,8 +678,10 @@ function Profile() {
           try {
             const blob = dataUrlToBlob(dataUrl)
             const cloudUrl = await uploadToCloudinary(blob, 'image')
-            updateAvatar(cloudUrl)
-            updateProfile({ profilePictureUrl: cloudUrl })
+            const result = await updateProfile({ profilePictureUrl: cloudUrl })
+            if (!result?.ok) {
+              throw new Error(result?.message || 'Avatar sync failed.')
+            }
           } catch (err) {
             setAvatarUploadError('Avatar upload failed. Please try again.')
             console.error('Avatar upload error:', err)

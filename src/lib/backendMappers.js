@@ -16,6 +16,43 @@ function extractNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+export function unwrapData(payload) {
+  if (!payload || typeof payload !== 'object') return payload
+  return payload?.data && typeof payload.data === 'object' ? payload.data : payload
+}
+
+export function getResponseMessage(payload, fallback = '') {
+  if (!payload || typeof payload !== 'object') return fallback
+  return (
+    payload.message ||
+    payload.data?.message ||
+    payload.result?.message ||
+    payload.statusMessage ||
+    fallback
+  )
+}
+
+export function getPrimaryUser(payload) {
+  const root = unwrapData(payload)
+  return (
+    root?.user ||
+    root?.currentUser ||
+    root?.profile ||
+    root?.account ||
+    root ||
+    {}
+  )
+}
+
+export function getCollection(payload, keys = []) {
+  const root = unwrapData(payload)
+  if (Array.isArray(root)) return root
+  for (const key of keys) {
+    if (Array.isArray(root?.[key])) return root[key]
+  }
+  return []
+}
+
 export function resolveBalance(...sources) {
   const candidateKeys = [
     'couponBalance',
@@ -45,7 +82,7 @@ export function resolveBalance(...sources) {
 }
 
 export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
-  const user = userPayload?.user || userPayload?.data?.user || userPayload?.data || userPayload || {}
+  const user = getPrimaryUser(userPayload) || {}
   const roleValue = String(user.role || user.accountType || 'user').toLowerCase()
   const userId = user._id || user.id || user.userId || user.email || `u-${Date.now()}`
 
@@ -65,7 +102,7 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     isVerified: user.isVerified ?? true,
     createdAt: user.createdAt || '',
     avatarColor: extras.avatarColor || 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
-    avatarUrl: extras.avatarUrl || user.profilePictureUrl || '',
+    avatarUrl: user.profilePictureUrl || extras.avatarUrl || '',
     favorites: extras.favorites || [],
     inventory: extras.inventory || [],
   }
@@ -189,7 +226,13 @@ export function mapCouponPackage(pack, targetCurrency) {
 }
 
 export function extractCheckoutUrl(payload) {
+  const root = unwrapData(payload)
   return (
+    root?.authorization_url ||
+    root?.authorizationUrl ||
+    root?.checkoutUrl ||
+    root?.url ||
+    root?.sessionUrl ||
     payload?.authorization_url ||
     payload?.authorizationUrl ||
     payload?.data?.authorization_url ||
@@ -200,6 +243,79 @@ export function extractCheckoutUrl(payload) {
     payload?.data?.url ||
     null
   )
+}
+
+export function normalizeCheckoutSession(payload) {
+  const root = unwrapData(payload) || {}
+  return {
+    checkoutUrl: extractCheckoutUrl(payload),
+    reference:
+      root.reference ||
+      root.paymentReference ||
+      root.checkoutReference ||
+      root.transactionRef ||
+      '',
+    message: getResponseMessage(payload, ''),
+    raw: payload,
+  }
+}
+
+export function normalizeAuthResponse(payload) {
+  const root = unwrapData(payload) || {}
+  const token =
+    payload?.token ||
+    root?.token ||
+    payload?.accessToken ||
+    root?.accessToken ||
+    payload?.jwt ||
+    root?.jwt ||
+    payload?.user?.token ||
+    root?.user?.token ||
+    payload?.result?.token ||
+    root?.result?.token ||
+    null
+
+  return {
+    token,
+    user: getPrimaryUser(payload),
+    message: getResponseMessage(payload, ''),
+    requiresVerification:
+      Boolean(root?.requiresVerification) ||
+      Boolean(payload?.requiresVerification) ||
+      (!token && /verify/i.test(getResponseMessage(payload, ''))),
+    requiresLogin:
+      Boolean(root?.requiresLogin) ||
+      Boolean(payload?.requiresLogin),
+    raw: payload,
+  }
+}
+
+export function normalizeUserSession(userPayload, couponPayload = null, extras = {}) {
+  const user = getPrimaryUser(userPayload)
+  const normalized = normalizeUser(userPayload, extras, couponPayload)
+  return {
+    user,
+    normalized,
+    balance: normalized.balance,
+    currency: normalized.currency,
+    raw: userPayload,
+  }
+}
+
+export function normalizeCouponPackagesResponse(payload, targetCurrency) {
+  const packages = getCollection(payload, ['packages', 'couponPackages', 'items'])
+  return {
+    packages: packages.map((pack) => mapCouponPackage(pack, targetCurrency)),
+    raw: payload,
+  }
+}
+
+export function normalizeTemplatesResponse(payload) {
+  const templates = getCollection(payload, ['templates', 'items', 'results'])
+  return {
+    templates: templates.map(mapTemplateToCard),
+    raw: payload,
+  }
 }
 
 /* ═══════════════════════════════════════════════

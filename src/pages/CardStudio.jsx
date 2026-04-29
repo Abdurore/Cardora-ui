@@ -9,7 +9,6 @@ import {
   HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash
 } from 'react-icons/hi2'
 import { IoColorPaletteOutline } from 'react-icons/io5'
-import logo from '../assets/icons/logo.png'
 import { defaultCardObject, resolveTemplateCardObject, musicPresets, getFontsForTier } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
@@ -24,6 +23,7 @@ import { getTierLimits } from '../lib/tierLimits.js'
 import { getPalettesForTier, applyPalette, getPaletteById } from '../lib/palettes.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
+const BRAND_LOGO = '/cardora-logo.png?v=4'
 
 const steps = ['closed', 'card', 'questions', 'preview']
 
@@ -2242,7 +2242,7 @@ function CardStudio() {
         </div>
         <div className="cs-progress">
           <div className="cs-wordmark">
-            <img src={logo} alt="Cardora" className="cs-top-logo" />
+            <img src={BRAND_LOGO} alt="Cardora" className="cs-top-logo" />
             <span>Cardora Studio</span>
             <span className={`cs-type-badge ${typeMeta.badge}`}>
               <span className="cs-type-badge-emoji">{typeMeta.emoji}</span>

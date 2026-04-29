@@ -17,8 +17,8 @@ const CARD_FORMATS = [
   {
     icon: '💌',
     title: 'Personal Cards',
-    tagline: 'Cinematic reveals with music and effects.',
-    description: 'Build a personalized experience that opens like a tiny film — envelope, music, glow, and all.',
+    tagline: 'Cinematic reveals with music.',
+    description: 'Envelope, glow, music, and a more personal kind of message.',
     accent: 'warm',
     cta: 'Try it',
     typePreselect: 'personal',
@@ -26,8 +26,8 @@ const CARD_FORMATS = [
   {
     icon: '📊',
     title: 'Poll Cards',
-    tagline: 'Ask your audience. See who answers.',
-    description: 'Embed a live poll inside your card. Recipients vote and see real-time results instantly.',
+    tagline: 'Ask and measure the mood.',
+    description: 'Drop a live poll into the card and let people vote in place.',
     accent: 'cool',
     cta: 'Try it',
     typePreselect: 'poll',
@@ -35,8 +35,8 @@ const CARD_FORMATS = [
   {
     icon: '💡',
     title: 'Trivia Cards',
-    tagline: 'Quiz your friends. Score the moment.',
-    description: 'Add a scored trivia challenge inside your card. Recipients get their score at the end.',
+    tagline: 'Turn the card into a challenge.',
+    description: 'Build a short quiz and reveal the score at the end.',
     accent: 'rose',
     cta: 'Try it',
     typePreselect: 'trivia',
@@ -44,8 +44,8 @@ const CARD_FORMATS = [
   {
     icon: '👁',
     title: 'Anonymous Inbox',
-    tagline: 'Let anyone send you a message. Anonymously.',
-    description: 'Share your link and receive honest messages from anyone — wrapped in a beautifully designed card.',
+    tagline: 'Open the door to honest messages.',
+    description: 'Share one link and collect anonymous notes inside your card design.',
     accent: 'mint',
     cta: 'Set up yours',
     typePreselect: 'anonymous',
@@ -53,8 +53,8 @@ const CARD_FORMATS = [
   {
     icon: '🔗',
     title: 'Chain Cards',
-    tagline: 'Send a card. Invite a card back.',
-    description: 'Start a back-and-forth — recipient opens your card and is invited to reply with their own.',
+    tagline: 'Send one. Pull one back.',
+    description: 'Invite the recipient to answer with a card of their own.',
     accent: 'teal',
     cta: 'Try it',
     to: '/studio?type=chain&tier=classic',
@@ -230,7 +230,7 @@ function Home() {
       <section className="landing-section">
         <div className="section-heading">
           <p className="eyebrow">Card Formats</p>
-          <h3 className="landing-title">Five ways to make someone feel something.</h3>
+          <h3 className="landing-title landing-title-compact">Five card formats. Five different feelings.</h3>
         </div>
         <div className="format-grid">
           {CARD_FORMATS.map((format) => (
