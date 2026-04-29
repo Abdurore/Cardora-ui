@@ -10063,6 +10063,18 @@ a {
   border: 1px solid rgba(100, 110, 120, 0.15);
 }
 
+.role-moderator {
+  background: linear-gradient(135deg, rgba(100, 160, 255, 0.12), rgba(120, 100, 255, 0.08));
+  color: #a0b8ff;
+  border: 1px solid rgba(100, 160, 255, 0.2);
+}
+
+.role-enterprise {
+  background: linear-gradient(135deg, rgba(255, 180, 50, 0.12), rgba(255, 120, 80, 0.08));
+  color: #ffcc80;
+  border: 1px solid rgba(255, 180, 50, 0.2);
+}
+
 .role-icon {
   font-size: 1rem;
 }
@@ -10807,11 +10819,11 @@ a {
   top: 0;
   z-index: 6;
   flex-shrink: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  padding: 20px 24px;
+  padding: 14px 20px;
   margin-bottom: 4px;
   border-radius: 22px;
   border: 1px solid rgba(126, 247, 255, 0.14);
@@ -10820,6 +10832,79 @@ a {
     linear-gradient(180deg, rgba(12, 22, 28, 0.85), rgba(6, 12, 16, 0.92));
   box-shadow: 0 20px 50px rgba(1, 8, 12, 0.35), inset 0 1px 0 rgba(126, 247, 255, 0.06);
   overflow: hidden;
+}
+
+.chat-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.chat-header-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.chat-header-wordmark {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #e2eaf0;
+  letter-spacing: 0.01em;
+}
+
+.chat-header-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.chat-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-header-profile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.chat-header-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.chat-header-avatar-initial {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #7ef7ff, #62ffa2);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0b0f12;
+  flex-shrink: 0;
+}
+
+.chat-header-balance {
+  font-size: 0.75rem;
+  color: rgba(126, 239, 255, 0.8);
+}
+
+.chat-header-signin {
+  font-size: 0.8rem;
+  padding: 6px 14px;
 }
 
 .chat-header-bar::before {
@@ -17299,6 +17384,45 @@ a {
   font-size: 0.82rem;
   color: rgba(148, 163, 184, 0.7);
   margin: -8px 0 20px;
+}
+
+.enterprise-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.enterprise-benefit-card {
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 180, 50, 0.12);
+  background: linear-gradient(135deg, rgba(255, 180, 50, 0.05), rgba(8, 16, 22, 0.6));
+}
+
+.enterprise-benefit-icon {
+  font-size: 1.5rem;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.enterprise-benefit-card h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffcc80;
+  margin: 0 0 6px;
+}
+
+.enterprise-benefit-card p {
+  font-size: 0.8rem;
+  color: rgba(200, 215, 225, 0.6);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.enterprise-contact-link {
+  color: #ffcc80;
+  text-decoration: underline;
 }
 
 /* Block container per media type */

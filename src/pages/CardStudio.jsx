@@ -2649,52 +2649,82 @@ function CardStudio() {
               </p>
             )}
 
-            {sendResult?.ok && sendResult?.slug ? (
+            {sendResult?.ok && (
               <div className="cs-send-link-wrap">
                 <p className="cs-send-link-label">Your unique card link</p>
-                <span className="detail-share-link-pill cs-send-link-pill">
-                  {`${window.location.origin}/card/${sendResult.slug}`.replace(/^https?:\/\//, '')}
-                </span>
-                <button
-                  type="button"
-                  className={`detail-share-copy-btn ${sendCopied ? 'copied' : ''}`}
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(`${window.location.origin}/card/${sendResult.slug}`)
-                      setSendCopied(true)
-                      setTimeout(() => setSendCopied(false), 1600)
-                    } catch { /* ignore */ }
-                  }}
-                >
-                  {sendCopied ? '✓ Copied' : 'Copy Link'}
-                </button>
+                {sendResult.slug ? (
+                  <>
+                    <span className="detail-share-link-pill cs-send-link-pill">
+                      {`${window.location.origin}/card/${sendResult.slug}`.replace(/^https?:\/\//, '')}
+                    </span>
+                    <button
+                      type="button"
+                      className={`detail-share-copy-btn ${sendCopied ? 'copied' : ''}`}
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(`${window.location.origin}/card/${sendResult.slug}`)
+                          setSendCopied(true)
+                          setTimeout(() => setSendCopied(false), 1600)
+                        } catch { /* ignore */ }
+                      }}
+                    >
+                      {sendCopied ? '✓ Copied' : 'Copy Link'}
+                    </button>
+                  </>
+                ) : (
+                  <p className="cs-send-modal-note" style={{ color: '#ffb4b4' }}>
+                    Card sent — link not returned yet. Visit your Profile to find it.
+                  </p>
+                )}
               </div>
-            ) : sendResult?.ok ? (
-              <p className="cs-send-modal-note" style={{ color: '#ffb4b4' }}>
-                Card created but no link was returned by the server. Please refresh your profile to find it.
-              </p>
-            ) : null}
+            )}
 
-            {sendResult?.ok && sendResult?.slug && <p className="detail-share-label">Share via</p>}
-            {sendResult?.ok && sendResult?.slug && <div className="detail-share-platforms cs-send-modal-platforms">
-              {SHARE_PLATFORMS.map((p) => {
-                const shareUrl = `${window.location.origin}/card/${sendResult.slug}`
-                const shareTitle = `Check out this card I made on Cardora`
-                return (
-                  <a
-                    key={p.id}
-                    href={p.getUrl(shareUrl, shareTitle)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="detail-share-platform-btn"
-                    style={{ '--platform-color': p.color }}
-                  >
-                    {p.icon}
-                    <span>{p.label}</span>
-                  </a>
-                )
-              })}
-            </div>}
+            {sendResult?.ok && sendResult?.slug && (
+              <>
+                <p className="detail-share-label">Share via</p>
+                <div className="detail-share-platforms cs-send-modal-platforms">
+                  {SHARE_PLATFORMS.map((p) => {
+                    const shareUrl = `${window.location.origin}/card/${sendResult.slug}`
+                    const shareTitle = `Check out this card I made on Cardora`
+                    return (
+                      <a
+                        key={p.id}
+                        href={p.getUrl(shareUrl, shareTitle)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="detail-share-platform-btn"
+                        style={{ '--platform-color': p.color }}
+                      >
+                        {p.icon}
+                        <span>{p.label}</span>
+                      </a>
+                    )
+                  })}
+                  {navigator.share && (
+                    <button
+                      type="button"
+                      className="detail-share-platform-btn"
+                      style={{ '--platform-color': 'rgba(118,239,255,0.7)' }}
+                      onClick={async () => {
+                        try {
+                          await navigator.share({
+                            title: 'Cardora Card',
+                            text: 'Check out this card I made on Cardora',
+                            url: `${window.location.origin}/card/${sendResult.slug}`,
+                          })
+                        } catch { /* cancelled */ }
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                      </svg>
+                      <span>More</span>
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="cs-send-modal-email-row">
               <p className="cs-send-link-label">Send via Email</p>

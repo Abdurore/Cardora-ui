@@ -57,6 +57,7 @@ import {
   normalizeTemplatesResponse,
   normalizeUserSession,
   cardObjectToBackendPayload,
+  cardObjectToLayoutData,
   mapBackendCard,
 } from '../lib/backendMappers.js'
 
@@ -543,6 +544,10 @@ function MainLayout() {
       const payload = {
         type: resolvedType,
         ...backendPayload,
+        // Send the full cardObject as layoutdata so the backend preserves all
+        // visual customizations (closedState, card border, animation effects,
+        // envelope design, music) and returns them to the recipient.
+        layoutdata: cardObjectToLayoutData(cardObject),
       }
       if (couponType) payload.couponType = couponType
       if (useCoupons) payload.useCoupons = useCoupons

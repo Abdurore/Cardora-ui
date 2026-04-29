@@ -18,6 +18,8 @@ const ROLE_CONFIG = {
   Artist: { badge: 'role-artist', icon: '🎨', desc: 'Create and publish templates to the marketplace' },
   User: { badge: 'role-user', icon: '✨', desc: 'Build and send personalized card experiences' },
   Admin: { badge: 'role-admin', icon: '⚡', desc: 'Monitor platform activity and manage content' },
+  Moderator: { badge: 'role-moderator', icon: '🛡', desc: 'Help keep Cardora safe and welcoming' },
+  Enterprise: { badge: 'role-enterprise', icon: '🏢', desc: 'Business account with analytics and ad management' },
   Visitor: { badge: 'role-visitor', icon: '👤', desc: 'Sign in to start creating' },
 }
 
@@ -92,6 +94,8 @@ function Profile() {
   const roleInfo = ROLE_CONFIG[roleName] || ROLE_CONFIG.Visitor
   const isAdmin = roleName === 'Admin'
   const isArtist = roleName === 'Artist'
+  const isModerator = roleName === 'Moderator'
+  const isEnterprise = roleName === 'Enterprise'
 
   const publishedTemplates = (marketplaceTemplates || []).filter((t) => {
     if (!isArtist || !currentUser?.id) return false
@@ -359,15 +363,25 @@ function Profile() {
             </button>
           )}
 
-          {/* Admin quick link */}
+          {/* Role dashboard quick links */}
           {isAdmin && (
             <Link to="/admin" className="profile-admin-link">
               <span>⚡</span> Open Admin Dashboard
             </Link>
           )}
+          {isModerator && (
+            <Link to="/moderator" className="profile-admin-link">
+              <span>🛡</span> Open Moderator Dashboard
+            </Link>
+          )}
+          {isEnterprise && (
+            <Link to="/enterprise" className="profile-admin-link">
+              <span>🏢</span> Open Enterprise Dashboard
+            </Link>
+          )}
 
           {/* Artist Apply */}
-          {!isArtist && !isAdmin && currentUser && (
+          {!isArtist && !isAdmin && !isModerator && !isEnterprise && currentUser && (
             <button
               className="profile-artist-apply-btn"
               type="button"
