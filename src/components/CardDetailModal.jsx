@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { getTierInfo } from '../utils/tier.js'
 import { getTemplateById } from '../lib/api.js'
+import ReportModal from './ReportModal.jsx'
 
 const SHARE_PLATFORMS = [
   {
@@ -50,6 +51,7 @@ function CardDetailModal({
   openCardTypeModal,
 }) {
   const [view, setView] = useState('main') // 'main' | 'share'
+  const [showReport, setShowReport] = useState(false)
   const [copied, setCopied] = useState(false)
   const [startY, setStartY] = useState(null)
   const navigate = useNavigate()
@@ -211,6 +213,9 @@ function CardDetailModal({
                 </svg>
                 Share Card
               </button>
+              <button className="cdm-close-link cdm-report-link" type="button" onClick={() => setShowReport(true)}>
+                Report template
+              </button>
               <button className="cdm-close-link" type="button" onClick={onClose}>Dismiss</button>
             </div>
           )}
@@ -271,6 +276,15 @@ function CardDetailModal({
           )}
         </div>
       </div>
+
+      {showReport && (
+        <ReportModal
+          type="template"
+          targetId={card?.id || card?.templateId || card?.slug}
+          targetName={card?.title}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </section>,
     document.body,
   )

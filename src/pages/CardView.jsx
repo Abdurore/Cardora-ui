@@ -5,6 +5,7 @@ import { getTierInfo } from '../utils/tier.js'
 import { getCardBySlug, submitCardResponse, submitPollVote, submitChainReply, submitTriviaAnswer } from '../lib/api.js'
 import { mapBackendCard, layoutDataToCardObject } from '../lib/backendMappers.js'
 import Envelope from '../components/Envelope.jsx'
+import ReportModal from '../components/ReportModal.jsx'
 import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
 
@@ -31,6 +32,7 @@ function CardView() {
   const [triviaSubmitted, setTriviaSubmitted] = useState(false)
   const [triviaStepIdx, setTriviaStepIdx] = useState(0)
   const [interactionMsg, setInteractionMsg] = useState('')
+  const [showReport, setShowReport] = useState(false)
   const audioRef = useRef(null)
 
   // Try loading from backend by slug
@@ -563,12 +565,29 @@ function CardView() {
                   <Link to="/" className="cv-watermark-brand">Cardora</Link>
                   <span className="cv-watermark-sep">·</span>
                   <Link to="/create" className="cv-watermark-cta">Create yours →</Link>
+                  <button
+                    type="button"
+                    className="cv-report-btn"
+                    onClick={() => setShowReport(true)}
+                    title="Report this card"
+                  >
+                    Report
+                  </button>
                 </div>
               </div>
             </div>
           </motion.section>
         )}
       </AnimatePresence>
+
+      {showReport && (
+        <ReportModal
+          type="card"
+          targetId={card?.id || card?.slug || id}
+          targetName={card?.title || ''}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   )
 }

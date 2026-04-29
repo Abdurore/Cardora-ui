@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { sendAnonymousMessage, getPublicUser, getUserAnonCard } from '../lib/api.js'
+import { sendCardAnonymousMessage, getPublicUser, getUserAnonCard } from '../lib/api.js'
 
 const MAX_CHARS = 500
 
@@ -48,7 +48,8 @@ function AnonSend() {
             textColor: l?.card?.textColor || 'rgba(201,247,255,0.72)',
             accentColor: l?.theme?.accentColor || '#7ef7ff',
             fontFamily: l?.theme?.fontFamily || 'Playfair Display',
-            cardId: card?._id || card?.id || card?.slug || null,
+            // Store slug for the /cards/:slug/anonymous-message endpoint
+            cardSlug: card?.slug || card?.shareSlug || card?._id || card?.id || null,
           })
         } else {
           setCardStyleMissing(true)
@@ -66,14 +67,12 @@ function AnonSend() {
 
   const handleSend = async () => {
     if (!message.trim()) { setError('Write something before sending.'); return }
+    const slug = cardStyle?.cardSlug
+    if (!slug) { setError('This inbox isn\'t ready to receive messages yet.'); return }
     setError('')
     setIsSending(true)
     try {
-      await sendAnonymousMessage({
-        recipientUsername: username,
-        message: message.trim(),
-        cardId: cardStyle?.cardId || null,
-      })
+      await sendCardAnonymousMessage(slug, { content: message.trim() })
       setSent(true)
     } catch {
       setError('Something went wrong. Please try again.')

@@ -14,6 +14,12 @@ import {
   getAdminArtistApplications,
   acceptArtistApplication,
   banUser,
+  unbanUser,
+  setUserRole,
+  getAdminReports,
+  getModeratorActionLogs,
+  disableAdminTemplate,
+  approveBroadcastRequest,
   getAdminPackages,
   createAdminPackage,
   deleteAdminPackage,
@@ -44,7 +50,7 @@ import {
 import { mapTemplateToCard } from '../lib/backendMappers.js'
 import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
-const TABS = ['Overview', 'Users', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
+const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
 
 // Persist trim points locally (backend doesn't store startSec/endSec yet).
 // Keyed by track _id OR cloudinary URL so drafts survive before an ID is assigned.
@@ -176,6 +182,15 @@ function AdminDashboard() {
   const [banForm, setBanForm] = useState({ identifier: '', durationDays: 7, reason: '' })
   const [banConfirm, setBanConfirm] = useState(null) // { user, payload } | null
   const [banSubmitting, setBanSubmitting] = useState(false)
+  // Unban form
+  const [unbanIdentifier, setUnbanIdentifier] = useState('')
+  // Set role form
+  const [roleForm, setRoleForm] = useState({ identifier: '', role: 'moderator' })
+  // Reports
+  const [reports, setReports] = useState([])
+  const [reportFilter, setReportFilter] = useState({ type: '', status: 'open' })
+  // Moderator logs
+  const [modLogs, setModLogs] = useState([])
   // Broadcast message
   const [broadcastMessage, setBroadcastMessage] = useState('')
 
@@ -314,9 +329,21 @@ function AdminDashboard() {
           }
           break
         }
+        case 'Reports': {
+          const q = `type=${reportFilter.type}&status=${reportFilter.status}&page=1&limit=100`
+          const res = await getAdminReports(q)
+          setReports(res?.data?.reports || res?.reports || [])
+          break
+        }
         case 'Logs': {
-          const res = await getAdminActionLogs()
-          setLogs(res?.data?.logs || res?.logs || [])
+          const [adminLogsRes, modLogsRes] = await Promise.allSettled([
+            getAdminActionLogs(),
+            getModeratorActionLogs(),
+          ])
+          if (adminLogsRes.status === 'fulfilled')
+            setLogs(adminLogsRes.value?.data?.logs || adminLogsRes.value?.logs || [])
+          if (modLogsRes.status === 'fulfilled')
+            setModLogs(modLogsRes.value?.data?.logs || modLogsRes.value?.logs || [])
           break
         }
       }
@@ -376,6 +403,36 @@ function AdminDashboard() {
       setBanSubmitting(false)
     }
   }
+
+  const handleUnbanUser = async () => {
+    const id = unbanIdentifier.trim()
+    if (!id) { showMsg('User ID or username required', false); return }
+    if (!window.confirm(`Unban user "${id}"?`)) return
+    try {
+      await unbanUser({ userId: id })
+      showMsg(`User "${id}" unbanned.`)
+      setUnbanIdentifier('')
+      loadTabData('Users')
+    } catch (err) {
+      showMsg(err.message || 'Unban failed', false)
+    }
+  }
+
+  const handleSetRole = async () => {
+    const id = roleForm.identifier.trim()
+    if (!id) { showMsg('User ID or username required', false); return }
+    if (!window.confirm(`Set role "${roleForm.role}" for user "${id}"?`)) return
+    try {
+      await setUserRole({ userId: id, role: roleForm.role })
+      showMsg(`Role updated to "${roleForm.role}".`)
+      setRoleForm({ identifier: '', role: 'moderator' })
+      loadTabData('Users')
+    } catch (err) {
+      showMsg(err.message || 'Role update failed', false)
+    }
+  }
+
+  const handleLoadReports = () => loadTabData('Reports')
 
   const handleCreatePackage = async () => {
     if (!newPkg.name) { showMsg('Package name required', false); return }
@@ -878,6 +935,46 @@ function AdminDashboard() {
               </div>
             </div>
 
+            {/* Unban Form */}
+            <div className="admin-sub-section">
+              <h4>Unban User</h4>
+              <div className="admin-inline-form">
+                <label className="admin-field">
+                  <span>User ID or Username</span>
+                  <input
+                    placeholder="user id or username"
+                    value={unbanIdentifier}
+                    onChange={e => setUnbanIdentifier(e.target.value)}
+                  />
+                </label>
+                <button className="primary" type="button" onClick={handleUnbanUser}>Unban</button>
+              </div>
+            </div>
+
+            {/* Set Role Form */}
+            <div className="admin-sub-section">
+              <h4>Assign Role</h4>
+              <p className="admin-sub-hint">Assignable roles: <code>enterprise</code>, <code>moderator</code></p>
+              <div className="admin-inline-form">
+                <label className="admin-field">
+                  <span>User ID or Username</span>
+                  <input
+                    placeholder="user id or username"
+                    value={roleForm.identifier}
+                    onChange={e => setRoleForm(p => ({ ...p, identifier: e.target.value }))}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Role</span>
+                  <select value={roleForm.role} onChange={e => setRoleForm(p => ({ ...p, role: e.target.value }))}>
+                    <option value="moderator">Moderator</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </label>
+                <button className="primary" type="button" onClick={handleSetRole}>Set Role</button>
+              </div>
+            </div>
+
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
@@ -900,6 +997,67 @@ function AdminDashboard() {
                     </tr>
                   ))}
                   {users.length === 0 && <tr><td colSpan={5}>No users found.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* REPORTS */}
+        {activeTab === 'Reports' && !loading && (
+          <div className="admin-section">
+            <h3 className="admin-section-title">User Reports</h3>
+
+            <div className="admin-inline-form admin-reports-filters">
+              <label className="admin-field">
+                <span>Type</span>
+                <select value={reportFilter.type} onChange={e => { setReportFilter(p => ({ ...p, type: e.target.value })); }}>
+                  <option value="">All types</option>
+                  <option value="user">User</option>
+                  <option value="card">Card</option>
+                  <option value="template">Template</option>
+                </select>
+              </label>
+              <label className="admin-field">
+                <span>Status</span>
+                <select value={reportFilter.status} onChange={e => { setReportFilter(p => ({ ...p, status: e.target.value })); }}>
+                  <option value="open">Open</option>
+                  <option value="reviewed">Reviewed</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="dismissed">Dismissed</option>
+                </select>
+              </label>
+              <button className="primary" type="button" onClick={handleLoadReports}>Filter</button>
+            </div>
+
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Target ID</th>
+                    <th>Reason</th>
+                    <th>Details</th>
+                    <th>Reported by</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reports.map((rep, i) => (
+                    <tr key={rep.reportId || rep._id || i}>
+                      <td><span className={`admin-role-chip ${rep.type || 'user'}`}>{rep.type || '—'}</span></td>
+                      <td className="admin-cell-mono">{rep.targetId || '—'}</td>
+                      <td>{rep.reason || '—'}</td>
+                      <td className="admin-cell-details">{rep.details || '—'}</td>
+                      <td>{rep.reportedByUsername || rep.reportedById || '—'}</td>
+                      <td><span className={`admin-status-chip ${rep.status || 'open'}`}>{rep.status || 'open'}</span></td>
+                      <td>{rep.createdAt ? new Date(rep.createdAt).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                  {reports.length === 0 && (
+                    <tr><td colSpan={7} style={{ textAlign: 'center', opacity: 0.5 }}>No reports found.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -968,6 +1126,19 @@ function AdminDashboard() {
                             </button>
                           </>
                         )}
+                        <button
+                          type="button"
+                          className="admin-action-btn warn"
+                          onClick={async () => {
+                            const id = tpl.templateId || tpl.id
+                            if (!id) return
+                            if (!window.confirm(`Disable template "${tpl.title}"?`)) return
+                            try { await disableAdminTemplate(id); showMsg('Template disabled.'); loadTabData('Templates') }
+                            catch (err) { showMsg(err.message || 'Disable failed', false) }
+                          }}
+                        >
+                          Disable
+                        </button>
                         <button
                           type="button"
                           className="admin-action-btn reject"
@@ -1496,22 +1667,43 @@ function AdminDashboard() {
         {/* LOGS */}
         {activeTab === 'Logs' && !loading && (
           <div className="admin-section">
-            <h3 className="admin-section-title">Action Logs</h3>
+            <h3 className="admin-section-title">Admin Action Logs</h3>
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Admin</th><th>Action</th><th>Target</th><th>Date</th></tr>
+                  <tr><th>Actor</th><th>Role</th><th>Action</th><th>Status</th><th>Date</th></tr>
                 </thead>
                 <tbody>
                   {logs.map((log, i) => (
                     <tr key={log._id || i}>
-                      <td>{log.adminId || log.admin || '-'}</td>
-                      <td>{log.action || log.type || '-'}</td>
-                      <td>{log.targetId || log.target || '-'}</td>
-                      <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : '-'}</td>
+                      <td>{log.actorUsername || log.adminId || log.admin || '—'}</td>
+                      <td><span className={`admin-role-chip ${(log.actorRole || 'admin').toLowerCase()}`}>{log.actorRole || 'Admin'}</span></td>
+                      <td>{log.action || log.type || '—'}</td>
+                      <td>{log.statusCode ? <span className={log.statusCode < 400 ? 'admin-status-ok' : 'admin-status-err'}>{log.statusCode}</span> : '—'}</td>
+                      <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : '—'}</td>
                     </tr>
                   ))}
-                  {logs.length === 0 && <tr><td colSpan={4}>No logs yet.</td></tr>}
+                  {logs.length === 0 && <tr><td colSpan={5}>No admin logs yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="admin-section-title" style={{ marginTop: 32 }}>Moderator Action Logs</h3>
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Moderator</th><th>Action</th><th>Status</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                  {modLogs.map((log, i) => (
+                    <tr key={log._id || i}>
+                      <td>{log.actorUsername || log.moderatorId || log.actor || '—'}</td>
+                      <td>{log.action || log.type || '—'}</td>
+                      <td>{log.statusCode ? <span className={log.statusCode < 400 ? 'admin-status-ok' : 'admin-status-err'}>{log.statusCode}</span> : '—'}</td>
+                      <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                  {modLogs.length === 0 && <tr><td colSpan={4}>No moderator logs yet.</td></tr>}
                 </tbody>
               </table>
             </div>
