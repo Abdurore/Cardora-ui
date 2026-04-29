@@ -431,6 +431,50 @@ export async function banUser(payload) {
   return request('/admin/ban-user', { method: 'POST', auth: true, body: payload })
 }
 
+export async function unbanUser(payload) {
+  return request('/admin/unban-user', { method: 'POST', auth: true, body: payload })
+}
+
+export async function setUserRole(payload) {
+  return request('/admin/users/set-role', { method: 'POST', auth: true, body: payload })
+}
+
+export async function getAdminReports(query = 'page=1&limit=50') {
+  return request(`/admin/reports?${query}`, { auth: true })
+}
+
+export async function getPublicProfile(identifier) {
+  return request(`/users/${identifier}/profile`, { auth: true })
+}
+
+export async function submitBroadcastRequest(payload) {
+  return request('/admin/broadcast-requests', { method: 'POST', auth: true, body: payload })
+}
+
+export async function approveBroadcastRequest(requestId) {
+  return request(`/admin/broadcast-requests/${requestId}/approve`, { method: 'POST', auth: true })
+}
+
+export async function getModeratorActionLogs(query = 'page=1&limit=100') {
+  return request(`/admin/moderator-action-logs?${query}`, { auth: true })
+}
+
+export async function disableAdminTemplate(templateId) {
+  return request(`/admin/templates/${templateId}/disable`, { method: 'PATCH', auth: true })
+}
+
+export async function reportUser(targetId, reason, details = '') {
+  return request('/reports/users', { method: 'POST', auth: true, body: { targetId, reason, details } })
+}
+
+export async function reportCard(targetId, reason, details = '') {
+  return request('/reports/cards', { method: 'POST', auth: true, body: { targetId, reason, details } })
+}
+
+export async function reportTemplate(targetId, reason, details = '') {
+  return request('/reports/templates', { method: 'POST', auth: true, body: { targetId, reason, details } })
+}
+
 export async function createAdminPackage(payload) {
   return request('/admin/packages', { method: 'POST', auth: true, body: payload })
 }
@@ -457,6 +501,10 @@ export async function getAdminRedeemCodes(query = 'page=1&limit=50') {
 
 export async function disableAdminRedeemCode(code) {
   return request('/admin/redeem-codes/disable', { method: 'PATCH', auth: true, body: { code } })
+}
+
+export async function deleteAdminRedeemCode(code) {
+  return request('/admin/redeem-codes', { method: 'DELETE', auth: true, body: { code } })
 }
 
 export async function sendSeasonalReminder(payload) {
@@ -528,6 +576,38 @@ export async function createCardElite(payload) {
 
 export async function createCardAnonymous(payload) {
   return request('/create-card/anonymous', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardPollClassic(payload) {
+  return request('/create-card/poll/classic', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardPollElite(payload) {
+  return request('/create-card/poll/elite', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardChainClassic(payload) {
+  return request('/create-card/chain/classic', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardChainElite(payload) {
+  return request('/create-card/chain/elite', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardTriviaClassic(payload) {
+  return request('/create-card/trivia/classic', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardTriviaElite(payload) {
+  return request('/create-card/trivia/elite', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardAnonClassic(payload) {
+  return request('/create-card/anonymous/classic', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createCardAnonElite(payload) {
+  return request('/create-card/anonymous/elite', { method: 'POST', auth: true, body: payload })
 }
 
 export async function useCouponCreateCard(payload) {

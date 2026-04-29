@@ -13,10 +13,8 @@ import { defaultCardObject, resolveTemplateCardObject, musicPresets, getFontsFor
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
-import { dataUrlToBlob, uploadToCloudinary } from '../lib/cloudinary.js'
+import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { getMediaVideos, getMediaMusic } from '../lib/api.js'
-import html2canvas from 'html2canvas'
-import TemplatePreviewSnapshot from '../components/TemplatePreviewSnapshot.jsx'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
 import { getMusicPresetsForTier } from '../data/cardDefaults.js'
 import { getTierLimits } from '../lib/tierLimits.js'
@@ -198,20 +196,6 @@ function formatTime(seconds) {
   return `${mins}:${String(secs).padStart(2, '0')}`
 }
 
-function drawRoundedRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath()
-  ctx.moveTo(x + radius, y)
-  ctx.lineTo(x + width - radius, y)
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
-  ctx.lineTo(x + width, y + height - radius)
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-  ctx.lineTo(x + radius, y + height)
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
-  ctx.lineTo(x, y + radius)
-  ctx.quadraticCurveTo(x, y, x + radius, y)
-  ctx.closePath()
-}
-
 function wrapCanvasText(ctx, text, centerX, startY, maxWidth, lineHeight) {
   const words = String(text || '').split(/\s+/).filter(Boolean)
   if (!words.length) return
@@ -230,84 +214,6 @@ function wrapCanvasText(ctx, text, centerX, startY, maxWidth, lineHeight) {
   }
 
   if (line) ctx.fillText(line, centerX, currentY)
-}
-
-function generateTemplatePreviewDataUrl(cardObject) {
-  const canvas = document.createElement('canvas')
-  canvas.width = 900
-  canvas.height = 1200
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Could not create preview canvas.')
-
-  const palette = Array.isArray(cardObject.background?.colors) && cardObject.background.colors.length
-    ? cardObject.background.colors.slice(0, 3)
-    : ['#0d1b22', '#163543', '#091116']
-
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
-  gradient.addColorStop(0, palette[0] || '#0d1b22')
-  gradient.addColorStop(0.55, palette[1] || palette[0] || '#163543')
-  gradient.addColorStop(1, palette[2] || palette[1] || palette[0] || '#091116')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  const glow = ctx.createRadialGradient(canvas.width * 0.76, canvas.height * 0.18, 16, canvas.width * 0.76, canvas.height * 0.18, 320)
-  glow.addColorStop(0, 'rgba(255,255,255,0.22)')
-  glow.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = glow
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  const cardX = 78
-  const cardY = 124
-  const cardW = canvas.width - 156
-  const cardH = canvas.height - 248
-  drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 44)
-  ctx.fillStyle = 'rgba(7, 14, 18, 0.72)'
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)'
-  ctx.lineWidth = 2
-  ctx.stroke()
-
-  const accent = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH)
-  accent.addColorStop(0, 'rgba(126, 247, 255, 0.22)')
-  accent.addColorStop(1, 'rgba(255, 255, 255, 0.04)')
-  ctx.fillStyle = accent
-  drawRoundedRect(ctx, cardX + 18, cardY + 18, cardW - 36, cardH - 36, 34)
-  ctx.fill()
-
-  ctx.fillStyle = 'rgba(239, 252, 255, 0.88)'
-  ctx.font = '700 64px Georgia, serif'
-  ctx.textAlign = 'center'
-  const heading = cardObject.closedState?.headingText || cardObject.content?.heading || 'A beautiful moment is waiting.'
-  wrapCanvasText(ctx, heading, canvas.width / 2, 300, 520, 74)
-
-  ctx.fillStyle = 'rgba(220, 242, 247, 0.74)'
-  ctx.font = '400 32px Arial'
-  const body = cardObject.closedState?.bodyText || cardObject.content?.body || 'Tap to open a personalized Cardora experience.'
-  wrapCanvasText(ctx, body, canvas.width / 2, 520, 560, 44)
-
-  const buttonText = cardObject.closedState?.button?.text || 'Open'
-  const buttonShape = cardObject.closedState?.button?.shape || 'pill'
-  const buttonWidth = 320
-  const buttonHeight = 88
-  const buttonX = (canvas.width - buttonWidth) / 2
-  const buttonY = 880
-  const buttonRadius = buttonShape === 'square' ? 18 : buttonShape === 'sharp' ? 8 : 999
-  drawRoundedRect(ctx, buttonX, buttonY, buttonWidth, buttonHeight, buttonRadius)
-  ctx.fillStyle = 'rgba(126, 247, 255, 0.18)'
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(126, 247, 255, 0.35)'
-  ctx.lineWidth = 2
-  ctx.stroke()
-
-  ctx.fillStyle = '#f4fdff'
-  ctx.font = '700 30px Arial'
-  ctx.fillText(buttonText, canvas.width / 2, buttonY + 54)
-
-  ctx.fillStyle = 'rgba(220, 242, 247, 0.38)'
-  ctx.font = '600 20px Arial'
-  ctx.fillText('Cardora Template Preview', canvas.width / 2, canvas.height - 90)
-
-  return canvas.toDataURL('image/jpeg', 0.88)
 }
 
 
@@ -462,6 +368,9 @@ function CardStudio() {
   const [publishError, setPublishError] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishSuccess, setPublishSuccess] = useState(null) // { name, previewImage } | null
+  const [publishScreenshot, setPublishScreenshot] = useState(null) // { previewUrl, cloudUrl } | null
+  const [screenshotUploading, setScreenshotUploading] = useState(false)
+  const screenshotInputRef = useRef(null)
   const [emojiInput, setEmojiInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState(null) // { ok, slug?, message }
@@ -469,7 +378,6 @@ function CardStudio() {
   const [sendCopied, setSendCopied] = useState(false)
   const [sendEmail, setSendEmail] = useState('')
   const fileInputRef = useRef(null)
-  const previewSnapshotRef = useRef(null)
   const pendingUploadsRef = useRef(new Map()) // blobUrl → { file, type }
   const [isUploading, setIsUploading] = useState(false)
 
@@ -540,9 +448,34 @@ function CardStudio() {
 
   const c = cardObject
 
+  const handleScreenshotFile = async (file) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setPublishError('Please select an image file (PNG, JPG, or WebP).')
+      return
+    }
+    setPublishError('')
+    setScreenshotUploading(true)
+    const localPreview = URL.createObjectURL(file)
+    setPublishScreenshot({ previewUrl: localPreview, cloudUrl: null })
+    try {
+      const cloudUrl = await uploadToCloudinary(file, 'image')
+      setPublishScreenshot({ previewUrl: localPreview, cloudUrl })
+    } catch (err) {
+      setPublishError(err.message || 'Screenshot upload failed.')
+      setPublishScreenshot(null)
+    } finally {
+      setScreenshotUploading(false)
+    }
+  }
+
   const handlePublish = async () => {
     if (!publishForm.name.trim()) {
       setPublishError('Template name is required.')
+      return
+    }
+    if (!publishScreenshot?.cloudUrl) {
+      setPublishError('Please upload a screenshot of your card first.')
       return
     }
 
@@ -553,27 +486,7 @@ function CardStudio() {
       const flushedForPublish = await flushPendingUploads(cardObject)
       setCardObject(flushedForPublish)
 
-      let previewDataUrl
-      if (previewSnapshotRef.current) {
-        await new Promise((resolve) => requestAnimationFrame(() => resolve()))
-        const canvas = await html2canvas(previewSnapshotRef.current, {
-          backgroundColor: null,
-          scale: 1,
-          useCORS: true,
-          logging: false,
-        })
-        previewDataUrl = canvas.toDataURL('image/jpeg', 0.88)
-      } else {
-        previewDataUrl = generateTemplatePreviewDataUrl(flushedForPublish)
-      }
-      const previewBlob = dataUrlToBlob(previewDataUrl)
-      const uploadedPreviewImage = await uploadToCloudinary(previewBlob, 'image')
-      const previewImage = uploadedPreviewImage || flushedForPublish.media.images?.[0]?.url || flushedForPublish.background.imageUrl || ''
-
-      if (!previewImage) {
-        throw new Error('Could not generate a preview image for this template.')
-      }
-
+      const previewImage = publishScreenshot.cloudUrl
       const publishedType = studioType === 'moment' ? 'personal' : studioType
       const result = await publishTemplate?.({
         name: publishForm.name.trim(),
@@ -597,6 +510,7 @@ function CardStudio() {
       setShowPublish(false)
       setSavedState('Template submitted for review')
       setPublishSuccess({ name: publishForm.name.trim(), previewImage })
+      setPublishScreenshot(null)
     } catch (error) {
       setPublishError(error.message || 'Could not submit the template.')
     } finally {
@@ -2511,15 +2425,6 @@ function CardStudio() {
         </div>
       </div>
 
-      {/* Hidden snapshot for template publish preview */}
-      {isArtist && (
-        <TemplatePreviewSnapshot
-          ref={previewSnapshotRef}
-          cardObject={cardObject}
-          recipientName={currentUser?.name || ''}
-        />
-      )}
-
       {/* Preview Modal */}
       {showPreview && (
         <CardPreviewModal
@@ -2578,17 +2483,62 @@ function CardStudio() {
                 />
               </label>
             </div>
-            <div className="cs-publish-preview-note">
-              <span className="cs-publish-preview-note-icon">👁</span>
-              <span>A preview image will be generated automatically from your current card design.</span>
+
+            {/* Screenshot upload */}
+            <div className="cs-publish-screenshot-section">
+              <p className="cs-publish-field-label">
+                Preview Screenshot <span className="cs-publish-required">required</span>
+              </p>
+              <p className="cs-publish-screenshot-hint-text">
+                Open the card preview → take a screenshot → upload it here. This is what buyers see in the marketplace.
+              </p>
+              <input
+                ref={screenshotInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={e => handleScreenshotFile(e.target.files?.[0])}
+              />
+              <div
+                className={`cs-publish-screenshot-zone${publishScreenshot?.previewUrl ? ' has-image' : ''}${screenshotUploading ? ' uploading' : ''}`}
+                onClick={() => !screenshotUploading && screenshotInputRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); handleScreenshotFile(e.dataTransfer.files?.[0]) }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => e.key === 'Enter' && screenshotInputRef.current?.click()}
+              >
+                {screenshotUploading ? (
+                  <div className="cs-publish-screenshot-state">
+                    <div className="chat-loading-spinner" style={{ width: 22, height: 22 }} />
+                    <span>Uploading…</span>
+                  </div>
+                ) : publishScreenshot?.previewUrl ? (
+                  <div className="cs-publish-screenshot-state cs-publish-screenshot-done">
+                    <img src={publishScreenshot.previewUrl} alt="Preview" className="cs-publish-screenshot-thumb" />
+                    <div className="cs-publish-screenshot-overlay">
+                      {publishScreenshot.cloudUrl
+                        ? <span>✓ Uploaded — click to replace</span>
+                        : <span>Processing…</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="cs-publish-screenshot-state">
+                    <span className="cs-publish-screenshot-icon">📸</span>
+                    <span className="cs-publish-screenshot-label">Click or drag to upload</span>
+                    <span className="cs-publish-screenshot-sub">PNG, JPG, or WebP — any size</span>
+                  </div>
+                )}
+              </div>
             </div>
+
             {publishError ? <p className="form-error">{publishError}</p> : null}
             <div className="cs-publish-actions">
               <button
                 type="button"
                 className="cs-nav-btn publish cs-publish-submit-btn"
                 onClick={handlePublish}
-                disabled={isPublishing}
+                disabled={isPublishing || screenshotUploading || !publishScreenshot?.cloudUrl}
               >
                 {isPublishing ? 'Submitting…' : 'Submit for Review →'}
               </button>

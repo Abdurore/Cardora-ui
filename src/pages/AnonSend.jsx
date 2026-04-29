@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { sendAnonymousMessage, getPublicUser, getUserAnonCard } from '../lib/api.js'
+import { sendCardAnonymousMessage, getPublicUser, getUserAnonCard } from '../lib/api.js'
 
 const MAX_CHARS = 500
 
@@ -13,6 +13,8 @@ function AnonSend() {
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [recipientNotFound, setRecipientNotFound] = useState(false)
+  const [cardStyleMissing, setCardStyleMissing] = useState(false)
 
   useEffect(() => {
     if (!username) return
@@ -24,6 +26,11 @@ function AnonSend() {
           userRes.status === 'fulfilled' && userRes.value
             ? userRes.value?.user || userRes.value?.data?.user || userRes.value
             : null
+        if (!u) {
+          setRecipientNotFound(true)
+          setLoading(false)
+          return
+        }
         setRecipient({
           name: u?.username || u?.name || username,
           avatarUrl: u?.profilePictureUrl || u?.avatarUrl || '',
@@ -41,8 +48,11 @@ function AnonSend() {
             textColor: l?.card?.textColor || 'rgba(201,247,255,0.72)',
             accentColor: l?.theme?.accentColor || '#7ef7ff',
             fontFamily: l?.theme?.fontFamily || 'Playfair Display',
-            cardId: card?._id || card?.id || card?.slug || null,
+            // Store slug for the /cards/:slug/anonymous-message endpoint
+            cardSlug: card?.slug || card?.shareSlug || card?._id || card?.id || null,
           })
+        } else {
+          setCardStyleMissing(true)
         }
         setLoading(false)
       },
@@ -57,20 +67,34 @@ function AnonSend() {
 
   const handleSend = async () => {
     if (!message.trim()) { setError('Write something before sending.'); return }
+    const slug = cardStyle?.cardSlug
+    if (!slug) { setError('This inbox isn\'t ready to receive messages yet.'); return }
     setError('')
     setIsSending(true)
     try {
-      await sendAnonymousMessage({
-        recipientUsername: username,
-        message: message.trim(),
-        cardId: cardStyle?.cardId || null,
-      })
+      await sendCardAnonymousMessage(slug, { content: message.trim() })
       setSent(true)
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
       setIsSending(false)
     }
+  }
+
+  if (!loading && recipientNotFound) {
+    return (
+      <div className="anon-page" style={{ '--anon-bg': '#07111a', '--anon-accent': '#7ef7ff' }}>
+        <div className="anon-page-bg" />
+        <div className="anon-sent-card" style={{ borderColor: '#7ef7ff22' }}>
+          <div className="anon-sent-glyph" style={{ color: '#7ef7ff' }}>?</div>
+          <h2 style={{ color: '#e9fbff' }}>User not found</h2>
+          <p style={{ color: 'rgba(201,247,255,0.7)' }}>
+            The inbox link you followed doesn't belong to an active Cardora account.
+          </p>
+          <Link className="anon-footer-link" to="/">Go to Cardora</Link>
+        </div>
+      </div>
+    )
   }
 
   if (sent) {
@@ -121,6 +145,11 @@ function AnonSend() {
         </div>
 
         <div className="anon-card-frame" style={{ background: bg, borderColor: `${accent}1a` }}>
+          {cardStyleMissing && (
+            <p className="anon-style-note" style={{ color: `${accent}80` }}>
+              @{recipient?.name || username} hasn't set up a custom inbox card yet — using default styling.
+            </p>
+          )}
           {(heading || body) && (
             <div className="anon-card-frame-copy">
               {heading && (

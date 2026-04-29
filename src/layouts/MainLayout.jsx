@@ -29,6 +29,14 @@ import {
   createCardPremium,
   createCardElite,
   createCardAnonymous,
+  createCardPollClassic,
+  createCardPollElite,
+  createCardChainClassic,
+  createCardChainElite,
+  createCardTriviaClassic,
+  createCardTriviaElite,
+  createCardAnonClassic,
+  createCardAnonElite,
   deleteCard as apiDeleteCard,
   getUserCards,
   claimDailyFreeCoupon,
@@ -542,18 +550,33 @@ function MainLayout() {
       if (chain) payload.chain = chain
       if (trivia) payload.trivia = trivia
 
-      // Route to the correct tier-specific endpoint
+      // Route to the correct type+tier endpoint.
+      // poll/trivia/chain/anonymous only have classic and elite tiers — if
+      // premium is requested for these types we promote to elite.
       let response
       const resolvedTier = (tier || 'classic').toLowerCase()
-      if (resolvedType === 'anonymous' || anonTemplate) {
+      if (resolvedType === 'poll') {
+        response = resolvedTier === 'elite'
+          ? await createCardPollElite(payload)
+          : await createCardPollClassic(payload)
+      } else if (resolvedType === 'chain') {
+        response = resolvedTier === 'elite'
+          ? await createCardChainElite(payload)
+          : await createCardChainClassic(payload)
+      } else if (resolvedType === 'trivia') {
+        response = resolvedTier === 'elite'
+          ? await createCardTriviaElite(payload)
+          : await createCardTriviaClassic(payload)
+      } else if (resolvedType === 'anonymous' || anonTemplate) {
         payload.anonTemplate = anonTemplate
-        response = await createCardAnonymous(payload)
-      } else if (resolvedTier === 'elite') {
-        response = await createCardElite(payload)
-      } else if (resolvedTier === 'premium') {
-        response = await createCardPremium(payload)
+        response = resolvedTier === 'classic'
+          ? await createCardAnonClassic(payload)
+          : await createCardAnonElite(payload)
       } else {
-        response = await createCardClassic(payload)
+        // personal / moment — all three tiers supported
+        if (resolvedTier === 'elite') response = await createCardElite(payload)
+        else if (resolvedTier === 'premium') response = await createCardPremium(payload)
+        else response = await createCardClassic(payload)
       }
 
       return { ok: true, data: response, message: getResponseMessage(response, 'Card created!') }

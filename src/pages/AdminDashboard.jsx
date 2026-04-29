@@ -14,14 +14,23 @@ import {
   getAdminArtistApplications,
   acceptArtistApplication,
   banUser,
+  unbanUser,
+  setUserRole,
+  getAdminReports,
+  getModeratorActionLogs,
+  disableAdminTemplate,
+  approveBroadcastRequest,
   getAdminPackages,
   createAdminPackage,
   deleteAdminPackage,
   getAdminRedeemCodes,
   createAdminRedeemCode,
+  disableAdminRedeemCode,
+  deleteAdminRedeemCode,
   getAdminAds,
   createAdminAd,
   updateAdminAd,
+  deleteAdminAd,
   getAdminAdsAnalytics,
   getAdminActionLogs,
   sendSeasonalReminder,
@@ -44,7 +53,25 @@ import {
 import { mapTemplateToCard } from '../lib/backendMappers.js'
 import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
-const TABS = ['Overview', 'Users', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
+const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
+
+// Persist trim points locally (backend doesn't store startSec/endSec yet).
+// Keyed by track _id OR cloudinary URL so drafts survive before an ID is assigned.
+const TRIM_STORE_KEY = 'cardora-music-trim'
+function readTrimStore() {
+  try { return JSON.parse(localStorage.getItem(TRIM_STORE_KEY) || '{}') } catch { return {} }
+}
+function writeTrimStore(store) {
+  try { localStorage.setItem(TRIM_STORE_KEY, JSON.stringify(store)) } catch {}
+}
+function mergeTrimData(tracks) {
+  const store = readTrimStore()
+  return tracks.map((t) => {
+    const key = t._id || t.id || t.url || t.audioUrl
+    const saved = key && store[key]
+    return saved ? { ...t, startSec: saved.startSec, endSec: saved.endSec } : t
+  })
+}
 
 function pickStatValue(...values) {
   for (const value of values) {
@@ -139,7 +166,9 @@ function AdminDashboard() {
   // New redeem code form
   const [newCode, setNewCode] = useState({ numberOfCC: 10, maxUses: 200, isActive: true })
   // New ad form
-  const [newAd, setNewAd] = useState({ name: '', type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+  const [newAd, setNewAd] = useState({ name: '', type: 'external', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1 })
+  // Broadcast subject
+  const [broadcastSubject, setBroadcastSubject] = useState('')
   const [adVideoUploading, setAdVideoUploading] = useState(false)
   const [adVideoDragOver, setAdVideoDragOver] = useState(false)
   const adVideoInputRef = useRef(null)
@@ -158,6 +187,15 @@ function AdminDashboard() {
   const [banForm, setBanForm] = useState({ identifier: '', durationDays: 7, reason: '' })
   const [banConfirm, setBanConfirm] = useState(null) // { user, payload } | null
   const [banSubmitting, setBanSubmitting] = useState(false)
+  // Unban form
+  const [unbanIdentifier, setUnbanIdentifier] = useState('')
+  // Set role form
+  const [roleForm, setRoleForm] = useState({ identifier: '', role: 'moderator' })
+  // Reports
+  const [reports, setReports] = useState([])
+  const [reportFilter, setReportFilter] = useState({ type: '', status: 'open' })
+  // Moderator logs
+  const [modLogs, setModLogs] = useState([])
   // Broadcast message
   const [broadcastMessage, setBroadcastMessage] = useState('')
 
@@ -288,16 +326,29 @@ function AdminDashboard() {
             setMediaVideos([])
           }
           if (musicRes.status === 'fulfilled') {
-            setMediaMusic(pickList(musicRes.value, 'music', 'tracks', 'items', 'media') || [])
+            const raw = pickList(musicRes.value, 'music', 'tracks', 'items', 'media') || []
+            setMediaMusic(mergeTrimData(raw))
           } else {
             console.warn('[Admin] /media/music failed', musicRes.reason)
             setMediaMusic([])
           }
           break
         }
+        case 'Reports': {
+          const q = `type=${reportFilter.type}&status=${reportFilter.status}&page=1&limit=100`
+          const res = await getAdminReports(q)
+          setReports(res?.data?.reports || res?.reports || [])
+          break
+        }
         case 'Logs': {
-          const res = await getAdminActionLogs()
-          setLogs(res?.data?.logs || res?.logs || [])
+          const [adminLogsRes, modLogsRes] = await Promise.allSettled([
+            getAdminActionLogs(),
+            getModeratorActionLogs(),
+          ])
+          if (adminLogsRes.status === 'fulfilled')
+            setLogs(adminLogsRes.value?.data?.logs || adminLogsRes.value?.logs || [])
+          if (modLogsRes.status === 'fulfilled')
+            setModLogs(modLogsRes.value?.data?.logs || modLogsRes.value?.logs || [])
           break
         }
       }
@@ -316,7 +367,7 @@ function AdminDashboard() {
     try {
       await acceptArtistApplication(appId)
       showMsg('Application accepted!')
-      loadTabData('Templates')
+      loadTabData('Artists')
     } catch (err) {
       showMsg(err.message || 'Failed', false)
     }
@@ -355,6 +406,81 @@ function AdminDashboard() {
       showMsg(err.message || 'Ban failed', false)
     } finally {
       setBanSubmitting(false)
+    }
+  }
+
+  const handleUnbanUser = async () => {
+    const id = unbanIdentifier.trim()
+    if (!id) { showMsg('User ID or username required', false); return }
+    if (!window.confirm(`Unban user "${id}"?`)) return
+    try {
+      await unbanUser({ userId: id })
+      showMsg(`User "${id}" unbanned.`)
+      setUnbanIdentifier('')
+      loadTabData('Users')
+    } catch (err) {
+      showMsg(err.message || 'Unban failed', false)
+    }
+  }
+
+  const handleSetRole = async () => {
+    const id = roleForm.identifier.trim()
+    if (!id) { showMsg('User ID or username required', false); return }
+    if (!window.confirm(`Set role "${roleForm.role}" for user "${id}"?`)) return
+    try {
+      await setUserRole({ userId: id, role: roleForm.role })
+      showMsg(`Role updated to "${roleForm.role}".`)
+      setRoleForm({ identifier: '', role: 'moderator' })
+      loadTabData('Users')
+    } catch (err) {
+      showMsg(err.message || 'Role update failed', false)
+    }
+  }
+
+  const handleLoadReports = async (overrides = {}) => {
+    const f = { ...reportFilter, ...overrides }
+    setLoading(true)
+    try {
+      const q = `type=${f.type}&status=${f.status}&page=1&limit=100`
+      const res = await getAdminReports(q)
+      setReports(res?.data?.reports || res?.reports || [])
+    } catch (err) {
+      console.error('Reports load failed', err)
+    }
+    setLoading(false)
+  }
+
+  const handleDeleteAd = async (ad) => {
+    if (!window.confirm(`Delete ad "${ad.name || 'this ad'}"? This cannot be undone.`)) return
+    const id = ad._id || ad.id
+    try {
+      await deleteAdminAd(id)
+      showMsg('Ad deleted.')
+      setAds(prev => prev.filter(a => (a._id || a.id) !== id))
+    } catch (err) {
+      showMsg(err.message || 'Delete failed.', false)
+    }
+  }
+
+  const handleDisableCode = async (code) => {
+    if (!window.confirm(`Disable code "${code.code}"?`)) return
+    try {
+      await disableAdminRedeemCode(code.code)
+      showMsg('Code disabled.')
+      loadTabData('Codes')
+    } catch (err) {
+      showMsg(err.message || 'Disable failed.', false)
+    }
+  }
+
+  const handleDeleteCode = async (code) => {
+    if (!window.confirm(`Delete code "${code.code}"? This cannot be undone.`)) return
+    try {
+      await deleteAdminRedeemCode(code.code)
+      showMsg('Code deleted.')
+      setRedeemCodes(prev => prev.filter(c => c.code !== code.code))
+    } catch (err) {
+      showMsg(err.message || 'Delete failed.', false)
     }
   }
 
@@ -433,9 +559,13 @@ function AdminDashboard() {
   const handleCreateAd = async () => {
     if (!newAd.videoUrl) { showMsg('Video URL required — please upload a video.', false); return }
     try {
-      await createAdminAd(newAd)
+      const payload = { ...newAd }
+      if (!payload.linkUrl) delete payload.linkUrl
+      if (!payload.maxViews) delete payload.maxViews
+      else payload.maxViews = Number(payload.maxViews)
+      await createAdminAd(payload)
       showMsg('Ad created!')
-      setNewAd({ name: '', type: 'external', videoUrl: '', rewardCC: 2, duration: 30, isActive: true, priority: 1 })
+      setNewAd({ name: '', type: 'external', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1 })
       if (adVideoInputRef.current) adVideoInputRef.current.value = ''
       loadTabData('Ads')
     } catch (err) {
@@ -445,13 +575,12 @@ function AdminDashboard() {
 
   const handleBroadcast = async () => {
     if (!broadcastMessage.trim()) { showMsg('Message cannot be empty.', false); return }
+    if (!broadcastSubject.trim()) { showMsg('Subject line is required.', false); return }
     try {
-      // /admin/broadcast-message route returns 404 — backend never deployed it.
-      // Reuse the working /admin/send-seasonal-reminder endpoint which already
-      // handles "send a custom message to all users" semantics.
-      await sendSeasonalReminder({ message: broadcastMessage.trim() })
+      await sendSeasonalReminder({ subject: broadcastSubject.trim(), message: broadcastMessage.trim() })
       showMsg('Broadcast sent to all users!')
       setBroadcastMessage('')
+      setBroadcastSubject('')
     } catch (err) {
       showMsg(err.message || 'Failed', false)
     }
@@ -504,7 +633,7 @@ function AdminDashboard() {
       }
       if (musicRes.status === 'fulfilled') {
         const list = pickList(musicRes.value, 'music', 'tracks', 'items', 'media')
-        if (list !== null) setMediaMusic(list)
+        if (list !== null) setMediaMusic(mergeTrimData(list))
       } else {
         console.warn('[Admin] getMediaMusic failed', musicRes.reason)
       }
@@ -578,6 +707,14 @@ function AdminDashboard() {
       const startSec = Number(draft.startSec || 0)
       const endSec = Number(draft.endSec || 0)
       const trimmed = endSec > 0 && (startSec > 0 || endSec < Number(draft.duration || 0) - 0.5)
+      // Persist trim points keyed by URL so they survive the round-trip to the
+      // backend (which doesn't store startSec/endSec yet). After refresh the
+      // mergeTrimData pass reattaches them using the same URL key.
+      if (trimmed && draft.url) {
+        const store = readTrimStore()
+        store[draft.url] = { startSec, endSec }
+        writeTrimStore(store)
+      }
       await uploadMediaMusic({
         name: draft.name,
         url: draft.url,
@@ -585,7 +722,7 @@ function AdminDashboard() {
       })
       showMsg(
         trimmed
-          ? 'Track added — trim is local only until the backend supports startSec/endSec.'
+          ? 'Track added — trim will apply in the studio.'
           : 'Track added to library!',
       )
       setMusicDraft(null)
@@ -662,19 +799,25 @@ function AdminDashboard() {
       return
     }
     try {
-      // Backend POST validator accepts only { name, url, duration:int } and
-      // rejects startSec/endSec — assume the same is true for PATCH until the
-      // schema is extended. Send only the safe fields.
+      // Backend validator currently rejects startSec/endSec. Persist them in
+      // localStorage and reattach via mergeTrimData on every list refresh.
+      const store = readTrimStore()
+      store[id] = {
+        startSec: Number(updated.startSec || 0),
+        endSec: Number(updated.endSec || 0),
+      }
+      // Also key by URL so the entry survives if the id changes (edge case).
+      const url = updated.url || updated.audioUrl
+      if (url) store[url] = store[id]
+      writeTrimStore(store)
       await updateMediaMusic(id, {
         name: updated.name,
         duration: Math.round(Number(updated.duration || 0)),
       })
-      // Keep trim metadata in the local record so the studio picker can still
-      // use it during this session. (It won't survive a page reload.)
       setMediaMusic((prev) =>
         prev.map((t) => ((t._id || t.id) === id ? { ...t, ...updated } : t)),
       )
-      showMsg('Track saved (trim metadata is local-only until backend supports it).')
+      showMsg('Track saved.')
       refreshMediaSilent()
     } catch (err) {
       console.error('[Admin] updateMediaMusic failed', err)
@@ -799,8 +942,15 @@ function AdminDashboard() {
             {/* Broadcast Message */}
             <div className="admin-sub-section">
               <h4>Send Message to All Users</h4>
-              <p className="admin-section-note">This will notify every registered user with your message.</p>
+              <p className="admin-section-note">This will email every registered user. Both subject and message are required.</p>
               <div className="admin-broadcast-form">
+                <input
+                  className="admin-broadcast-subject"
+                  placeholder="Email subject line…"
+                  value={broadcastSubject}
+                  onChange={e => setBroadcastSubject(e.target.value)}
+                  maxLength={150}
+                />
                 <textarea
                   className="admin-broadcast-textarea"
                   placeholder="Write your message to all users…"
@@ -811,7 +961,7 @@ function AdminDashboard() {
                 />
                 <div className="admin-broadcast-footer">
                   <span className="admin-broadcast-count">{broadcastMessage.length}/500</span>
-                  <button className="primary" type="button" onClick={handleBroadcast} disabled={!broadcastMessage.trim()}>
+                  <button className="primary" type="button" onClick={handleBroadcast} disabled={!broadcastMessage.trim() || !broadcastSubject.trim()}>
                     Send to All
                   </button>
                 </div>
@@ -845,6 +995,46 @@ function AdminDashboard() {
               </div>
             </div>
 
+            {/* Unban Form */}
+            <div className="admin-sub-section">
+              <h4>Unban User</h4>
+              <div className="admin-inline-form">
+                <label className="admin-field">
+                  <span>User ID or Username</span>
+                  <input
+                    placeholder="user id or username"
+                    value={unbanIdentifier}
+                    onChange={e => setUnbanIdentifier(e.target.value)}
+                  />
+                </label>
+                <button className="primary" type="button" onClick={handleUnbanUser}>Unban</button>
+              </div>
+            </div>
+
+            {/* Set Role Form */}
+            <div className="admin-sub-section">
+              <h4>Assign Role</h4>
+              <p className="admin-sub-hint">Assignable roles: <code>enterprise</code>, <code>moderator</code></p>
+              <div className="admin-inline-form">
+                <label className="admin-field">
+                  <span>User ID or Username</span>
+                  <input
+                    placeholder="user id or username"
+                    value={roleForm.identifier}
+                    onChange={e => setRoleForm(p => ({ ...p, identifier: e.target.value }))}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Role</span>
+                  <select value={roleForm.role} onChange={e => setRoleForm(p => ({ ...p, role: e.target.value }))}>
+                    <option value="moderator">Moderator</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </label>
+                <button className="primary" type="button" onClick={handleSetRole}>Set Role</button>
+              </div>
+            </div>
+
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
@@ -854,19 +1044,122 @@ function AdminDashboard() {
                     <th>Role</th>
                     <th>CC</th>
                     <th>Verified</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(user => (
-                    <tr key={user._id || user.id}>
-                      <td>{user.username || user.name}</td>
-                      <td>{user.email}</td>
-                      <td><span className={`admin-role-chip ${(user.role || 'user').toLowerCase()}`}>{user.role || 'User'}</span></td>
-                      <td>{user.cc ?? user.balance ?? 0}</td>
-                      <td>{user.isVerified ? 'Yes' : 'No'}</td>
+                  {users.map(user => {
+                    const uid = user._id || user.id
+                    const uname = user.username || user.name || uid
+                    return (
+                      <tr key={uid}>
+                        <td>{uname}</td>
+                        <td>{user.email}</td>
+                        <td><span className={`admin-role-chip ${(user.role || 'user').toLowerCase()}`}>{user.role || 'User'}</span></td>
+                        <td>{user.cc ?? user.balance ?? 0}</td>
+                        <td>{user.isVerified ? 'Yes' : 'No'}</td>
+                        <td style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            type="button"
+                            className="admin-action-btn reject"
+                            onClick={() => {
+                              setBanForm(p => ({ ...p, identifier: uname }))
+                              openBanConfirm()
+                            }}
+                          >
+                            Ban
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-action-btn approve"
+                            onClick={async () => {
+                              if (!window.confirm(`Unban "${uname}"?`)) return
+                              try { await unbanUser({ userId: uid || uname }); showMsg(`"${uname}" unbanned.`); loadTabData('Users') }
+                              catch (err) { showMsg(err.message || 'Failed', false) }
+                            }}
+                          >
+                            Unban
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {users.length === 0 && <tr><td colSpan={6}>No users found.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* REPORTS */}
+        {activeTab === 'Reports' && !loading && (
+          <div className="admin-section">
+            <h3 className="admin-section-title">User Reports</h3>
+
+            <div className="admin-inline-form admin-reports-filters">
+              <label className="admin-field">
+                <span>Type</span>
+                <select
+                  value={reportFilter.type}
+                  onChange={e => {
+                    const val = e.target.value
+                    setReportFilter(p => ({ ...p, type: val }))
+                    handleLoadReports({ type: val })
+                  }}
+                >
+                  <option value="">All types</option>
+                  <option value="user">User</option>
+                  <option value="card">Card</option>
+                  <option value="template">Template</option>
+                </select>
+              </label>
+              <label className="admin-field">
+                <span>Status</span>
+                <select
+                  value={reportFilter.status}
+                  onChange={e => {
+                    const val = e.target.value
+                    setReportFilter(p => ({ ...p, status: val }))
+                    handleLoadReports({ status: val })
+                  }}
+                >
+                  <option value="open">Open</option>
+                  <option value="reviewed">Reviewed</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="dismissed">Dismissed</option>
+                </select>
+              </label>
+              <button className="primary" type="button" onClick={() => handleLoadReports()}>Refresh</button>
+            </div>
+
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Target ID</th>
+                    <th>Reason</th>
+                    <th>Details</th>
+                    <th>Reported by</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reports.map((rep, i) => (
+                    <tr key={rep.reportId || rep._id || i}>
+                      <td><span className={`admin-role-chip ${rep.type || 'user'}`}>{rep.type || '—'}</span></td>
+                      <td className="admin-cell-mono">{rep.targetId || '—'}</td>
+                      <td>{rep.reason || '—'}</td>
+                      <td className="admin-cell-details">{rep.details || '—'}</td>
+                      <td>{rep.reportedByUsername || rep.reportedById || '—'}</td>
+                      <td><span className={`admin-status-chip ${rep.status || 'open'}`}>{rep.status || 'open'}</span></td>
+                      <td>{rep.createdAt ? new Date(rep.createdAt).toLocaleDateString() : '—'}</td>
                     </tr>
                   ))}
-                  {users.length === 0 && <tr><td colSpan={5}>No users found.</td></tr>}
+                  {reports.length === 0 && (
+                    <tr><td colSpan={7} style={{ textAlign: 'center', opacity: 0.5 }}>No reports found.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -935,6 +1228,19 @@ function AdminDashboard() {
                             </button>
                           </>
                         )}
+                        <button
+                          type="button"
+                          className="admin-action-btn warn"
+                          onClick={async () => {
+                            const id = tpl.templateId || tpl.id
+                            if (!id) return
+                            if (!window.confirm(`Disable template "${tpl.title}"?`)) return
+                            try { await disableAdminTemplate(id); showMsg('Template disabled.'); loadTabData('Templates') }
+                            catch (err) { showMsg(err.message || 'Disable failed', false) }
+                          }}
+                        >
+                          Disable
+                        </button>
                         <button
                           type="button"
                           className="admin-action-btn reject"
@@ -1101,18 +1407,41 @@ function AdminDashboard() {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Code</th><th>CC</th><th>Uses</th><th>Active</th></tr>
+                  <tr><th>Code</th><th>CC</th><th>Uses</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {redeemCodes.map(code => (
                     <tr key={code._id || code.code}>
-                      <td><code>{code.code}</code></td>
+                      <td>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <code>{code.code}</code>
+                          <button
+                            type="button"
+                            className="admin-action-btn"
+                            style={{ padding: '2px 7px', fontSize: '0.65rem' }}
+                            onClick={() => navigator.clipboard?.writeText(code.code).then(() => showMsg('Copied!'))}
+                            title="Copy code"
+                          >
+                            Copy
+                          </button>
+                        </span>
+                      </td>
                       <td>{code.numberOfCC}</td>
-                      <td>{code.usedCount ?? 0}/{code.maxUses ?? 'Unlimited'}</td>
-                      <td>{code.isActive ? 'Yes' : 'No'}</td>
+                      <td>{code.usedCount ?? 0}/{code.maxUses ?? '∞'}</td>
+                      <td>{code.isActive !== false ? 'Active' : 'Inactive'}</td>
+                      <td style={{ display: 'flex', gap: 4 }}>
+                        {code.isActive !== false && (
+                          <button type="button" className="admin-action-btn warn" onClick={() => handleDisableCode(code)}>
+                            Disable
+                          </button>
+                        )}
+                        <button type="button" className="admin-action-btn reject" onClick={() => handleDeleteCode(code)}>
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
-                  {redeemCodes.length === 0 && <tr><td colSpan={4}>No codes.</td></tr>}
+                  {redeemCodes.length === 0 && <tr><td colSpan={5}>No codes.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -1191,6 +1520,14 @@ function AdminDashboard() {
                   <input type="number" placeholder="30" value={newAd.duration} onChange={e => setNewAd(p => ({ ...p, duration: Number(e.target.value) }))} />
                 </label>
                 <label className="admin-field">
+                  <span>CTA Link URL <small>(optional — shown as a button after the ad)</small></span>
+                  <input type="url" placeholder="https://example.com" value={newAd.linkUrl} onChange={e => setNewAd(p => ({ ...p, linkUrl: e.target.value }))} />
+                </label>
+                <label className="admin-field">
+                  <span>Max Views <small>(optional — ad auto-disables when reached)</small></span>
+                  <input type="number" placeholder="unlimited" value={newAd.maxViews} onChange={e => setNewAd(p => ({ ...p, maxViews: e.target.value }))} />
+                </label>
+                <label className="admin-field">
                   <span>Display Priority (higher = shown first)</span>
                   <input type="number" placeholder="1" value={newAd.priority} onChange={e => setNewAd(p => ({ ...p, priority: Number(e.target.value) }))} />
                 </label>
@@ -1221,7 +1558,7 @@ function AdminDashboard() {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Name</th><th>Type</th><th>Reward</th><th>Duration</th><th>Active</th><th>Actions</th></tr>
+                  <tr><th>Name</th><th>Type</th><th>Reward</th><th>Duration</th><th>Views</th><th>CTA</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {ads.map(ad => (
@@ -1230,15 +1567,20 @@ function AdminDashboard() {
                       <td>{ad.type}</td>
                       <td>{ad.rewardCC} CC</td>
                       <td>{ad.duration}s</td>
+                      <td>{ad.currentViews ?? 0}{ad.maxViews ? `/${ad.maxViews}` : ''}</td>
+                      <td>{ad.linkUrl ? <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7ef7ff', fontSize: '0.75rem' }}>Link</a> : '—'}</td>
                       <td>{ad.isActive ? 'Yes' : 'No'}</td>
-                      <td>
+                      <td style={{ display: 'flex', gap: 4 }}>
                         <button type="button" className="admin-action-btn approve" onClick={() => handleToggleAd(ad)}>
                           {ad.isActive ? 'Disable' : 'Enable'}
+                        </button>
+                        <button type="button" className="admin-action-btn reject" onClick={() => handleDeleteAd(ad)}>
+                          Delete
                         </button>
                       </td>
                     </tr>
                   ))}
-                  {ads.length === 0 && <tr><td colSpan={5}>No ads.</td></tr>}
+                  {ads.length === 0 && <tr><td colSpan={8}>No ads.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -1463,22 +1805,43 @@ function AdminDashboard() {
         {/* LOGS */}
         {activeTab === 'Logs' && !loading && (
           <div className="admin-section">
-            <h3 className="admin-section-title">Action Logs</h3>
+            <h3 className="admin-section-title">Admin Action Logs</h3>
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Admin</th><th>Action</th><th>Target</th><th>Date</th></tr>
+                  <tr><th>Actor</th><th>Role</th><th>Action</th><th>Status</th><th>Date</th></tr>
                 </thead>
                 <tbody>
                   {logs.map((log, i) => (
                     <tr key={log._id || i}>
-                      <td>{log.adminId || log.admin || '-'}</td>
-                      <td>{log.action || log.type || '-'}</td>
-                      <td>{log.targetId || log.target || '-'}</td>
-                      <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : '-'}</td>
+                      <td>{log.actorUsername || log.adminId || log.admin || '—'}</td>
+                      <td><span className={`admin-role-chip ${(log.actorRole || 'admin').toLowerCase()}`}>{log.actorRole || 'Admin'}</span></td>
+                      <td>{log.action || log.type || '—'}</td>
+                      <td>{log.statusCode ? <span className={log.statusCode < 400 ? 'admin-status-ok' : 'admin-status-err'}>{log.statusCode}</span> : '—'}</td>
+                      <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : '—'}</td>
                     </tr>
                   ))}
-                  {logs.length === 0 && <tr><td colSpan={4}>No logs yet.</td></tr>}
+                  {logs.length === 0 && <tr><td colSpan={5}>No admin logs yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="admin-section-title" style={{ marginTop: 32 }}>Moderator Action Logs</h3>
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Moderator</th><th>Action</th><th>Status</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                  {modLogs.map((log, i) => (
+                    <tr key={log._id || i}>
+                      <td>{log.actorUsername || log.moderatorId || log.actor || '—'}</td>
+                      <td>{log.action || log.type || '—'}</td>
+                      <td>{log.statusCode ? <span className={log.statusCode < 400 ? 'admin-status-ok' : 'admin-status-err'}>{log.statusCode}</span> : '—'}</td>
+                      <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                  {modLogs.length === 0 && <tr><td colSpan={4}>No moderator logs yet.</td></tr>}
                 </tbody>
               </table>
             </div>

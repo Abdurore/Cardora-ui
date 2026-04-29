@@ -247,8 +247,9 @@ function mix(a, b, weight) {
 
 function parseHex(hex) {
   if (typeof hex !== 'string') return null
-  const m = hex.replace('#', '').match(/^([0-9a-f]{6})$/i)
-  if (!m) return null
-  const n = parseInt(m[1], 16)
+  let h = hex.replace('#', '')
+  if (/^[0-9a-f]{3}$/i.test(h)) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]
+  if (!/^[0-9a-f]{6}$/i.test(h)) return null
+  const n = parseInt(h, 16)
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
 }
