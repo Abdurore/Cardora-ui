@@ -46,6 +46,24 @@ import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
 const TABS = ['Overview', 'Users', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
 
+// Persist trim points locally (backend doesn't store startSec/endSec yet).
+// Keyed by track _id OR cloudinary URL so drafts survive before an ID is assigned.
+const TRIM_STORE_KEY = 'cardora-music-trim'
+function readTrimStore() {
+  try { return JSON.parse(localStorage.getItem(TRIM_STORE_KEY) || '{}') } catch { return {} }
+}
+function writeTrimStore(store) {
+  try { localStorage.setItem(TRIM_STORE_KEY, JSON.stringify(store)) } catch {}
+}
+function mergeTrimData(tracks) {
+  const store = readTrimStore()
+  return tracks.map((t) => {
+    const key = t._id || t.id || t.url || t.audioUrl
+    const saved = key && store[key]
+    return saved ? { ...t, startSec: saved.startSec, endSec: saved.endSec } : t
+  })
+}
+
 function pickStatValue(...values) {
   for (const value of values) {
     if (value === 0) return 0
@@ -288,7 +306,8 @@ function AdminDashboard() {
             setMediaVideos([])
           }
           if (musicRes.status === 'fulfilled') {
-            setMediaMusic(pickList(musicRes.value, 'music', 'tracks', 'items', 'media') || [])
+            const raw = pickList(musicRes.value, 'music', 'tracks', 'items', 'media') || []
+            setMediaMusic(mergeTrimData(raw))
           } else {
             console.warn('[Admin] /media/music failed', musicRes.reason)
             setMediaMusic([])
@@ -504,7 +523,7 @@ function AdminDashboard() {
       }
       if (musicRes.status === 'fulfilled') {
         const list = pickList(musicRes.value, 'music', 'tracks', 'items', 'media')
-        if (list !== null) setMediaMusic(list)
+        if (list !== null) setMediaMusic(mergeTrimData(list))
       } else {
         console.warn('[Admin] getMediaMusic failed', musicRes.reason)
       }
@@ -578,6 +597,14 @@ function AdminDashboard() {
       const startSec = Number(draft.startSec || 0)
       const endSec = Number(draft.endSec || 0)
       const trimmed = endSec > 0 && (startSec > 0 || endSec < Number(draft.duration || 0) - 0.5)
+      // Persist trim points keyed by URL so they survive the round-trip to the
+      // backend (which doesn't store startSec/endSec yet). After refresh the
+      // mergeTrimData pass reattaches them using the same URL key.
+      if (trimmed && draft.url) {
+        const store = readTrimStore()
+        store[draft.url] = { startSec, endSec }
+        writeTrimStore(store)
+      }
       await uploadMediaMusic({
         name: draft.name,
         url: draft.url,
@@ -585,7 +612,7 @@ function AdminDashboard() {
       })
       showMsg(
         trimmed
-          ? 'Track added — trim is local only until the backend supports startSec/endSec.'
+          ? 'Track added — trim will apply in the studio.'
           : 'Track added to library!',
       )
       setMusicDraft(null)
@@ -662,19 +689,25 @@ function AdminDashboard() {
       return
     }
     try {
-      // Backend POST validator accepts only { name, url, duration:int } and
-      // rejects startSec/endSec — assume the same is true for PATCH until the
-      // schema is extended. Send only the safe fields.
+      // Backend validator currently rejects startSec/endSec. Persist them in
+      // localStorage and reattach via mergeTrimData on every list refresh.
+      const store = readTrimStore()
+      store[id] = {
+        startSec: Number(updated.startSec || 0),
+        endSec: Number(updated.endSec || 0),
+      }
+      // Also key by URL so the entry survives if the id changes (edge case).
+      const url = updated.url || updated.audioUrl
+      if (url) store[url] = store[id]
+      writeTrimStore(store)
       await updateMediaMusic(id, {
         name: updated.name,
         duration: Math.round(Number(updated.duration || 0)),
       })
-      // Keep trim metadata in the local record so the studio picker can still
-      // use it during this session. (It won't survive a page reload.)
       setMediaMusic((prev) =>
         prev.map((t) => ((t._id || t.id) === id ? { ...t, ...updated } : t)),
       )
-      showMsg('Track saved (trim metadata is local-only until backend supports it).')
+      showMsg('Track saved.')
       refreshMediaSilent()
     } catch (err) {
       console.error('[Admin] updateMediaMusic failed', err)

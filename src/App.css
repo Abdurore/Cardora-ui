@@ -14007,6 +14007,15 @@ a {
 
 .anon-char-count.warn { color: rgba(255,160,80,0.8); }
 
+.anon-style-note {
+  font-size: 0.78rem;
+  padding: 6px 10px;
+  margin: 0 0 12px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
 .anon-error {
   font-size: 0.82rem;
   color: rgba(255,100,100,0.9);
