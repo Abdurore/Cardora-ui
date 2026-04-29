@@ -463,6 +463,14 @@ export async function disableAdminTemplate(templateId) {
   return request(`/admin/templates/${templateId}/disable`, { method: 'PATCH', auth: true })
 }
 
+export async function getEnterpriseAdStats() {
+  return request('/ads/enterprise-stats', { auth: true })
+}
+
+export async function getAdminTemplatesLookup(query = '') {
+  return request(`/admin/templates/lookup?${query}`, { auth: true })
+}
+
 export async function reportUser(targetId, reason, details = '') {
   return request('/reports/users', { method: 'POST', auth: true, body: { targetId, reason, details } })
 }

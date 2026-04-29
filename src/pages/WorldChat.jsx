@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useOutletContext, useNavigate } from 'react-router-dom'
+import { useOutletContext, useNavigate, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
-import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import { getWorldChat, API_BASE } from '../lib/api.js'
 import { mapChatMessage } from '../lib/backendMappers.js'
@@ -193,22 +192,37 @@ function WorldChat() {
 
   return (
     <div className="page-body chat-page">
-      <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
       <div className="screen-body chat-body">
         <div className="chat-header-bar">
-          <div>
+          <Link to="/" className="chat-header-brand">
+            <img src="/cardora-logo.png?v=4" alt="Cardora" className="chat-header-logo" />
+            <span className="chat-header-wordmark">Cardora</span>
+          </Link>
+
+          <div className="chat-header-center">
             <p className="eyebrow">Community</p>
             <h2 className="chat-title">World Chat</h2>
+            <div className="chat-header-meta">
+              {onlineCount > 0 && (
+                <span className="chat-online-count">{onlineCount} online</span>
+              )}
+              <span className={`chat-status ${connected ? 'online' : 'offline'}`}>
+                <span className={`chat-status-dot ${!connected ? 'pulse' : ''}`} />
+                {connected ? 'Live' : 'Reconnecting…'}
+              </span>
+            </div>
           </div>
-          <div className="chat-header-right">
-            {onlineCount > 0 && (
-              <span className="chat-online-count">{onlineCount} online</span>
-            )}
-            <span className={`chat-status ${connected ? 'online' : 'offline'}`}>
-              <span className={`chat-status-dot ${!connected ? 'pulse' : ''}`} />
-              {connected ? 'Live' : 'Reconnecting…'}
-            </span>
-          </div>
+
+          {currentUser ? (
+            <Link to="/profile" className="chat-header-profile">
+              {currentUser.avatarUrl
+                ? <img src={currentUser.avatarUrl} alt="" className="chat-header-avatar" />
+                : <span className="chat-header-avatar-initial">{(currentUser.name || 'U')[0]}</span>}
+              <span className="chat-header-balance">◈ {balance}</span>
+            </Link>
+          ) : (
+            <button type="button" className="primary chat-header-signin" onClick={openAuthModal}>Sign in</button>
+          )}
         </div>
 
         {/* Offline banner */}

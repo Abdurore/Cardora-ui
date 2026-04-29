@@ -5,6 +5,8 @@ const ROLE_MAP = {
   artist: 'Artist',
   creator: 'User',
   user: 'User',
+  moderator: 'Moderator',
+  enterprise: 'Enterprise',
 }
 
 function capitalize(value = '') {

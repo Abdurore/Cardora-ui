@@ -8,6 +8,8 @@ import StoreGifts from './pages/StoreGifts.jsx'
 import CardView from './pages/CardView.jsx'
 import CardStudio from './pages/CardStudio.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
+import ModeratorDashboard from './pages/ModeratorDashboard.jsx'
+import EnterpriseDashboard from './pages/EnterpriseDashboard.jsx'
 import WorldChat from './pages/WorldChat.jsx'
 import AuthPage from './pages/AuthPage.jsx'
 import LegalPage from './pages/LegalPage.jsx'
@@ -27,6 +29,8 @@ function App() {
         <Route path="/studio" element={<CardStudio />} />
         <Route path="/create" element={<CreateCardPicker />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/moderator" element={<ModeratorDashboard />} />
+        <Route path="/enterprise" element={<EnterpriseDashboard />} />
         <Route path="/chat" element={<WorldChat />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
