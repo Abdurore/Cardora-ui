@@ -8568,6 +8568,16 @@ a {
   z-index: 0;
 }
 
+.cp-backdrop.animated {
+  animation: cpGradientShift 8s ease infinite;
+}
+
+@keyframes cpGradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .cp-backdrop-video {
   position: absolute;
   inset: 0;

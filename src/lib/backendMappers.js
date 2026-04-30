@@ -340,12 +340,14 @@ export function cardObjectToLayoutData(cardObject) {
       .filter(Boolean)
   }
 
-  // Ensure numbers where backend expects numbers
+  // Normalise textBodyAnimation values to numbers (0 = disabled).
+  // Backend expects numbers; FE stores 'none' for "off" or a numeric string for speed.
   if (layout.card?.textBodyAnimation) {
-    const fade = layout.card.textBodyAnimation.fadeInDuration
-    if (fade !== 'none' && fade !== undefined) {
-      layout.card.textBodyAnimation.fadeInDuration = Number(fade) || 0
-    }
+    const ta = layout.card.textBodyAnimation
+    ta.fadeInDuration = ta.fadeInDuration === 'none' || ta.fadeInDuration == null
+      ? 0 : Number(ta.fadeInDuration) || 0
+    ta.selfTypeSpeed = ta.selfTypeSpeed === 'none' || ta.selfTypeSpeed == null
+      ? 0 : Number(ta.selfTypeSpeed) || 0
   }
 
   return layout
