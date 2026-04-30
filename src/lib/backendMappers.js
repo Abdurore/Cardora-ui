@@ -472,8 +472,10 @@ export function cardObjectToBackendPayload(cardObject) {
     : undefined
 
   // ── enhancements.questions: Q&A array attached to a card
-  const questions = Array.isArray(cardObject.questions) && cardObject.questions.length
-    ? cardObject.questions
+  // cardObject.questions is { items: [...], button: {...}, denyBehavior }
+  // Only the items array belongs in enhancements; button/denyBehavior are visual/FE-only.
+  const questions = Array.isArray(cardObject.questions?.items) && cardObject.questions.items.length
+    ? cardObject.questions.items
     : undefined
 
   // Build the payload. Always include `media` (as empty array if no images)
