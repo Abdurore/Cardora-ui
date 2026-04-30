@@ -290,7 +290,7 @@ function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const { currentUser, publishTemplate, createCardOnBackend, refreshBalance, balance } = useOutletContext() || {}
+  const { currentUser, publishTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal } = useOutletContext() || {}
   // Read card type and tier from location state (set by CreateCardPicker)
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
@@ -555,7 +555,6 @@ function CardStudio() {
     if (!currentUser) return
     if (tierCost > 0 && (balance ?? 0) < tierCost) {
       setSendResult({ ok: false, message: `You need ${tierCost} CC to send this card. Your balance: ${balance ?? 0} CC.` })
-      setShowSendModal(true)
       return
     }
     setIsSending(true)
@@ -587,12 +586,13 @@ function CardStudio() {
       // Backend returns a unique slug per created card — check every possible shape
       const d = result.data || {}
       const slug =
-        d.card?.slug || d.card?.shareSlug || d.card?.cardId || d.card?._id ||
-        d.slug || d.shareSlug || d.cardId || d._id ||
-        d.data?.card?.slug || d.data?.slug || d.data?.cardId || d.data?._id ||
+        d.card?.slug || d.card?.shareSlug || d.card?.cardId || d.card?._id || d.card?.id ||
+        d.slug || d.shareSlug || d.cardId || d._id || d.id ||
+        d.data?.card?.slug || d.data?.slug || d.data?.cardId || d.data?._id || d.data?.id ||
+        d.renderModel?.slug || d.renderModel?.card?.slug ||
         ''
       if (!slug) {
-        console.warn('Card created but no slug returned. Response shape:', d)
+        console.warn('Card created but no slug returned. Response shape:', JSON.stringify(d))
       }
       setSendResult({ ok: true, slug, message: result.message })
       refreshBalance?.()
@@ -603,12 +603,13 @@ function CardStudio() {
 
   const handleSendClick = async () => {
     if (!currentUser) {
-      // Show a simple auth notice — open auth modal if available via context
-      alert('Please sign in to send a card.')
+      openAuthModal?.()
       return
     }
-    await handleSend()
+    // Open modal immediately so the user sees a loading state, then fill it with the result.
+    setSendResult(null)
     setShowSendModal(true)
+    await handleSend()
   }
 
   const handleSave = () => {
@@ -2619,37 +2620,45 @@ function CardStudio() {
             <div className="cs-send-modal-header">
               <div className="cs-send-modal-header-left">
                 <span className="cs-send-modal-eyebrow">{TYPE_LABEL[studioType] || 'Personal Card'} · {tierLabel}</span>
-                <h3>{sendResult?.ok ? 'Your card is ready to share!' : 'Share Your Card'}</h3>
+                <h3>{sendResult?.ok ? 'Your card is ready to share!' : isSending ? 'Creating your card…' : 'Share Your Card'}</h3>
               </div>
               <button
                 type="button"
                 className="cs-send-modal-close"
                 aria-label="Close"
-                onClick={() => { setShowSendModal(false); setSendResult(null) }}
+                disabled={isSending}
+                onClick={() => { if (!isSending) { setShowSendModal(false); setSendResult(null) } }}
               >
                 ×
               </button>
             </div>
 
-            {sendResult?.ok && tierCost > 0 && (
+            {isSending && (
+              <div className="cs-send-loading">
+                <div className="chat-loading-spinner" />
+                <p>Uploading media and creating your card…</p>
+              </div>
+            )}
+
+            {!isSending && sendResult?.ok && tierCost > 0 && (
               <div className="cs-send-modal-cc-deducted">
                 <span className="cs-send-modal-cc-icon">✓</span>
                 <span><strong>{tierCost} CC</strong> deducted from your balance</span>
               </div>
             )}
-            {sendResult?.ok && tierCost === 0 && (
+            {!isSending && sendResult?.ok && tierCost === 0 && (
               <div className="cs-send-modal-cc-deducted free">
                 <span className="cs-send-modal-cc-icon">✓</span>
                 <span>Sent free — Classic tier</span>
               </div>
             )}
-            {!sendResult?.ok && (
-              <p className="cs-send-modal-note">
-                {sendResult?.message || `This card costs ${tierCost === 0 ? 'nothing (free)' : `${tierCost} CC`} to send.`}
+            {!isSending && !sendResult?.ok && sendResult !== null && (
+              <p className="cs-send-modal-note" style={{ color: '#ffb4b4' }}>
+                {sendResult.message || 'Something went wrong. Please try again.'}
               </p>
             )}
 
-            {sendResult?.ok && (
+            {!isSending && sendResult?.ok && (
               <div className="cs-send-link-wrap">
                 <p className="cs-send-link-label">Your unique card link</p>
                 {sendResult.slug ? (
@@ -2679,7 +2688,7 @@ function CardStudio() {
               </div>
             )}
 
-            {sendResult?.ok && sendResult?.slug && (
+            {!isSending && sendResult?.ok && sendResult?.slug && (
               <>
                 <p className="detail-share-label">Share via</p>
                 <div className="detail-share-platforms cs-send-modal-platforms">
@@ -2726,6 +2735,7 @@ function CardStudio() {
               </>
             )}
 
+            {!isSending && (
             <div className="cs-send-modal-email-row">
               <p className="cs-send-link-label">Send via Email</p>
               <div className="cs-send-modal-email-input-wrap">
@@ -2745,10 +2755,13 @@ function CardStudio() {
                 </a>
               </div>
             </div>
+            )}
 
+            {!isSending && (
             <p className="cs-send-modal-tier-note">
               {typeMeta.emoji} {TYPE_LABEL[studioType] || 'Card'} · {tierLabel} tier
             </p>
+            )}
           </div>
         </div>,
         document.body,
