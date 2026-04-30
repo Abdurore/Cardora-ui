@@ -529,25 +529,14 @@ function MainLayout() {
 
   const handleCreateCard = async (cardObject, { type, couponType, useCoupons, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
-      // Backend card engine uses 'personal' for the standard card type. 'moment'
-      // is still the internal studio id — normalise at the API boundary.
       const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : type
-      // Backend schema { type, tier, config, enhancements, state } — the FE
-      // splits the cardObject into all three sibling keys. If a field gets
-      // rejected under one bucket the validator error tells us which other
-      // bucket to move it to (and the helper updates in one place).
       const backendPayload = cardObjectToBackendPayload(cardObject)
-      // tier is encoded in the endpoint path (/create-card/elite etc.) and
-      // rejected as a top-level field by the validator. Spread only the
-      // buckets the helper actually populated (state/etc. omitted while
-      // backend shape is unknown).
+      const layoutdata = cardObjectToLayoutData(cardObject)
+
       const payload = {
         type: resolvedType,
         ...backendPayload,
-        // Send the full cardObject as layoutdata so the backend preserves all
-        // visual customizations (closedState, card border, animation effects,
-        // envelope design, music) and returns them to the recipient.
-        layoutdata: cardObjectToLayoutData(cardObject),
+        layoutdata,
       }
       if (couponType) payload.couponType = couponType
       if (useCoupons) payload.useCoupons = useCoupons
@@ -555,11 +544,28 @@ function MainLayout() {
       if (chain) payload.chain = chain
       if (trivia) payload.trivia = trivia
 
-      // Route to the correct type+tier endpoint.
-      // poll/trivia/chain/anonymous only have classic and elite tiers — if
-      // premium is requested for these types we promote to elite.
-      let response
       const resolvedTier = (tier || 'classic').toLowerCase()
+      const endpoint = resolvedType === 'poll'
+        ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+        : resolvedType === 'chain'
+          ? `/create-card/chain/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+          : resolvedType === 'trivia'
+            ? `/create-card/trivia/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+            : resolvedType === 'anonymous' || anonTemplate
+              ? `/create-card/anonymous/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+              : `/create-card/${resolvedTier}`
+
+      console.group(`%c[CardCreate] POST ${endpoint}`, 'color:#7ef7ff;font-weight:bold')
+      console.log('%cFull payload sent to backend:', 'color:#62ffa2;font-weight:bold', JSON.parse(JSON.stringify(payload)))
+      console.log('%clayoutdata only:', 'color:#ffcc80;font-weight:bold', JSON.parse(JSON.stringify(layoutdata)))
+      console.log('%cconfig only:', 'color:#a0b8ff;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.config)))
+      console.log('%cenhancements only:', 'color:#a0b8ff;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.enhancements)))
+      if (poll)   console.log('%cpoll:', 'color:#ff9bd2', poll)
+      if (trivia) console.log('%ctrivia:', 'color:#ff9bd2', trivia)
+      if (chain)  console.log('%cchain:', 'color:#ff9bd2', chain)
+      console.groupEnd()
+
+      let response
       if (resolvedType === 'poll') {
         response = resolvedTier === 'elite'
           ? await createCardPollElite(payload)
@@ -578,14 +584,20 @@ function MainLayout() {
           ? await createCardAnonClassic(payload)
           : await createCardAnonElite(payload)
       } else {
-        // personal / moment — all three tiers supported
         if (resolvedTier === 'elite') response = await createCardElite(payload)
         else if (resolvedTier === 'premium') response = await createCardPremium(payload)
         else response = await createCardClassic(payload)
       }
 
+      console.log('%c[CardCreate] ✓ Success response:', 'color:#62ffa2;font-weight:bold', response)
       return { ok: true, data: response, message: getResponseMessage(response, 'Card created!') }
     } catch (error) {
+      console.group('%c[CardCreate] ✗ Error', 'color:#ff6b6b;font-weight:bold')
+      console.error('message:', error.message)
+      console.error('status:', error.status)
+      console.error('payload (backend response body):', error.payload)
+      console.error('debug info:', error.debug)
+      console.groupEnd()
       return { ok: false, message: error.message || 'Card creation failed.' }
     }
   }
