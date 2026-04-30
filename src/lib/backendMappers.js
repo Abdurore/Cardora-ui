@@ -340,12 +340,14 @@ export function cardObjectToLayoutData(cardObject) {
       .filter(Boolean)
   }
 
-  // Ensure numbers where backend expects numbers
+  // Normalise textBodyAnimation values to numbers (0 = disabled).
+  // Backend expects numbers; FE stores 'none' for "off" or a numeric string for speed.
   if (layout.card?.textBodyAnimation) {
-    const fade = layout.card.textBodyAnimation.fadeInDuration
-    if (fade !== 'none' && fade !== undefined) {
-      layout.card.textBodyAnimation.fadeInDuration = Number(fade) || 0
-    }
+    const ta = layout.card.textBodyAnimation
+    ta.fadeInDuration = ta.fadeInDuration === 'none' || ta.fadeInDuration == null
+      ? 0 : Number(ta.fadeInDuration) || 0
+    ta.selfTypeSpeed = ta.selfTypeSpeed === 'none' || ta.selfTypeSpeed == null
+      ? 0 : Number(ta.selfTypeSpeed) || 0
   }
 
   return layout
@@ -472,8 +474,10 @@ export function cardObjectToBackendPayload(cardObject) {
     : undefined
 
   // ── enhancements.questions: Q&A array attached to a card
-  const questions = Array.isArray(cardObject.questions) && cardObject.questions.length
-    ? cardObject.questions
+  // cardObject.questions is { items: [...], button: {...}, denyBehavior }
+  // Only the items array belongs in enhancements; button/denyBehavior are visual/FE-only.
+  const questions = Array.isArray(cardObject.questions?.items) && cardObject.questions.items.length
+    ? cardObject.questions.items
     : undefined
 
   // Build the payload. Always include `media` (as empty array if no images)

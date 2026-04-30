@@ -125,8 +125,8 @@ function CardPreviewModal({
   const c = cardObject
   const hasQuestions = toolAllowed('questions') && limit('allowQuestions') && c.questions.items.length > 0
   const hasGift = toolAllowed('gifts') && limit('allowGifts') && c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
-  const hasFadeIn = toolAllowed('cardStyle') && limit('allowFadeIn') && c.card.textBodyAnimation.fadeInDuration !== 'none'
-  const hasTypewriter = toolAllowed('cardStyle') && limit('allowTypewriter') && c.card.textBodyAnimation.selfTypeSpeed !== 'none'
+  const hasFadeIn = toolAllowed('cardStyle') && limit('allowFadeIn') && Number(c.card.textBodyAnimation.fadeInDuration) > 0
+  const hasTypewriter = toolAllowed('cardStyle') && limit('allowTypewriter') && Number(c.card.textBodyAnimation.selfTypeSpeed) > 0
   const typeSpeed = hasTypewriter ? parseFloat(c.card.textBodyAnimation.selfTypeSpeed) || 2 : 2
   const fadeSpeed = hasFadeIn ? parseFloat(c.card.textBodyAnimation.fadeInDuration) || 2 : 0
   const mediaAllowed = toolAllowed('media') && maxImages > 0
@@ -268,8 +268,9 @@ function CardPreviewModal({
   const bgStyle = {}
   if (c.background.type === 'color') {
     bgStyle.background = c.background.colors[0] || '#000000'
-  } else if (c.background.type === 'gradient') {
+  } else if (c.background.type === 'gradient' || c.background.type === 'animated') {
     bgStyle.background = `linear-gradient(135deg, ${c.background.colors.join(', ')})`
+    if (c.background.type === 'animated') bgStyle.backgroundSize = '400% 400%'
   } else if (c.background.type === 'image' && c.background.imageUrl) {
     bgStyle.background = `url(${c.background.imageUrl}) center/cover no-repeat`
   }
@@ -396,7 +397,7 @@ function CardPreviewModal({
           </button>
         ))}
       </div>
-      <div className="cp-backdrop" style={bgStyle}>
+      <div className={`cp-backdrop${c.background.type === 'animated' ? ' animated' : ''}`} style={bgStyle}>
         {c.background.type === 'video' && c.background.videoUrl && limit('allowVideoBackground') ? (
           <video className="cp-backdrop-video" src={c.background.videoUrl} autoPlay muted loop playsInline />
         ) : null}
