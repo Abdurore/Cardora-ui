@@ -321,201 +321,354 @@ export function normalizeTemplatesResponse(payload) {
 }
 
 /* ═══════════════════════════════════════════════
-   CARD MAPPERS — Transform frontend cardObject
-   to/from backend layoutdata format
+   CARD MAPPERS — frontend cardObject ↔ backend payload
+   Source of truth: Backend API Handbook (README_21)
    ═══════════════════════════════════════════════ */
 
-/**
- * Transform frontend cardObject → backend layoutdata
- * Backend expects media.images as string[], frontend uses object[]
- */
-export function cardObjectToLayoutData(cardObject) {
-  if (!cardObject) return {}
-  const layout = structuredClone(cardObject)
-
-  // Transform media.images from [{url, caption, fit}] → string[]
-  if (layout.media?.images && Array.isArray(layout.media.images)) {
-    layout.media.images = layout.media.images
-      .map(img => typeof img === 'string' ? img : img?.url)
-      .filter(Boolean)
-  }
-
-  // Normalise textBodyAnimation values to numbers (0 = disabled).
-  // Backend expects numbers; FE stores 'none' for "off" or a numeric string for speed.
-  if (layout.card?.textBodyAnimation) {
-    const ta = layout.card.textBodyAnimation
-    ta.fadeInDuration = ta.fadeInDuration === 'none' || ta.fadeInDuration == null
-      ? 0 : Number(ta.fadeInDuration) || 0
-    ta.selfTypeSpeed = ta.selfTypeSpeed === 'none' || ta.selfTypeSpeed == null
-      ? 0 : Number(ta.selfTypeSpeed) || 0
-  }
-
-  return layout
-}
-
-/**
- * Split a full cardObject into the backend card-engine's three top-level
- * payload keys: { config, enhancements, state }.
- *
- * Schema rules learned so far (from validator errors):
- *   - top-level `tier` is NOT allowed (tier comes from the endpoint path)
- *   - config.colors must be an OBJECT, not an array — uses palette anchors
- *     { primary, surface, ink, accent }
- *   - enhancements.background only accepts { type } so far; `type` must be
- *     one of [color, video, animated]
- *   - enhancements.media must be an ARRAY of URL strings (not {images:[...]})
- *   - enhancements.animation rejects {openEffect, confettiColors, backgroundEffect}
- *     — backend uses different keys; we send {} until we know them
- *   - enhancements rejects: theme, card, closedState, giftEffect, previewImage,
- *     previewUrl — these have no bucket in the schema yet (FE-only)
- *
- * Anything FE-only is preserved in the cardObject for the studio preview but
- * not transmitted; the recipient's rendered card is reconstructed from
- * { colors, font, content, background.type, media, interaction, questions }.
- */
-
-// FE background.type → backend background.type
-const BG_TYPE_MAP = {
-  color: 'color',
-  video: 'video',
-  gradient: 'animated',
-  animated: 'animated',
-  image: 'color', // backend has no 'image' option; send a flat color as a fallback
-}
-
-// Backend custom validators sometimes reject short-hex (#fff) or rgb()/named
-// colors. Normalise everything to 7-char #rrggbb. Falls back to a sentinel
-// when input is unrecognisable.
+// Normalise short or non-standard hex → 7-char #rrggbb.
 function normaliseHex(input, fallback = '#76efff') {
   if (typeof input !== 'string') return fallback
   let v = input.trim().toLowerCase()
   if (!v.startsWith('#')) return fallback
-  if (v.length === 4) {
-    // #abc → #aabbcc
-    v = `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}`
-  }
+  if (v.length === 4) v = `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}`
   if (/^#[0-9a-f]{6}$/.test(v)) return v
   return fallback
 }
 
-export function cardObjectToBackendPayload(cardObject) {
-  // Backend `config.colors` schema (validator-confirmed):
-  //   background : string  (required)
-  //   gradient   : array of strings (required)
-  //   accent     : string  (required)
-  // Mapping from our palette anchors:
-  //   background ← palette.surface
-  //   gradient   ← background.colors[] from FE (gradient stops) or [primary, accent]
-  //   accent     ← palette.primary (the hero/eye-catching color)
-  const fallbackColors = {
-    background: '#0b0f12',
-    gradient: ['#76efff', '#62ffa2'],
-    accent: '#76efff',
+/**
+ * cardObjectToLayoutData — returns the layoutdata branch.
+ * Per the API handbook, layoutdata only carries paperTexture metadata.
+ * The backend forces layoutdata.tier to match the card's tier automatically.
+ */
+export function cardObjectToLayoutData() {
+  return {
+    paperTexture: {
+      type: 'none',
+      opacity: 0,
+      blendMode: 'normal',
+    },
   }
+}
+
+/**
+ * cardObjectToBackendPayload — transforms the frontend cardObject into the
+ * three backend payload branches: { config, enhancements, layoutdata }.
+ *
+ * Branch ownership (from API handbook):
+ *   config      → colors, font, type-specific content text
+ *   enhancements → visual FX: background, music, lock, ambientEffect,
+ *                  openEffect, media, animation
+ *   layoutdata  → paperTexture only (tier managed by backend)
+ *
+ * Tier gates (handbook):
+ *   classic → enhancements: {} (backend rejects non-default enhancements)
+ *   premium → background, lock, ambientEffect, animation
+ *             (NO music, video bg, openEffect, media)
+ *   elite   → full enhancement set
+ *
+ * @param {object} cardObject  Frontend card state
+ * @param {object} opts
+ * @param {string} opts.type   Card type: personal|poll|chain|trivia|anonymous
+ * @param {string} opts.tier   Card tier: classic|premium|elite
+ * @param {object} opts.poll   Poll state from CardStudio { question, options[] }
+ * @param {object} opts.trivia Trivia state { questions[{ text, options[], correctIndex }] }
+ * @param {object} opts.chain  Chain state { prompt, rules[] }
+ */
+export function cardObjectToBackendPayload(cardObject, {
+  type = 'personal',
+  tier = 'classic',
+  poll = null,
+  trivia = null,
+  chain = null,
+} = {}) {
+  const FB = { background: '#0b0f12', gradient: ['#76efff', '#62ffa2'], accent: '#76efff' }
+
   if (!cardObject) {
     return {
-      config: { colors: fallbackColors, font: 'Cinzel' },
+      config: { colors: FB, font: 'Cinzel', content: {} },
       enhancements: {},
-      state: {},
+      layoutdata: cardObjectToLayoutData(),
     }
   }
 
-  // ── config.colors (REQUIRED: { background, gradient[2], accent })
-  // All values must be valid 7-char hex strings; gradient[0] !== gradient[1].
+  const normalType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : type
+  const resolvedTier = (tier || 'classic').toLowerCase()
+
+  // ── config.colors
   const palette = cardObject.palette || {}
-  const feGradientStops = Array.isArray(cardObject.background?.colors)
-    ? cardObject.background.colors
-    : []
-  const rawStop1 =
-    feGradientStops[0] ||
-    palette.primary ||
-    cardObject.theme?.accentColor
-  const rawStop2 =
-    feGradientStops[feGradientStops.length - 1] ||
-    palette.accent ||
-    cardObject.theme?.headingColor
-  const stop1 = normaliseHex(rawStop1, fallbackColors.gradient[0])
-  let stop2 = normaliseHex(rawStop2, fallbackColors.gradient[1])
-  if (stop2 === stop1) stop2 = fallbackColors.gradient[1] === stop1 ? fallbackColors.gradient[0] : fallbackColors.gradient[1]
-  const gradient = [stop1, stop2]
+  const feColors = Array.isArray(cardObject.background?.colors) ? cardObject.background.colors : []
+  const raw1 = feColors[0] || palette.primary || cardObject.theme?.accentColor
+  const raw2 = feColors[feColors.length - 1] || palette.accent || cardObject.theme?.headingColor
+  const stop1 = normaliseHex(raw1, FB.gradient[0])
+  let stop2 = normaliseHex(raw2, FB.gradient[1])
+  if (stop2 === stop1) stop2 = FB.gradient[1] === stop1 ? FB.gradient[0] : FB.gradient[1]
 
   const colors = {
-    background: normaliseHex(
-      palette.surface || cardObject.card?.backgroundColor || feGradientStops[0],
-      fallbackColors.background,
-    ),
-    gradient,
-    accent: normaliseHex(
-      palette.primary || cardObject.theme?.accentColor || stop1,
-      fallbackColors.accent,
-    ),
+    background: normaliseHex(palette.surface || cardObject.card?.backgroundColor || feColors[0], FB.background),
+    gradient: [stop1, stop2],
+    accent: normaliseHex(palette.primary || cardObject.theme?.accentColor || stop1, FB.accent),
   }
   const font = cardObject.theme?.fontFamily || 'Cinzel'
 
-  // ── enhancements.media: ARRAY OF OBJECTS, each requires { url, type }.
-  // We only have image media on the FE today; type is always 'image'.
-  const mediaItems = Array.isArray(cardObject.media?.images)
-    ? cardObject.media.images
-        .map((img) => {
-          if (!img) return null
-          if (typeof img === 'string') return { url: img, type: 'image' }
-          if (img.url) return { url: img.url, type: img.type || 'image' }
-          return null
-        })
-        .filter(Boolean)
-    : []
-
-  // ── enhancements.background: only `type` is accepted right now
-  const bgType = BG_TYPE_MAP[cardObject.background?.type] || 'color'
-
-  // ── enhancements.interaction: lock, password, reveal behaviour
-  const interaction = cardObject.interaction && Object.keys(cardObject.interaction).length
-    ? cardObject.interaction
-    : undefined
-
-  // ── enhancements.questions: Q&A array attached to a card
-  // cardObject.questions is { items: [...], button: {...}, denyBehavior }
-  // Only the items array belongs in enhancements; button/denyBehavior are visual/FE-only.
-  const questions = Array.isArray(cardObject.questions?.items) && cardObject.questions.items.length
-    ? cardObject.questions.items
-    : undefined
-
-  // Build the payload. Always include `media` (as empty array if no images)
-  // since some schemas require the key to be present. Same for any other
-  // optional buckets — empty is safer than absent for strict validators.
-  const enhancements = {
-    background: { type: bgType },
-    media: mediaItems,
-  }
-  if (interaction) enhancements.interaction = interaction
-  if (questions)   enhancements.questions   = questions
-
-  const payload = {
-    config: {
-      colors,
-      font,
-      // content is REQUIRED. Send heading/body/extendedBody.
-      content: {
-        heading: cardObject.content?.heading || '',
-        body: cardObject.content?.body || '',
-        extendedBody: cardObject.content?.extendedBody || '',
+  // ── config.content (type-specific — handbook §7 "Canonical Field Ownership")
+  let content = {}
+  if (normalType === 'personal') {
+    const items = Array.isArray(cardObject.questions?.items) ? cardObject.questions.items : []
+    content = {
+      header: cardObject.content?.heading || '',
+      body: cardObject.content?.body || '',
+      questionBlock: {
+        enabled: items.length > 0,
+        question: items[0]?.text || '',
+        suspenseTexts: items.slice(1).map(q => q.text || '').filter(Boolean),
+        answerType: 'yes_no',
       },
-    },
-    enhancements,
+    }
+  } else if (normalType === 'poll' && poll) {
+    content = {
+      question: poll.question || '',
+      options: (poll.options || [])
+        .filter(o => String(o || '').trim())
+        .map((o, i) => ({
+          id: typeof o === 'object' ? (o.id || `opt_${i}`) : `opt_${i}`,
+          text: typeof o === 'string' ? o : (o.text || ''),
+        })),
+    }
+  } else if (normalType === 'chain') {
+    const c = chain || {}
+    content = {
+      challenge: c.prompt || c.challenge || '',
+      rules: Array.isArray(c.rules) ? c.rules : [],
+    }
+  } else if (normalType === 'trivia' && trivia) {
+    content = {
+      questions: (trivia.questions || []).map(q => ({
+        question: q.text || q.question || '',
+        options: Array.isArray(q.options) ? q.options : [],
+        correctIndex: q.correctIndex ?? 0,
+      })),
+    }
+  } else if (normalType === 'anonymous') {
+    content = {
+      message: cardObject.content?.body || cardObject.content?.heading || '',
+    }
   }
 
-  // Poll / trivia / chain data live at the top level of the card payload
-  // (alongside config + enhancements), not nested inside enhancements.
-  if (cardObject.poll    && cardObject.poll.question)    payload.poll    = cardObject.poll
-  if (cardObject.trivia  && cardObject.trivia.questions) payload.trivia  = cardObject.trivia
-  if (cardObject.chain   !== undefined)                  payload.chain   = cardObject.chain
+  // ── enhancements (handbook §7 enhancements spec)
+  // Classic cards send empty object — backend rejects non-default enhancements.
+  let enhancements = {}
 
-  return payload
+  if (resolvedTier !== 'classic') {
+    const isElite = resolvedTier === 'elite'
+
+    // Background type — video is elite-only; downgrade for premium
+    let bgType = cardObject.background?.type || 'color'
+    if (!isElite && (bgType === 'video' || bgType === 'image')) bgType = 'animated'
+    if (bgType === 'image') bgType = 'color'
+
+    // background.value: color hex for solid, video URL for video, '' for gradient/animated
+    let bgValue = ''
+    if (bgType === 'color') bgValue = normaliseHex(feColors[0] || colors.background, FB.background)
+    else if (bgType === 'video') bgValue = cardObject.background?.videoUrl || ''
+
+    enhancements = {
+      background: {
+        type: bgType,
+        value: bgValue,
+        videoSettings: {
+          blur: 0,
+          darkTint: bgType === 'video' ? 0.15 : 0,
+          tintLevel: 0,
+          tintColor: '',
+        },
+        gradientAnimation: {
+          enabled: bgType === 'animated',
+          duration: Number(cardObject.background?.animationDuration) || 8,
+        },
+      },
+      // lock.type: FE uses 'time', backend requires 'timer' (handbook Common AI Mistakes #3)
+      lock: {
+        type: (() => { const lt = cardObject.interaction?.lock?.type || 'none'; return lt === 'time' ? 'timer' : lt })(),
+        value: String(cardObject.interaction?.lock?.value || ''),
+      },
+      ambientEffect: {
+        type: cardObject.animation?.backgroundEffect?.type || 'none',
+        emojis: Array.isArray(cardObject.animation?.backgroundEffect?.emojis)
+          ? cardObject.animation.backgroundEffect.emojis : [],
+      },
+      animation: {
+        // Map FE text animations → card entry animation
+        entry: Number(cardObject.card?.textBodyAnimation?.selfTypeSpeed) > 0 ? 'slide'
+          : Number(cardObject.card?.textBodyAnimation?.fadeInDuration) > 0 ? 'fade'
+          : 'fade',
+        speed: (() => {
+          const sp = Number(cardObject.card?.textBodyAnimation?.selfTypeSpeed) || 0
+          const fd = Number(cardObject.card?.textBodyAnimation?.fadeInDuration) || 0
+          return sp > 0 ? sp : (fd > 0 ? fd : 1)
+        })(),
+      },
+    }
+
+    // Elite-only: music, openEffect, media
+    if (isElite) {
+      const music = cardObject.background?.music || {}
+      enhancements.music = {
+        track: music.url || '',
+        volume: typeof music.volume === 'number' ? music.volume : 0,
+      }
+
+      const cc = Array.isArray(cardObject.animation?.confettiColors) ? cardObject.animation.confettiColors : []
+      enhancements.openEffect = {
+        type: cardObject.animation?.openEffect || 'none',
+        colors: [cc[0] || '', cc[1] || '', cc[2] || ''],
+      }
+
+      enhancements.media = Array.isArray(cardObject.media?.images)
+        ? cardObject.media.images.map(img => {
+            const url = typeof img === 'string' ? img : img?.url
+            return url ? { type: 'image', url } : null
+          }).filter(Boolean)
+        : []
+    }
+  }
+
+  return {
+    config: { colors, font, content },
+    enhancements,
+    layoutdata: cardObjectToLayoutData(),
+  }
 }
 
-// Back-compat shim — older call sites still import the old name.
+// Back-compat shim.
 export function cardObjectToBackendConfig(cardObject) {
   return cardObjectToBackendPayload(cardObject).config
+}
+
+/**
+ * backendCardToCardObject — reconstructs a frontend cardObject from the backend
+ * card structure { config, enhancements, layoutdata } returned by GET /cards/:slug.
+ */
+export function backendCardToCardObject(card) {
+  if (!card) return backfillEnvelope(structuredClone(defaultCardObject))
+
+  const config = card.config || {}
+  const enhancements = card.enhancements || {}
+  const colors = config.colors || {}
+  const content = config.content || {}
+
+  const bgType = enhancements.background?.type || 'color'
+  const isVideo = bgType === 'video'
+  const bgColors = bgType === 'color'
+    ? [enhancements.background?.value || colors.background || '#0a0a0a']
+    : (colors.gradient?.length >= 2 ? [...colors.gradient] : ['#0a0a0a', '#1a1a2e'])
+
+  const entryAnim = enhancements.animation?.entry || 'fade'
+  const entrySpeed = Number(enhancements.animation?.speed) || 1
+
+  const lockType = (() => {
+    const lt = enhancements.lock?.type || 'none'
+    return lt === 'timer' ? 'time' : lt
+  })()
+
+  const accent = colors.accent || '#76efff'
+  const bgColor = colors.background || '#111111'
+  const fontFamily = config.font || 'Cinzel'
+
+  const questionItems = content.questionBlock?.enabled && content.questionBlock?.question
+    ? [
+        { text: content.questionBlock.question, id: 'q1', type: 'text', options: [] },
+        ...(content.questionBlock.suspenseTexts || []).map((t, i) => ({
+          text: t, id: `q${i + 2}`, type: 'text', options: [],
+        })),
+      ]
+    : []
+
+  return backfillEnvelope({
+    palette: null,
+    background: {
+      type: bgType,
+      colors: bgColors,
+      animationDuration: Number(enhancements.background?.gradientAnimation?.duration) || 2,
+      imageUrl: '',
+      videoUrl: isVideo ? (enhancements.background?.value || '') : '',
+      music: {
+        url: enhancements.music?.track || '',
+        isUploaded: false,
+        volume: typeof enhancements.music?.volume === 'number' ? enhancements.music.volume : 0.8,
+        startSec: 0,
+        endSec: 0,
+      },
+    },
+    theme: {
+      fontFamily,
+      headingSize: 28,
+      bodySize: 16,
+      accentColor: accent,
+      textColor: '#ffffff',
+      headingColor: '#ffffff',
+    },
+    card: {
+      backgroundColor: bgColor,
+      backgroundOpacity: 0,
+      textColor: '#ffffff',
+      headingColor: '#ffffff',
+      cardBorder: { type: 'solid', colors: [accent], width: 2, animationDuration: 2 },
+      scrollbarColor: accent,
+      textBodyAnimation: {
+        fadeInDuration: entryAnim === 'fade' ? entrySpeed : 0,
+        selfTypeSpeed: entryAnim === 'slide' ? entrySpeed : 0,
+      },
+    },
+    closedState: {
+      backgroundColor: bgColor,
+      borderColor: '#2b3142',
+      textColor: '#d7dbe5',
+      headingColor: '#ffffff',
+      headingFont: fontFamily,
+      headingText: content.header || 'You have a surprise',
+      bodyText: 'Someone special sent you something beautiful.',
+      button: {
+        text: 'Open',
+        backgroundColor: accent,
+        textColor: '#000000',
+        borderColor: accent,
+        shape: 'pill',
+      },
+      envelope: structuredClone(defaultCardObject.closedState.envelope),
+    },
+    animation: {
+      openEffect: enhancements.openEffect?.type || 'none',
+      confettiColors: (enhancements.openEffect?.colors || []).filter(Boolean),
+      backgroundEffect: {
+        type: enhancements.ambientEffect?.type || 'none',
+        emojis: enhancements.ambientEffect?.emojis || [],
+      },
+    },
+    media: {
+      images: (enhancements.media || []).map(m => ({
+        url: typeof m === 'string' ? m : (m?.url || ''),
+        caption: '',
+        fit: 'cover',
+        positionX: 50,
+        positionY: 50,
+      })),
+    },
+    interaction: {
+      lock: { type: lockType, value: enhancements.lock?.value || '' },
+      reveal: { type: 'tap', hint: '' },
+    },
+    content: {
+      heading: content.header || content.message || content.challenge || content.question || '',
+      body: content.body || content.message || '',
+      extendedBody: '',
+    },
+    questions: {
+      items: questionItems,
+      button: { textColor: '#ffffff', borderColor: accent, backgroundColor: bgColor },
+      denyBehavior: 'none',
+    },
+    giftEffect: { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '' },
+  })
 }
 
 /**
@@ -562,33 +715,42 @@ export function layoutDataToCardObject(layoutdata) {
 }
 
 /**
- * Map a backend card (from /usercards or /cards/:slug) to a frontend-usable shape
+ * Map a backend card (from /usercards or /cards/:slug) to a frontend-usable shape.
+ * Uses backendCardToCardObject to reconstruct from config+enhancements per API handbook.
  */
 export function mapBackendCard(card) {
   const slug = card.slug || card._id || card.cardId || ''
-  const layout = card.layoutdata || card.layoutData || {}
-  const content = layout.content || {}
+  const config = card.config || {}
+  const content = config.content || {}
+  const enhancements = card.enhancements || {}
 
-  const type = normaliseType(card.type || layout.type)
+  const type = normaliseType(card.type)
+  const tier = normaliseTier(card.tier || card.layoutdata?.tier)
+
+  const lockType = (() => {
+    const lt = enhancements.lock?.type || 'none'
+    return lt === 'timer' ? 'time' : lt
+  })()
+
   return {
     id: card.cardId || card._id || slug,
     slug,
-    title: card.title || content.heading || 'Untitled Card',
+    title: card.title || content.header || content.question || content.challenge || 'Untitled Card',
     subtitle: content.body || '',
-    message: content.body || '',
+    message: content.body || content.message || '',
     type,
     templateId: card.templateId || '',
-    tier: normaliseTier(findTier({ ...card, layoutConfig: layout, layoutdata: layout })),
+    tier,
     createdAt: card.createdAt || '',
-    poll: card.poll || null,
-    chain: card.chain || null,
-    trivia: card.trivia || null,
-    layoutdata: layout,
-    cardObject: layoutDataToCardObject(layout),
+    poll: content.question ? { question: content.question, options: content.options || [] } : null,
+    chain: content.challenge ? { challenge: content.challenge, rules: content.rules || [] } : null,
+    trivia: content.questions ? { questions: content.questions } : null,
+    layoutdata: card.layoutdata || {},
+    cardObject: backendCardToCardObject(card),
     tag: type === 'personal' ? '' : capitalize(type),
-    interaction: layout.interaction || {},
-    locked: layout.interaction?.lock?.type === 'password' || layout.interaction?.lock?.type === 'time',
-    lockType: layout.interaction?.lock?.type || 'none',
+    interaction: enhancements,
+    locked: lockType !== 'none',
+    lockType,
   }
 }
 
