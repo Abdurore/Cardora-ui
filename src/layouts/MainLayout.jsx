@@ -18,6 +18,7 @@ import {
   getTemplates,
   getUserCoupons,
   likeTemplate,
+  unlikeTemplate,
   login,
   logout,
   requestOtp,
@@ -57,7 +58,6 @@ import {
   normalizeTemplatesResponse,
   normalizeUserSession,
   cardObjectToBackendPayload,
-  cardObjectToLayoutData,
   mapBackendCard,
 } from '../lib/backendMappers.js'
 
@@ -260,8 +260,13 @@ function MainLayout() {
     if (!backendTemplate) return
     const templateId = backendTemplate.templateId || backendTemplate._id
     if (!templateId) return
+    const wasLiked = favorites.includes(cardId)
     try {
-      await likeTemplate(templateId)
+      if (wasLiked) {
+        await unlikeTemplate(templateId)
+      } else {
+        await likeTemplate(templateId)
+      }
     } catch (error) {
       console.error('Like sync failed', error)
     }
@@ -530,21 +535,26 @@ function MainLayout() {
   const handleCreateCard = async (cardObject, { type, couponType, useCoupons, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
       const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : type
-      const backendPayload = cardObjectToBackendPayload(cardObject)
-      const layoutdata = cardObjectToLayoutData(cardObject)
+      const resolvedTier = (tier || 'classic').toLowerCase()
+
+      // cardObjectToBackendPayload now returns { config, enhancements, layoutdata }
+      // per the API handbook — type-specific content goes inside config.content,
+      // not as separate top-level poll/chain/trivia fields.
+      const backendPayload = cardObjectToBackendPayload(cardObject, {
+        type: resolvedType,
+        tier: resolvedTier,
+        poll,
+        trivia,
+        chain,
+      })
 
       const payload = {
         type: resolvedType,
+        tier: resolvedTier,
         ...backendPayload,
-        layoutdata,
       }
       if (couponType) payload.couponType = couponType
       if (useCoupons) payload.useCoupons = useCoupons
-      if (poll) payload.poll = poll
-      if (chain) payload.chain = chain
-      if (trivia) payload.trivia = trivia
-
-      const resolvedTier = (tier || 'classic').toLowerCase()
       const endpoint = resolvedType === 'poll'
         ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
         : resolvedType === 'chain'
@@ -556,13 +566,10 @@ function MainLayout() {
               : `/create-card/${resolvedTier}`
 
       console.group(`%c[CardCreate] POST ${endpoint}`, 'color:#7ef7ff;font-weight:bold')
-      console.log('%cFull payload sent to backend:', 'color:#62ffa2;font-weight:bold', JSON.parse(JSON.stringify(payload)))
-      console.log('%clayoutdata only:', 'color:#ffcc80;font-weight:bold', JSON.parse(JSON.stringify(layoutdata)))
-      console.log('%cconfig only:', 'color:#a0b8ff;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.config)))
-      console.log('%cenhancements only:', 'color:#a0b8ff;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.enhancements)))
-      if (poll)   console.log('%cpoll:', 'color:#ff9bd2', poll)
-      if (trivia) console.log('%ctrivia:', 'color:#ff9bd2', trivia)
-      if (chain)  console.log('%cchain:', 'color:#ff9bd2', chain)
+      console.log('%cFull payload:', 'color:#62ffa2;font-weight:bold', JSON.parse(JSON.stringify(payload)))
+      console.log('%cconfig.content:', 'color:#ffcc80;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.config?.content)))
+      console.log('%cenhancements:', 'color:#a0b8ff;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.enhancements)))
+      console.log('%clayoutdata:', 'color:#a0b8ff;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.layoutdata)))
       console.groupEnd()
 
       let response
