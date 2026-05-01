@@ -16972,17 +16972,93 @@ a {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 32px 28px 24px;
-  border-radius: 24px;
+  gap: 0;
+  padding: 28px 24px 20px;
+  border-radius: 20px;
   border: 1px solid rgba(126, 247, 255, 0.18);
   background:
     radial-gradient(circle at 50% 0%, rgba(126, 247, 255, 0.08), transparent 60%),
     linear-gradient(180deg, rgba(10, 20, 28, 0.97), rgba(6, 14, 20, 0.99));
   box-shadow: 0 32px 64px rgba(0, 0, 0, 0.55);
-  min-width: 220px;
-  text-align: center;
+  width: min(340px, 90vw);
+}
+
+.chat-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.chat-profile-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.chat-profile-bio {
+  margin: 14px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(201, 230, 240, 0.7);
+  word-break: break-word;
+}
+
+.chat-profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.chat-profile-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: rgba(180, 210, 220, 0.55);
+}
+
+.chat-profile-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+}
+
+.chat-profile-skeleton-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+  background-size: 200% 100%;
+  animation: chatSkeletonShimmer 1.4s ease infinite;
+  flex-shrink: 0;
+}
+
+.chat-profile-skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.chat-profile-skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+  background-size: 200% 100%;
+  animation: chatSkeletonShimmer 1.4s ease infinite;
+}
+
+.chat-profile-skeleton-line.wide { width: 70%; }
+.chat-profile-skeleton-line.narrow { width: 45%; }
+
+@keyframes chatSkeletonShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .chat-profile-close {
@@ -17005,11 +17081,11 @@ a {
 }
 
 .chat-profile-avatar-wrap {
-  width: 72px;
-  height: 72px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   overflow: hidden;
-  margin-bottom: 4px;
+  flex-shrink: 0;
   border: 2px solid rgba(126, 247, 255, 0.2);
 }
 
@@ -17032,10 +17108,11 @@ a {
 }
 
 .chat-profile-name {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   color: #e2eaf0;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .chat-msg-avatar-btn {

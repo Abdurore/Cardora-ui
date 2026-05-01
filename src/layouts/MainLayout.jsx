@@ -18,6 +18,7 @@ import {
   getTemplates,
   getUserCoupons,
   likeTemplate,
+  unlikeTemplate,
   login,
   logout,
   requestOtp,
@@ -259,8 +260,13 @@ function MainLayout() {
     if (!backendTemplate) return
     const templateId = backendTemplate.templateId || backendTemplate._id
     if (!templateId) return
+    const wasLiked = favorites.includes(cardId)
     try {
-      await likeTemplate(templateId)
+      if (wasLiked) {
+        await unlikeTemplate(templateId)
+      } else {
+        await likeTemplate(templateId)
+      }
     } catch (error) {
       console.error('Like sync failed', error)
     }
