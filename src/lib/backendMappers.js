@@ -335,6 +335,16 @@ function normaliseHex(input, fallback = '#76efff') {
   return fallback
 }
 
+// Returns true when a hex color is light enough that dark text is needed.
+// Uses a fast perceived-luminance formula (same as WCAG relative luminance approx).
+function isLightColor(hex) {
+  const h = normaliseHex(hex, '#000000').replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16) / 255
+  const g = parseInt(h.slice(2, 4), 16) / 255
+  const b = parseInt(h.slice(4, 6), 16) / 255
+  return 0.299 * r + 0.587 * g + 0.114 * b > 0.55
+}
+
 /**
  * cardObjectToLayoutData — returns the layoutdata branch.
  * Per the API handbook, layoutdata only carries paperTexture metadata.
@@ -395,17 +405,25 @@ export function cardObjectToBackendPayload(cardObject, {
   const resolvedTier = (tier || 'classic').toLowerCase()
 
   // ── config.colors
+  // palette.primary = heading/border color (→ config.colors.accent + gradient[0])
+  // palette.accent  = UI highlight/seal/secondary (→ config.colors.gradient[1])
+  // palette.surface = dark card base (→ config.colors.background)
   const palette = cardObject.palette || {}
   const feColors = Array.isArray(cardObject.background?.colors) ? cardObject.background.colors : []
+
+  // Gradient stops: prefer explicit background.colors, fall back to palette anchors.
+  // Never use headingColor (a text colour) as a gradient stop.
   const raw1 = feColors[0] || palette.primary || cardObject.theme?.accentColor
-  const raw2 = feColors[feColors.length - 1] || palette.accent || cardObject.theme?.headingColor
+  const raw2 = feColors[feColors.length - 1] || palette.accent || FB.gradient[1]
   const stop1 = normaliseHex(raw1, FB.gradient[0])
   let stop2 = normaliseHex(raw2, FB.gradient[1])
   if (stop2 === stop1) stop2 = FB.gradient[1] === stop1 ? FB.gradient[0] : FB.gradient[1]
 
   const colors = {
-    background: normaliseHex(palette.surface || cardObject.card?.backgroundColor || feColors[0], FB.background),
+    // surface/dark base — never use a gradient stop as fallback here
+    background: normaliseHex(palette.surface || cardObject.card?.backgroundColor, FB.background),
     gradient: [stop1, stop2],
+    // primary accent (heading/border emphasis colour, = palette.primary)
     accent: normaliseHex(palette.primary || cardObject.theme?.accentColor || stop1, FB.accent),
   }
   const font = cardObject.theme?.fontFamily || 'Cinzel'
@@ -570,9 +588,19 @@ export function backendCardToCardObject(card) {
     return lt === 'timer' ? 'time' : lt
   })()
 
-  const accent = colors.accent || '#76efff'
+  // primaryAccent = palette.primary (heading/border/border-emphasis colour)
+  // uiAccent      = palette.accent  (buttons, seal, secondary highlight)
+  // These are stored as colors.accent and colors.gradient[1] respectively.
+  const primaryAccent = colors.accent || '#76efff'
+  const uiAccent = colors.gradient?.[1] || primaryAccent
   const bgColor = colors.background || '#111111'
   const fontFamily = config.font || 'Cinzel'
+
+  // Derive text / heading colour from background luminance so light-surface
+  // palettes (paper-ink, jade-parchment) don't render white text on cream.
+  const onLight = isLightColor(bgColor)
+  const baseTextColor = onLight ? '#1a1a1a' : '#ffffff'
+  const baseHeadingColor = onLight ? '#0a0a0a' : '#ffffff'
 
   const questionItems = content.questionBlock?.enabled && content.questionBlock?.question
     ? [
@@ -584,7 +612,15 @@ export function backendCardToCardObject(card) {
     : []
 
   return backfillEnvelope({
-    palette: null,
+    // Partial palette: enough for Studio color pickers to show the right values.
+    // id is null because we don't store palette.id through the backend.
+    palette: {
+      id: null,
+      surface: bgColor,
+      primary: primaryAccent,
+      accent: uiAccent,
+      ink: baseTextColor,
+    },
     background: {
       type: bgType,
       colors: bgColors,
@@ -603,17 +639,19 @@ export function backendCardToCardObject(card) {
       fontFamily,
       headingSize: 28,
       bodySize: 16,
-      accentColor: accent,
-      textColor: '#ffffff',
-      headingColor: '#ffffff',
+      // uiAccent = palette.accent (secondary highlight used for buttons/seal/emphasis)
+      accentColor: uiAccent,
+      textColor: baseTextColor,
+      headingColor: baseHeadingColor,
     },
     card: {
       backgroundColor: bgColor,
       backgroundOpacity: 0,
-      textColor: '#ffffff',
-      headingColor: '#ffffff',
-      cardBorder: { type: 'solid', colors: [accent], width: 2, animationDuration: 2 },
-      scrollbarColor: accent,
+      textColor: baseTextColor,
+      headingColor: baseHeadingColor,
+      // primaryAccent = palette.primary (the card's main emphasis/border colour)
+      cardBorder: { type: 'solid', colors: [primaryAccent], width: 2, animationDuration: 2 },
+      scrollbarColor: primaryAccent,
       textBodyAnimation: {
         fadeInDuration: entryAnim === 'fade' ? entrySpeed : 0,
         selfTypeSpeed: entryAnim === 'slide' ? entrySpeed : 0,
@@ -621,17 +659,17 @@ export function backendCardToCardObject(card) {
     },
     closedState: {
       backgroundColor: bgColor,
-      borderColor: '#2b3142',
-      textColor: '#d7dbe5',
-      headingColor: '#ffffff',
+      borderColor: primaryAccent,
+      textColor: baseTextColor,
+      headingColor: baseHeadingColor,
       headingFont: fontFamily,
       headingText: content.header || 'You have a surprise',
       bodyText: 'Someone special sent you something beautiful.',
       button: {
         text: 'Open',
-        backgroundColor: accent,
-        textColor: '#000000',
-        borderColor: accent,
+        backgroundColor: primaryAccent,
+        textColor: onLight ? '#ffffff' : bgColor,
+        borderColor: primaryAccent,
         shape: 'pill',
       },
       envelope: structuredClone(defaultCardObject.closedState.envelope),
@@ -664,7 +702,7 @@ export function backendCardToCardObject(card) {
     },
     questions: {
       items: questionItems,
-      button: { textColor: '#ffffff', borderColor: accent, backgroundColor: bgColor },
+      button: { textColor: onLight ? bgColor : '#ffffff', borderColor: primaryAccent, backgroundColor: primaryAccent },
       denyBehavior: 'none',
     },
     giftEffect: { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '' },
