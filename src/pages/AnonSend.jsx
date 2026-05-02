@@ -1,62 +1,45 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { sendCardAnonymousMessage, getPublicUser, getUserAnonCard } from '../lib/api.js'
+import { sendCardAnonymousMessage, getPublicProfile } from '../lib/api.js'
 
 const MAX_CHARS = 500
 
 function AnonSend() {
   const { username } = useParams()
   const [recipient, setRecipient] = useState(null)
-  const [cardStyle, setCardStyle] = useState(null)
+  const [cardStyle] = useState(null)
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [recipientNotFound, setRecipientNotFound] = useState(false)
-  const [cardStyleMissing, setCardStyleMissing] = useState(false)
+  const [cardStyleMissing] = useState(true)
 
   useEffect(() => {
     if (!username) return
     let cancelled = false
-    Promise.allSettled([getPublicUser(username), getUserAnonCard(username)]).then(
-      ([userRes, cardRes]) => {
+    ;(async () => {
+      try {
+        const res = await getPublicProfile(username)
         if (cancelled) return
-        const u =
-          userRes.status === 'fulfilled' && userRes.value
-            ? userRes.value?.user || userRes.value?.data?.user || userRes.value
-            : null
-        if (!u) {
+        const u = res?.data?.user || res?.user || res?.data || res
+        if (!u || !u.username) {
           setRecipientNotFound(true)
           setLoading(false)
           return
         }
         setRecipient({
-          name: u?.username || u?.name || username,
-          avatarUrl: u?.profilePictureUrl || u?.avatarUrl || '',
-          avatarLetter: (u?.username || u?.name || username).charAt(0).toUpperCase(),
+          name: u.username || u.name || username,
+          avatarUrl: u.profilePictureUrl || u.avatarUrl || '',
+          avatarLetter: (u.username || u.name || username).charAt(0).toUpperCase(),
         })
-
-        if (cardRes.status === 'fulfilled' && cardRes.value) {
-          const card = cardRes.value?.card || cardRes.value?.data?.card || cardRes.value
-          const l = card?.layoutConfig || card?.layoutdata || {}
-          setCardStyle({
-            heading: l?.content?.heading || '',
-            body: l?.content?.body || '',
-            backgroundColor: l?.card?.backgroundColor || '#07111a',
-            headingColor: l?.card?.headingColor || '#e9fbff',
-            textColor: l?.card?.textColor || 'rgba(201,247,255,0.72)',
-            accentColor: l?.theme?.accentColor || '#7ef7ff',
-            fontFamily: l?.theme?.fontFamily || 'Playfair Display',
-            // Store slug for the /cards/:slug/anonymous-message endpoint
-            cardSlug: card?.slug || card?.shareSlug || card?._id || card?.id || null,
-          })
-        } else {
-          setCardStyleMissing(true)
-        }
-        setLoading(false)
-      },
-    )
+      } catch {
+        if (!cancelled) setRecipientNotFound(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
     return () => { cancelled = true }
   }, [username])
 

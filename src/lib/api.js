@@ -202,7 +202,7 @@ export async function getCardBySlug(slug, password) {
 }
 
 export async function submitCardResponse(slug, body) {
-  return request(`/cards/${slug}/response`, { method: 'POST', body })
+  return request(`/cards/${slug}/response`, { method: 'POST', auth: true, body })
 }
 
 export async function submitPollVote(slug, body) {
@@ -285,6 +285,10 @@ export async function likeTemplate(templateId) {
   return request(`/templates/${templateId}/like`, { method: 'POST', auth: true })
 }
 
+export async function unlikeTemplate(templateId) {
+  return request(`/templates/${templateId}/unlike`, { method: 'POST', auth: true })
+}
+
 export async function createTemplate(payload) {
   return request('/create-template', { method: 'POST', auth: true, body: payload })
 }
@@ -320,43 +324,25 @@ export async function rejectTemplate(templateId, reason = '') {
   })
 }
 
-// Per-template analytics for the owning artist.
-export async function getTemplateAnalytics(templateId) {
-  return request(`/templates/${templateId}/analytics`, { auth: true })
-}
 
 /* ═══════════════════════════════════════════════
    ANONYMOUS INBOX
    ═══════════════════════════════════════════════ */
 export async function sendAnonymousMessage(payload) {
-  // POST /anonymous-messages — no auth required (Classic tier)
-  // payload: { recipientUsername, message, templateId, tier }
-  return request('/anonymous-messages', { method: 'POST', body: payload }).catch(() => ({
-    ok: false,
-    message: 'Anonymous messaging not yet available.',
-  }))
+  // POST /cards/:slug/anonymous-message per handbook — recipient's anon card slug required
+  // payload: { slug, message }
+  return request(`/cards/${payload.slug}/anonymous-message`, { method: 'POST', body: { message: payload.message } })
+    .catch(() => ({ ok: false, message: 'Anonymous messaging not yet available.' }))
 }
 
 export async function getAnonMessages() {
-  // GET /anonymous-messages — auth required
-  return request('/anonymous-messages', { auth: true }).catch(() => ({ messages: [] }))
+  // Not in the current backend handbook — returns empty until backend adds this route
+  return Promise.resolve({ messages: [] })
 }
 
-export async function deleteAnonMessage(id) {
-  // DELETE /anonymous-messages/:id — auth required
-  return request(`/anonymous-messages/${id}`, { method: 'DELETE', auth: true }).catch(() => ({
-    ok: false,
-  }))
-}
-
-export async function getPublicUser(username) {
-  // GET /users/:username — public profile lookup for AnonSend page
-  return request(`/users/${username}`).catch(() => null)
-}
-
-export async function getUserAnonCard(username) {
-  // GET /users/:username/anon-card — fetch recipient's active anonymous inbox card
-  return request(`/users/${username}/anon-card`).catch(() => null)
+export async function deleteAnonMessage() {
+  // Not in the current backend handbook
+  return Promise.resolve({ ok: false })
 }
 
 /* ═══════════════════════════════════════════════
@@ -511,6 +497,10 @@ export async function disableAdminRedeemCode(code) {
   return request('/admin/redeem-codes/disable', { method: 'PATCH', auth: true, body: { code } })
 }
 
+export async function enableAdminRedeemCode(code) {
+  return request('/admin/redeem-codes/enable', { method: 'PATCH', auth: true, body: { code } })
+}
+
 export async function deleteAdminRedeemCode(code) {
   return request('/admin/redeem-codes', { method: 'DELETE', auth: true, body: { code } })
 }
@@ -565,6 +555,10 @@ export async function deleteAdminAd(adId) {
 
 export async function getAdminAdsGlobalStats() {
   return request('/admin/ads/global-stats', { auth: true })
+}
+
+export async function getAdminAdsEnterpriseStats() {
+  return request('/admin/ads/enterprise-stats', { auth: true })
 }
 
 /* ═══════════════════════════════════════════════

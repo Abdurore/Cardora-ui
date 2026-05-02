@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useOutletContext, useNavigate, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import ScreenNav from '../components/ScreenNav.jsx'
-import { getWorldChat, API_BASE } from '../lib/api.js'
+import { getWorldChat, getPublicProfile, API_BASE } from '../lib/api.js'
 import { mapChatMessage } from '../lib/backendMappers.js'
 
 function formatAge(isoStr) {
@@ -31,6 +31,8 @@ function WorldChat() {
   const [onlineCount, setOnlineCount] = useState(0)
   const [, setTick] = useState(0)
   const [profileCard, setProfileCard] = useState(null) // { userId, username, avatarUrl, role }
+  const [profileDetails, setProfileDetails] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(false)
   const socketRef = useRef(null)
   const messagesEndRef = useRef(null)
   const cooldownRef = useRef(null)
@@ -160,6 +162,27 @@ function WorldChat() {
     return () => clearTimeout(timer)
   }, [joinLeave])
 
+  // Fetch extended profile details when a profile card is opened
+  useEffect(() => {
+    if (!profileCard) { setProfileDetails(null); return }
+    let cancelled = false
+    setProfileDetails(null)
+    setProfileLoading(true)
+    ;(async () => {
+      try {
+        const res = await getPublicProfile(profileCard.username)
+        if (cancelled) return
+        const u = res?.data?.user || res?.user || res?.data || res
+        setProfileDetails(u || null)
+      } catch {
+        if (!cancelled) setProfileDetails(null)
+      } finally {
+        if (!cancelled) setProfileLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [profileCard])
+
   const SEND_COOLDOWN = 15 // seconds between messages
 
   const sendMessage = () => {
@@ -191,6 +214,37 @@ function WorldChat() {
   // User can always type while signed in + online; cooldown only gates the actual send.
   const canType = Boolean(currentUser && isOnline && connected)
   const canSend = Boolean(canType && !cooldown)
+
+  function normalizeRole(raw) {
+    if (!raw) return null
+    const r = String(raw).toLowerCase()
+    if (r === 'admin') return 'Admin'
+    if (r === 'artist') return 'Artist'
+    if (r === 'moderator') return 'Moderator'
+    if (r === 'enterprise') return 'Enterprise'
+    return null
+  }
+
+  function roleBadgeClass(role) {
+    if (role === 'Admin') return 'role-admin'
+    if (role === 'Artist') return 'role-artist'
+    if (role === 'Moderator') return 'role-moderator'
+    if (role === 'Enterprise') return 'role-enterprise'
+    return ''
+  }
+
+  function roleIcon(role) {
+    if (role === 'Admin') return '⚡'
+    if (role === 'Artist') return '🎨'
+    if (role === 'Moderator') return '🛡'
+    if (role === 'Enterprise') return '🏢'
+    return ''
+  }
+
+  function formatJoined(isoStr) {
+    if (!isoStr) return null
+    return new Date(isoStr).toLocaleDateString([], { month: 'long', year: 'numeric' })
+  }
 
   return (
     <div className="page-body chat-page">
@@ -352,18 +406,62 @@ function WorldChat() {
           <div className="chat-profile-backdrop" onClick={() => setProfileCard(null)} />
           <div className="chat-profile-card">
             <button type="button" className="chat-profile-close" onClick={() => setProfileCard(null)} aria-label="Close">×</button>
-            <div className="chat-profile-avatar-wrap">
-              {profileCard.avatarUrl
-                ? <img src={profileCard.avatarUrl} alt="" className="chat-profile-avatar" />
-                : <span className="chat-profile-avatar-initial">{(profileCard.username || 'U')[0].toUpperCase()}</span>}
-            </div>
-            <p className="chat-profile-name">@{profileCard.username}</p>
-            {profileCard.role && (
-              <span className={`profile-role-badge ${profileCard.role === 'Artist' ? 'role-artist' : profileCard.role === 'Admin' ? 'role-admin' : profileCard.role === 'Moderator' ? 'role-moderator' : profileCard.role === 'Enterprise' ? 'role-enterprise' : 'role-user'}`} style={{ marginTop: 8, display: 'inline-flex' }}>
-                {profileCard.role === 'Artist' ? '🎨' : profileCard.role === 'Admin' ? '⚡' : profileCard.role === 'Moderator' ? '🛡' : profileCard.role === 'Enterprise' ? '🏢' : '✨'}{' '}
-                {profileCard.role}
-              </span>
-            )}
+
+            {profileLoading ? (
+              <div className="chat-profile-skeleton">
+                <div className="chat-profile-skeleton-avatar" />
+                <div className="chat-profile-skeleton-lines">
+                  <div className="chat-profile-skeleton-line wide" />
+                  <div className="chat-profile-skeleton-line narrow" />
+                </div>
+              </div>
+            ) : (() => {
+              const displayAvatarUrl = profileDetails?.profilePictureUrl || profileDetails?.avatarUrl || profileCard.avatarUrl
+              const displayName = profileDetails?.username || profileCard.username
+              const role = normalizeRole(profileDetails?.role || profileCard.role)
+              const bio = profileDetails?.bio || profileDetails?.about || null
+              const joined = formatJoined(profileDetails?.createdAt || profileDetails?.joinedAt)
+              const referrals = typeof profileDetails?.referralsCount === 'number' ? profileDetails.referralsCount : null
+
+              return (
+                <>
+                  <div className="chat-profile-header">
+                    <div className="chat-profile-avatar-wrap">
+                      {displayAvatarUrl
+                        ? <img src={displayAvatarUrl} alt="" className="chat-profile-avatar" />
+                        : <span className="chat-profile-avatar-initial">{(displayName || 'U')[0].toUpperCase()}</span>}
+                    </div>
+                    <div className="chat-profile-info">
+                      <p className="chat-profile-name">@{displayName}</p>
+                      {role && (
+                        <span className={`profile-role-badge ${roleBadgeClass(role)}`}>
+                          {roleIcon(role)} {role}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {bio && <p className="chat-profile-bio">{bio}</p>}
+
+                  {(joined || referrals !== null) && (
+                    <div className="chat-profile-meta">
+                      {joined && (
+                        <span className="chat-profile-meta-item">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                          Joined {joined}
+                        </span>
+                      )}
+                      {referrals !== null && (
+                        <span className="chat-profile-meta-item">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                          {referrals} {referrals === 1 ? 'referral' : 'referrals'}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </div>
         </div>,
         document.body,
