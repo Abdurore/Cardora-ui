@@ -532,14 +532,16 @@ function MainLayout() {
     }
   }
 
-  const handleCreateCard = async (cardObject, { type, couponType, useCoupons, poll, chain, trivia, tier, anonTemplate } = {}) => {
+  const handleCreateCard = async (cardObject, { type, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
-      const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : type
+      const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : (anonTemplate ? 'anonymous' : type)
       const resolvedTier = (tier || 'classic').toLowerCase()
 
-      // cardObjectToBackendPayload now returns { config, enhancements, layoutdata }
-      // per the API handbook — type-specific content goes inside config.content,
-      // not as separate top-level poll/chain/trivia fields.
+      // Premium tier is ONLY valid for personal cards (engine.js line 139)
+      if (resolvedTier === 'premium' && resolvedType !== 'personal') {
+        return { ok: false, message: 'Premium tier is only available for personal cards.' }
+      }
+
       const backendPayload = cardObjectToBackendPayload(cardObject, {
         type: resolvedType,
         tier: resolvedTier,
@@ -548,20 +550,39 @@ function MainLayout() {
         chain,
       })
 
-      const payload = {
-        type: resolvedType,
-        tier: resolvedTier,
-        ...backendPayload,
+      // Client-side validation matching backend Joi rules. Catching here surfaces
+      // a clear, type-specific message rather than the backend's generic 400.
+      const c = backendPayload.config?.content || {}
+      let missing = null
+      if (resolvedType === 'personal') {
+        if (!String(c.header || '').trim()) missing = 'Card heading is required.'
+        else if (!String(c.body || '').trim()) missing = 'Card body text is required.'
+      } else if (resolvedType === 'poll') {
+        if (!String(c.question || '').trim()) missing = 'Poll question is required.'
+        else if (!Array.isArray(c.options) || c.options.length < 2) missing = 'Poll needs at least 2 non-empty options.'
+      } else if (resolvedType === 'chain') {
+        if (!String(c.challenge || '').trim()) missing = 'Chain prompt is required.'
+      } else if (resolvedType === 'trivia') {
+        if (!Array.isArray(c.questions) || c.questions.length < 1) missing = 'Trivia needs at least 1 question with text and 2+ options.'
+      } else if (resolvedType === 'anonymous') {
+        if (!String(c.message || '').trim()) missing = 'Anonymous template needs a message.'
       }
-      if (couponType) payload.couponType = couponType
-      if (useCoupons) payload.useCoupons = useCoupons
+      if (missing) {
+        return { ok: false, message: missing }
+      }
+
+      // Forced endpoints reject unknown fields and forbid type/tier in body.
+      // We send ONLY { config, enhancements, layoutdata } — no top-level type/tier,
+      // no couponType/useCoupons/anonTemplate (those are frontend-only state).
+      const payload = backendPayload
+
       const endpoint = resolvedType === 'poll'
         ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
         : resolvedType === 'chain'
           ? `/create-card/chain/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
           : resolvedType === 'trivia'
             ? `/create-card/trivia/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-            : resolvedType === 'anonymous' || anonTemplate
+            : resolvedType === 'anonymous'
               ? `/create-card/anonymous/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
               : `/create-card/${resolvedTier}`
 
@@ -585,8 +606,7 @@ function MainLayout() {
         response = resolvedTier === 'elite'
           ? await createCardTriviaElite(payload)
           : await createCardTriviaClassic(payload)
-      } else if (resolvedType === 'anonymous' || anonTemplate) {
-        payload.anonTemplate = anonTemplate
+      } else if (resolvedType === 'anonymous') {
         response = resolvedTier === 'classic'
           ? await createCardAnonClassic(payload)
           : await createCardAnonElite(payload)
