@@ -385,6 +385,7 @@ function CardStudio() {
   const [activeEditEl, setActiveEditEl] = useState(null) // { type:'heading'|'body'|'extendedBody'|'image', index:number }
   const dragStateRef = useRef(null)
   const editPopoverRef = useRef(null)
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
 
   // Poll / Trivia / Chain / Anonymous template state
   const [pollData, setPollData] = useState({ question: '', options: ['', ''], allowMultiple: false })
@@ -2501,13 +2502,19 @@ function CardStudio() {
 
       {/* Mobile layout */}
       <div className="cs-mobile-shell">
+        {/* Header */}
         <div className="cs-mobile-header">
           <button type="button" className="cs-mobile-back" onClick={() => navigate(-1)}>‹</button>
           <div className="cs-mobile-title">{typeMeta.emoji} {typeMeta.label}</div>
           <button type="button" className="cs-mobile-save" onClick={handleSave}>Save</button>
         </div>
 
-        <div className="cs-mobile-preview" style={{ background: previewBg }}>
+        {/* Full-height interactive preview */}
+        <div
+          className="cs-mobile-preview"
+          style={{ background: previewBg }}
+          onClick={() => setActiveEditEl(null)}
+        >
           {c.background.type === 'image' && c.background.imageUrl ? (
             <img className="cs-mobile-background" src={c.background.imageUrl} alt="" />
           ) : null}
@@ -2525,58 +2532,75 @@ function CardStudio() {
               <p style={{ color: c.closedState.textColor }}>{c.closedState.bodyText}</p>
             </div>
           ) : (
-            renderStudioContentPreview(true)
+            renderStudioContentPreview(false)
+          )}
+          {/* Tap hint — fades after first edit */}
+          {!activeEditEl && studioType === 'personal' && c.media.images.length === 0 && (
+            <p className="cs-mobile-tap-hint">Tap text to edit directly</p>
           )}
         </div>
 
-        {/* Scroll zone: tabs are sticky inside here, panel scrolls freely */}
-        <div className="cs-mobile-scroll-zone">
-          <div className="cs-mobile-sticky-bar">
-            <div className="cs-mobile-stepnav">
-              {steps.map(step => (
-                <button
-                  key={step}
-                  type="button"
-                  className={`cs-mobile-step ${activeStep === step ? 'active' : ''}`}
-                  onClick={() => goToStep(step)}
+        {/* Element-specific edit bar — slides up when element tapped */}
+        {activeEditEl && (
+          <div className="cs-mobile-edit-bar">
+            {activeEditEl.type === 'heading' && (
+              <>
+                <span className="cs-mobile-edit-label">Heading</span>
+                <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.headingSize', Math.max(14, (c.theme.headingSize ?? 28) - 2))}>A−</button>
+                <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.headingSize', Math.min(56, (c.theme.headingSize ?? 28) + 2))}>A+</button>
+                <input type="color" className="cs-mobile-edit-color" title="Heading color" value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} />
+              </>
+            )}
+            {(activeEditEl.type === 'body' || activeEditEl.type === 'extendedBody') && (
+              <>
+                <span className="cs-mobile-edit-label">Text</span>
+                <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.bodySize', Math.max(10, (c.theme.bodySize ?? 16) - 1))}>A−</button>
+                <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.bodySize', Math.min(28, (c.theme.bodySize ?? 16) + 1))}>A+</button>
+                <input type="color" className="cs-mobile-edit-color" title="Text color" value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} />
+              </>
+            )}
+            {activeEditEl.type === 'image' && (
+              <>
+                <span className="cs-mobile-edit-label">Image</span>
+                <select
+                  className="cs-mobile-edit-select"
+                  value={c.media.images[activeEditEl.index]?.fit || 'cover'}
+                  onChange={e => updateImageSetting(activeEditEl.index, 'fit', e.target.value)}
                 >
-                  {step === 'closed' ? 'Closed' : step}
-                </button>
-              ))}
-            </div>
-
-            <div className="cs-mobile-tools">
-              {TOOL_GROUP_ORDER.flatMap((group) =>
-                activeTools.filter(t => t.group === group)
-              ).map(tool => {
-                const Icon = tool.icon
-                return (
-                  <button
-                    key={tool.id}
-                    type="button"
-                    className={`cs-mobile-tool-chip ${activeTool === tool.id ? 'active' : ''}`}
-                    onClick={() => {
-                      setActiveTool(tool.id)
-                      if (tool.id === 'closedState') setActiveStep('closed')
-                      else if (tool.id === 'questions') setActiveStep('questions')
-                      else setActiveStep('card')
-                    }}
-                  >
-                    <Icon size={16} />
-                    <span>{tool.label}</span>
-                  </button>
-                )
-              })}
-            </div>
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                  <option value="fill">Fill</option>
+                </select>
+                <button type="button" className="cs-mobile-edit-btn cs-mobile-edit-remove" onClick={() => { removeImage(activeEditEl.index); setActiveEditEl(null) }}>Remove</button>
+              </>
+            )}
+            <button type="button" className="cs-mobile-edit-done" onClick={() => setActiveEditEl(null)}>Done</button>
           </div>
+        )}
 
-          {/* Editing panel — scrolls inside scroll-zone */}
-          <div className="cs-mobile-panel">
-            {renderPanel()}
+        {/* Slim bottom bar: step nav + Tools button */}
+        <div className="cs-mobile-bottom-bar">
+          <div className="cs-mobile-stepnav">
+            {steps.map(step => (
+              <button
+                key={step}
+                type="button"
+                className={`cs-mobile-step ${activeStep === step ? 'active' : ''}`}
+                onClick={() => goToStep(step)}
+              >
+                {step === 'closed' ? 'Closed' : step.charAt(0).toUpperCase() + step.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div className="cs-mobile-bottom-actions">
+            <button type="button" className="cs-mobile-tools-btn" onClick={() => setMobilePanelOpen(true)}>
+              <HiOutlineSparkles size={16} />
+              <span>Tools</span>
+            </button>
           </div>
         </div>
 
-        {/* Footer: natural-flow bottom bar */}
+        {/* Footer */}
         <div className="cs-mobile-footer">
           <button type="button" className="cs-mobile-ghost" onClick={enterPreview}>
             <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
@@ -2594,6 +2618,43 @@ function CardStudio() {
             </button>
           )}
         </div>
+
+        {/* Tool panel bottom sheet */}
+        {mobilePanelOpen && (
+          <div className="cs-mobile-panel-sheet">
+            <div className="cs-mobile-panel-backdrop" onClick={() => setMobilePanelOpen(false)} />
+            <div className="cs-mobile-panel-content">
+              <div className="cs-mobile-panel-handle" />
+              <div className="cs-mobile-panel-header">
+                <div className="cs-mobile-tools">
+                  {TOOL_GROUP_ORDER.flatMap(group => activeTools.filter(t => t.group === group)).map(tool => {
+                    const Icon = tool.icon
+                    return (
+                      <button
+                        key={tool.id}
+                        type="button"
+                        className={`cs-mobile-tool-chip ${activeTool === tool.id ? 'active' : ''}`}
+                        onClick={() => {
+                          setActiveTool(tool.id)
+                          if (tool.id === 'closedState') setActiveStep('closed')
+                          else if (tool.id === 'questions') setActiveStep('questions')
+                          else setActiveStep('card')
+                        }}
+                      >
+                        <Icon size={15} />
+                        <span>{tool.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <button type="button" className="cs-mobile-panel-done" onClick={() => setMobilePanelOpen(false)}>Done</button>
+              </div>
+              <div className="cs-mobile-panel-body">
+                {renderPanel()}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Preview Modal */}
