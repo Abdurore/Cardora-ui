@@ -191,6 +191,8 @@ function AdminDashboard() {
   const [unbanIdentifier, setUnbanIdentifier] = useState('')
   // Set role form
   const [roleForm, setRoleForm] = useState({ identifier: '', role: 'moderator' })
+  const [roleConfirm, setRoleConfirm] = useState(null) // { user, identifier, role } | null
+  const [roleSubmitting, setRoleSubmitting] = useState(false)
   // Reports
   const [reports, setReports] = useState([])
   const [reportFilter, setReportFilter] = useState({ type: '', status: 'open' })
@@ -423,18 +425,29 @@ function AdminDashboard() {
     }
   }
 
-  const handleSetRole = async () => {
-    const id = roleForm.identifier.trim()
+  const openRoleConfirm = (identifierOverride, roleOverride) => {
+    const id = (identifierOverride || roleForm.identifier).trim()
+    const role = roleOverride || roleForm.role
     if (!id) { showMsg('User ID or username required', false); return }
-    if (!window.confirm(`Set role "${roleForm.role}" for user "${id}"?`)) return
+    const matchedUser = users.find(u =>
+      (u._id || u.id) === id || u.username === id || u.name === id
+    ) || null
+    setRoleConfirm({ user: matchedUser, identifier: id, role })
+  }
+
+  const confirmSetRole = async () => {
+    if (!roleConfirm) return
+    setRoleSubmitting(true)
     try {
-      await setUserRole({ userId: id, role: roleForm.role })
-      showMsg(`Role updated to "${roleForm.role}".`)
+      await setUserRole({ userId: roleConfirm.identifier, role: roleConfirm.role })
+      showMsg(`Role updated to "${roleConfirm.role}".`)
       setRoleForm({ identifier: '', role: 'moderator' })
+      setRoleConfirm(null)
       loadTabData('Users')
     } catch (err) {
       showMsg(err.message || 'Role update failed', false)
     }
+    setRoleSubmitting(false)
   }
 
   const handleLoadReports = async (overrides = {}) => {
@@ -1014,7 +1027,7 @@ function AdminDashboard() {
             {/* Set Role Form */}
             <div className="admin-sub-section">
               <h4>Assign Role</h4>
-              <p className="admin-sub-hint">Assignable roles: <code>enterprise</code>, <code>moderator</code></p>
+              <p className="admin-sub-hint">Change any user's role. Use the table below to assign roles directly from a row.</p>
               <div className="admin-inline-form">
                 <label className="admin-field">
                   <span>User ID or Username</span>
@@ -1025,13 +1038,15 @@ function AdminDashboard() {
                   />
                 </label>
                 <label className="admin-field">
-                  <span>Role</span>
+                  <span>New Role</span>
                   <select value={roleForm.role} onChange={e => setRoleForm(p => ({ ...p, role: e.target.value }))}>
                     <option value="moderator">Moderator</option>
                     <option value="enterprise">Enterprise</option>
+                    <option value="artist">Artist</option>
+                    <option value="user">User (reset)</option>
                   </select>
                 </label>
-                <button className="primary" type="button" onClick={handleSetRole}>Set Role</button>
+                <button className="primary" type="button" onClick={() => openRoleConfirm()}>Assign Role</button>
               </div>
             </div>
 
@@ -1051,14 +1066,47 @@ function AdminDashboard() {
                   {users.map(user => {
                     const uid = user._id || user.id
                     const uname = user.username || user.name || uid
+                    const currentRole = (user.role || 'user').toLowerCase()
+                    const isMod = currentRole === 'moderator'
+                    const isEnterprise = currentRole === 'enterprise'
                     return (
                       <tr key={uid}>
                         <td>{uname}</td>
                         <td>{user.email}</td>
-                        <td><span className={`admin-role-chip ${(user.role || 'user').toLowerCase()}`}>{user.role || 'User'}</span></td>
+                        <td><span className={`admin-role-chip ${currentRole}`}>{user.role || 'User'}</span></td>
                         <td>{user.cc ?? user.balance ?? 0}</td>
                         <td>{user.isVerified ? 'Yes' : 'No'}</td>
-                        <td style={{ display: 'flex', gap: 4 }}>
+                        <td className="admin-actions-cell">
+                          {!isMod && !isEnterprise && (
+                            <button
+                              type="button"
+                              className="admin-action-btn neutral"
+                              onClick={() => openRoleConfirm(uid || uname, 'moderator')}
+                              title="Promote to Moderator"
+                            >
+                              +Mod
+                            </button>
+                          )}
+                          {isMod && (
+                            <button
+                              type="button"
+                              className="admin-action-btn neutral"
+                              onClick={() => openRoleConfirm(uid || uname, 'user')}
+                              title="Remove Moderator role"
+                            >
+                              −Mod
+                            </button>
+                          )}
+                          {isEnterprise && (
+                            <button
+                              type="button"
+                              className="admin-action-btn neutral"
+                              onClick={() => openRoleConfirm(uid || uname, 'user')}
+                              title="Remove Enterprise role"
+                            >
+                              −Ent
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="admin-action-btn reject"
@@ -1073,7 +1121,6 @@ function AdminDashboard() {
                             type="button"
                             className="admin-action-btn approve"
                             onClick={async () => {
-                              if (!window.confirm(`Unban "${uname}"?`)) return
                               try { await unbanUser({ userId: uid || uname }); showMsg(`"${uname}" unbanned.`); loadTabData('Users') }
                               catch (err) { showMsg(err.message || 'Failed', false) }
                             }}
@@ -1849,6 +1896,48 @@ function AdminDashboard() {
         )}
       </div>
       <ScreenNav />
+
+      {roleConfirm && (
+        <div className="ban-confirm-overlay" role="dialog" aria-modal="true">
+          <div className="ban-confirm-backdrop" onClick={() => !roleSubmitting && setRoleConfirm(null)} />
+          <div className="ban-confirm-card">
+            <h3 className="ban-confirm-title">Confirm role change</h3>
+            {roleConfirm.user ? (
+              <div className="ban-confirm-user">
+                <div className="ban-confirm-avatar">
+                  {roleConfirm.user.profilePictureUrl
+                    ? <img src={roleConfirm.user.profilePictureUrl} alt={roleConfirm.user.username || ''} />
+                    : <span>{(roleConfirm.user.username || '?').slice(0, 1).toUpperCase()}</span>}
+                </div>
+                <div className="ban-confirm-info">
+                  <div className="ban-confirm-username">{roleConfirm.user.username || '—'}</div>
+                  <div className="ban-confirm-email">{roleConfirm.user.email || '—'}</div>
+                  <div className="ban-confirm-meta">
+                    <span className={`admin-role-chip ${(roleConfirm.user.role || 'user').toLowerCase()}`}>{roleConfirm.user.role || 'User'}</span>
+                    <span>→</span>
+                    <span className={`admin-role-chip ${roleConfirm.role}`}>{roleConfirm.role.charAt(0).toUpperCase() + roleConfirm.role.slice(1)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="ban-confirm-user ban-confirm-user-missing">
+                <p>User not found in loaded list. Role change will be attempted using:</p>
+                <code>{roleConfirm.identifier}</code>
+                <p style={{ marginTop: 6 }}>New role: <strong>{roleConfirm.role}</strong></p>
+              </div>
+            )}
+            <p className="ban-confirm-warn">This will immediately update the user's permissions. Proceed?</p>
+            <div className="ban-confirm-actions">
+              <button type="button" className="ban-confirm-cancel" onClick={() => setRoleConfirm(null)} disabled={roleSubmitting}>
+                Cancel
+              </button>
+              <button type="button" className="ban-confirm-submit" onClick={confirmSetRole} disabled={roleSubmitting}>
+                {roleSubmitting ? 'Updating…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {banConfirm && (
         <div className="ban-confirm-overlay" role="dialog" aria-modal="true">
