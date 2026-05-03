@@ -328,13 +328,6 @@ export async function rejectTemplate(templateId, reason = '') {
 /* ═══════════════════════════════════════════════
    ANONYMOUS INBOX
    ═══════════════════════════════════════════════ */
-export async function sendAnonymousMessage(payload) {
-  // POST /cards/:slug/anonymous-message per handbook — recipient's anon card slug required
-  // payload: { slug, message }
-  return request(`/cards/${payload.slug}/anonymous-message`, { method: 'POST', body: { message: payload.message } })
-    .catch(() => ({ ok: false, message: 'Anonymous messaging not yet available.' }))
-}
-
 export async function getAnonMessages() {
   // Not in the current backend handbook — returns empty until backend adds this route
   return Promise.resolve({ messages: [] })
@@ -627,7 +620,7 @@ export async function sendCardAnonymousMessage(slug, body) {
    MEDIA MANAGEMENT
    ═══════════════════════════════════════════════ */
 export async function getMediaVideos() {
-  return request('/media/videos', { auth: true })
+  return request('/media/videos')
 }
 
 export async function uploadMediaVideo(payload) {
@@ -639,7 +632,7 @@ export async function deleteMediaVideo(nameKey) {
 }
 
 export async function getMediaMusic() {
-  return request('/media/music', { auth: true })
+  return request('/media/music')
 }
 
 export async function uploadMediaMusic(payload) {
