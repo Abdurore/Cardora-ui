@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { reportUser, reportCard, reportTemplate } from '../lib/api.js'
 
 const REASONS = [
@@ -36,7 +37,7 @@ export default function ReportModal({ type, targetId, targetName, onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="report-modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="report-modal" onClick={e => e.stopPropagation()}>
         <button className="report-modal-close" type="button" onClick={onClose} aria-label="Close">✕</button>
@@ -91,6 +92,7 @@ export default function ReportModal({ type, targetId, targetName, onClose }) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
