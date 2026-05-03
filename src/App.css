@@ -7456,6 +7456,208 @@ a {
   display: block;
 }
 
+/* ——— INTERACTIVE PREVIEW — multi-image grid ——— */
+.cs-preview-media-grid {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+.cs-preview-media-grid--1 { grid-template-columns: 1fr; }
+.cs-preview-media-grid--2 { grid-template-columns: 1fr 1fr; }
+.cs-preview-media-grid--3 { grid-template-columns: 1fr 1fr; }
+.cs-preview-media-grid--3 > .cs-preview-media-item:first-child { grid-column: 1 / -1; }
+
+.cs-preview-media-item {
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: grab;
+  position: relative;
+  user-select: none;
+  transition: box-shadow 0.15s;
+}
+.cs-preview-media-item:active { cursor: grabbing; }
+.cs-preview-media-item img {
+  width: 100%;
+  display: block;
+  pointer-events: none;
+}
+.cs-preview-media-item.cs-edit-active {
+  box-shadow: 0 0 0 2px rgba(126,239,255,0.7);
+}
+
+/* Resize handle at bottom edge of image */
+.cs-resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 18px;
+  cursor: s-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to top, rgba(0,0,0,0.38), transparent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.cs-preview-media-item:hover .cs-resize-handle,
+.cs-preview-media-item.cs-edit-active .cs-resize-handle { opacity: 1; }
+.cs-resize-handle::after {
+  content: '';
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.65);
+}
+
+/* Per-image controls overlay (fit toggle, remove) */
+.cs-image-selected-bar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  background: rgba(8,14,20,0.88);
+  border-radius: 8px;
+  padding: 3px 6px;
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.1s ease;
+}
+.cs-image-selected-bar button {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e2eaf0;
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  line-height: 1.5;
+}
+.cs-image-selected-bar button:hover { background: rgba(126,239,255,0.14); }
+
+/* Ghost "add image" slot */
+.cs-preview-add-image {
+  border-radius: 12px;
+  border: 1.5px dashed rgba(126,239,255,0.22);
+  background: rgba(126,239,255,0.03);
+  color: rgba(126,239,255,0.45);
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 10px;
+  width: 100%;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.cs-preview-add-image:hover {
+  border-color: rgba(126,239,255,0.5);
+  background: rgba(126,239,255,0.06);
+  color: rgba(126,239,255,0.75);
+}
+.cs-preview-add-image--full {
+  aspect-ratio: 2.8;
+  min-height: 72px;
+}
+
+/* Editable text elements */
+.cs-editable {
+  outline: none;
+  cursor: text;
+  border-radius: 5px;
+  transition: box-shadow 0.15s;
+  display: block;
+}
+.cs-editable:hover { box-shadow: 0 0 0 1.5px rgba(126,239,255,0.22); }
+.cs-edit-active { box-shadow: 0 0 0 2px rgba(126,239,255,0.58) !important; }
+
+/* Context toolbar — appears inside the card above selected element */
+.cs-edit-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(6,12,18,0.94);
+  border: 1px solid rgba(126,239,255,0.15);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+  flex-wrap: wrap;
+  animation: fadeIn 0.12s ease;
+}
+.cs-edit-toolbar-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(126,239,255,0.55);
+  padding-right: 6px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  margin-right: 2px;
+  white-space: nowrap;
+}
+.cs-edit-toolbar button {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e2eaf0;
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.cs-edit-toolbar button:hover { background: rgba(126,239,255,0.1); }
+.cs-edit-toolbar input[type="color"] {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  cursor: pointer;
+  padding: 0;
+  background: none;
+  flex-shrink: 0;
+}
+.cs-edit-toolbar select {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e2eaf0;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 0.76rem;
+}
+.cs-edit-toolbar-close {
+  margin-left: auto;
+  opacity: 0.55;
+  font-size: 1rem !important;
+  padding: 1px 7px !important;
+}
+
+/* CardPreviewModal multi-image grid */
+.cp-media-grid--2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.cp-media-grid--3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.cp-media-grid--3 > .cp-media-item:first-child { grid-column: 1 / -1; }
+.cp-media-grid--2 .cp-media-item,
+.cp-media-grid--3 .cp-media-item {
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 90px;
+}
+.cp-media-grid--2 .cp-media-item img,
+.cp-media-grid--3 .cp-media-item img {
+  width: 100%;
+  height: 100%;
+  min-height: 90px;
+  object-fit: cover;
+  display: block;
+}
+
 .cs-preview-questions {
   margin-top: 8px;
   padding: 12px;

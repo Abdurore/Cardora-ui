@@ -507,18 +507,28 @@ function CardPreviewModal({
                   {c.content.heading}
                 </h2>
 
-                {/* Media */}
-                {primaryImage && (
+                {/* Media — show all uploaded images */}
+                {mediaAllowed && c.media.images.length > 0 && (
                   <div
-                    className={`cp-media-section cp-media-section-full cp-reveal-element ${revealStep >= 2 ? 'visible' : ''} ${revealStep >= 4 ? 'settled' : ''}`}
+                    className={`cp-media-section cp-media-section-full cp-media-grid--${Math.min(c.media.images.length, 3)} cp-reveal-element ${revealStep >= 2 ? 'visible' : ''} ${revealStep >= 4 ? 'settled' : ''}`}
                     style={{
                       transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s',
                     }}
                   >
-                    <div className="cp-media-item cp-media-item-full">
-                      <img src={primaryImage.url} alt={primaryImage.caption || ''} style={previewImageStyle} />
-                    </div>
-                    {primaryImage.caption && <p className="cp-caption cp-caption-full">{primaryImage.caption}</p>}
+                    {c.media.images.map((img, i) => (
+                      <div key={i} className="cp-media-item cp-media-item-full">
+                        <img
+                          src={img.url}
+                          alt={img.caption || ''}
+                          style={{
+                            objectFit: img.fit || 'cover',
+                            objectPosition: `${img.positionX ?? 50}% ${img.positionY ?? 50}%`,
+                            height: img.height ? `${img.height}px` : undefined,
+                          }}
+                        />
+                        {img.caption && <p className="cp-caption cp-caption-full">{img.caption}</p>}
+                      </div>
+                    ))}
                   </div>
                 )}
 

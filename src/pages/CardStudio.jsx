@@ -381,6 +381,11 @@ function CardStudio() {
   const pendingUploadsRef = useRef(new Map()) // blobUrl → { file, type }
   const [isUploading, setIsUploading] = useState(false)
 
+  // Interactive preview editing
+  const [activeEditEl, setActiveEditEl] = useState(null) // { type:'heading'|'body'|'extendedBody'|'image', index:number }
+  const dragStateRef = useRef(null)
+  const editPopoverRef = useRef(null)
+
   // Poll / Trivia / Chain / Anonymous template state
   const [pollData, setPollData] = useState({ question: '', options: ['', ''], allowMultiple: false })
   const [triviaData, setTriviaData] = useState({
@@ -664,6 +669,47 @@ function CardStudio() {
     const imgs = [...c.media.images]
     imgs[idx] = { ...imgs[idx], [key]: value }
     update('media.images', imgs)
+  }
+
+  // Interactive preview: image drag to reposition
+  const startImageDrag = (e, imgIndex) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragStateRef.current = {
+      imgIndex,
+      startX: e.clientX, startY: e.clientY,
+      origX: c.media.images[imgIndex]?.positionX ?? 50,
+      origY: c.media.images[imgIndex]?.positionY ?? 50,
+      mode: 'drag',
+    }
+    const onMove = (ev) => {
+      const { imgIndex: idx, startX, startY, origX, origY } = dragStateRef.current
+      const dx = (ev.clientX - startX) / 2.5
+      const dy = (ev.clientY - startY) / 2.5
+      updateImageSetting(idx, 'positionX', Math.max(0, Math.min(100, origX - dx)))
+      updateImageSetting(idx, 'positionY', Math.max(0, Math.min(100, origY - dy)))
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      dragStateRef.current = null
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp, { once: true })
+  }
+
+  // Interactive preview: image resize (drag bottom edge)
+  const startImageResize = (e, imgIndex) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startY = e.clientY
+    const origHeight = c.media.images[imgIndex]?.height ?? 160
+    const onMove = (ev) => {
+      const newH = Math.max(60, Math.min(320, origHeight + (ev.clientY - startY)))
+      updateImageSetting(imgIndex, 'height', newH)
+    }
+    const onUp = () => window.removeEventListener('pointermove', onMove)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp, { once: true })
   }
 
   const addQuestion = () => {
@@ -1892,8 +1938,6 @@ function CardStudio() {
   const renderStudioContentPreview = (compact = false) => {
     const previewQuestion = triviaData.questions[0] || { text: '', options: ['', '', '', ''], correctIndex: 0 }
     const previewPollOptions = pollData.options.filter(Boolean)
-    const primaryImage = c.media.images[0]
-
     if (studioType === 'poll') {
       return (
         <div className={`cs-preview-poll ${compact ? 'compact' : ''}`} style={{
@@ -2096,36 +2140,162 @@ function CardStudio() {
 
     const headingSize = c.theme.headingSize ?? 28
     const bodySize = c.theme.bodySize ?? 16
+    const imgs = c.media.images
+    const imgCount = Math.min(imgs.length, 3)
     return (
-      <div className={`cs-preview-card ${compact ? 'compact' : ''}`} style={{
-        backgroundColor: c.card.backgroundColor,
-        ...cardBorderCss,
-      }}>
-        {primaryImage && (
-          <div className="cs-preview-media">
-            <img
-              src={primaryImage.url}
-              alt=""
-              style={{
-                objectFit: primaryImage.fit || 'cover',
-                objectPosition: `${primaryImage.positionX ?? 50}% ${primaryImage.positionY ?? 50}%`,
-              }}
-            />
+      <div
+        className={`cs-preview-card ${compact ? 'compact' : ''}`}
+        style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}
+        onClick={() => setActiveEditEl(null)}
+      >
+        {/* Multi-image grid — all images shown */}
+        {!compact && imgs.length > 0 && (
+          <div className={`cs-preview-media-grid cs-preview-media-grid--${imgCount}`}>
+            {imgs.map((img, i) => {
+              const isActive = activeEditEl?.type === 'image' && activeEditEl.index === i
+              return (
+                <div
+                  key={i}
+                  className={`cs-preview-media-item${isActive ? ' cs-edit-active' : ''}`}
+                  style={{ height: img.height ? `${img.height}px` : undefined }}
+                  onPointerDown={e => { e.stopPropagation(); startImageDrag(e, i) }}
+                  onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'image', index: i }) }}
+                >
+                  <img
+                    src={img.url}
+                    alt={img.caption || ''}
+                    style={{
+                      objectFit: img.fit || 'cover',
+                      objectPosition: `${img.positionX ?? 50}% ${img.positionY ?? 50}%`,
+                      height: img.height ? `${img.height}px` : undefined,
+                    }}
+                    draggable={false}
+                  />
+                  {isActive && (
+                    <>
+                      <div className="cs-image-selected-bar" onClick={e => e.stopPropagation()}>
+                        <select
+                          value={img.fit || 'cover'}
+                          onChange={e => updateImageSetting(i, 'fit', e.target.value)}
+                        >
+                          <option value="cover">Cover</option>
+                          <option value="contain">Contain</option>
+                          <option value="fill">Fill</option>
+                        </select>
+                        <button type="button" onClick={() => { removeImage(i); setActiveEditEl(null) }}>
+                          Remove
+                        </button>
+                      </div>
+                      <div
+                        className="cs-resize-handle"
+                        onPointerDown={e => { e.stopPropagation(); startImageResize(e, i) }}
+                      />
+                    </>
+                  )}
+                </div>
+              )
+            })}
+            {imgs.length < (tierLimits.maxImages ?? Infinity) && (
+              <button
+                type="button"
+                className="cs-preview-add-image"
+                onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}
+              >
+                + Add
+              </button>
+            )}
           </div>
         )}
-        <h3 style={{
-          color: c.card.headingColor,
-          fontFamily: `'${c.theme.fontFamily}', serif`,
-          fontSize: `${headingSize}px`,
-        }}>
+
+        {/* Heading — click to edit inline */}
+        <h3
+          contentEditable={!compact}
+          suppressContentEditableWarning
+          className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
+          style={{
+            color: c.card.headingColor,
+            fontFamily: `'${c.theme.fontFamily}', serif`,
+            fontSize: `${headingSize}px`,
+            outline: 'none',
+          }}
+          onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
+          onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+        >
           {c.content.heading}
         </h3>
-        <p style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px` }}>{c.content.body}</p>
-        {c.content.extendedBody && (
-          <p className="cs-extended" style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px` }}>
+
+        {/* Body — click to edit inline */}
+        <p
+          contentEditable={!compact}
+          suppressContentEditableWarning
+          className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
+          style={{
+            color: c.card.textColor,
+            fontFamily: `'${c.theme.fontFamily}', sans-serif`,
+            fontSize: `${bodySize}px`,
+            outline: 'none',
+          }}
+          onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
+          onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
+        >
+          {c.content.body}
+        </p>
+
+        {/* Extended body */}
+        {(c.content.extendedBody || (!compact && activeEditEl?.type === 'extendedBody')) && (
+          <p
+            contentEditable={!compact}
+            suppressContentEditableWarning
+            className={`cs-extended cs-editable${!compact && activeEditEl?.type === 'extendedBody' ? ' cs-edit-active' : ''}`}
+            style={{
+              color: c.card.textColor,
+              fontFamily: `'${c.theme.fontFamily}', sans-serif`,
+              fontSize: `${bodySize}px`,
+              outline: 'none',
+            }}
+            onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'extendedBody', index: 0 }) } }}
+            onBlur={e => { if (!compact) update('content.extendedBody', e.currentTarget.textContent) }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
+          >
             {c.content.extendedBody}
           </p>
         )}
+
+        {/* Floating edit toolbar */}
+        {!compact && activeEditEl && activeEditEl.type !== 'image' && (
+          <div className="cs-edit-toolbar" ref={editPopoverRef} onClick={e => e.stopPropagation()}>
+            {activeEditEl.type === 'heading' && (
+              <>
+                <span className="cs-edit-toolbar-label">Heading</span>
+                <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
+                <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
+                <input
+                  type="color"
+                  title="Heading color"
+                  value={c.card.headingColor || '#ffffff'}
+                  onChange={e => update('card.headingColor', e.target.value)}
+                />
+              </>
+            )}
+            {(activeEditEl.type === 'body' || activeEditEl.type === 'extendedBody') && (
+              <>
+                <span className="cs-edit-toolbar-label">Text</span>
+                <button type="button" onClick={() => update('theme.bodySize', Math.max(10, bodySize - 1))}>A−</button>
+                <button type="button" onClick={() => update('theme.bodySize', Math.min(28, bodySize + 1))}>A+</button>
+                <input
+                  type="color"
+                  title="Text color"
+                  value={c.card.textColor || '#e2eaf0'}
+                  onChange={e => update('card.textColor', e.target.value)}
+                />
+              </>
+            )}
+            <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
+          </div>
+        )}
+
         {c.questions.items.length > 0 && (
           <div className="cs-preview-questions">
             <p className="cs-q-label">Questions ({c.questions.items.length})</p>
