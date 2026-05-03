@@ -705,10 +705,16 @@ function CardStudio() {
     const startY = e.clientY
     const origHeight = c.media.images[imgIndex]?.height ?? 160
     const onMove = (ev) => {
-      const newH = Math.max(60, Math.min(320, origHeight + (ev.clientY - startY)))
+      // Scale factor 0.7 reduces sensitivity — 1px drag ≈ 0.7px height change
+      const delta = (ev.clientY - startY) * 0.7
+      const newH = Math.round(Math.max(60, Math.min(360, origHeight + delta)))
       updateImageSetting(imgIndex, 'height', newH)
     }
-    const onUp = () => window.removeEventListener('pointermove', onMove)
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      dragStateRef.current = null
+    }
+    dragStateRef.current = { mode: 'resize', imgIndex }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp, { once: true })
   }
@@ -2338,7 +2344,7 @@ function CardStudio() {
               const state = i === ai ? 'active' : i < ai ? 'done' : ''
               return (
                 <button key={step} type="button" className={`cs-step ${state}`} onClick={() => goToStep(step)}>
-                  <span>{step === 'closed' ? 'Closed State' : step}</span>
+                  <span>{{closed: 'Envelope', card: 'Card', questions: 'Q&A', preview: 'Preview'}[step] || step}</span>
                 </button>
               )
             })}
@@ -2455,19 +2461,33 @@ function CardStudio() {
                 {c.background.type === 'video' && c.background.videoUrl ? (
                   <video className="cs-screen-background video" src={c.background.videoUrl} autoPlay muted loop playsInline />
                 ) : null}
-                {/* Closed State Preview */}
+                {/* Closed State Preview — editable */}
                 {activeStep === 'closed' && (
-                  <div className="cs-preview-closed" style={{
-                    backgroundColor: c.closedState.backgroundColor,
-                    border: `2px solid ${c.closedState.borderColor}`,
-                  }}>
-                    <h3 style={{
-                      color: c.closedState.headingColor,
-                      fontFamily: `'${c.closedState.headingFont}', serif`,
-                    }}>
+                  <div
+                    className="cs-preview-closed"
+                    style={{ backgroundColor: c.closedState.backgroundColor, border: `2px solid ${c.closedState.borderColor}` }}
+                    onClick={() => setActiveEditEl(null)}
+                  >
+                    <h3
+                      contentEditable
+                      suppressContentEditableWarning
+                      className={`cs-editable${activeEditEl?.type === 'closedHeading' ? ' cs-edit-active' : ''}`}
+                      style={{ color: c.closedState.headingColor, fontFamily: `'${c.closedState.headingFont}', serif`, outline: 'none' }}
+                      onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'closedHeading', index: 0 }) }}
+                      onBlur={e => { update('closedState.headingText', e.currentTarget.textContent); setActiveEditEl(null) }}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+                    >
                       {c.closedState.headingText}
                     </h3>
-                    <p style={{ color: c.closedState.textColor }}>
+                    <p
+                      contentEditable
+                      suppressContentEditableWarning
+                      className={`cs-editable${activeEditEl?.type === 'closedBody' ? ' cs-edit-active' : ''}`}
+                      style={{ color: c.closedState.textColor, outline: 'none' }}
+                      onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'closedBody', index: 0 }) }}
+                      onBlur={e => { update('closedState.bodyText', e.currentTarget.textContent); setActiveEditEl(null) }}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
+                    >
                       {c.closedState.bodyText}
                     </p>
                     <button
@@ -2482,6 +2502,24 @@ function CardStudio() {
                     >
                       {c.closedState.button.text}
                     </button>
+                    {/* Floating toolbar for closed state text elements */}
+                    {activeEditEl && (activeEditEl.type === 'closedHeading' || activeEditEl.type === 'closedBody') && (
+                      <div className="cs-edit-toolbar cs-edit-toolbar-closed" onClick={e => e.stopPropagation()}>
+                        {activeEditEl.type === 'closedHeading' && (
+                          <>
+                            <span className="cs-edit-toolbar-label">Heading</span>
+                            <input type="color" title="Heading color" value={c.closedState.headingColor || '#ffffff'} onChange={e => update('closedState.headingColor', e.target.value)} />
+                          </>
+                        )}
+                        {activeEditEl.type === 'closedBody' && (
+                          <>
+                            <span className="cs-edit-toolbar-label">Body</span>
+                            <input type="color" title="Text color" value={c.closedState.textColor || '#e2eaf0'} onChange={e => update('closedState.textColor', e.target.value)} />
+                          </>
+                        )}
+                        <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2508,32 +2546,35 @@ function CardStudio() {
 
         {/* State nav — what part of the card is being edited */}
         <div className="cs-mobile-state-nav">
-          <button
-            type="button"
-            className={`cs-mobile-state-btn${activeStep === 'closed' ? ' active' : ''}`}
-            onClick={() => goToStep('closed')}
-          >
-            <span className="cs-mobile-state-icon">🎁</span>
-            Envelope
+          <button type="button" className={`cs-mobile-state-btn${activeStep === 'closed' ? ' active' : ''}`} onClick={() => goToStep('closed')}>
+            <span className="cs-mobile-state-icon">🎁</span>Envelope
           </button>
-          <button
-            type="button"
-            className={`cs-mobile-state-btn${activeStep === 'card' || activeStep === 'questions' ? ' active' : ''}`}
-            onClick={() => goToStep('card')}
-          >
-            <span className="cs-mobile-state-icon">✉</span>
-            Card
+          <button type="button" className={`cs-mobile-state-btn${activeStep === 'card' ? ' active' : ''}`} onClick={() => goToStep('card')}>
+            <span className="cs-mobile-state-icon">✉</span>Card
           </button>
-          {(c.questions.items.length > 0 || activeTool === 'questions') && (
-            <button
-              type="button"
-              className={`cs-mobile-state-btn${activeStep === 'questions' ? ' active' : ''}`}
-              onClick={() => goToStep('questions')}
-            >
-              <span className="cs-mobile-state-icon">💬</span>
-              Q&amp;A
+          {activeTools.some(t => t.id === 'media') && (
+            <button type="button" className={`cs-mobile-state-btn${activeTool === 'media' && activeStep === 'card' ? ' active' : ''}`} onClick={() => { goToStep('card'); setActiveTool('media'); setMobilePanelOpen(true) }}>
+              <span className="cs-mobile-state-icon">🖼</span>Media
             </button>
           )}
+          {activeTools.some(t => t.id === 'theme') && (
+            <button type="button" className={`cs-mobile-state-btn${activeTool === 'theme' && activeStep === 'card' ? ' active' : ''}`} onClick={() => { goToStep('card'); setActiveTool('theme'); setMobilePanelOpen(true) }}>
+              <span className="cs-mobile-state-icon">🎨</span>Theme
+            </button>
+          )}
+          {activeTools.some(t => t.id === 'background') && (
+            <button type="button" className={`cs-mobile-state-btn${activeTool === 'background' ? ' active' : ''}`} onClick={() => { goToStep('card'); setActiveTool('background'); setMobilePanelOpen(true) }}>
+              <span className="cs-mobile-state-icon">✨</span>Effects
+            </button>
+          )}
+          {(c.questions.items.length > 0 || activeTool === 'questions') && (
+            <button type="button" className={`cs-mobile-state-btn${activeStep === 'questions' ? ' active' : ''}`} onClick={() => goToStep('questions')}>
+              <span className="cs-mobile-state-icon">💬</span>Q&amp;A
+            </button>
+          )}
+          <button type="button" className="cs-mobile-state-btn" onClick={enterPreview}>
+            <span className="cs-mobile-state-icon">👁</span>Preview
+          </button>
         </div>
 
         {/* Full-height interactive preview */}
@@ -2549,14 +2590,29 @@ function CardStudio() {
             <video className="cs-mobile-background video" src={c.background.videoUrl} autoPlay muted loop playsInline />
           ) : null}
           {activeStep === 'closed' ? (
-            <div className="cs-preview-closed compact" style={{
-              backgroundColor: c.closedState.backgroundColor,
-              border: `2px solid ${c.closedState.borderColor}`,
-            }}>
-              <h3 style={{ color: c.closedState.headingColor, fontFamily: `'${c.closedState.headingFont}', serif` }}>
+            <div className="cs-preview-closed compact" style={{ backgroundColor: c.closedState.backgroundColor, border: `2px solid ${c.closedState.borderColor}` }} onClick={() => setActiveEditEl(null)}>
+              <h3
+                contentEditable
+                suppressContentEditableWarning
+                className={`cs-editable${activeEditEl?.type === 'closedHeading' ? ' cs-edit-active' : ''}`}
+                style={{ color: c.closedState.headingColor, fontFamily: `'${c.closedState.headingFont}', serif`, outline: 'none' }}
+                onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'closedHeading', index: 0 }) }}
+                onBlur={e => { update('closedState.headingText', e.currentTarget.textContent); setActiveEditEl(null) }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+              >
                 {c.closedState.headingText}
               </h3>
-              <p style={{ color: c.closedState.textColor }}>{c.closedState.bodyText}</p>
+              <p
+                contentEditable
+                suppressContentEditableWarning
+                className={`cs-editable${activeEditEl?.type === 'closedBody' ? ' cs-edit-active' : ''}`}
+                style={{ color: c.closedState.textColor, outline: 'none' }}
+                onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'closedBody', index: 0 }) }}
+                onBlur={e => { update('closedState.bodyText', e.currentTarget.textContent); setActiveEditEl(null) }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
+              >
+                {c.closedState.bodyText}
+              </p>
             </div>
           ) : (
             renderStudioContentPreview(false)
@@ -2567,9 +2623,21 @@ function CardStudio() {
           )}
         </div>
 
-        {/* Element-specific edit bar — slides up when element tapped */}
+        {/* Element-specific edit bar — slides up when element tapped (mobile only) */}
         {activeEditEl && (
           <div className="cs-mobile-edit-bar">
+            {activeEditEl.type === 'closedHeading' && (
+              <>
+                <span className="cs-mobile-edit-label">Envelope Title</span>
+                <input type="color" className="cs-mobile-edit-color" title="Heading color" value={c.closedState.headingColor || '#ffffff'} onChange={e => update('closedState.headingColor', e.target.value)} />
+              </>
+            )}
+            {activeEditEl.type === 'closedBody' && (
+              <>
+                <span className="cs-mobile-edit-label">Envelope Text</span>
+                <input type="color" className="cs-mobile-edit-color" title="Text color" value={c.closedState.textColor || '#e2eaf0'} onChange={e => update('closedState.textColor', e.target.value)} />
+              </>
+            )}
             {activeEditEl.type === 'heading' && (
               <>
                 <span className="cs-mobile-edit-label">Heading</span>
@@ -2601,8 +2669,8 @@ function CardStudio() {
                 <button type="button" className="cs-mobile-edit-btn cs-mobile-edit-remove" onClick={() => { removeImage(activeEditEl.index); setActiveEditEl(null) }}>Remove</button>
               </>
             )}
-            {/* Reorder arrows for all element types */}
-            {studioType === 'personal' && (() => {
+            {/* Reorder arrows — only for open card elements, not closed state */}
+            {studioType === 'personal' && !['closedHeading', 'closedBody'].includes(activeEditEl.type) && (() => {
               const mobileElKey = activeEditEl.type === 'image' ? 'media' : activeEditEl.type === 'heading' ? 'heading' : 'body'
               const mobileOrder = c.layout?.elementOrder || ['media', 'heading', 'body']
               const mobileIdx = mobileOrder.indexOf(mobileElKey)
