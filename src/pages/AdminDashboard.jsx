@@ -4,6 +4,8 @@ import { uploadToCloudinary } from '../lib/cloudinary.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import StatusModal from '../components/StatusModal.jsx'
+import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import {
   getAdminDashboard,
   getAdminStatsUsers,
@@ -140,6 +142,8 @@ function normalizeOverviewStats(overview, dashboard, usersStats, cardsStats, tem
 function AdminDashboard() {
   const { currentUser, balance, openAuthModal, marketplaceTemplates, deleteMarketplaceTemplate } = useOutletContext()
   const navigate = useNavigate()
+  const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
+  const [statusModal, setStatusModal] = useState(null) // { type, title?, message }
   const [activeTab, setActiveTab] = useState('Overview')
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
@@ -154,7 +158,6 @@ function AdminDashboard() {
   const [mediaMusic, setMediaMusic] = useState([])
   const [allTemplates, setAllTemplates] = useState([])
   const [loading, setLoading] = useState(false)
-  const [actionMsg, setActionMsg] = useState({ text: '', ok: false })
 
   // New package form
   const [newPkg, setNewPkg] = useState({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false })
@@ -205,8 +208,7 @@ function AdminDashboard() {
   const isAdminGate = currentUser && currentUser.role === 'Admin'
 
   const showMsg = (text, ok = true) => {
-    setActionMsg({ text, ok })
-    setTimeout(() => setActionMsg({ text: '', ok: false }), 3000)
+    setStatusModal({ type: ok ? 'success' : 'error', message: text })
   }
 
   // Backend response shapes drift across endpoints. This helper looks for a
@@ -395,7 +397,7 @@ function AdminDashboard() {
   const handleUnbanUser = async () => {
     const id = unbanIdentifier.trim()
     if (!id) { showMsg('User ID or username required', false); return }
-    if (!window.confirm(`Unban user "${id}"?`)) return
+    if (!await appConfirm('Unban User', `Unban "${id}"?`)) return
     try {
       await unbanUser({ userId: id })
       showMsg(`User "${id}" unbanned.`)
@@ -447,7 +449,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteAd = async (ad) => {
-    if (!window.confirm(`Delete ad "${ad.name || 'this ad'}"? This cannot be undone.`)) return
+    if (!await appConfirm('Delete Ad', `Delete "${ad.name || 'this ad'}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     const id = ad._id || ad.id
     try {
       await deleteAdminAd(id)
@@ -459,7 +461,7 @@ function AdminDashboard() {
   }
 
   const handleDisableCode = async (code) => {
-    if (!window.confirm(`Disable code "${code.code}"?`)) return
+    if (!await appConfirm('Disable Code', `Disable code "${code.code}"?`, { variant: 'warning', confirmLabel: 'Disable' })) return
     try {
       await disableAdminRedeemCode(code.code)
       showMsg('Code disabled.')
@@ -470,7 +472,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteCode = async (code) => {
-    if (!window.confirm(`Delete code "${code.code}"? This cannot be undone.`)) return
+    if (!await appConfirm('Delete Code', `Delete code "${code.code}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     try {
       await deleteAdminRedeemCode(code.code)
       showMsg('Code deleted.')
@@ -653,7 +655,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteVideo = async (video) => {
-    if (!window.confirm('Delete this video?')) return
+    if (!await appConfirm('Delete Video', 'Delete this video? This cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })) return
     const nameKey = video?.nameKey || video?.title || video?.name
     if (!nameKey) { showMsg('Missing video identifier.', false); return }
     try {
@@ -730,8 +732,8 @@ function AdminDashboard() {
     }
   }
 
-  const handleDiscardDraft = () => {
-    if (!window.confirm('Discard this upload? The Cloudinary file will not be added to the library.')) return
+  const handleDiscardDraft = async () => {
+    if (!await appConfirm('Discard Upload', 'Discard this upload? The Cloudinary file will not be added to the library.', { variant: 'warning', confirmLabel: 'Discard' })) return
     setMusicDraft(null)
   }
 
@@ -752,7 +754,7 @@ function AdminDashboard() {
   const handleAdminDeleteTemplate = async (tpl) => {
     const id = tpl.templateId || tpl.id
     if (!id) return
-    if (!window.confirm(`Delete template "${tpl.title}"? This cannot be undone.`)) return
+    if (!await appConfirm('Delete Template', `Delete "${tpl.title}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     const res = await deleteMarketplaceTemplate?.(id)
     if (res?.ok) {
       showMsg('Template deleted.')
@@ -796,7 +798,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteTrack = async (track) => {
-    if (!window.confirm('Delete this track?')) return
+    if (!await appConfirm('Delete Track', 'Delete this track? This cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })) return
     const nameKey = track?.nameKey || track?.name || track?.title
     if (!nameKey) { showMsg('Missing track identifier.', false); return }
     try {
@@ -834,9 +836,6 @@ function AdminDashboard() {
           <h2>Platform Dashboard</h2>
         </div>
 
-        {actionMsg.text && (
-          <p className={`store-earn-msg ${actionMsg.ok ? 'success' : 'error'}`}>{actionMsg.text}</p>
-        )}
 
         {/* Tab Navigation */}
         <div className="admin-tabs">
@@ -1218,7 +1217,7 @@ function AdminDashboard() {
                           onClick={async () => {
                             const id = tpl.templateId || tpl.id
                             if (!id) return
-                            if (!window.confirm(`Disable template "${tpl.title}"?`)) return
+                            if (!await appConfirm('Disable Template', `Disable "${tpl.title}"?`, { variant: 'warning', confirmLabel: 'Disable' })) return
                             try { await disableAdminTemplate(id); showMsg('Template disabled.'); loadTabData('Templates') }
                             catch (err) { showMsg(err.message || 'Disable failed', false) }
                           }}
@@ -1877,11 +1876,14 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* Fixed toast — visible regardless of scroll */}
-      {actionMsg.text && (
-        <div className={`admin-fixed-toast ${actionMsg.ok ? 'success' : 'error'}`}>
-          {actionMsg.ok ? '✓' : '✕'} {actionMsg.text}
-        </div>
+      {ConfirmModal}
+      {statusModal && (
+        <StatusModal
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          onClose={() => setStatusModal(null)}
+        />
       )}
     </div>
   )
