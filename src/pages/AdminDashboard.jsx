@@ -193,6 +193,7 @@ function AdminDashboard() {
   const [roleForm, setRoleForm] = useState({ identifier: '', role: 'moderator' })
   const [roleConfirm, setRoleConfirm] = useState(null) // { user, identifier, role } | null
   const [roleSubmitting, setRoleSubmitting] = useState(false)
+  const [roleError, setRoleError] = useState('')
   // Reports
   const [reports, setReports] = useState([])
   const [reportFilter, setReportFilter] = useState({ type: '', status: 'open' })
@@ -438,6 +439,7 @@ function AdminDashboard() {
   const confirmSetRole = async () => {
     if (!roleConfirm) return
     setRoleSubmitting(true)
+    setRoleError('')
     try {
       await setUserRole({ userId: roleConfirm.identifier, role: roleConfirm.role })
       showMsg(`Role updated to "${roleConfirm.role}".`)
@@ -445,6 +447,7 @@ function AdminDashboard() {
       setRoleConfirm(null)
       loadTabData('Users')
     } catch (err) {
+      setRoleError(err.message || 'Role update failed. Check the user ID and try again.')
       showMsg(err.message || 'Role update failed', false)
     }
     setRoleSubmitting(false)
@@ -1899,7 +1902,7 @@ function AdminDashboard() {
 
       {roleConfirm && (
         <div className="ban-confirm-overlay" role="dialog" aria-modal="true">
-          <div className="ban-confirm-backdrop" onClick={() => !roleSubmitting && setRoleConfirm(null)} />
+          <div className="ban-confirm-backdrop" onClick={() => { if (!roleSubmitting) { setRoleConfirm(null); setRoleError('') } }} />
           <div className="ban-confirm-card">
             <h3 className="ban-confirm-title">Confirm role change</h3>
             {roleConfirm.user ? (
@@ -1927,8 +1930,9 @@ function AdminDashboard() {
               </div>
             )}
             <p className="ban-confirm-warn">This will immediately update the user's permissions. Proceed?</p>
+            {roleError && <p style={{ color: '#ff6b9d', fontSize: '0.82rem', margin: '8px 0 0' }}>{roleError}</p>}
             <div className="ban-confirm-actions">
-              <button type="button" className="ban-confirm-cancel" onClick={() => setRoleConfirm(null)} disabled={roleSubmitting}>
+              <button type="button" className="ban-confirm-cancel" onClick={() => { setRoleConfirm(null); setRoleError('') }} disabled={roleSubmitting}>
                 Cancel
               </button>
               <button type="button" className="ban-confirm-submit" onClick={confirmSetRole} disabled={roleSubmitting}>
@@ -1997,6 +2001,13 @@ function AdminDashboard() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Fixed toast — visible regardless of scroll */}
+      {actionMsg.text && (
+        <div className={`admin-fixed-toast ${actionMsg.ok ? 'success' : 'error'}`}>
+          {actionMsg.ok ? '✓' : '✕'} {actionMsg.text}
         </div>
       )}
     </div>

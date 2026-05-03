@@ -126,6 +126,10 @@ export const defaultCardObject = {
     giftTitle: '',
     giftAmount: '',
   },
+
+  layout: {
+    elementOrder: ['media', 'heading', 'body'],
+  },
 }
 
 // Free ambient music URLs (royalty-free). Each preset declares a minimum tier —
