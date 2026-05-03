@@ -17539,6 +17539,82 @@ a {
   color: rgba(180, 210, 220, 0.55);
 }
 
+.chat-profile-fullname {
+  margin: 0 0 2px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: rgba(225, 240, 245, 0.92);
+}
+
+.chat-profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.chat-profile-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(126, 247, 255, 0.08);
+  border: 1px solid rgba(126, 247, 255, 0.18);
+  color: rgba(180, 230, 240, 0.85);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+}
+
+.chat-profile-verified {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7ef7ff, #62ffa2);
+  color: #07111a;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(8, 14, 22, 0.95);
+}
+
+.chat-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.chat-profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.chat-profile-stat strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2eaf0;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-profile-stat span {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(180, 210, 220, 0.5);
+}
+
 .chat-profile-skeleton {
   display: flex;
   align-items: center;
@@ -17599,12 +17675,18 @@ a {
 }
 
 .chat-profile-avatar-wrap {
+  position: relative;
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  overflow: hidden;
   flex-shrink: 0;
   border: 2px solid rgba(126, 247, 255, 0.2);
+}
+
+.chat-profile-avatar-wrap > img,
+.chat-profile-avatar-wrap > .chat-profile-avatar-initial {
+  border-radius: 50%;
+  overflow: hidden;
 }
 
 .chat-profile-avatar {
@@ -18806,6 +18888,64 @@ a {
   box-shadow: none;
 }
 
+/* Library mode (saved track) — read-only */
+.amt-name-display {
+  flex: 1;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #e2eaf0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 6px 0;
+}
+
+.amt-library-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px dashed rgba(126, 247, 255, 0.14);
+  padding-top: 10px;
+  flex-wrap: wrap;
+}
+
+.amt-library-span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: rgba(220, 242, 247, 0.78);
+}
+
+.amt-library-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(126, 247, 255, 0.6);
+}
+
+.amt-library-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: #e2eaf0;
+}
+
+.amt-library-len {
+  font-size: 0.72rem;
+  color: rgba(220, 242, 247, 0.5);
+}
+
+.amt-library-locked {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: rgba(180, 200, 210, 0.5);
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .admin-media-music-item {
   display: flex;
   align-items: center;
@@ -19199,6 +19339,41 @@ a {
   color: rgba(148, 163, 184, 0.55);
   text-align: center;
   margin-top: 4px;
+}
+
+/* Mobile: tighter spacing, smaller markers, hide reward labels to prevent overlap */
+@media (max-width: 540px) {
+  .store-referral-track-wrap {
+    padding: 0 4px;
+  }
+  .store-referral-track {
+    margin-bottom: 40px;
+  }
+  .store-referral-marker-dot {
+    width: 11px;
+    height: 11px;
+  }
+  .store-referral-marker-label {
+    font-size: 0.55rem;
+    top: 12px;
+  }
+  .store-referral-marker-reward {
+    font-size: 0.52rem;
+    bottom: 12px;
+  }
+  .store-referral-milestones-head {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .store-referral-milestones-head h5 {
+    font-size: 0.78rem;
+  }
+}
+
+/* Very narrow screens: hide secondary reward labels, keep only milestone numbers */
+@media (max-width: 380px) {
+  .store-referral-marker-reward { display: none; }
+  .store-referral-track { margin-bottom: 28px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════

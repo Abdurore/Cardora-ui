@@ -11,8 +11,6 @@ import {
   getAdminStatsTemplates,
   getAdminStatsOverview,
   getAdminUsers,
-  getAdminArtistApplications,
-  acceptArtistApplication,
   banUser,
   unbanUser,
   setUserRole,
@@ -47,13 +45,11 @@ import {
   deleteMediaMusic,
   getAdminTemplates,
   getTemplates,
-  approveTemplate,
-  rejectTemplate,
 } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
 import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
-const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
+const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
 
 // Persist trim points locally (backend doesn't store startSec/endSec yet).
 // Keyed by track _id OR cloudinary URL so drafts survive before an ID is assigned.
@@ -147,7 +143,6 @@ function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('Overview')
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
-  const [applications, setApplications] = useState([])
   const [packages, setPackages] = useState([])
   const [redeemCodes, setRedeemCodes] = useState([])
   const [ads, setAds] = useState([])
@@ -299,11 +294,6 @@ function AdminDashboard() {
           setAllTemplates(merged.map(mapTemplateToCard))
           break
         }
-        case 'Artists': {
-          const res = await getAdminArtistApplications()
-          setApplications(res?.data?.applications || res?.applications || [])
-          break
-        }
         case 'Packages': {
           const res = await getAdminPackages()
           setPackages(res?.data?.packages || res?.packages || [])
@@ -365,16 +355,6 @@ function AdminDashboard() {
     if (!isAdminGate) return
     loadTabData(activeTab)
   }, [activeTab, isAdminGate])
-
-  const handleAcceptApplication = async (appId) => {
-    try {
-      await acceptArtistApplication(appId)
-      showMsg('Application accepted!')
-      loadTabData('Artists')
-    } catch (err) {
-      showMsg(err.message || 'Failed', false)
-    }
-  }
 
   const openBanConfirm = () => {
     const id = banForm.identifier.trim()
@@ -766,32 +746,6 @@ function AdminDashboard() {
     } catch (err) {
       console.error('[Admin] uploadMediaMusic failed', err)
       showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
-    }
-  }
-
-  const handleApproveTemplate = async (tpl) => {
-    const id = tpl.templateId || tpl.id
-    if (!id) return
-    try {
-      await approveTemplate(id)
-      showMsg(`Approved "${tpl.title}".`)
-      loadTabData('Templates')
-    } catch (err) {
-      showMsg(err.message || 'Approve failed.', false)
-    }
-  }
-
-  const handleRejectTemplate = async (tpl) => {
-    const id = tpl.templateId || tpl.id
-    if (!id) return
-    const reason = window.prompt(`Reject "${tpl.title}"? Optional reason:`, '')
-    if (reason === null) return
-    try {
-      await rejectTemplate(id, reason)
-      showMsg(`Rejected "${tpl.title}".`)
-      loadTabData('Templates')
-    } catch (err) {
-      showMsg(err.message || 'Reject failed.', false)
     }
   }
 
@@ -1216,13 +1170,11 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* TEMPLATES — review & delete */}
+        {/* TEMPLATES — live marketplace only (backend doesn't gate by approval) */}
         {activeTab === 'Templates' && !loading && (() => {
-          const pending = allTemplates.filter(t => t.status === 'pending')
-          const live = allTemplates.filter(t => t.status === 'approved' || t.status === 'live' || !t.status || t.status === '')
-          const rejected = allTemplates.filter(t => t.status === 'rejected')
+          const live = allTemplates
 
-          const renderTable = (rows, showReviewActions) => (
+          const renderTable = (rows) => (
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
@@ -1260,24 +1212,6 @@ function AdminDashboard() {
                         </span>
                       </td>
                       <td style={{ display: 'flex', gap: 6 }}>
-                        {showReviewActions && (
-                          <>
-                            <button
-                              type="button"
-                              className="admin-action-btn accept"
-                              onClick={() => handleApproveTemplate(tpl)}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-action-btn reject"
-                              onClick={() => handleRejectTemplate(tpl)}
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
                         <button
                           type="button"
                           className="admin-action-btn warn"
@@ -1307,80 +1241,19 @@ function AdminDashboard() {
           )
 
           return (
-            <>
-              <div className="admin-section">
-                <h3 className="admin-section-title">
-                  Pending Review {pending.length > 0 ? `(${pending.length})` : ''}
-                </h3>
-                {pending.length > 0 ? renderTable(pending, true) : (
-                  <div className="admin-empty">
-                    <span className="admin-empty-icon">{"\u{1F4E5}"}</span>
-                    <p>No templates awaiting review.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="admin-section">
-                <h3 className="admin-section-title">
-                  Live Marketplace {live.length > 0 ? `(${live.length})` : ''}
-                </h3>
-                {live.length > 0 ? renderTable(live, false) : (
-                  <div className="admin-empty">
-                    <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
-                    <p>No approved templates in the marketplace yet.</p>
-                  </div>
-                )}
-              </div>
-
-              {rejected.length > 0 && (
-                <div className="admin-section">
-                  <h3 className="admin-section-title">Rejected ({rejected.length})</h3>
-                  {renderTable(rejected, false)}
+            <div className="admin-section">
+              <h3 className="admin-section-title">
+                Live Templates {live.length > 0 ? `(${live.length})` : ''}
+              </h3>
+              {live.length > 0 ? renderTable(live) : (
+                <div className="admin-empty">
+                  <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
+                  <p>No templates in the marketplace yet.</p>
                 </div>
               )}
-            </>
+            </div>
           )
         })()}
-
-        {/* ARTISTS — applications */}
-        {activeTab === 'Artists' && !loading && (
-          <div className="admin-section">
-            <h3 className="admin-section-title">Artist Applications</h3>
-            {applications.length > 0 ? (
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>User</th>
-                      <th>Portfolio</th>
-                      <th>Bio</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {applications.map(app => (
-                      <tr key={app._id || app.id}>
-                        <td>{app.username || app.user?.username || '-'}</td>
-                        <td><a href={app.portfolio} target="_blank" rel="noopener noreferrer">{app.portfolio ? 'View' : '-'}</a></td>
-                        <td>{app.bio || '-'}</td>
-                        <td><span className={`admin-template-status ${app.status || 'pending'}`}>{app.status || 'pending'}</span></td>
-                        <td>
-                          <button type="button" className="admin-action-btn approve" onClick={() => handleAcceptApplication(app._id || app.id)}>Accept</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="admin-empty">
-                <span className="admin-empty-icon">{"\u{1F4CB}"}</span>
-                <p>No artist applications pending.</p>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* PACKAGES */}
         {activeTab === 'Packages' && !loading && (
@@ -1804,14 +1677,14 @@ function AdminDashboard() {
                 </div>
               )}
 
-              {/* Music list — themed editor with playback + trim controls */}
+              {/* Music library — read-only saved tracks (delete only) */}
               {mediaMusic.length > 0 ? (
                 <div className="admin-media-music-list">
                   {mediaMusic.map(track => (
                     <AdminMusicTrack
                       key={track._id || track.id}
+                      mode="library"
                       track={track}
-                      onSave={handleSaveTrack}
                       onDelete={handleDeleteTrack}
                     />
                   ))}
