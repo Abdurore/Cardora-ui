@@ -446,7 +446,7 @@ export function cardObjectToBackendPayload(cardObject, {
         enabled: items.length > 0 && Boolean((items[0]?.text || '').trim()),
         question: items[0]?.text || '',
         suspenseTexts: items.slice(1).map(q => (q.text || '').trim()).filter(Boolean),
-        answerType: 'yes_no',
+        type: 'yes_no',
       },
     }
   } else if (normalType === 'poll' && poll) {
@@ -501,7 +501,9 @@ export function cardObjectToBackendPayload(cardObject, {
     const isElite = resolvedTier === 'elite'
 
     // Background type — video is elite-only; downgrade for premium
+    const VALID_BG_TYPES = new Set(['color', 'gradient', 'video', 'animated'])
     let bgType = cardObject.background?.type || 'color'
+    if (!VALID_BG_TYPES.has(bgType)) bgType = 'color'
     if (!isElite && (bgType === 'video' || bgType === 'image')) bgType = 'animated'
     if (bgType === 'image') bgType = 'color'
 
@@ -564,8 +566,20 @@ export function cardObjectToBackendPayload(cardObject, {
       // colorSchema (min 1 char). Empty strings fail — fill with '#ffffff' as safe default.
       const cc = Array.isArray(cardObject.animation?.confettiColors) ? cardObject.animation.confettiColors : []
       const fillColor = colors.accent || '#ffffff'
+      const OPEN_EFFECT_MAP = {
+        hearts: 'heartsBurst',
+        stars: 'starShower',
+        heartsBurst: 'heartsBurst',
+        starShower: 'starShower',
+        confetti: 'confetti',
+        fireworks: 'fireworks',
+        balloons: 'balloons',
+        emojiRain: 'emojiRain',
+        none: 'none',
+      }
+      const rawOpenEffect = cardObject.animation?.openEffect || 'none'
       enhancements.openEffect = {
-        type: cardObject.animation?.openEffect || 'none',
+        type: OPEN_EFFECT_MAP[rawOpenEffect] || 'none',
         colors: [
           (cc[0] && String(cc[0]).trim()) || fillColor,
           (cc[1] && String(cc[1]).trim()) || fillColor,
