@@ -7372,40 +7372,25 @@ a {
 .cs-preview-closed {
   width: 100%;
   max-width: 320px;
-  padding: 36px 26px 28px;
-  border-radius: 24px;
+  padding: 32px 24px;
+  border-radius: 22px;
   display: grid;
-  gap: 16px;
+  gap: 14px;
   text-align: center;
-  animation: csSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.35), 0 2px 0 rgba(255,255,255,0.04) inset;
-  position: relative;
+  animation: csSlideUp 0.5s ease both;
 }
 
 .cs-preview-closed h3 {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   line-height: 1.2;
-  cursor: text;
-  min-height: 1.5em;
 }
 
 .cs-preview-closed p {
   margin: 0;
   font-size: 0.88rem;
-  line-height: 1.6;
-  opacity: 0.82;
-  cursor: text;
-  min-height: 1.5em;
-}
-
-/* Floating toolbar pinned inside closed-state preview */
-.cs-edit-toolbar-closed {
-  position: absolute;
-  top: -48px;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
+  line-height: 1.5;
+  opacity: 0.8;
 }
 
 .cs-preview-closed.compact {
@@ -7433,21 +7418,17 @@ a {
 .cs-preview-card {
   width: 100%;
   max-width: 340px;
-  padding: 20px 18px;
-  border-radius: 24px;
+  padding: 18px;
+  border-radius: 22px;
   display: grid;
   gap: 12px;
-  animation: csSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-  box-shadow: 0 18px 50px rgba(0,0,0,0.3), 0 2px 0 rgba(255,255,255,0.04) inset;
-  position: relative;
+  animation: csSlideUp 0.5s ease both;
 }
 
 .cs-preview-card h3 {
   margin: 0;
   font-size: 1.2rem;
-  line-height: 1.15;
-  cursor: text;
-  min-height: 1.4em;
+  line-height: 1.1;
 }
 
 .cs-preview-card p {
@@ -7455,8 +7436,6 @@ a {
   font-size: 0.85rem;
   line-height: 1.6;
   opacity: 0.85;
-  cursor: text;
-  min-height: 1.4em;
 }
 
 .cs-extended {
@@ -7512,30 +7491,23 @@ a {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 26px;
+  height: 18px;
   cursor: s-resize;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(to top, rgba(0,0,0,0.55), transparent);
+  background: linear-gradient(to top, rgba(0,0,0,0.38), transparent);
   opacity: 0;
-  transition: opacity 0.2s;
-  touch-action: none;
+  transition: opacity 0.15s;
 }
 .cs-preview-media-item:hover .cs-resize-handle,
 .cs-preview-media-item.cs-edit-active .cs-resize-handle { opacity: 1; }
-.cs-resize-handle::before {
-  content: '↕';
-  font-size: 0.65rem;
-  color: rgba(255,255,255,0.5);
-  margin-right: 6px;
-}
 .cs-resize-handle::after {
   content: '';
-  width: 36px;
+  width: 28px;
   height: 3px;
-  border-radius: 99px;
-  background: rgba(255,255,255,0.7);
+  border-radius: 2px;
+  background: rgba(255,255,255,0.65);
 }
 
 /* Per-image controls overlay (fit toggle, remove) */
@@ -8445,8 +8417,7 @@ a {
     overflow-y: auto;
   }
   /* Hide desktop inline edit toolbar on mobile — use cs-mobile-edit-bar instead */
-  .cs-mobile-preview .cs-edit-toolbar,
-  .cs-preview-closed .cs-edit-toolbar-closed { display: none !important; }
+  .cs-mobile-preview .cs-edit-toolbar { display: none !important; }
 
   .cs-mobile-img {
     position: absolute;
