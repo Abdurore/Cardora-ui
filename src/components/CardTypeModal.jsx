@@ -27,7 +27,7 @@ const CARD_TYPES = [
     tagline: 'Ask and see who answers',
     description: 'Embed a live poll. Recipients vote and see real-time results.',
     accent: 'cool',
-    tiers: ['classic', 'premium'],
+    tiers: ['classic', 'elite'],
   },
   {
     id: 'trivia',
@@ -37,7 +37,7 @@ const CARD_TYPES = [
     tagline: 'Quiz your people',
     description: 'Create a scored quiz. Recipients see their score and correct answers at the end.',
     accent: 'rose',
-    tiers: ['classic', 'premium'],
+    tiers: ['classic', 'elite'],
   },
   {
     id: 'chain',
@@ -47,7 +47,7 @@ const CARD_TYPES = [
     tagline: 'Send and receive back',
     description: 'Send a card that invites the recipient to reply with their own card back.',
     accent: 'emerald',
-    tiers: ['classic', 'premium'],
+    tiers: ['classic', 'elite'],
   },
   {
     id: 'anonymous',
@@ -57,7 +57,7 @@ const CARD_TYPES = [
     tagline: 'Receive honest messages',
     description: 'Share a link and let anyone send you a message — anonymously, beautifully wrapped.',
     accent: 'mint',
-    tiers: ['classic', 'premium'],
+    tiers: ['classic', 'elite'],
   },
 ]
 

@@ -604,10 +604,12 @@ export function cardObjectToBackendPayload(cardObject, {
     }
   }
 
+  // layoutdata is NOT sent — backend does not have a confirmed schema for it
+  // and allowUnknown:false causes Joi to fail the entire payload with
+  // "'value' failed custom validation because" when unknown keys are present.
   return {
     config: { colors, font, content },
     enhancements,
-    layoutdata: cardObjectToLayoutData(),
   }
 }
 
