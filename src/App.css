@@ -13284,8 +13284,21 @@ a {
   border-color: rgba(255, 80, 120, 0.25);
 }
 
+.admin-action-btn.neutral {
+  background: rgba(126, 239, 255, 0.08);
+  color: #7ef7ff;
+  border-color: rgba(126, 239, 255, 0.2);
+}
+
 .admin-action-btn:hover {
   transform: translateY(-1px);
+}
+
+.admin-actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
 }
 
 .admin-empty {
