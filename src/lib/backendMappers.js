@@ -528,10 +528,17 @@ export function cardObjectToBackendPayload(cardObject, {
         },
       },
       // lock.type: FE uses 'time', backend requires 'timer' (handbook Common AI Mistakes #3)
-      lock: {
-        type: (() => { const lt = cardObject.interaction?.lock?.type || 'none'; return lt === 'time' ? 'timer' : lt })(),
-        value: String(cardObject.interaction?.lock?.value || ''),
-      },
+      // lock.value: backend uses Joi.alternatives([string.min(1), number]) — '' fails both.
+      // For non-value lock types (none/tap/scratch), send '0' as a safe placeholder.
+      lock: (() => {
+        const lt = cardObject.interaction?.lock?.type || 'none'
+        const lockType = lt === 'time' ? 'timer' : lt
+        const rawVal = cardObject.interaction?.lock?.value
+        const lockValue = (rawVal != null && String(rawVal).trim())
+          ? String(rawVal).trim()
+          : '0'
+        return { type: lockType, value: lockValue }
+      })(),
       ambientEffect: (() => {
         const VALID_AMBIENT = new Set(['none', 'starfield', 'snow', 'bubbles', 'fountain', 'fireflies', 'floating'])
         const rawType = cardObject.animation?.backgroundEffect?.type || 'none'
