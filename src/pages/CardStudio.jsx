@@ -21,6 +21,7 @@ import { getTierLimits } from '../lib/tierLimits.js'
 import { getPalettesForTier, applyPalette, getPaletteById } from '../lib/palettes.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
+const STUDIO_AUTOSAVE_PREFIX = 'cardora:studioAutoSave:'
 const BRAND_LOGO = '/cardora-logo.png?v=4'
 
 const steps = ['closed', 'card', 'questions', 'preview']
@@ -298,6 +299,37 @@ function CardStudio() {
   const draftStorageKey = currentUser?.id
     ? `${STUDIO_DRAFT_PREFIX}${currentUser.id}`
     : `${STUDIO_DRAFT_PREFIX}guest`
+  const autoSaveKey = currentUser?.id
+    ? `${STUDIO_AUTOSAVE_PREFIX}${currentUser.id}`
+    : `${STUDIO_AUTOSAVE_PREFIX}guest`
+
+  // Read the most recent autosave for this user/context. Used on mount to
+  // restore unsaved work — survives reloads, browser closes, accidental
+  // navigation away. Scoped by studioType+studioTier so we don't restore a
+  // poll draft into a personal-card session, etc.
+  const readAutoSave = () => {
+    try {
+      const raw = localStorage.getItem(autoSaveKey)
+      if (!raw) return null
+      const saved = JSON.parse(raw)
+      if (!saved || typeof saved !== 'object') return null
+      // Only restore when the user is opening the same type+tier — otherwise
+      // a poll/elite draft would clobber a fresh personal/classic session.
+      if (saved.studioType !== studioType || saved.studioTier !== studioTier) return null
+      return saved
+    } catch {
+      return null
+    }
+  }
+  const autoSavedRef = useRef(null)
+  if (autoSavedRef.current === null && !location.state?.draftCardObject) {
+    // Lazy-init once. Skip when an explicit draft is being opened from the
+    // drafts list — that path takes priority.
+    autoSavedRef.current = readAutoSave() || false
+  }
+  const initialAutoSaved = autoSavedRef.current && autoSavedRef.current.cardObject
+    ? autoSavedRef.current
+    : null
 
   // -- Card type + tier from URL --
   const studioType = searchParams.get('type') || 'personal'
@@ -354,13 +386,15 @@ function CardStudio() {
   )
   const defaultToolId = activeTools[0]?.id || 'content'
 
-  const [cardObject, setCardObject] = useState(() =>
-    existingDraftObject ? structuredClone(existingDraftObject) : resolveTemplateCardObject(cardData),
-  )
+  const [cardObject, setCardObject] = useState(() => {
+    if (existingDraftObject) return structuredClone(existingDraftObject)
+    if (initialAutoSaved?.cardObject) return structuredClone(initialAutoSaved.cardObject)
+    return resolveTemplateCardObject(cardData)
+  })
   const [activeTool, setActiveTool] = useState(defaultToolId)
   const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'closed' : 'card')
   const [showPreview, setShowPreview] = useState(false)
-  const [savedState, setSavedState] = useState('Unsaved draft')
+  const [savedState, setSavedState] = useState(initialAutoSaved ? 'Restored from last session' : 'Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
   const [publishForm, setPublishForm] = useState({
     name: cardData?.title || existingDraftObject?.content?.heading || resolveTemplateCardObject(cardData).content.heading,
@@ -387,14 +421,95 @@ function CardStudio() {
   const editPopoverRef = useRef(null)
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
 
-  // Poll / Trivia / Chain / Anonymous template state
-  const [pollData, setPollData] = useState({ question: '', options: ['', ''], allowMultiple: false })
-  const [triviaData, setTriviaData] = useState({
-    questions: [{ text: '', options: ['', '', '', ''], correctIndex: 0 }],
-  })
-  const [chainData, setChainData] = useState({ enabled: false, prompt: '' })
-  const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: studioTier || 'classic' })
+  // Poll / Trivia / Chain / Anonymous template state. Seed from the autosave
+  // payload when one exists so a poll/trivia/chain in progress survives a
+  // reload, just like the rest of cardObject does.
+  const [pollData, setPollData] = useState(() =>
+    initialAutoSaved?.pollData || { question: '', options: ['', ''], allowMultiple: false }
+  )
+  const [triviaData, setTriviaData] = useState(() =>
+    initialAutoSaved?.triviaData || {
+      questions: [{ text: '', options: ['', '', '', ''], correctIndex: 0 }],
+    }
+  )
+  const [chainData, setChainData] = useState(() =>
+    initialAutoSaved?.chainData || { enabled: false, prompt: '' }
+  )
+  const [anonTemplate, setAnonTemplate] = useState(() =>
+    initialAutoSaved?.anonTemplate || { enabled: false, tier: studioTier || 'classic' }
+  )
   const [anonPreviewTab, setAnonPreviewTab] = useState('sender') // 'sender' | 'recipient'
+
+  // Auto-save: every change persists to localStorage after a short debounce so
+  // an accidental reload, browser close, or navigation away doesn't lose the
+  // user's work. The blob: URLs in c.media.images can't be revived after a
+  // reload (they belong to the previous page session), so they're stripped
+  // before saving — only http(s)/data URLs are kept.
+  const autoSaveTimerRef = useRef(null)
+  const skipFirstAutoSaveRef = useRef(true)
+  // Always points at the latest "write a snapshot" function so the unload
+  // handler (registered once) sees current state instead of the first render's.
+  const writeAutoSaveRef = useRef(() => {})
+  writeAutoSaveRef.current = () => {
+    try {
+      const sanitized = structuredClone(cardObject)
+      if (Array.isArray(sanitized?.media?.images)) {
+        sanitized.media.images = sanitized.media.images.filter(
+          (img) => img?.url && /^(https?:|data:)/.test(img.url)
+        )
+      }
+      if (sanitized?.background?.value && sanitized.background.value.startsWith('blob:')) {
+        sanitized.background.value = ''
+      }
+      const payload = {
+        draftId: draftIdRef.current,
+        studioType,
+        studioTier,
+        cardObject: sanitized,
+        pollData,
+        triviaData,
+        chainData,
+        anonTemplate,
+        updatedAt: new Date().toISOString(),
+      }
+      localStorage.setItem(autoSaveKey, JSON.stringify(payload))
+      setSavedState('Auto-saved just now')
+    } catch {
+      // Quota errors etc. — fail silently, keep user typing.
+    }
+  }
+
+  useEffect(() => {
+    if (skipFirstAutoSaveRef.current) {
+      skipFirstAutoSaveRef.current = false
+      return
+    }
+    setSavedState('Saving…')
+    clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(() => writeAutoSaveRef.current(), 600)
+    return () => clearTimeout(autoSaveTimerRef.current)
+  }, [cardObject, pollData, triviaData, chainData, anonTemplate])
+
+  // Flush a pending autosave synchronously before unload so the very last
+  // edit (within the debounce window) isn't lost when the user closes the
+  // tab or hits reload.
+  useEffect(() => {
+    const flush = () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current)
+        autoSaveTimerRef.current = null
+      }
+      writeAutoSaveRef.current()
+    }
+    window.addEventListener('beforeunload', flush)
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('beforeunload', flush)
+      window.removeEventListener('pagehide', flush)
+      // Component unmount: flush so navigating away within the SPA also persists.
+      flush()
+    }
+  }, [])
 
   // Admin-curated media
   const [adminVideos, setAdminVideos] = useState([])
@@ -517,6 +632,7 @@ function CardStudio() {
       setSavedState('Template submitted for review')
       setPublishSuccess({ name: publishForm.name.trim(), previewImage })
       setPublishScreenshot(null)
+      try { localStorage.removeItem(autoSaveKey) } catch { /* ignore */ }
     } catch (error) {
       setPublishError(error.message || 'Could not submit the template.')
     } finally {
@@ -602,6 +718,9 @@ function CardStudio() {
       }
       setSendResult({ ok: true, slug, message: result.message })
       refreshBalance?.()
+      // Card sent successfully — clear the autosave so the next studio visit
+      // starts fresh instead of restoring the just-sent card.
+      try { localStorage.removeItem(autoSaveKey) } catch { /* ignore */ }
     } else {
       setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
     }
