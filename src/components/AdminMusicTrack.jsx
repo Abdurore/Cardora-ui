@@ -12,11 +12,17 @@ function formatSec(seconds) {
 // the raw audio still plays end-to-end if they hit play, so they can hear
 // where to set the bounds.
 //
-// `mode` defaults to 'edit' (existing track in the library). Use 'draft' for
-// a freshly-uploaded clip not yet saved — the action buttons relabel and the
-// track is always dirty until the first save.
-export default function AdminMusicTrack({ track, onSave, onDelete, mode = 'edit' }) {
+// Modes:
+//  - 'draft'   — freshly-uploaded clip awaiting trim+save (full editor).
+//  - 'library' — saved track already in the library (read-only; play the
+//                trimmed span + delete only). User said: once saved, can't
+//                re-edit, only remove.
+//  - 'edit'    — legacy editable mode. Kept for compatibility but unused in
+//                the music library list now.
+export default function AdminMusicTrack({ track, onSave, onDelete, mode = 'library' }) {
   const isDraft = mode === 'draft'
+  const isLibrary = mode === 'library'
+  const isEditable = !isLibrary  // draft + legacy 'edit'
   const audioRef = useRef(null)
   const [duration, setDuration] = useState(Number(track.duration) || 0)
   const [position, setPosition] = useState(0)
@@ -31,7 +37,9 @@ export default function AdminMusicTrack({ track, onSave, onDelete, mode = 'edit'
       ? Number(track.endSec)
       : Number(track.duration) || 0,
   )
-  const [trimMode, setTrimMode] = useState(false) // true = clamp playback to [start, end]
+  // Library mode locks playback to the saved span — that's the whole point.
+  // Editable modes default to false so admins can hear the full clip while trimming.
+  const [trimMode, setTrimMode] = useState(mode === 'library')
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
@@ -123,12 +131,16 @@ export default function AdminMusicTrack({ track, onSave, onDelete, mode = 'edit'
 
       <div className="amt-head">
         <div className="amt-icon" aria-hidden="true">♫</div>
-        <input
-          className="amt-name-input"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Track name"
-        />
+        {isEditable ? (
+          <input
+            className="amt-name-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Track name"
+          />
+        ) : (
+          <div className="amt-name-display" title={name}>{name || 'Untitled track'}</div>
+        )}
         <button
           type="button"
           className="amt-delete"
@@ -177,66 +189,81 @@ export default function AdminMusicTrack({ track, onSave, onDelete, mode = 'edit'
         <span className="amt-time">{formatSec(position)} / {formatSec(duration)}</span>
       </div>
 
-      <div className="amt-trim">
-        <div className="amt-trim-head">
-          <span className="amt-trim-label">Play span</span>
-          <button
-            type="button"
-            className={`amt-trim-toggle ${trimMode ? 'on' : ''}`}
-            onClick={() => setTrimMode((v) => !v)}
-            title="Loop only the selected span"
-          >
-            {trimMode ? 'Looping span' : 'Loop span'}
-          </button>
-        </div>
+      {isEditable ? (
+        <>
+          <div className="amt-trim">
+            <div className="amt-trim-head">
+              <span className="amt-trim-label">Play span</span>
+              <button
+                type="button"
+                className={`amt-trim-toggle ${trimMode ? 'on' : ''}`}
+                onClick={() => setTrimMode((v) => !v)}
+                title="Loop only the selected span"
+              >
+                {trimMode ? 'Looping span' : 'Loop span'}
+              </button>
+            </div>
 
-        <div className="amt-trim-grid">
-          <label className="amt-trim-field">
-            <span>Start</span>
-            <input
-              type="range"
-              min="0"
-              max={Math.max(0, endSec - 0.5) || 0}
-              step="0.1"
-              value={startSec}
-              onChange={(e) => setStartSec(Number(e.target.value))}
-            />
-            <em>{formatSec(startSec)}</em>
-          </label>
-          <label className="amt-trim-field">
-            <span>End</span>
-            <input
-              type="range"
-              min={Math.min(duration, startSec + 0.5)}
-              max={duration || 0}
-              step="0.1"
-              value={endSec}
-              onChange={(e) => setEndSec(Number(e.target.value))}
-            />
-            <em>{formatSec(endSec)}</em>
-          </label>
-        </div>
-      </div>
+            <div className="amt-trim-grid">
+              <label className="amt-trim-field">
+                <span>Start</span>
+                <input
+                  type="range"
+                  min="0"
+                  max={Math.max(0, endSec - 0.5) || 0}
+                  step="0.1"
+                  value={startSec}
+                  onChange={(e) => setStartSec(Number(e.target.value))}
+                />
+                <em>{formatSec(startSec)}</em>
+              </label>
+              <label className="amt-trim-field">
+                <span>End</span>
+                <input
+                  type="range"
+                  min={Math.min(duration, startSec + 0.5)}
+                  max={duration || 0}
+                  step="0.1"
+                  value={endSec}
+                  onChange={(e) => setEndSec(Number(e.target.value))}
+                />
+                <em>{formatSec(endSec)}</em>
+              </label>
+            </div>
+          </div>
 
-      <div className="amt-actions">
-        <span className="amt-status">
-          {isDraft
-            ? 'Trim and name your clip, then save it to the library.'
-            : dirty
-            ? 'Unsaved changes'
-            : 'Saved'}
-        </span>
-        <button
-          type="button"
-          className="amt-save"
-          onClick={handleSave}
-          disabled={!dirty || saving || !name.trim()}
-        >
-          {saving
-            ? (isDraft ? 'Adding…' : 'Saving…')
-            : (isDraft ? 'Save to library' : 'Save')}
-        </button>
-      </div>
+          <div className="amt-actions">
+            <span className="amt-status">
+              {isDraft
+                ? 'Trim and name your clip, then save it to the library.'
+                : dirty
+                ? 'Unsaved changes'
+                : 'Saved'}
+            </span>
+            <button
+              type="button"
+              className="amt-save"
+              onClick={handleSave}
+              disabled={!dirty || saving || !name.trim()}
+            >
+              {saving
+                ? (isDraft ? 'Adding…' : 'Saving…')
+                : (isDraft ? 'Save to library' : 'Save')}
+            </button>
+          </div>
+        </>
+      ) : (
+        // Library view: read-only span summary, no edit affordances. The only
+        // way to change a saved clip is delete + re-upload.
+        <div className="amt-library-info">
+          <span className="amt-library-span">
+            <span className="amt-library-label">Saved span</span>
+            <span className="amt-library-value">{formatSec(startSec)} → {formatSec(endSec)}</span>
+            <span className="amt-library-len">({formatSec(Math.max(0, endSec - startSec))})</span>
+          </span>
+          <span className="amt-library-locked" title="Saved tracks can be deleted but not re-edited">🔒 Locked</span>
+        </div>
+      )}
     </div>
   )
 }
