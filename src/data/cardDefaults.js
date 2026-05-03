@@ -84,7 +84,7 @@ export const defaultCardObject = {
     openEffect: 'confetti',
     confettiColors: ['#76efff', '#62ffa2', '#ff9bd2'],
     backgroundEffect: {
-      type: 'sparkle',
+      type: 'fireflies',
       emojis: ['✨', '💫'],
     },
   },
@@ -278,7 +278,7 @@ export const templateCardObjects = {
       openEffect: 'confetti',
       confettiColors: ['#ff79c6', '#bd93f9', '#ff92d0', '#f8e8ff'],
       backgroundEffect: {
-        type: 'sparkle',
+        type: 'floating',
         emojis: ['💍', '✨', '💖'],
       },
     },

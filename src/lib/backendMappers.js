@@ -530,11 +530,15 @@ export function cardObjectToBackendPayload(cardObject, {
         type: (() => { const lt = cardObject.interaction?.lock?.type || 'none'; return lt === 'time' ? 'timer' : lt })(),
         value: String(cardObject.interaction?.lock?.value || ''),
       },
-      ambientEffect: {
-        type: cardObject.animation?.backgroundEffect?.type || 'none',
-        emojis: Array.isArray(cardObject.animation?.backgroundEffect?.emojis)
-          ? cardObject.animation.backgroundEffect.emojis : [],
-      },
+      ambientEffect: (() => {
+        const VALID_AMBIENT = new Set(['none', 'starfield', 'snow', 'bubbles', 'fountain', 'fireflies', 'floating'])
+        const rawType = cardObject.animation?.backgroundEffect?.type || 'none'
+        return {
+          type: VALID_AMBIENT.has(rawType) ? rawType : 'none',
+          emojis: Array.isArray(cardObject.animation?.backgroundEffect?.emojis)
+            ? cardObject.animation.backgroundEffect.emojis : [],
+        }
+      })(),
       animation: {
         // Map FE text animations → card entry animation
         entry: Number(cardObject.card?.textBodyAnimation?.selfTypeSpeed) > 0 ? 'slide'
