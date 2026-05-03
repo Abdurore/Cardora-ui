@@ -422,6 +422,13 @@ function WorldChat() {
               const bio = profileDetails?.bio || profileDetails?.about || null
               const joined = formatJoined(profileDetails?.createdAt || profileDetails?.joinedAt)
               const referrals = typeof profileDetails?.referralsCount === 'number' ? profileDetails.referralsCount : null
+              const cardsSent = profileDetails?.cardsSent ?? profileDetails?.cardsCount ?? profileDetails?.totalCards ?? null
+              const followers = profileDetails?.followersCount ?? profileDetails?.followers ?? null
+              const following = profileDetails?.followingCount ?? profileDetails?.following ?? null
+              const isVerified = profileDetails?.isVerified || profileDetails?.verified || false
+              const status = profileDetails?.status || profileDetails?.customStatus || null
+              const fullName = profileDetails?.fullName || profileDetails?.displayName || null
+              const location = profileDetails?.location || profileDetails?.country || null
 
               return (
                 <>
@@ -430,20 +437,54 @@ function WorldChat() {
                       {displayAvatarUrl
                         ? <img src={displayAvatarUrl} alt="" className="chat-profile-avatar" />
                         : <span className="chat-profile-avatar-initial">{(displayName || 'U')[0].toUpperCase()}</span>}
+                      {isVerified && <span className="chat-profile-verified" title="Verified">✓</span>}
                     </div>
                     <div className="chat-profile-info">
+                      {fullName && <p className="chat-profile-fullname">{fullName}</p>}
                       <p className="chat-profile-name">@{displayName}</p>
-                      {role && (
-                        <span className={`profile-role-badge ${roleBadgeClass(role)}`}>
-                          {roleIcon(role)} {role}
-                        </span>
-                      )}
+                      <div className="chat-profile-badges">
+                        {role && (
+                          <span className={`profile-role-badge ${roleBadgeClass(role)}`}>
+                            {roleIcon(role)} {role}
+                          </span>
+                        )}
+                        {status && <span className="chat-profile-status-pill">{status}</span>}
+                      </div>
                     </div>
                   </div>
 
                   {bio && <p className="chat-profile-bio">{bio}</p>}
 
-                  {(joined || referrals !== null) && (
+                  {(cardsSent !== null || followers !== null || following !== null || referrals !== null) && (
+                    <div className="chat-profile-stats">
+                      {cardsSent !== null && (
+                        <div className="chat-profile-stat">
+                          <strong>{cardsSent}</strong>
+                          <span>{cardsSent === 1 ? 'Card' : 'Cards'}</span>
+                        </div>
+                      )}
+                      {followers !== null && (
+                        <div className="chat-profile-stat">
+                          <strong>{followers}</strong>
+                          <span>{followers === 1 ? 'Follower' : 'Followers'}</span>
+                        </div>
+                      )}
+                      {following !== null && (
+                        <div className="chat-profile-stat">
+                          <strong>{following}</strong>
+                          <span>Following</span>
+                        </div>
+                      )}
+                      {referrals !== null && (
+                        <div className="chat-profile-stat">
+                          <strong>{referrals}</strong>
+                          <span>{referrals === 1 ? 'Referral' : 'Referrals'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(joined || location) && (
                     <div className="chat-profile-meta">
                       {joined && (
                         <span className="chat-profile-meta-item">
@@ -451,10 +492,10 @@ function WorldChat() {
                           Joined {joined}
                         </span>
                       )}
-                      {referrals !== null && (
+                      {location && (
                         <span className="chat-profile-meta-item">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                          {referrals} {referrals === 1 ? 'referral' : 'referrals'}
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                          {location}
                         </span>
                       )}
                     </div>

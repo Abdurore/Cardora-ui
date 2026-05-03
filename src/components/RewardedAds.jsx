@@ -78,8 +78,15 @@ function RewardedAds({ onBalanceUpdate }) {
     try {
       const res = await getRewardedAd()
       const adData = res?.ad || res?.data?.ad || res?.data || res
-      if (!adData?.id && !adData?._id) {
-        setError('No ads available right now. Try again later.')
+      // An ad is "real" if it has any of the identifying fields. Without a real
+      // ad, surface the backend's own message so admins can debug active state.
+      const looksLikeAd = adData && typeof adData === 'object' && (
+        adData.id || adData._id || adData.videoUrl || adData.imageUrl || adData.name
+      )
+      if (!looksLikeAd) {
+        console.warn('[RewardedAds] no ad in response:', res)
+        const backendMsg = res?.message || res?.error || res?.data?.message
+        setError(backendMsg || 'No ads available right now. If admin shows ads as active, you may have hit your daily limit or each ad\'s view cap.')
         setPhase('idle')
         return
       }
