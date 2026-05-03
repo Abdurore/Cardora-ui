@@ -571,10 +571,16 @@ function MainLayout() {
         return { ok: false, message: missing }
       }
 
-      // Forced endpoints reject unknown fields and forbid type/tier in body.
-      // We send ONLY { config, enhancements, layoutdata } — no top-level type/tier,
-      // no couponType/useCoupons/anonTemplate (those are frontend-only state).
-      const payload = backendPayload
+      // Endpoint routing (per API handbook table):
+      // /create-card/{classic|premium|elite}  → type REQUIRED in body, tier FORBIDDEN
+      // /create-card/{poll|chain|trivia|anonymous}/{classic|elite} → type FORBIDDEN in body
+      // /create-card/anonymous → type FORBIDDEN in body
+      // So: personal cards need { type, config, enhancements, layoutdata }
+      //     typed cards need    { config, enhancements, layoutdata }
+      const isPersonal = resolvedType === 'personal'
+      const payload = isPersonal
+        ? { type: 'personal', ...backendPayload }
+        : backendPayload
 
       const endpoint = resolvedType === 'poll'
         ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
