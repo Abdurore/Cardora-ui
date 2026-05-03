@@ -535,12 +535,9 @@ function MainLayout() {
   const handleCreateCard = async (cardObject, { type, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
       const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : (anonTemplate ? 'anonymous' : type)
-      const resolvedTier = (tier || 'classic').toLowerCase()
-
-      // Premium tier is ONLY valid for personal cards (engine.js line 139)
-      if (resolvedTier === 'premium' && resolvedType !== 'personal') {
-        return { ok: false, message: 'Premium tier is only available for personal cards.' }
-      }
+      // Premium is personal-only — upgrade poll/chain/trivia/anon to elite instead
+      const rawTier = (tier || 'classic').toLowerCase()
+      const resolvedTier = (rawTier === 'premium' && resolvedType !== 'personal') ? 'elite' : rawTier
 
       const backendPayload = cardObjectToBackendPayload(cardObject, {
         type: resolvedType,
