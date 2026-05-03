@@ -2143,119 +2143,107 @@ function CardStudio() {
     const bodySize = c.theme.bodySize ?? 16
     const imgs = c.media.images
     const imgCount = Math.min(imgs.length, 3)
-    return (
-      <div
-        className={`cs-preview-card ${compact ? 'compact' : ''}`}
-        style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}
-        onClick={() => setActiveEditEl(null)}
-      >
-        {/* Multi-image grid — all images shown */}
-        {!compact && imgs.length > 0 && (
-          <div className={`cs-preview-media-grid cs-preview-media-grid--${imgCount}`}>
-            {imgs.map((img, i) => {
-              const isActive = activeEditEl?.type === 'image' && activeEditEl.index === i
-              return (
-                <div
-                  key={i}
-                  className={`cs-preview-media-item${isActive ? ' cs-edit-active' : ''}`}
-                  style={{ height: img.height ? `${img.height}px` : undefined }}
-                  onPointerDown={e => { e.stopPropagation(); startImageDrag(e, i) }}
-                  onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'image', index: i }) }}
-                >
-                  <img
-                    src={img.url}
-                    alt={img.caption || ''}
-                    style={{
-                      objectFit: img.fit || 'cover',
-                      objectPosition: `${img.positionX ?? 50}% ${img.positionY ?? 50}%`,
-                      height: img.height ? `${img.height}px` : undefined,
-                    }}
-                    draggable={false}
-                  />
-                  {isActive && (
-                    <>
-                      <div className="cs-image-selected-bar" onClick={e => e.stopPropagation()}>
-                        <select
-                          value={img.fit || 'cover'}
-                          onChange={e => updateImageSetting(i, 'fit', e.target.value)}
-                        >
-                          <option value="cover">Cover</option>
-                          <option value="contain">Contain</option>
-                          <option value="fill">Fill</option>
-                        </select>
-                        <button type="button" onClick={() => { removeImage(i); setActiveEditEl(null) }}>
-                          Remove
-                        </button>
-                      </div>
-                      <div
-                        className="cs-resize-handle"
-                        onPointerDown={e => { e.stopPropagation(); startImageResize(e, i) }}
-                      />
-                    </>
-                  )}
-                </div>
-              )
-            })}
-            {imgs.length < (tierLimits.maxImages ?? Infinity) && (
-              <button
-                type="button"
-                className="cs-preview-add-image"
-                onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}
-              >
-                + Add
-              </button>
-            )}
-          </div>
+    const elementOrder = c.layout?.elementOrder || ['media', 'heading', 'body']
+
+    // Helper: move an element key up (-1) or down (+1) in the order
+    const moveEl = (key, dir) => {
+      const order = [...elementOrder]
+      const idx = order.indexOf(key)
+      if (idx < 0) return
+      const next = idx + dir
+      if (next < 0 || next >= order.length) return
+      ;[order[idx], order[next]] = [order[next], order[idx]]
+      update('layout.elementOrder', order)
+    }
+
+    // Map element type → order key
+    const elKey = activeEditEl?.type === 'image' ? 'media'
+      : activeEditEl?.type === 'heading' ? 'heading'
+      : activeEditEl?.type ? 'body' : null
+
+    // ─── Per-element JSX blocks ───────────────────────────────────────────
+    const mediaBlock = !compact && imgs.length > 0 ? (
+      <div key="media" className={`cs-preview-media-grid cs-preview-media-grid--${imgCount}`}>
+        {imgs.map((img, i) => {
+          const isActive = activeEditEl?.type === 'image' && activeEditEl.index === i
+          return (
+            <div
+              key={i}
+              className={`cs-preview-media-item${isActive ? ' cs-edit-active' : ''}`}
+              style={{ height: img.height ? `${img.height}px` : undefined }}
+              onPointerDown={e => { e.stopPropagation(); startImageDrag(e, i) }}
+              onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'image', index: i }) }}
+            >
+              <img
+                src={img.url}
+                alt={img.caption || ''}
+                style={{
+                  objectFit: img.fit || 'cover',
+                  objectPosition: `${img.positionX ?? 50}% ${img.positionY ?? 50}%`,
+                  height: img.height ? `${img.height}px` : undefined,
+                }}
+                draggable={false}
+              />
+              {isActive && (
+                <>
+                  <div className="cs-image-selected-bar" onClick={e => e.stopPropagation()}>
+                    <select value={img.fit || 'cover'} onChange={e => updateImageSetting(i, 'fit', e.target.value)}>
+                      <option value="cover">Cover</option>
+                      <option value="contain">Contain</option>
+                      <option value="fill">Fill</option>
+                    </select>
+                    <button type="button" onClick={() => { moveEl('media', -1) }} title="Move up">↑</button>
+                    <button type="button" onClick={() => { moveEl('media', 1) }} title="Move down">↓</button>
+                    <button type="button" onClick={() => { removeImage(i); setActiveEditEl(null) }}>Remove</button>
+                  </div>
+                  <div className="cs-resize-handle" onPointerDown={e => { e.stopPropagation(); startImageResize(e, i) }} />
+                </>
+              )}
+            </div>
+          )
+        })}
+        {imgs.length < (tierLimits.maxImages ?? Infinity) && (
+          <button type="button" className="cs-preview-add-image" onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
+            + Add
+          </button>
         )}
+      </div>
+    ) : null
 
-        {/* Heading — click to edit inline */}
-        <h3
-          contentEditable={!compact}
-          suppressContentEditableWarning
-          className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
-          style={{
-            color: c.card.headingColor,
-            fontFamily: `'${c.theme.fontFamily}', serif`,
-            fontSize: `${headingSize}px`,
-            outline: 'none',
-          }}
-          onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
-          onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
-        >
-          {c.content.heading}
-        </h3>
+    const headingBlock = (
+      <h3
+        key="heading"
+        contentEditable={!compact}
+        suppressContentEditableWarning
+        className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
+        style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
+        onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
+        onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+      >
+        {c.content.heading}
+      </h3>
+    )
 
-        {/* Body — click to edit inline */}
+    const bodyBlock = (
+      <div key="body">
         <p
           contentEditable={!compact}
           suppressContentEditableWarning
           className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
-          style={{
-            color: c.card.textColor,
-            fontFamily: `'${c.theme.fontFamily}', sans-serif`,
-            fontSize: `${bodySize}px`,
-            outline: 'none',
-          }}
+          style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
           onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
           onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
         >
           {c.content.body}
         </p>
-
-        {/* Extended body */}
         {(c.content.extendedBody || (!compact && activeEditEl?.type === 'extendedBody')) && (
           <p
             contentEditable={!compact}
             suppressContentEditableWarning
             className={`cs-extended cs-editable${!compact && activeEditEl?.type === 'extendedBody' ? ' cs-edit-active' : ''}`}
-            style={{
-              color: c.card.textColor,
-              fontFamily: `'${c.theme.fontFamily}', sans-serif`,
-              fontSize: `${bodySize}px`,
-              outline: 'none',
-            }}
+            style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
             onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'extendedBody', index: 0 }) } }}
             onBlur={e => { if (!compact) update('content.extendedBody', e.currentTarget.textContent) }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
@@ -2263,8 +2251,21 @@ function CardStudio() {
             {c.content.extendedBody}
           </p>
         )}
+      </div>
+    )
 
-        {/* Floating edit toolbar */}
+    const elementMap = { media: mediaBlock, heading: headingBlock, body: bodyBlock }
+
+    return (
+      <div
+        className={`cs-preview-card ${compact ? 'compact' : ''}`}
+        style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}
+        onClick={() => setActiveEditEl(null)}
+      >
+        {/* Render elements in user-defined order */}
+        {elementOrder.map(key => elementMap[key] ?? null)}
+
+        {/* Desktop floating edit toolbar (hidden on mobile via CSS) */}
         {!compact && activeEditEl && activeEditEl.type !== 'image' && (
           <div className="cs-edit-toolbar" ref={editPopoverRef} onClick={e => e.stopPropagation()}>
             {activeEditEl.type === 'heading' && (
@@ -2272,12 +2273,7 @@ function CardStudio() {
                 <span className="cs-edit-toolbar-label">Heading</span>
                 <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
                 <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
-                <input
-                  type="color"
-                  title="Heading color"
-                  value={c.card.headingColor || '#ffffff'}
-                  onChange={e => update('card.headingColor', e.target.value)}
-                />
+                <input type="color" title="Heading color" value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} />
               </>
             )}
             {(activeEditEl.type === 'body' || activeEditEl.type === 'extendedBody') && (
@@ -2285,12 +2281,15 @@ function CardStudio() {
                 <span className="cs-edit-toolbar-label">Text</span>
                 <button type="button" onClick={() => update('theme.bodySize', Math.max(10, bodySize - 1))}>A−</button>
                 <button type="button" onClick={() => update('theme.bodySize', Math.min(28, bodySize + 1))}>A+</button>
-                <input
-                  type="color"
-                  title="Text color"
-                  value={c.card.textColor || '#e2eaf0'}
-                  onChange={e => update('card.textColor', e.target.value)}
-                />
+                <input type="color" title="Text color" value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} />
+              </>
+            )}
+            {/* Reorder arrows for non-image elements */}
+            {elKey && (
+              <>
+                <span className="cs-edit-toolbar-sep" />
+                <button type="button" title="Move up" onClick={() => moveEl(elKey, -1)}>↑</button>
+                <button type="button" title="Move down" onClick={() => moveEl(elKey, 1)}>↓</button>
               </>
             )}
             <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
@@ -2301,9 +2300,7 @@ function CardStudio() {
           <div className="cs-preview-questions">
             <p className="cs-q-label">Questions ({c.questions.items.length})</p>
             {c.questions.items.map((q, i) => (
-              <div key={i} className="cs-q-preview-item">
-                <span>{q.text}</span>
-              </div>
+              <div key={i} className="cs-q-preview-item"><span>{q.text}</span></div>
             ))}
           </div>
         )}
@@ -2509,6 +2506,36 @@ function CardStudio() {
           <button type="button" className="cs-mobile-save" onClick={handleSave}>Save</button>
         </div>
 
+        {/* State nav — what part of the card is being edited */}
+        <div className="cs-mobile-state-nav">
+          <button
+            type="button"
+            className={`cs-mobile-state-btn${activeStep === 'closed' ? ' active' : ''}`}
+            onClick={() => goToStep('closed')}
+          >
+            <span className="cs-mobile-state-icon">🎁</span>
+            Envelope
+          </button>
+          <button
+            type="button"
+            className={`cs-mobile-state-btn${activeStep === 'card' || activeStep === 'questions' ? ' active' : ''}`}
+            onClick={() => goToStep('card')}
+          >
+            <span className="cs-mobile-state-icon">✉</span>
+            Card
+          </button>
+          {(c.questions.items.length > 0 || activeTool === 'questions') && (
+            <button
+              type="button"
+              className={`cs-mobile-state-btn${activeStep === 'questions' ? ' active' : ''}`}
+              onClick={() => goToStep('questions')}
+            >
+              <span className="cs-mobile-state-icon">💬</span>
+              Q&amp;A
+            </button>
+          )}
+        </div>
+
         {/* Full-height interactive preview */}
         <div
           className="cs-mobile-preview"
@@ -2574,30 +2601,45 @@ function CardStudio() {
                 <button type="button" className="cs-mobile-edit-btn cs-mobile-edit-remove" onClick={() => { removeImage(activeEditEl.index); setActiveEditEl(null) }}>Remove</button>
               </>
             )}
+            {/* Reorder arrows for all element types */}
+            {studioType === 'personal' && (() => {
+              const mobileElKey = activeEditEl.type === 'image' ? 'media' : activeEditEl.type === 'heading' ? 'heading' : 'body'
+              const mobileOrder = c.layout?.elementOrder || ['media', 'heading', 'body']
+              const mobileIdx = mobileOrder.indexOf(mobileElKey)
+              return (
+                <>
+                  <span className="cs-mobile-edit-sep" />
+                  <button
+                    type="button"
+                    className="cs-mobile-edit-btn"
+                    disabled={mobileIdx <= 0}
+                    onClick={() => {
+                      const o = [...mobileOrder]; [o[mobileIdx], o[mobileIdx - 1]] = [o[mobileIdx - 1], o[mobileIdx]]; update('layout.elementOrder', o)
+                    }}
+                    title="Move up"
+                  >↑</button>
+                  <button
+                    type="button"
+                    className="cs-mobile-edit-btn"
+                    disabled={mobileIdx >= mobileOrder.length - 1}
+                    onClick={() => {
+                      const o = [...mobileOrder]; [o[mobileIdx], o[mobileIdx + 1]] = [o[mobileIdx + 1], o[mobileIdx]]; update('layout.elementOrder', o)
+                    }}
+                    title="Move down"
+                  >↓</button>
+                </>
+              )
+            })()}
             <button type="button" className="cs-mobile-edit-done" onClick={() => setActiveEditEl(null)}>Done</button>
           </div>
         )}
 
-        {/* Slim bottom bar: step nav + Tools button */}
+        {/* Slim bottom bar: Tools button only (state nav is at top) */}
         <div className="cs-mobile-bottom-bar">
-          <div className="cs-mobile-stepnav">
-            {steps.map(step => (
-              <button
-                key={step}
-                type="button"
-                className={`cs-mobile-step ${activeStep === step ? 'active' : ''}`}
-                onClick={() => goToStep(step)}
-              >
-                {step === 'closed' ? 'Closed' : step.charAt(0).toUpperCase() + step.slice(1)}
-              </button>
-            ))}
-          </div>
-          <div className="cs-mobile-bottom-actions">
-            <button type="button" className="cs-mobile-tools-btn" onClick={() => setMobilePanelOpen(true)}>
-              <HiOutlineSparkles size={16} />
-              <span>Tools</span>
-            </button>
-          </div>
+          <button type="button" className="cs-mobile-tools-btn" onClick={() => setMobilePanelOpen(true)}>
+            <HiOutlineSparkles size={16} />
+            <span>Tools &amp; Settings</span>
+          </button>
         </div>
 
         {/* Footer */}

@@ -7630,6 +7630,13 @@ a {
   font-size: 1rem !important;
   padding: 1px 7px !important;
 }
+.cs-edit-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
 
 /* CardPreviewModal multi-image grid */
 .cp-media-grid--2 {
@@ -8591,62 +8598,81 @@ a {
     pointer-events: none;
   }
 
-  /* Slim bottom bar: step nav + Tools button */
+  /* State nav — shows which card state is being edited (top of preview) */
+  .cs-mobile-state-nav {
+    flex-shrink: 0;
+    display: flex;
+    align-items: stretch;
+    background: rgba(4, 8, 14, 0.98);
+    border-bottom: 1px solid rgba(118, 239, 255, 0.07);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .cs-mobile-state-nav::-webkit-scrollbar { display: none; }
+  .cs-mobile-state-btn {
+    flex: 1;
+    min-width: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 9px 12px 8px;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: rgba(200, 230, 240, 0.38);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  .cs-mobile-state-btn.active {
+    color: var(--type-accent, #7ef7ff);
+    border-bottom-color: var(--type-accent, #7ef7ff);
+    background: rgba(118, 239, 255, 0.04);
+    font-weight: 600;
+  }
+  .cs-mobile-state-icon {
+    font-size: 1rem;
+    line-height: 1;
+    display: block;
+  }
+
+  /* Slim bottom bar: just the Tools button */
   .cs-mobile-bottom-bar {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 0;
+    justify-content: center;
     background: rgba(4, 8, 14, 0.96);
     border-top: 1px solid rgba(118, 239, 255, 0.07);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
-  .cs-mobile-stepnav {
-    flex: 1;
-    display: flex;
-    gap: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding: 0 8px;
-  }
-  .cs-mobile-stepnav::-webkit-scrollbar { display: none; }
-  .cs-mobile-step {
-    padding: 12px 14px;
-    border-radius: 0;
-    white-space: nowrap;
-    flex-shrink: 0;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: transparent;
-    color: rgba(200, 230, 240, 0.4);
-    font-size: 0.74rem;
-    letter-spacing: 0.02em;
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .cs-mobile-step.active {
-    color: var(--type-accent, #7ef7ff);
-    border-bottom-color: var(--type-accent, #7ef7ff);
-    font-weight: 600;
-  }
-  .cs-mobile-bottom-actions {
-    flex-shrink: 0;
-    padding: 0 10px;
-    border-left: 1px solid rgba(118, 239, 255, 0.07);
-  }
   .cs-mobile-tools-btn {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 10px 14px;
+    gap: 6px;
+    padding: 12px 28px;
     background: transparent;
     border: 0;
     color: rgba(200, 230, 240, 0.55);
-    font-size: 0.74rem;
+    font-size: 0.78rem;
     cursor: pointer;
     white-space: nowrap;
+    letter-spacing: 0.03em;
   }
   .cs-mobile-tools-btn:active { color: var(--type-accent, #7ef7ff); }
+  .cs-mobile-edit-sep {
+    width: 1px;
+    height: 22px;
+    background: rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+    margin: 0 4px;
+  }
 
   /* Element edit bar — slides up when element tapped */
   .cs-mobile-edit-bar {

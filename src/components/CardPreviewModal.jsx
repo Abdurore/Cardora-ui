@@ -495,60 +495,64 @@ function CardPreviewModal({
               style={cardSurfaceStyle({ ...borderStyle, '--scrollbar-color': c.card.scrollbarColor })}
             >
               <div className="cp-card-inner cp-card-inner-full" style={{ '--scrollbar-color': c.card.scrollbarColor }}>
-                {/* Heading */}
-                <h2
-                  className={`cp-heading cp-reveal-element ${revealStep >= 1 ? 'visible' : ''}`}
-                  style={{
-                    color: c.card.headingColor,
-                    fontFamily: `'${c.theme.fontFamily}', serif`,
-                    fontSize: `${c.theme.headingSize ?? 28}px`,
-                  }}
-                >
-                  {c.content.heading}
-                </h2>
-
-                {/* Media — show all uploaded images */}
-                {mediaAllowed && c.media.images.length > 0 && (
-                  <div
-                    className={`cp-media-section cp-media-section-full cp-media-grid--${Math.min(c.media.images.length, 3)} cp-reveal-element ${revealStep >= 2 ? 'visible' : ''} ${revealStep >= 4 ? 'settled' : ''}`}
-                    style={{
-                      transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s',
-                    }}
-                  >
-                    {c.media.images.map((img, i) => (
-                      <div key={i} className="cp-media-item cp-media-item-full">
-                        <img
-                          src={img.url}
-                          alt={img.caption || ''}
-                          style={{
-                            objectFit: img.fit || 'cover',
-                            objectPosition: `${img.positionX ?? 50}% ${img.positionY ?? 50}%`,
-                            height: img.height ? `${img.height}px` : undefined,
-                          }}
-                        />
-                        {img.caption && <p className="cp-caption cp-caption-full">{img.caption}</p>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Body */}
-                <div
-                  className={`cp-body cp-reveal-element ${fadeBody && revealStep >= 3 ? 'visible' : ''}`}
-                  style={{
-                    color: c.card.textColor,
-                    fontFamily: `'${c.theme.fontFamily}', sans-serif`,
-                    fontSize: `${c.theme.bodySize ?? 16}px`,
-                    transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s',
-                  }}
-                >
-                  <p>{hasTypewriter ? typedBody : c.content.body}</p>
-                  {c.content.extendedBody && (
-                    <p className="cp-extended">
-                      {hasTypewriter ? typedExtended : c.content.extendedBody}
-                    </p>
-                  )}
-                </div>
+                {/* Render card body elements in the user-defined order */}
+                {(c.layout?.elementOrder || ['media', 'heading', 'body']).map(key => {
+                  if (key === 'heading') return (
+                    <h2
+                      key="heading"
+                      className={`cp-heading cp-reveal-element ${revealStep >= 1 ? 'visible' : ''}`}
+                      style={{
+                        color: c.card.headingColor,
+                        fontFamily: `'${c.theme.fontFamily}', serif`,
+                        fontSize: `${c.theme.headingSize ?? 28}px`,
+                      }}
+                    >
+                      {c.content.heading}
+                    </h2>
+                  )
+                  if (key === 'media') return mediaAllowed && c.media.images.length > 0 ? (
+                    <div
+                      key="media"
+                      className={`cp-media-section cp-media-section-full cp-media-grid--${Math.min(c.media.images.length, 3)} cp-reveal-element ${revealStep >= 2 ? 'visible' : ''} ${revealStep >= 4 ? 'settled' : ''}`}
+                      style={{ transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s' }}
+                    >
+                      {c.media.images.map((img, i) => (
+                        <div key={i} className="cp-media-item cp-media-item-full">
+                          <img
+                            src={img.url}
+                            alt={img.caption || ''}
+                            style={{
+                              objectFit: img.fit || 'cover',
+                              objectPosition: `${img.positionX ?? 50}% ${img.positionY ?? 50}%`,
+                              height: img.height ? `${img.height}px` : undefined,
+                            }}
+                          />
+                          {img.caption && <p className="cp-caption cp-caption-full">{img.caption}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null
+                  if (key === 'body') return (
+                    <div
+                      key="body"
+                      className={`cp-body cp-reveal-element ${fadeBody && revealStep >= 3 ? 'visible' : ''}`}
+                      style={{
+                        color: c.card.textColor,
+                        fontFamily: `'${c.theme.fontFamily}', sans-serif`,
+                        fontSize: `${c.theme.bodySize ?? 16}px`,
+                        transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s',
+                      }}
+                    >
+                      <p>{hasTypewriter ? typedBody : c.content.body}</p>
+                      {c.content.extendedBody && (
+                        <p className="cp-extended">
+                          {hasTypewriter ? typedExtended : c.content.extendedBody}
+                        </p>
+                      )}
+                    </div>
+                  )
+                  return null
+                })}
 
                 {/* Continue */}
                 <button
