@@ -381,6 +381,12 @@ function CardStudio() {
   const pendingUploadsRef = useRef(new Map()) // blobUrl → { file, type }
   const [isUploading, setIsUploading] = useState(false)
 
+  // Interactive preview editing
+  const [activeEditEl, setActiveEditEl] = useState(null) // { type:'heading'|'body'|'extendedBody'|'image', index:number }
+  const dragStateRef = useRef(null)
+  const editPopoverRef = useRef(null)
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
+
   // Poll / Trivia / Chain / Anonymous template state
   const [pollData, setPollData] = useState({ question: '', options: ['', ''], allowMultiple: false })
   const [triviaData, setTriviaData] = useState({
@@ -664,6 +670,47 @@ function CardStudio() {
     const imgs = [...c.media.images]
     imgs[idx] = { ...imgs[idx], [key]: value }
     update('media.images', imgs)
+  }
+
+  // Interactive preview: image drag to reposition
+  const startImageDrag = (e, imgIndex) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragStateRef.current = {
+      imgIndex,
+      startX: e.clientX, startY: e.clientY,
+      origX: c.media.images[imgIndex]?.positionX ?? 50,
+      origY: c.media.images[imgIndex]?.positionY ?? 50,
+      mode: 'drag',
+    }
+    const onMove = (ev) => {
+      const { imgIndex: idx, startX, startY, origX, origY } = dragStateRef.current
+      const dx = (ev.clientX - startX) / 2.5
+      const dy = (ev.clientY - startY) / 2.5
+      updateImageSetting(idx, 'positionX', Math.max(0, Math.min(100, origX - dx)))
+      updateImageSetting(idx, 'positionY', Math.max(0, Math.min(100, origY - dy)))
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      dragStateRef.current = null
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp, { once: true })
+  }
+
+  // Interactive preview: image resize (drag bottom edge)
+  const startImageResize = (e, imgIndex) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startY = e.clientY
+    const origHeight = c.media.images[imgIndex]?.height ?? 160
+    const onMove = (ev) => {
+      const newH = Math.max(60, Math.min(320, origHeight + (ev.clientY - startY)))
+      updateImageSetting(imgIndex, 'height', newH)
+    }
+    const onUp = () => window.removeEventListener('pointermove', onMove)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp, { once: true })
   }
 
   const addQuestion = () => {
@@ -1892,8 +1939,6 @@ function CardStudio() {
   const renderStudioContentPreview = (compact = false) => {
     const previewQuestion = triviaData.questions[0] || { text: '', options: ['', '', '', ''], correctIndex: 0 }
     const previewPollOptions = pollData.options.filter(Boolean)
-    const primaryImage = c.media.images[0]
-
     if (studioType === 'poll') {
       return (
         <div className={`cs-preview-poll ${compact ? 'compact' : ''}`} style={{
@@ -2096,43 +2141,166 @@ function CardStudio() {
 
     const headingSize = c.theme.headingSize ?? 28
     const bodySize = c.theme.bodySize ?? 16
-    return (
-      <div className={`cs-preview-card ${compact ? 'compact' : ''}`} style={{
-        backgroundColor: c.card.backgroundColor,
-        ...cardBorderCss,
-      }}>
-        {primaryImage && (
-          <div className="cs-preview-media">
-            <img
-              src={primaryImage.url}
-              alt=""
-              style={{
-                objectFit: primaryImage.fit || 'cover',
-                objectPosition: `${primaryImage.positionX ?? 50}% ${primaryImage.positionY ?? 50}%`,
-              }}
-            />
-          </div>
+    const imgs = c.media.images
+    const imgCount = Math.min(imgs.length, 3)
+    const elementOrder = c.layout?.elementOrder || ['media', 'heading', 'body']
+
+    // Helper: move an element key up (-1) or down (+1) in the order
+    const moveEl = (key, dir) => {
+      const order = [...elementOrder]
+      const idx = order.indexOf(key)
+      if (idx < 0) return
+      const next = idx + dir
+      if (next < 0 || next >= order.length) return
+      ;[order[idx], order[next]] = [order[next], order[idx]]
+      update('layout.elementOrder', order)
+    }
+
+    // Map element type → order key
+    const elKey = activeEditEl?.type === 'image' ? 'media'
+      : activeEditEl?.type === 'heading' ? 'heading'
+      : activeEditEl?.type ? 'body' : null
+
+    // ─── Per-element JSX blocks ───────────────────────────────────────────
+    const mediaBlock = !compact && imgs.length > 0 ? (
+      <div key="media" className={`cs-preview-media-grid cs-preview-media-grid--${imgCount}`}>
+        {imgs.map((img, i) => {
+          const isActive = activeEditEl?.type === 'image' && activeEditEl.index === i
+          return (
+            <div
+              key={i}
+              className={`cs-preview-media-item${isActive ? ' cs-edit-active' : ''}`}
+              style={{ height: img.height ? `${img.height}px` : undefined }}
+              onPointerDown={e => { e.stopPropagation(); startImageDrag(e, i) }}
+              onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'image', index: i }) }}
+            >
+              <img
+                src={img.url}
+                alt={img.caption || ''}
+                style={{
+                  objectFit: img.fit || 'cover',
+                  objectPosition: `${img.positionX ?? 50}% ${img.positionY ?? 50}%`,
+                  height: img.height ? `${img.height}px` : undefined,
+                }}
+                draggable={false}
+              />
+              {isActive && (
+                <>
+                  <div className="cs-image-selected-bar" onClick={e => e.stopPropagation()}>
+                    <select value={img.fit || 'cover'} onChange={e => updateImageSetting(i, 'fit', e.target.value)}>
+                      <option value="cover">Cover</option>
+                      <option value="contain">Contain</option>
+                      <option value="fill">Fill</option>
+                    </select>
+                    <button type="button" onClick={() => { moveEl('media', -1) }} title="Move up">↑</button>
+                    <button type="button" onClick={() => { moveEl('media', 1) }} title="Move down">↓</button>
+                    <button type="button" onClick={() => { removeImage(i); setActiveEditEl(null) }}>Remove</button>
+                  </div>
+                  <div className="cs-resize-handle" onPointerDown={e => { e.stopPropagation(); startImageResize(e, i) }} />
+                </>
+              )}
+            </div>
+          )
+        })}
+        {imgs.length < (tierLimits.maxImages ?? Infinity) && (
+          <button type="button" className="cs-preview-add-image" onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
+            + Add
+          </button>
         )}
-        <h3 style={{
-          color: c.card.headingColor,
-          fontFamily: `'${c.theme.fontFamily}', serif`,
-          fontSize: `${headingSize}px`,
-        }}>
-          {c.content.heading}
-        </h3>
-        <p style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px` }}>{c.content.body}</p>
-        {c.content.extendedBody && (
-          <p className="cs-extended" style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px` }}>
+      </div>
+    ) : null
+
+    const headingBlock = (
+      <h3
+        key="heading"
+        contentEditable={!compact}
+        suppressContentEditableWarning
+        className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
+        style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
+        onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
+        onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+      >
+        {c.content.heading}
+      </h3>
+    )
+
+    const bodyBlock = (
+      <div key="body">
+        <p
+          contentEditable={!compact}
+          suppressContentEditableWarning
+          className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
+          style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
+          onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
+          onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
+        >
+          {c.content.body}
+        </p>
+        {(c.content.extendedBody || (!compact && activeEditEl?.type === 'extendedBody')) && (
+          <p
+            contentEditable={!compact}
+            suppressContentEditableWarning
+            className={`cs-extended cs-editable${!compact && activeEditEl?.type === 'extendedBody' ? ' cs-edit-active' : ''}`}
+            style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
+            onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'extendedBody', index: 0 }) } }}
+            onBlur={e => { if (!compact) update('content.extendedBody', e.currentTarget.textContent) }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
+          >
             {c.content.extendedBody}
           </p>
         )}
+      </div>
+    )
+
+    const elementMap = { media: mediaBlock, heading: headingBlock, body: bodyBlock }
+
+    return (
+      <div
+        className={`cs-preview-card ${compact ? 'compact' : ''}`}
+        style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}
+        onClick={() => setActiveEditEl(null)}
+      >
+        {/* Render elements in user-defined order */}
+        {elementOrder.map(key => elementMap[key] ?? null)}
+
+        {/* Desktop floating edit toolbar (hidden on mobile via CSS) */}
+        {!compact && activeEditEl && activeEditEl.type !== 'image' && (
+          <div className="cs-edit-toolbar" ref={editPopoverRef} onClick={e => e.stopPropagation()}>
+            {activeEditEl.type === 'heading' && (
+              <>
+                <span className="cs-edit-toolbar-label">Heading</span>
+                <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
+                <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
+                <input type="color" title="Heading color" value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} />
+              </>
+            )}
+            {(activeEditEl.type === 'body' || activeEditEl.type === 'extendedBody') && (
+              <>
+                <span className="cs-edit-toolbar-label">Text</span>
+                <button type="button" onClick={() => update('theme.bodySize', Math.max(10, bodySize - 1))}>A−</button>
+                <button type="button" onClick={() => update('theme.bodySize', Math.min(28, bodySize + 1))}>A+</button>
+                <input type="color" title="Text color" value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} />
+              </>
+            )}
+            {/* Reorder arrows for non-image elements */}
+            {elKey && (
+              <>
+                <span className="cs-edit-toolbar-sep" />
+                <button type="button" title="Move up" onClick={() => moveEl(elKey, -1)}>↑</button>
+                <button type="button" title="Move down" onClick={() => moveEl(elKey, 1)}>↓</button>
+              </>
+            )}
+            <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
+          </div>
+        )}
+
         {c.questions.items.length > 0 && (
           <div className="cs-preview-questions">
             <p className="cs-q-label">Questions ({c.questions.items.length})</p>
             {c.questions.items.map((q, i) => (
-              <div key={i} className="cs-q-preview-item">
-                <span>{q.text}</span>
-              </div>
+              <div key={i} className="cs-q-preview-item"><span>{q.text}</span></div>
             ))}
           </div>
         )}
@@ -2331,13 +2499,49 @@ function CardStudio() {
 
       {/* Mobile layout */}
       <div className="cs-mobile-shell">
+        {/* Header */}
         <div className="cs-mobile-header">
           <button type="button" className="cs-mobile-back" onClick={() => navigate(-1)}>‹</button>
           <div className="cs-mobile-title">{typeMeta.emoji} {typeMeta.label}</div>
           <button type="button" className="cs-mobile-save" onClick={handleSave}>Save</button>
         </div>
 
-        <div className="cs-mobile-preview" style={{ background: previewBg }}>
+        {/* State nav — what part of the card is being edited */}
+        <div className="cs-mobile-state-nav">
+          <button
+            type="button"
+            className={`cs-mobile-state-btn${activeStep === 'closed' ? ' active' : ''}`}
+            onClick={() => goToStep('closed')}
+          >
+            <span className="cs-mobile-state-icon">🎁</span>
+            Envelope
+          </button>
+          <button
+            type="button"
+            className={`cs-mobile-state-btn${activeStep === 'card' || activeStep === 'questions' ? ' active' : ''}`}
+            onClick={() => goToStep('card')}
+          >
+            <span className="cs-mobile-state-icon">✉</span>
+            Card
+          </button>
+          {(c.questions.items.length > 0 || activeTool === 'questions') && (
+            <button
+              type="button"
+              className={`cs-mobile-state-btn${activeStep === 'questions' ? ' active' : ''}`}
+              onClick={() => goToStep('questions')}
+            >
+              <span className="cs-mobile-state-icon">💬</span>
+              Q&amp;A
+            </button>
+          )}
+        </div>
+
+        {/* Full-height interactive preview */}
+        <div
+          className="cs-mobile-preview"
+          style={{ background: previewBg }}
+          onClick={() => setActiveEditEl(null)}
+        >
           {c.background.type === 'image' && c.background.imageUrl ? (
             <img className="cs-mobile-background" src={c.background.imageUrl} alt="" />
           ) : null}
@@ -2355,58 +2559,90 @@ function CardStudio() {
               <p style={{ color: c.closedState.textColor }}>{c.closedState.bodyText}</p>
             </div>
           ) : (
-            renderStudioContentPreview(true)
+            renderStudioContentPreview(false)
+          )}
+          {/* Tap hint — fades after first edit */}
+          {!activeEditEl && studioType === 'personal' && c.media.images.length === 0 && (
+            <p className="cs-mobile-tap-hint">Tap text to edit directly</p>
           )}
         </div>
 
-        {/* Scroll zone: tabs are sticky inside here, panel scrolls freely */}
-        <div className="cs-mobile-scroll-zone">
-          <div className="cs-mobile-sticky-bar">
-            <div className="cs-mobile-stepnav">
-              {steps.map(step => (
-                <button
-                  key={step}
-                  type="button"
-                  className={`cs-mobile-step ${activeStep === step ? 'active' : ''}`}
-                  onClick={() => goToStep(step)}
+        {/* Element-specific edit bar — slides up when element tapped */}
+        {activeEditEl && (
+          <div className="cs-mobile-edit-bar">
+            {activeEditEl.type === 'heading' && (
+              <>
+                <span className="cs-mobile-edit-label">Heading</span>
+                <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.headingSize', Math.max(14, (c.theme.headingSize ?? 28) - 2))}>A−</button>
+                <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.headingSize', Math.min(56, (c.theme.headingSize ?? 28) + 2))}>A+</button>
+                <input type="color" className="cs-mobile-edit-color" title="Heading color" value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} />
+              </>
+            )}
+            {(activeEditEl.type === 'body' || activeEditEl.type === 'extendedBody') && (
+              <>
+                <span className="cs-mobile-edit-label">Text</span>
+                <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.bodySize', Math.max(10, (c.theme.bodySize ?? 16) - 1))}>A−</button>
+                <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.bodySize', Math.min(28, (c.theme.bodySize ?? 16) + 1))}>A+</button>
+                <input type="color" className="cs-mobile-edit-color" title="Text color" value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} />
+              </>
+            )}
+            {activeEditEl.type === 'image' && (
+              <>
+                <span className="cs-mobile-edit-label">Image</span>
+                <select
+                  className="cs-mobile-edit-select"
+                  value={c.media.images[activeEditEl.index]?.fit || 'cover'}
+                  onChange={e => updateImageSetting(activeEditEl.index, 'fit', e.target.value)}
                 >
-                  {step === 'closed' ? 'Closed' : step}
-                </button>
-              ))}
-            </div>
-
-            <div className="cs-mobile-tools">
-              {TOOL_GROUP_ORDER.flatMap((group) =>
-                activeTools.filter(t => t.group === group)
-              ).map(tool => {
-                const Icon = tool.icon
-                return (
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                  <option value="fill">Fill</option>
+                </select>
+                <button type="button" className="cs-mobile-edit-btn cs-mobile-edit-remove" onClick={() => { removeImage(activeEditEl.index); setActiveEditEl(null) }}>Remove</button>
+              </>
+            )}
+            {/* Reorder arrows for all element types */}
+            {studioType === 'personal' && (() => {
+              const mobileElKey = activeEditEl.type === 'image' ? 'media' : activeEditEl.type === 'heading' ? 'heading' : 'body'
+              const mobileOrder = c.layout?.elementOrder || ['media', 'heading', 'body']
+              const mobileIdx = mobileOrder.indexOf(mobileElKey)
+              return (
+                <>
+                  <span className="cs-mobile-edit-sep" />
                   <button
-                    key={tool.id}
                     type="button"
-                    className={`cs-mobile-tool-chip ${activeTool === tool.id ? 'active' : ''}`}
+                    className="cs-mobile-edit-btn"
+                    disabled={mobileIdx <= 0}
                     onClick={() => {
-                      setActiveTool(tool.id)
-                      if (tool.id === 'closedState') setActiveStep('closed')
-                      else if (tool.id === 'questions') setActiveStep('questions')
-                      else setActiveStep('card')
+                      const o = [...mobileOrder]; [o[mobileIdx], o[mobileIdx - 1]] = [o[mobileIdx - 1], o[mobileIdx]]; update('layout.elementOrder', o)
                     }}
-                  >
-                    <Icon size={16} />
-                    <span>{tool.label}</span>
-                  </button>
-                )
-              })}
-            </div>
+                    title="Move up"
+                  >↑</button>
+                  <button
+                    type="button"
+                    className="cs-mobile-edit-btn"
+                    disabled={mobileIdx >= mobileOrder.length - 1}
+                    onClick={() => {
+                      const o = [...mobileOrder]; [o[mobileIdx], o[mobileIdx + 1]] = [o[mobileIdx + 1], o[mobileIdx]]; update('layout.elementOrder', o)
+                    }}
+                    title="Move down"
+                  >↓</button>
+                </>
+              )
+            })()}
+            <button type="button" className="cs-mobile-edit-done" onClick={() => setActiveEditEl(null)}>Done</button>
           </div>
+        )}
 
-          {/* Editing panel — scrolls inside scroll-zone */}
-          <div className="cs-mobile-panel">
-            {renderPanel()}
-          </div>
+        {/* Slim bottom bar: Tools button only (state nav is at top) */}
+        <div className="cs-mobile-bottom-bar">
+          <button type="button" className="cs-mobile-tools-btn" onClick={() => setMobilePanelOpen(true)}>
+            <HiOutlineSparkles size={16} />
+            <span>Tools &amp; Settings</span>
+          </button>
         </div>
 
-        {/* Footer: natural-flow bottom bar */}
+        {/* Footer */}
         <div className="cs-mobile-footer">
           <button type="button" className="cs-mobile-ghost" onClick={enterPreview}>
             <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
@@ -2424,6 +2660,43 @@ function CardStudio() {
             </button>
           )}
         </div>
+
+        {/* Tool panel bottom sheet */}
+        {mobilePanelOpen && (
+          <div className="cs-mobile-panel-sheet">
+            <div className="cs-mobile-panel-backdrop" onClick={() => setMobilePanelOpen(false)} />
+            <div className="cs-mobile-panel-content">
+              <div className="cs-mobile-panel-handle" />
+              <div className="cs-mobile-panel-header">
+                <div className="cs-mobile-tools">
+                  {TOOL_GROUP_ORDER.flatMap(group => activeTools.filter(t => t.group === group)).map(tool => {
+                    const Icon = tool.icon
+                    return (
+                      <button
+                        key={tool.id}
+                        type="button"
+                        className={`cs-mobile-tool-chip ${activeTool === tool.id ? 'active' : ''}`}
+                        onClick={() => {
+                          setActiveTool(tool.id)
+                          if (tool.id === 'closedState') setActiveStep('closed')
+                          else if (tool.id === 'questions') setActiveStep('questions')
+                          else setActiveStep('card')
+                        }}
+                      >
+                        <Icon size={15} />
+                        <span>{tool.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <button type="button" className="cs-mobile-panel-done" onClick={() => setMobilePanelOpen(false)}>Done</button>
+              </div>
+              <div className="cs-mobile-panel-body">
+                {renderPanel()}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Preview Modal */}
