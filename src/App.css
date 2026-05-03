@@ -19639,3 +19639,46 @@ a {
   color: #ffc83c;
   border-color: rgba(255,200,60,0.18);
 }
+
+/* ── RewardedAds video player overlays ──────────────── */
+.rad-player { position: relative; border-radius: 12px; overflow: hidden; background: #000; }
+.rad-video { width: 100%; display: block; max-height: 280px; object-fit: contain; background: #000; }
+.rad-overlay-top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 10px; background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent); pointer-events: none; }
+.rad-brand-pill { font-size: 0.7rem; color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.4); border-radius: 6px; padding: 2px 8px; pointer-events: none; }
+.rad-skip-btn { font-size: 0.72rem; color: #fff; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 3px 10px; cursor: pointer; pointer-events: all; }
+.rad-overlay-bottom { position: absolute; bottom: 28px; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; }
+.rad-cta-btn { font-size: 0.78rem; font-weight: 600; color: #0b0f12; background: linear-gradient(135deg, #7ef7ff, #62ffa2); border: none; border-radius: 8px; padding: 6px 16px; cursor: pointer; text-decoration: none; }
+.rad-video-controls { display: flex; gap: 6px; margin-left: auto; }
+.rad-ctrl-btn { width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.rad-progress-bar { height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; margin-top: 0; }
+.rad-progress-fill { height: 100%; background: linear-gradient(90deg, #7ef7ff, #62ffa2); border-radius: 2px; transition: width 0.25s linear; }
+
+/* ── Admin fixed toast (scroll-position independent) ── */
+.admin-fixed-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: fadeInUp 0.2s ease;
+}
+.admin-fixed-toast.success {
+  background: rgba(98, 255, 162, 0.15);
+  color: #62ffa2;
+  border: 1px solid rgba(98, 255, 162, 0.3);
+}
+.admin-fixed-toast.error {
+  background: rgba(255, 80, 120, 0.15);
+  color: #ff9bd2;
+  border: 1px solid rgba(255, 80, 120, 0.3);
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
