@@ -6,25 +6,23 @@ const DEFAULT_COLORS = ['#76efff', '#62ffa2', '#ff9bd2', '#ffd166', '#f4fdff']
 // lighter set. Elite unlocks everything. `tier: 'none'` means the option is
 // available to all (e.g. the 'None' off-state).
 export const OPEN_EFFECTS = [
-  { value: 'none',      label: 'None',              tier: 'none' },
-  { value: 'confetti',  label: '🎉 Confetti',        tier: 'premium' },
-  { value: 'hearts',    label: '💖 Hearts Burst',    tier: 'premium' },
-  { value: 'stars',     label: '⭐ Star Shower',     tier: 'premium' },
-  { value: 'fireworks', label: '🎆 Fireworks',       tier: 'elite' },
-  { value: 'balloons',  label: '🎈 Balloons',        tier: 'elite' },
-  { value: 'emojiRain', label: '✨ Emoji Rain',      tier: 'elite' },
+  { value: 'none',        label: 'None',           tier: 'none' },
+  { value: 'confetti',    label: '🎉 Confetti',     tier: 'premium' },
+  { value: 'heartsBurst', label: '💖 Hearts Burst', tier: 'premium' },
+  { value: 'starShower',  label: '⭐ Star Shower',  tier: 'premium' },
+  { value: 'fireworks',   label: '🎆 Fireworks',    tier: 'elite' },
+  { value: 'balloons',    label: '🎈 Balloons',     tier: 'elite' },
+  { value: 'emojiRain',   label: '✨ Emoji Rain',   tier: 'elite' },
 ]
 
 export const AMBIENT_EFFECTS = [
-  { value: 'none',      label: 'None',              tier: 'none' },
-  { value: 'sparkle',   label: 'Sparkle',           tier: 'premium' },
-  { value: 'stars',     label: 'Starfield',         tier: 'premium' },
-  { value: 'bubbles',   label: 'Bubbles',           tier: 'premium' },
-  { value: 'snow',      label: 'Snow',              tier: 'elite' },
-  { value: 'fountain',  label: 'Fountain',          tier: 'elite' },
-  { value: 'hearts',    label: 'Floating Hearts',   tier: 'elite' },
-  { value: 'fireflies', label: 'Fireflies',         tier: 'elite' },
-  { value: 'floating',  label: 'Floating (emoji)',  tier: 'elite' },
+  { value: 'none',      label: 'None',         tier: 'none' },
+  { value: 'starfield', label: '⭐ Starfield',  tier: 'premium' },
+  { value: 'bubbles',   label: '🫧 Bubbles',    tier: 'premium' },
+  { value: 'snow',      label: '❄️ Snow',       tier: 'elite' },
+  { value: 'fountain',  label: '⛲ Fountain',   tier: 'elite' },
+  { value: 'fireflies', label: '✨ Fireflies',  tier: 'elite' },
+  { value: 'floating',  label: '💫 Floating',   tier: 'elite' },
 ]
 
 const TIER_RANK = { classic: 0, premium: 1, elite: 2 }
@@ -54,8 +52,10 @@ export function fireOpenEffect(type, colors) {
       return fireConfetti(palette)
     case 'fireworks':
       return fireFireworks(palette)
+    case 'heartsBurst':
     case 'hearts':
       return fireShapeBurst('❤️', palette, { spread: 90, startVelocity: 45 })
+    case 'starShower':
     case 'stars':
       return fireStarShower(palette)
     case 'balloons':
@@ -178,6 +178,7 @@ export function getAmbientPreset(type, colors = DEFAULT_COLORS) {
   const palette = resolveColors(colors)
   switch (type) {
     case 'sparkle':
+    case 'starfield':
       return {
         ...BASE_FULLSCREEN,
         particles: {
@@ -190,6 +191,7 @@ export function getAmbientPreset(type, colors = DEFAULT_COLORS) {
         },
       }
     case 'stars':
+    case 'starfield':
       return {
         ...BASE_FULLSCREEN,
         particles: {
@@ -249,6 +251,7 @@ export function getAmbientPreset(type, colors = DEFAULT_COLORS) {
           life: { duration: { value: 4 }, count: 1 },
         },
       }
+    case 'floating':
     case 'hearts':
       return {
         ...BASE_FULLSCREEN,
