@@ -605,13 +605,12 @@ function MainLayout() {
         finalPayload = { ...backendPayload, enhancements: enh }
       }
 
-      // Per the API handbook samples, ALL routes expect type + tier in the body.
-      // Every sample payload (personal, poll, chain, trivia, anonymous) includes both.
-      const payload = {
-        type: resolvedType,
-        tier: resolvedTier,
-        ...finalPayload,
-      }
+      // Backend validation rules (confirmed from actual 400 responses):
+      // - /create-card/{tier} (personal): type REQUIRED, tier FORBIDDEN in body
+      // - /create-card/{type}/{tier} (typed): type FORBIDDEN, tier FORBIDDEN in body
+      const payload = isPersonal
+        ? { type: 'personal', ...finalPayload }
+        : finalPayload
 
       const endpoint = resolvedType === 'poll'
         ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
