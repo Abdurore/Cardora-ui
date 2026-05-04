@@ -24,7 +24,22 @@ const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 const STUDIO_AUTOSAVE_PREFIX = 'cardora:studioAutoSave:'
 const BRAND_LOGO = '/cardora-logo.png?v=4'
 
-const steps = ['closed', 'card', 'questions', 'preview']
+// Steps vary by type — non-personal cards skip 'questions' (they have their own interactive panel)
+const STEPS_BY_TYPE = {
+  personal:  ['closed', 'card', 'questions', 'preview'],
+  poll:      ['closed', 'card', 'preview'],
+  trivia:    ['closed', 'card', 'preview'],
+  chain:     ['closed', 'card', 'preview'],
+  anonymous: ['closed', 'card', 'preview'],
+}
+
+const STEP_LABELS_BY_TYPE = {
+  personal:  { closed: 'Envelope', card: 'Card', questions: 'Q&A', preview: 'Preview' },
+  poll:      { closed: 'Envelope', card: 'Poll', preview: 'Preview' },
+  trivia:    { closed: 'Envelope', card: 'Trivia', preview: 'Preview' },
+  chain:     { closed: 'Envelope', card: 'Chain', preview: 'Preview' },
+  anonymous: { closed: 'Envelope', card: 'Card', preview: 'Preview' },
+}
 
 const ALL_TOOLS = [
   { id: 'closedState', icon: HiOutlineEnvelope, label: 'Envelope', hint: 'Sealed reveal & first impression', group: 'Content' },
@@ -701,10 +716,20 @@ function CardStudio() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  const studioSteps = STEPS_BY_TYPE[studioType] || STEPS_BY_TYPE.personal
+  const stepLabels = STEP_LABELS_BY_TYPE[studioType] || STEP_LABELS_BY_TYPE.personal
+
   const goToStep = (step) => {
     setActiveStep(step)
     if (step === 'closed') setActiveTool('closedState')
-    if (step === 'card') setActiveTool('content')
+    if (step === 'card') {
+      // Switch to the type-specific editing tool
+      if (studioType === 'poll') setActiveTool('poll')
+      else if (studioType === 'trivia') setActiveTool('trivia')
+      else if (studioType === 'chain') setActiveTool('chain')
+      else if (studioType === 'anonymous') setActiveTool('anon')
+      else setActiveTool('content')
+    }
     if (step === 'questions') setActiveTool('questions')
     if (step === 'preview') {
       setShowPreview(true)
@@ -2161,18 +2186,24 @@ function CardStudio() {
             <p className="cs-preview-poll-eyebrow">&#x1F4CA; Live Poll Experience</p>
             <span className="cs-preview-pill">Recipients vote</span>
           </div>
-          <h3 style={{
-            color: c.card.headingColor,
-            fontFamily: `'${c.theme.fontFamily}', serif`,
-          }}>
+          <h3
+            style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, cursor: 'pointer' }}
+            onClick={() => { setActiveTool('content'); setActiveStep('card') }}
+            title="Click to edit heading"
+          >
             {c.content.heading}
           </h3>
-          <p className="cs-preview-poll-question" style={{ color: c.card.textColor }}>
+          <p
+            className="cs-preview-poll-question cs-clickable-preview"
+            style={{ color: c.card.textColor }}
+            onClick={() => { setActiveTool('poll'); setActiveStep('card') }}
+            title="Click to edit poll question"
+          >
             {pollData.question || 'Ask a question your recipients can answer instantly.'}
           </p>
-          <div className="cs-preview-poll-options">
+          <div className="cs-preview-poll-options" onClick={() => { setActiveTool('poll'); setActiveStep('card') }} title="Click to edit options" style={{ cursor: 'pointer' }}>
             {(previewPollOptions.length > 0 ? previewPollOptions : ['Option 1', 'Option 2', 'Option 3']).map((opt, i) => (
-              <div key={i} className="cs-preview-poll-option" style={{ color: c.card.textColor }}>
+              <div key={i} className="cs-preview-poll-option cs-clickable-preview" style={{ color: c.card.textColor }}>
                 <span className="cs-preview-poll-dot" />
                 <span>{opt}</span>
               </div>
@@ -2208,17 +2239,22 @@ function CardStudio() {
           }}>
             {c.content.heading}
           </h3>
-          <p className="cs-preview-trivia-counter" style={{ color: c.theme.accentColor }}>
+          <p
+            className="cs-preview-trivia-counter"
+            style={{ color: c.theme.accentColor, cursor: 'pointer' }}
+            onClick={() => { setActiveTool('trivia'); setActiveStep('card') }}
+            title="Click to edit trivia"
+          >
             Question 1 of {Math.max(triviaData.questions.length, 1)}
           </p>
-          <div className="cs-preview-trivia-q" style={{ color: c.card.textColor }}>
+          <div className="cs-preview-trivia-q cs-clickable-preview" style={{ color: c.card.textColor }} onClick={() => { setActiveTool('trivia'); setActiveStep('card') }} title="Click to edit">
             <p>{previewQuestion.text || 'Place your first quiz question here.'}</p>
           </div>
-          <div className="cs-preview-trivia-opts">
+          <div className="cs-preview-trivia-opts" onClick={() => { setActiveTool('trivia'); setActiveStep('card') }} style={{ cursor: 'pointer' }}>
             {(previewQuestion.options?.length ? previewQuestion.options : ['', '', '', '']).map((opt, oi) => (
               <div
                 key={oi}
-                className={`cs-preview-trivia-opt ${previewQuestion.correctIndex === oi ? 'correct' : ''}`}
+                className={`cs-preview-trivia-opt cs-clickable-preview ${previewQuestion.correctIndex === oi ? 'correct' : ''}`}
                 style={{ color: c.card.textColor }}
               >
                 <span className="cs-preview-trivia-opt-index">{String.fromCharCode(65 + oi)}</span>
@@ -2246,7 +2282,7 @@ function CardStudio() {
             {c.content.heading || 'Your message here'}
           </h3>
           <p style={{ color: c.card.textColor, fontSize: '0.85rem', opacity: 0.7 }}>{c.content.body}</p>
-          <div className="cs-chain-reply-strip">
+          <div className="cs-chain-reply-strip cs-clickable-preview" onClick={() => { setActiveTool('chain'); setActiveStep('card') }} title="Click to edit chain prompt" style={{ cursor: 'pointer' }}>
             <span>🔗</span>
             <span>{chainData.prompt || "Now it's your turn…"}</span>
           </div>
@@ -2567,12 +2603,12 @@ function CardStudio() {
             </span>
           </div>
           <div className="cs-steps">
-            {steps.map((step, i) => {
-              const ai = steps.indexOf(activeStep)
+            {studioSteps.map((step, i) => {
+              const ai = studioSteps.indexOf(activeStep)
               const state = i === ai ? 'active' : i < ai ? 'done' : ''
               return (
                 <button key={step} type="button" className={`cs-step ${state}`} onClick={() => goToStep(step)}>
-                  <span>{{closed: 'Envelope', card: 'Card', questions: 'Q&A', preview: 'Preview'}[step] || step}</span>
+                  <span>{stepLabels[step] || step}</span>
                 </button>
               )
             })}
@@ -2778,7 +2814,7 @@ function CardStudio() {
             <span className="cs-mobile-state-icon">🎁</span>Envelope
           </button>
           <button type="button" className={`cs-mobile-state-btn${activeStep === 'card' ? ' active' : ''}`} onClick={() => goToStep('card')}>
-            <span className="cs-mobile-state-icon">✉</span>Card
+            <span className="cs-mobile-state-icon">✉</span>{stepLabels.card || 'Card'}
           </button>
           {activeTools.some(t => t.id === 'media') && (
             <button type="button" className={`cs-mobile-state-btn${activeTool === 'media' && activeStep === 'card' ? ' active' : ''}`} onClick={() => { goToStep('card'); setActiveTool('media'); setMobilePanelOpen(true) }}>
@@ -2795,7 +2831,7 @@ function CardStudio() {
               <span className="cs-mobile-state-icon">✨</span>Effects
             </button>
           )}
-          {(c.questions.items.length > 0 || activeTool === 'questions') && (
+          {studioType === 'personal' && (c.questions.items.length > 0 || activeTool === 'questions') && (
             <button type="button" className={`cs-mobile-state-btn${activeStep === 'questions' ? ' active' : ''}`} onClick={() => goToStep('questions')}>
               <span className="cs-mobile-state-icon">💬</span>Q&amp;A
             </button>
