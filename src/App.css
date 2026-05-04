@@ -7596,9 +7596,97 @@ a {
   border-radius: 5px;
   transition: box-shadow 0.15s;
   display: block;
+  position: relative;
 }
 .cs-editable:hover { box-shadow: 0 0 0 1.5px rgba(126,239,255,0.22); }
 .cs-edit-active { box-shadow: 0 0 0 2px rgba(126,239,255,0.58) !important; }
+
+/* Empty state placeholder for contentEditable elements. The pseudo-element
+   only renders when the element is truly empty so it doesn't fight with
+   real content. */
+.cs-editable:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(126, 239, 255, 0.45);
+  opacity: 0.85;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Hover hint pill — appears top-right of an editable element on hover so
+   first-time users understand the element responds to clicks. Hidden when
+   the element is already focused (active edit). */
+.cs-editable:hover::after {
+  content: attr(data-edit-hint);
+  position: absolute;
+  top: -10px;
+  right: 4px;
+  padding: 2px 7px;
+  background: rgba(126, 239, 255, 0.92);
+  color: #061117;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  text-transform: uppercase;
+  z-index: 5;
+}
+.cs-edit-active::after { display: none !important; }
+.cs-editable:focus { cursor: text; }
+.cs-editable:focus::after { display: none; }
+
+/* Drag-and-drop drop zone overlay on the preview card */
+.cs-preview-card.cs-drop-active {
+  outline: 2.5px dashed rgba(126, 239, 255, 0.7);
+  outline-offset: -8px;
+}
+.cs-preview-drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 18, 26, 0.78);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 50;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: dropPulse 0.4s ease;
+}
+.cs-preview-drop-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(126, 239, 255, 0.18);
+  border: 2px solid rgba(126, 239, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  color: #7ef7ff;
+}
+.cs-preview-drop-overlay p {
+  margin: 0;
+  color: #e9fbff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+@keyframes dropPulse {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Undo button in topbar */
+.cs-undo-btn {
+  font-size: 0.78rem;
+  padding: 6px 10px;
+}
+.cs-undo-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Context toolbar — appears inside the card above selected element */
 .cs-edit-toolbar {
