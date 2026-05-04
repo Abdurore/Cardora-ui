@@ -7440,6 +7440,9 @@ a {
   animation: csSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   box-shadow: 0 18px 50px rgba(0,0,0,0.3), 0 2px 0 rgba(255,255,255,0.04) inset;
   position: relative;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .cs-preview-card h3 {
@@ -7448,6 +7451,8 @@ a {
   line-height: 1.15;
   cursor: text;
   min-height: 1.4em;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .cs-preview-card p {
@@ -7457,6 +7462,8 @@ a {
   opacity: 0.85;
   cursor: text;
   min-height: 1.4em;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .cs-extended {
@@ -15959,6 +15966,9 @@ a {
   display: grid;
   gap: 16px;
   animation: csSlideUp 0.5s ease both;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .cs-preview-poll-eyebrow {
@@ -16040,6 +16050,9 @@ a {
   display: grid;
   gap: 14px;
   animation: csSlideUp 0.5s ease both;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .cs-preview-trivia-eyebrow {
@@ -17100,6 +17113,9 @@ a {
   justify-content: center;
   gap: 8px;
   padding: 20px 16px 16px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .cs-chain-reply-strip {

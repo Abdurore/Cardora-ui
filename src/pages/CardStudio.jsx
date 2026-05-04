@@ -24,21 +24,21 @@ const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 const STUDIO_AUTOSAVE_PREFIX = 'cardora:studioAutoSave:'
 const BRAND_LOGO = '/cardora-logo.png?v=4'
 
-// Steps vary by type — non-personal cards skip 'questions' (they have their own interactive panel)
+// Steps vary by type — non-personal cards don't have envelope
 const STEPS_BY_TYPE = {
   personal:  ['closed', 'card', 'questions', 'preview'],
-  poll:      ['closed', 'card', 'preview'],
-  trivia:    ['closed', 'card', 'preview'],
-  chain:     ['closed', 'card', 'preview'],
-  anonymous: ['closed', 'card', 'preview'],
+  poll:      ['card', 'preview'],
+  trivia:    ['card', 'preview'],
+  chain:     ['card', 'preview'],
+  anonymous: ['card', 'preview'],
 }
 
 const STEP_LABELS_BY_TYPE = {
   personal:  { closed: 'Envelope', card: 'Card', questions: 'Q&A', preview: 'Preview' },
-  poll:      { closed: 'Envelope', card: 'Poll', preview: 'Preview' },
-  trivia:    { closed: 'Envelope', card: 'Trivia', preview: 'Preview' },
-  chain:     { closed: 'Envelope', card: 'Chain', preview: 'Preview' },
-  anonymous: { closed: 'Envelope', card: 'Card', preview: 'Preview' },
+  poll:      { card: 'Poll', preview: 'Preview' },
+  trivia:    { card: 'Trivia', preview: 'Preview' },
+  chain:     { card: 'Chain', preview: 'Preview' },
+  anonymous: { card: 'Card', preview: 'Preview' },
 }
 
 const ALL_TOOLS = [
@@ -94,14 +94,14 @@ const TOOLS_BY_TYPE_TIER = {
   'personal:classic': ['closedState', 'content', 'background', 'theme'],
   'personal:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
   'personal:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
-  'poll:classic':   ['closedState', 'content', 'background', 'theme', 'poll'],
-  'poll:premium':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'poll'],
-  'trivia:classic': ['closedState', 'content', 'background', 'theme', 'trivia'],
-  'trivia:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'trivia'],
-  'chain:classic':  ['closedState', 'content', 'background', 'theme', 'chain'],
-  'chain:premium':  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'chain'],
-  'anonymous:classic':   ['closedState', 'content', 'background', 'theme', 'anon'],
-  'anonymous:premium':   ['closedState', 'content', 'media', 'background', 'theme', 'animation', 'anon'],
+  'poll:classic':   ['content', 'background', 'theme', 'poll'],
+  'poll:premium':   ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'poll'],
+  'trivia:classic': ['content', 'background', 'theme', 'trivia'],
+  'trivia:premium': ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'trivia'],
+  'chain:classic':  ['content', 'background', 'theme', 'chain'],
+  'chain:premium':  ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'chain'],
+  'anonymous:classic':   ['content', 'background', 'theme', 'anon'],
+  'anonymous:premium':   ['content', 'media', 'background', 'theme', 'animation', 'anon'],
 }
 
 const STUDIO_TYPE_META = {
@@ -951,6 +951,7 @@ function CardStudio() {
   }
 
   const addQuestion = () => {
+    if (c.questions.items.length >= 1) return // max 1 question
     const items = [...c.questions.items, { text: 'New question?' }]
     update('questions.items', items)
   }
@@ -1773,8 +1774,8 @@ function CardStudio() {
                     className={`cs-q-preset ${used ? 'used' : ''}`}
                     onClick={() => {
                       if (used) return
-                      const items = [...c.questions.items, { text: preset.text }]
-                      update('questions.items', items)
+                      // Replace existing question (max 1 question)
+                      update('questions.items', [{ text: preset.text }])
                     }}
                     disabled={used}
                     title={used ? 'Already added' : 'Add this prompt'}
@@ -1797,7 +1798,9 @@ function CardStudio() {
               <button type="button" className="cs-remove-btn" onClick={() => removeQuestion(i)}>Remove</button>
             </div>
           ))}
-          <button type="button" className="cs-button" onClick={addQuestion}>+ Add custom question</button>
+          {c.questions.items.length < 1 && (
+            <button type="button" className="cs-button" onClick={addQuestion}>+ Add custom question</button>
+          )}
 
           {(tierLimits.allowCustomPalette || isArtist) && (
             <div className="cs-sub-section">
@@ -2810,9 +2813,11 @@ function CardStudio() {
 
         {/* State nav — what part of the card is being edited */}
         <div className="cs-mobile-state-nav">
-          <button type="button" className={`cs-mobile-state-btn${activeStep === 'closed' ? ' active' : ''}`} onClick={() => goToStep('closed')}>
-            <span className="cs-mobile-state-icon">🎁</span>Envelope
-          </button>
+          {studioType === 'personal' && (
+            <button type="button" className={`cs-mobile-state-btn${activeStep === 'closed' ? ' active' : ''}`} onClick={() => goToStep('closed')}>
+              <span className="cs-mobile-state-icon">🎁</span>Envelope
+            </button>
+          )}
           <button type="button" className={`cs-mobile-state-btn${activeStep === 'card' ? ' active' : ''}`} onClick={() => goToStep('card')}>
             <span className="cs-mobile-state-icon">✉</span>{stepLabels.card || 'Card'}
           </button>
