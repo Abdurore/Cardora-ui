@@ -605,9 +605,13 @@ function MainLayout() {
         finalPayload = { ...backendPayload, enhancements: enh }
       }
 
-      const payload = isPersonal
-        ? { type: 'personal', ...finalPayload }
-        : finalPayload
+      // Per the API handbook samples, ALL routes expect type + tier in the body.
+      // Every sample payload (personal, poll, chain, trivia, anonymous) includes both.
+      const payload = {
+        type: resolvedType,
+        tier: resolvedTier,
+        ...finalPayload,
+      }
 
       const endpoint = resolvedType === 'poll'
         ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
@@ -623,8 +627,8 @@ function MainLayout() {
       try {
         console.log('%cFull payload:', 'color:#62ffa2;font-weight:bold', structuredClone(payload))
         console.log('%cconfig.content:', 'color:#ffcc80;font-weight:bold', structuredClone(backendPayload.config?.content ?? {}))
-        console.log('%cenhancements:', 'color:#a0b8ff;font-weight:bold', structuredClone(backendPayload.enhancements ?? {}))
-        console.log('%clayoutdata:', 'color:#a0b8ff;font-weight:bold', structuredClone(backendPayload.layoutdata ?? {}))
+        console.log('%cenhancements:', 'color:#a0b8ff;font-weight:bold', structuredClone(payload.enhancements ?? {}))
+        console.log('%c⚠ EXACT JSON being sent:', 'color:#ffd700;font-weight:bold;font-size:13px', JSON.stringify(payload, null, 2))
       } catch (logErr) {
         console.log('(could not clone payload for debug logging)', logErr)
       }
