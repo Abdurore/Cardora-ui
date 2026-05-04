@@ -517,10 +517,21 @@ export function cardObjectToBackendPayload(cardObject, {
     if (bgType === 'image') bgType = 'color'
     bgType = safeEnum(bgType, VALID_BG, 'color')
 
-    // background.value: color hex for solid, video URL for video, '' for gradient/animated
+    // background.value: per handbook examples —
+    //   color:    hex color value (e.g. '#0b0f12')
+    //   gradient: preset token (e.g. 'midnight-gradient') or color hex
+    //   animated: preset token (e.g. 'aurora-soft') or color hex
+    //   video:    video URL
+    // Backend custom validator rejects empty string for gradient/animated.
     let bgValue = ''
-    if (bgType === 'color') bgValue = normaliseHex(feColors[0] || colors.background, FB.background)
-    else if (bgType === 'video') bgValue = cardObject.background?.videoUrl || ''
+    if (bgType === 'color') {
+      bgValue = normaliseHex(feColors[0] || colors.background, FB.background)
+    } else if (bgType === 'video') {
+      bgValue = cardObject.background?.videoUrl || ''
+    } else {
+      // gradient / animated: use primary color as the value token if no preset is stored
+      bgValue = normaliseHex(feColors[0] || colors.accent || colors.background, FB.background)
+    }
 
     // lock.type: FE uses 'time', backend requires 'timer' (handbook Common AI Mistakes #3)
     const rawLock = cardObject.interaction?.lock?.type || 'none'
@@ -551,15 +562,19 @@ export function cardObjectToBackendPayload(cardObject, {
         },
       },
       // lock.type: FE uses 'time', backend requires 'timer' (handbook Common AI Mistakes #3)
-      // lock.value: backend uses Joi.alternatives([string.min(1), number]) — '' fails both.
-      // For non-value lock types (none/tap/scratch), send '0' as a safe placeholder.
+      // lock.value: per handbook samples, type 'none' uses value '' (empty string).
+      // Active lock types (password/timer) require a non-empty value.
       lock: (() => {
         const lt = cardObject.interaction?.lock?.type || 'none'
         const lockType = safeEnum(lt === 'time' ? 'timer' : lt, VALID_LOCK)
+        if (lockType === 'none' || lockType === 'tap' || lockType === 'scratch') {
+          return { type: lockType, value: '' }
+        }
+        // password/timer — must have a non-empty value
         const rawVal = cardObject.interaction?.lock?.value
         const lockValue = (rawVal != null && String(rawVal).trim())
           ? String(rawVal).trim()
-          : '0'
+          : (lockType === 'timer' ? new Date(Date.now() + 86400000).toISOString() : '0000')
         return { type: lockType, value: lockValue }
       })(),
       ambientEffect: {
