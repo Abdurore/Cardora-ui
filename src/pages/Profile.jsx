@@ -7,6 +7,8 @@ import InventoryCard from '../components/InventoryCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
 import ShareCardModal from '../components/ShareCardModal.jsx'
+import StatusModal from '../components/StatusModal.jsx'
+import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
@@ -44,6 +46,8 @@ function Profile() {
     onCurrencyChange,
   } = useOutletContext()
   const navigate = useNavigate()
+  const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
+  const [statusModal, setStatusModal] = useState(null)
   const avatarInputRef = useRef(null)
   const [cropSrc, setCropSrc] = useState(null)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
@@ -509,9 +513,9 @@ function Profile() {
                         className="profile-card-action-btn delete"
                         onClick={async (e) => {
                           e.stopPropagation()
-                          if (!window.confirm(`Delete template "${card.title}"? This cannot be undone.`)) return
+                          if (!await appConfirm('Delete Template', `Delete "${card.title}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
                           const res = await deleteMarketplaceTemplate?.(card.templateId || card.id)
-                          if (!res?.ok) window.alert(res?.message || 'Delete failed.')
+                          if (!res?.ok) setStatusModal({ type: 'error', message: res?.message || 'Delete failed.' })
                         }}
                         title="Delete template"
                         aria-label="Delete template"
@@ -833,6 +837,14 @@ function Profile() {
             </div>
           </div>
         </section>
+      )}
+      {ConfirmModal}
+      {statusModal && (
+        <StatusModal
+          type={statusModal.type}
+          message={statusModal.message}
+          onClose={() => setStatusModal(null)}
+        />
       )}
     </div>
   )

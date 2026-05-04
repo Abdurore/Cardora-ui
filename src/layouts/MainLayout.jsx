@@ -532,14 +532,13 @@ function MainLayout() {
     }
   }
 
-  const handleCreateCard = async (cardObject, { type, couponType, useCoupons, poll, chain, trivia, tier, anonTemplate } = {}) => {
+  const handleCreateCard = async (cardObject, { type, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
-      const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : type
-      const resolvedTier = (tier || 'classic').toLowerCase()
+      const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : (anonTemplate ? 'anonymous' : type)
+      // Premium is personal-only — upgrade poll/chain/trivia/anon to elite instead
+      const rawTier = (tier || 'classic').toLowerCase()
+      const resolvedTier = (rawTier === 'premium' && resolvedType !== 'personal') ? 'elite' : rawTier
 
-      // cardObjectToBackendPayload now returns { config, enhancements, layoutdata }
-      // per the API handbook — type-specific content goes inside config.content,
-      // not as separate top-level poll/chain/trivia fields.
       const backendPayload = cardObjectToBackendPayload(cardObject, {
         type: resolvedType,
         tier: resolvedTier,
@@ -548,31 +547,46 @@ function MainLayout() {
         chain,
       })
 
-      const payload = {
-        type: resolvedType,
-        ...backendPayload,
-      }
-      if (couponType) payload.couponType = couponType
-      if (useCoupons) payload.useCoupons = useCoupons
-
-      // Determine the endpoint. Forced-tier/type routes already encode type+tier
-      // in the URL, so we do NOT include them in the body (avoids "'tier' is not allowed").
-      let endpoint
-      let isForcedRoute = true
-      if (resolvedType === 'poll') {
-        endpoint = `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+      // Client-side validation matching backend Joi rules. Catching here surfaces
+      // a clear, type-specific message rather than the backend's generic 400.
+      const c = backendPayload.config?.content || {}
+      let missing = null
+      if (resolvedType === 'personal') {
+        if (!String(c.header || '').trim()) missing = 'Card heading is required.'
+        else if (!String(c.body || '').trim()) missing = 'Card body text is required.'
+      } else if (resolvedType === 'poll') {
+        if (!String(c.question || '').trim()) missing = 'Poll question is required.'
+        else if (!Array.isArray(c.options) || c.options.length < 2) missing = 'Poll needs at least 2 non-empty options.'
       } else if (resolvedType === 'chain') {
-        endpoint = `/create-card/chain/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+        if (!String(c.challenge || '').trim()) missing = 'Chain prompt is required.'
       } else if (resolvedType === 'trivia') {
-        endpoint = `/create-card/trivia/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-      } else if (resolvedType === 'anonymous' || anonTemplate) {
-        endpoint = `/create-card/anonymous/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-      } else {
-        endpoint = `/create-card/${resolvedTier}`
+        if (!Array.isArray(c.questions) || c.questions.length < 1) missing = 'Trivia needs at least 1 question with text and 2+ options.'
+      } else if (resolvedType === 'anonymous') {
+        if (!String(c.message || '').trim()) missing = 'Anonymous template needs a message.'
+      }
+      if (missing) {
+        return { ok: false, message: missing }
       }
 
-      // For the generic /create-card route (not currently used), we'd need type+tier in body.
-      // For forced routes, the backend infers them from the URL path.
+      // Endpoint routing (per API handbook table):
+      // /create-card/{classic|premium|elite}  → type REQUIRED in body, tier FORBIDDEN
+      // /create-card/{poll|chain|trivia|anonymous}/{classic|elite} → type FORBIDDEN in body
+      // So: personal cards need { type, config, enhancements, layoutdata }
+      //     typed cards need    { config, enhancements, layoutdata }
+      const isPersonal = resolvedType === 'personal'
+      const payload = isPersonal
+        ? { type: 'personal', ...backendPayload }
+        : backendPayload
+
+      const endpoint = resolvedType === 'poll'
+        ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+        : resolvedType === 'chain'
+          ? `/create-card/chain/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+          : resolvedType === 'trivia'
+            ? `/create-card/trivia/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+            : resolvedType === 'anonymous'
+              ? `/create-card/anonymous/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+              : `/create-card/${resolvedTier}`
 
       console.group(`%c[CardCreate] POST ${endpoint}`, 'color:#7ef7ff;font-weight:bold')
       try {
@@ -598,8 +612,7 @@ function MainLayout() {
         response = resolvedTier === 'elite'
           ? await createCardTriviaElite(payload)
           : await createCardTriviaClassic(payload)
-      } else if (resolvedType === 'anonymous' || anonTemplate) {
-        payload.anonTemplate = anonTemplate
+      } else if (resolvedType === 'anonymous') {
         response = resolvedTier === 'classic'
           ? await createCardAnonClassic(payload)
           : await createCardAnonElite(payload)

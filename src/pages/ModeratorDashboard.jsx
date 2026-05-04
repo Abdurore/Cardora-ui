@@ -2,6 +2,8 @@ import { useOutletContext, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
+import StatusModal from '../components/StatusModal.jsx'
+import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import {
   getAdminReports,
   banUser,
@@ -17,9 +19,10 @@ const TABS = ['Reports', 'Users', 'Templates', 'Logs', 'Broadcast']
 function ModeratorDashboard() {
   const { currentUser, balance, openAuthModal } = useOutletContext()
   const navigate = useNavigate()
+  const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
+  const [statusModal, setStatusModal] = useState(null)
   const [activeTab, setActiveTab] = useState('Reports')
   const [loading, setLoading] = useState(false)
-  const [actionMsg, setActionMsg] = useState({ text: '', ok: false })
 
   // Reports
   const [reports, setReports] = useState([])
@@ -44,8 +47,7 @@ function ModeratorDashboard() {
   const isModerator = currentUser?.role === 'Moderator'
 
   const showMsg = (text, ok = true) => {
-    setActionMsg({ text, ok })
-    setTimeout(() => setActionMsg({ text: '', ok: false }), 3000)
+    setStatusModal({ type: ok ? 'success' : 'error', message: text })
   }
 
   const loadReports = async (overrides = {}) => {
@@ -108,7 +110,7 @@ function ModeratorDashboard() {
   const handleUnban = async () => {
     const id = unbanId.trim()
     if (!id) { showMsg('User ID or username required.', false); return }
-    if (!window.confirm(`Unban user "${id}"?`)) return
+    if (!await appConfirm('Unban User', `Unban "${id}"?`)) return
     try {
       await unbanUser({ userId: id })
       showMsg(`"${id}" unbanned.`)
@@ -121,7 +123,7 @@ function ModeratorDashboard() {
   const handleDisableTemplate = async (tpl) => {
     const id = tpl.templateId || tpl._id || tpl.id
     if (!id) return
-    if (!window.confirm(`Disable template "${tpl.name || tpl.title}"?`)) return
+    if (!await appConfirm('Disable Template', `Disable "${tpl.name || tpl.title}"?`, { variant: 'warning', confirmLabel: 'Disable' })) return
     try {
       await disableAdminTemplate(id)
       showMsg('Template disabled.')
@@ -172,9 +174,6 @@ function ModeratorDashboard() {
           <h2>Moderation Dashboard</h2>
         </div>
 
-        {actionMsg.text && (
-          <p className={`store-earn-msg ${actionMsg.ok ? 'success' : 'error'}`}>{actionMsg.text}</p>
-        )}
 
         <div className="admin-tabs">
           {TABS.map(tab => (
@@ -425,6 +424,14 @@ function ModeratorDashboard() {
             </div>
           </div>
         </div>
+      )}
+      {ConfirmModal}
+      {statusModal && (
+        <StatusModal
+          type={statusModal.type}
+          message={statusModal.message}
+          onClose={() => setStatusModal(null)}
+        />
       )}
     </div>
   )

@@ -429,6 +429,13 @@ export function cardObjectToBackendPayload(cardObject, {
   const font = cardObject.theme?.fontFamily || 'Cinzel'
 
   // ── config.content (type-specific — handbook §7 "Canonical Field Ownership")
+  // Backend Joi rules (cards/schema.js):
+  //   personal  → header (1-200), body (1-4000) BOTH REQUIRED min(1)
+  //   poll      → question (1-500) REQUIRED, options array min(2) max(25); each {id min 1, text min 1}
+  //   chain     → challenge (1-600) REQUIRED, rules array max(25); each rule min(1)
+  //   trivia    → questions min(1) max(50); each {question min(1), options array min(2) max(8) each min(1), correctIndex < options.length}
+  //   anonymous → message (1-2000) REQUIRED min(1)
+  // Empty strings on required fields = 400 validation error. UI must block submit before this is called.
   let content = {}
   if (normalType === 'personal') {
     const items = Array.isArray(cardObject.questions?.items) ? cardObject.questions.items : []
@@ -436,35 +443,49 @@ export function cardObjectToBackendPayload(cardObject, {
       header: cardObject.content?.heading || '',
       body: cardObject.content?.body || '',
       questionBlock: {
-        enabled: items.length > 0,
+        enabled: items.length > 0 && Boolean((items[0]?.text || '').trim()),
         question: items[0]?.text || '',
-        suspenseTexts: items.slice(1).map(q => q.text || '').filter(Boolean),
-        answerType: 'yes_no',
+        suspenseTexts: items.slice(1).map(q => (q.text || '').trim()).filter(Boolean),
+        type: 'yes_no',
       },
     }
   } else if (normalType === 'poll' && poll) {
+    const rawOptions = Array.isArray(poll.options) ? poll.options : []
     content = {
       question: poll.question || '',
-      options: (poll.options || [])
-        .filter(o => String(o || '').trim())
-        .map((o, i) => ({
-          id: typeof o === 'object' ? (o.id || `opt_${i}`) : `opt_${i}`,
-          text: typeof o === 'string' ? o : (o.text || ''),
-        })),
+      options: rawOptions
+        .map((o, i) => {
+          const text = typeof o === 'string' ? o : (o?.text || '')
+          const id = (typeof o === 'object' && o?.id) ? o.id : `opt_${i}`
+          return { id, text: String(text).trim() }
+        })
+        .filter(o => o.text), // drop empty-text options (each text needs min(1))
     }
   } else if (normalType === 'chain') {
     const c = chain || {}
     content = {
       challenge: c.prompt || c.challenge || '',
-      rules: Array.isArray(c.rules) ? c.rules : [],
+      // each rule needs min(1) — drop empty entries
+      rules: Array.isArray(c.rules) ? c.rules.map(r => String(r || '').trim()).filter(Boolean) : [],
     }
   } else if (normalType === 'trivia' && trivia) {
+    const rawQuestions = Array.isArray(trivia.questions) ? trivia.questions : []
     content = {
-      questions: (trivia.questions || []).map(q => ({
-        question: q.text || q.question || '',
-        options: Array.isArray(q.options) ? q.options : [],
-        correctIndex: q.correctIndex ?? 0,
-      })),
+      questions: rawQuestions
+        .map(q => {
+          const options = (Array.isArray(q.options) ? q.options : [])
+            .map(opt => String(opt || '').trim())
+            .filter(Boolean) // each option text needs min(1)
+          const correctIndex = Number.isInteger(q.correctIndex) ? q.correctIndex : 0
+          return {
+            question: String(q.text || q.question || '').trim(),
+            options,
+            // clamp correctIndex within bounds (backend custom validator rejects out-of-range)
+            correctIndex: Math.max(0, Math.min(correctIndex, Math.max(0, options.length - 1))),
+          }
+        })
+        // drop questions that fail backend constraints (question text required, options min(2))
+        .filter(q => q.question && q.options.length >= 2),
     }
   } else if (normalType === 'anonymous') {
     content = {
@@ -489,7 +510,9 @@ export function cardObjectToBackendPayload(cardObject, {
     const isElite = resolvedTier === 'elite'
 
     // Background type — video is elite-only; downgrade for premium
+    const VALID_BG_TYPES = new Set(['color', 'gradient', 'video', 'animated'])
     let bgType = cardObject.background?.type || 'color'
+    if (!VALID_BG_TYPES.has(bgType)) bgType = 'color'
     if (!isElite && (bgType === 'video' || bgType === 'image')) bgType = 'animated'
     if (bgType === 'image') bgType = 'color'
     bgType = safeEnum(bgType, VALID_BG, 'color')
@@ -527,12 +550,20 @@ export function cardObjectToBackendPayload(cardObject, {
           duration: Number(cardObject.background?.animationDuration) || 8,
         },
       },
-      lock: {
-        type: lockType,
-        value: String(cardObject.interaction?.lock?.value || ''),
-      },
+      // lock.type: FE uses 'time', backend requires 'timer' (handbook Common AI Mistakes #3)
+      // lock.value: backend uses Joi.alternatives([string.min(1), number]) — '' fails both.
+      // For non-value lock types (none/tap/scratch), send '0' as a safe placeholder.
+      lock: (() => {
+        const lt = cardObject.interaction?.lock?.type || 'none'
+        const lockType = safeEnum(lt === 'time' ? 'timer' : lt, VALID_LOCK)
+        const rawVal = cardObject.interaction?.lock?.value
+        const lockValue = (rawVal != null && String(rawVal).trim())
+          ? String(rawVal).trim()
+          : '0'
+        return { type: lockType, value: lockValue }
+      })(),
       ambientEffect: {
-        type: ambientType,
+        type: safeEnum(cardObject.animation?.backgroundEffect?.type || 'none', VALID_AMBIENT),
         emojis: Array.isArray(cardObject.animation?.backgroundEffect?.emojis)
           ? cardObject.animation.backgroundEffect.emojis : [],
       },
@@ -554,26 +585,47 @@ export function cardObjectToBackendPayload(cardObject, {
         volume: typeof music.volume === 'number' ? music.volume : 0,
       }
 
-      const rawOpenFx = cardObject.animation?.openEffect || 'none'
+      // openEffect.colors: backend requires array.length(3) where each item satisfies
+      // colorSchema (min 1 char). Empty strings fail — fill with '#ffffff' as safe default.
       const cc = Array.isArray(cardObject.animation?.confettiColors) ? cardObject.animation.confettiColors : []
+      const fillColor = colors.accent || '#ffffff'
+      const OPEN_EFFECT_MAP = {
+        hearts: 'heartsBurst',
+        stars: 'starShower',
+        heartsBurst: 'heartsBurst',
+        starShower: 'starShower',
+        confetti: 'confetti',
+        fireworks: 'fireworks',
+        balloons: 'balloons',
+        emojiRain: 'emojiRain',
+        none: 'none',
+      }
+      const rawOpenEffect = cardObject.animation?.openEffect || 'none'
       enhancements.openEffect = {
-        type: safeEnum(rawOpenFx, VALID_OPEN_FX),
-        colors: [cc[0] || '', cc[1] || '', cc[2] || ''],
+        type: OPEN_EFFECT_MAP[rawOpenEffect] || 'none',
+        colors: [
+          (cc[0] && String(cc[0]).trim()) || fillColor,
+          (cc[1] && String(cc[1]).trim()) || fillColor,
+          (cc[2] && String(cc[2]).trim()) || fillColor,
+        ],
       }
 
+      // media[].url: backend Joi.string().uri().required() — drop blob:/file:/empty URLs.
       enhancements.media = Array.isArray(cardObject.media?.images)
-        ? cardObject.media.images.map(img => {
-            const url = typeof img === 'string' ? img : img?.url
-            return url ? { type: 'image', url } : null
-          }).filter(Boolean)
+        ? cardObject.media.images
+            .map(img => (typeof img === 'string' ? img : img?.url))
+            .filter(url => typeof url === 'string' && /^(https?:|data:)/i.test(url.trim()))
+            .map(url => ({ type: 'image', url: url.trim() }))
         : []
     }
   }
 
+  // layoutdata is NOT sent — backend does not have a confirmed schema for it
+  // and allowUnknown:false causes Joi to fail the entire payload with
+  // "'value' failed custom validation because" when unknown keys are present.
   return {
     config: { colors, font, content },
     enhancements,
-    layoutdata: cardObjectToLayoutData(),
   }
 }
 

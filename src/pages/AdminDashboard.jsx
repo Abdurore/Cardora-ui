@@ -1,9 +1,12 @@
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
+import { trimAudioFile, getAudioDuration } from '../lib/audioTrim.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import StatusModal from '../components/StatusModal.jsx'
+import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import {
   getAdminDashboard,
   getAdminStatsUsers,
@@ -11,8 +14,6 @@ import {
   getAdminStatsTemplates,
   getAdminStatsOverview,
   getAdminUsers,
-  getAdminArtistApplications,
-  acceptArtistApplication,
   banUser,
   unbanUser,
   setUserRole,
@@ -47,13 +48,11 @@ import {
   deleteMediaMusic,
   getAdminTemplates,
   getTemplates,
-  approveTemplate,
-  rejectTemplate,
 } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
 import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
-const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Artists', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
+const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
 
 // Persist trim points locally (backend doesn't store startSec/endSec yet).
 // Keyed by track _id OR cloudinary URL so drafts survive before an ID is assigned.
@@ -144,10 +143,11 @@ function normalizeOverviewStats(overview, dashboard, usersStats, cardsStats, tem
 function AdminDashboard() {
   const { currentUser, balance, openAuthModal, marketplaceTemplates, deleteMarketplaceTemplate } = useOutletContext()
   const navigate = useNavigate()
+  const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
+  const [statusModal, setStatusModal] = useState(null) // { type, title?, message }
   const [activeTab, setActiveTab] = useState('Overview')
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
-  const [applications, setApplications] = useState([])
   const [packages, setPackages] = useState([])
   const [redeemCodes, setRedeemCodes] = useState([])
   const [ads, setAds] = useState([])
@@ -159,7 +159,6 @@ function AdminDashboard() {
   const [mediaMusic, setMediaMusic] = useState([])
   const [allTemplates, setAllTemplates] = useState([])
   const [loading, setLoading] = useState(false)
-  const [actionMsg, setActionMsg] = useState({ text: '', ok: false })
 
   // New package form
   const [newPkg, setNewPkg] = useState({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false })
@@ -191,6 +190,9 @@ function AdminDashboard() {
   const [unbanIdentifier, setUnbanIdentifier] = useState('')
   // Set role form
   const [roleForm, setRoleForm] = useState({ identifier: '', role: 'moderator' })
+  const [roleConfirm, setRoleConfirm] = useState(null) // { user, identifier, role } | null
+  const [roleSubmitting, setRoleSubmitting] = useState(false)
+  const [roleError, setRoleError] = useState('')
   // Reports
   const [reports, setReports] = useState([])
   const [reportFilter, setReportFilter] = useState({ type: '', status: 'open' })
@@ -207,8 +209,7 @@ function AdminDashboard() {
   const isAdminGate = currentUser && currentUser.role === 'Admin'
 
   const showMsg = (text, ok = true) => {
-    setActionMsg({ text, ok })
-    setTimeout(() => setActionMsg({ text: '', ok: false }), 3000)
+    setStatusModal({ type: ok ? 'success' : 'error', message: text })
   }
 
   // Backend response shapes drift across endpoints. This helper looks for a
@@ -296,11 +297,6 @@ function AdminDashboard() {
           setAllTemplates(merged.map(mapTemplateToCard))
           break
         }
-        case 'Artists': {
-          const res = await getAdminArtistApplications()
-          setApplications(res?.data?.applications || res?.applications || [])
-          break
-        }
         case 'Packages': {
           const res = await getAdminPackages()
           setPackages(res?.data?.packages || res?.packages || [])
@@ -363,16 +359,6 @@ function AdminDashboard() {
     loadTabData(activeTab)
   }, [activeTab, isAdminGate])
 
-  const handleAcceptApplication = async (appId) => {
-    try {
-      await acceptArtistApplication(appId)
-      showMsg('Application accepted!')
-      loadTabData('Artists')
-    } catch (err) {
-      showMsg(err.message || 'Failed', false)
-    }
-  }
-
   const openBanConfirm = () => {
     const id = banForm.identifier.trim()
     if (!id) { showMsg('User ID or username required', false); return }
@@ -412,7 +398,7 @@ function AdminDashboard() {
   const handleUnbanUser = async () => {
     const id = unbanIdentifier.trim()
     if (!id) { showMsg('User ID or username required', false); return }
-    if (!window.confirm(`Unban user "${id}"?`)) return
+    if (!await appConfirm('Unban User', `Unban "${id}"?`)) return
     try {
       await unbanUser({ userId: id })
       showMsg(`User "${id}" unbanned.`)
@@ -423,18 +409,31 @@ function AdminDashboard() {
     }
   }
 
-  const handleSetRole = async () => {
-    const id = roleForm.identifier.trim()
+  const openRoleConfirm = (identifierOverride, roleOverride) => {
+    const id = (identifierOverride || roleForm.identifier).trim()
+    const role = roleOverride || roleForm.role
     if (!id) { showMsg('User ID or username required', false); return }
-    if (!window.confirm(`Set role "${roleForm.role}" for user "${id}"?`)) return
+    const matchedUser = users.find(u =>
+      (u._id || u.id) === id || u.username === id || u.name === id
+    ) || null
+    setRoleConfirm({ user: matchedUser, identifier: id, role })
+  }
+
+  const confirmSetRole = async () => {
+    if (!roleConfirm) return
+    setRoleSubmitting(true)
+    setRoleError('')
     try {
-      await setUserRole({ userId: id, role: roleForm.role })
-      showMsg(`Role updated to "${roleForm.role}".`)
+      await setUserRole({ userId: roleConfirm.identifier, role: roleConfirm.role })
+      showMsg(`Role updated to "${roleConfirm.role}".`)
       setRoleForm({ identifier: '', role: 'moderator' })
+      setRoleConfirm(null)
       loadTabData('Users')
     } catch (err) {
+      setRoleError(err.message || 'Role update failed. Check the user ID and try again.')
       showMsg(err.message || 'Role update failed', false)
     }
+    setRoleSubmitting(false)
   }
 
   const handleLoadReports = async (overrides = {}) => {
@@ -451,7 +450,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteAd = async (ad) => {
-    if (!window.confirm(`Delete ad "${ad.name || 'this ad'}"? This cannot be undone.`)) return
+    if (!await appConfirm('Delete Ad', `Delete "${ad.name || 'this ad'}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     const id = ad._id || ad.id
     try {
       await deleteAdminAd(id)
@@ -463,7 +462,7 @@ function AdminDashboard() {
   }
 
   const handleDisableCode = async (code) => {
-    if (!window.confirm(`Disable code "${code.code}"?`)) return
+    if (!await appConfirm('Disable Code', `Disable code "${code.code}"?`, { variant: 'warning', confirmLabel: 'Disable' })) return
     try {
       await disableAdminRedeemCode(code.code)
       showMsg('Code disabled.')
@@ -474,7 +473,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteCode = async (code) => {
-    if (!window.confirm(`Delete code "${code.code}"? This cannot be undone.`)) return
+    if (!await appConfirm('Delete Code', `Delete code "${code.code}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     try {
       await deleteAdminRedeemCode(code.code)
       showMsg('Code deleted.')
@@ -657,7 +656,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteVideo = async (video) => {
-    if (!window.confirm('Delete this video?')) return
+    if (!await appConfirm('Delete Video', 'Delete this video? This cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })) return
     const nameKey = video?.nameKey || video?.title || video?.name
     if (!nameKey) { showMsg('Missing video identifier.', false); return }
     try {
@@ -678,64 +677,71 @@ function AdminDashboard() {
     }
     setMediaMusicUploading(true)
     try {
-      // Cloudinary stores audio under the `video` resource type — 'auto' can
-      // misclassify some codecs and return 4xx. Use 'video' explicitly so mp3
-      // and wav uploads work consistently.
-      const url = await uploadToCloudinary(file, 'video')
+      // Hold the file locally so the admin can trim it BEFORE we burn a
+      // Cloudinary slot. Only the trimmed segment will be uploaded on save —
+      // the original raw file is discarded if they discard the draft.
+      const localUrl = URL.createObjectURL(file)
+      const duration = await getAudioDuration(file).catch(() => 0)
       const defaultName = (newTrack.name || '').trim() ||
         file.name.replace(/\.[^.]+$/, '').slice(0, 80)
-      // Park as a draft. The admin will trim + name, then save once.
-      setMusicDraft({ url, name: defaultName })
+      setMusicDraft({
+        url: localUrl,
+        name: defaultName,
+        file,                  // raw file kept in state for the eventual trim+upload
+        duration,
+        startSec: 0,
+        endSec: duration,
+      })
       setNewTrack({ name: '', url: '' })
       if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
-      showMsg('Trim and name your clip, then save to the library.')
+      showMsg('Set the play span, then save — only the trimmed clip is uploaded.')
     } catch (err) {
-      console.error('[Admin] Cloudinary audio upload failed', err)
-      showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
+      console.error('[Admin] audio file load failed', err)
+      showMsg(`Could not read audio: ${err.message || 'unknown error'}`, false)
     } finally {
       setMediaMusicUploading(false)
     }
   }
 
-  // Single-shot save for a freshly-uploaded clip. The backend's validator
-  // currently only accepts { name, url, duration:int } — startSec/endSec are
-  // rejected as "not allowed". Until the backend extends the schema, trim
-  // metadata is held client-side only (the studio music picker honours it via
-  // the in-memory record but it won't survive a page reload).
+  // Single-shot save for a freshly-uploaded clip. The trim is applied
+  // client-side BEFORE the upload — only the chosen play span ends up in
+  // Cloudinary and the library. The full file never leaves the browser.
   const handleSaveDraftTrack = async (draft) => {
     try {
       const startSec = Number(draft.startSec || 0)
       const endSec = Number(draft.endSec || 0)
-      const trimmed = endSec > 0 && (startSec > 0 || endSec < Number(draft.duration || 0) - 0.5)
-      // Persist trim points keyed by URL so they survive the round-trip to the
-      // backend (which doesn't store startSec/endSec yet). After refresh the
-      // mergeTrimData pass reattaches them using the same URL key.
-      if (trimmed && draft.url) {
-        const store = readTrimStore()
-        store[draft.url] = { startSec, endSec }
-        writeTrimStore(store)
+      const fullDuration = Number(draft.duration || 0)
+      const trimmed = endSec > 0 && (startSec > 0 || endSec < fullDuration - 0.05)
+      const sourceFile = draft.file
+      if (!sourceFile) {
+        showMsg('Original audio file is missing — please re-upload.', false)
+        return
       }
+      const fileToUpload = trimmed
+        ? await trimAudioFile(sourceFile, startSec, endSec)
+        : sourceFile
+      const url = await uploadToCloudinary(fileToUpload, 'video')
+      const finalDuration = trimmed ? Math.max(1, Math.round(endSec - startSec)) : Math.max(1, Math.round(fullDuration))
       await uploadMediaMusic({
         name: draft.name,
-        url: draft.url,
-        duration: Math.round(Number(draft.duration || 0)),
+        url,
+        duration: finalDuration,
       })
-      showMsg(
-        trimmed
-          ? 'Track added — trim will apply in the studio.'
-          : 'Track added to library!',
-      )
+      // Release the local blob URL — we no longer need it.
+      if (draft.url?.startsWith('blob:')) URL.revokeObjectURL(draft.url)
+      showMsg(trimmed ? 'Trimmed clip added to library!' : 'Track added to library!')
       setMusicDraft(null)
       await refreshMediaSilent()
     } catch (err) {
-      console.error('[Admin] uploadMediaMusic (draft) failed', err)
+      console.error('[Admin] trim+upload music failed', err)
       showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
       throw err
     }
   }
 
-  const handleDiscardDraft = () => {
-    if (!window.confirm('Discard this upload? The Cloudinary file will not be added to the library.')) return
+  const handleDiscardDraft = async () => {
+    if (!await appConfirm('Discard Upload', 'Discard this upload? The audio is held only in your browser and will not be saved.', { variant: 'warning', confirmLabel: 'Discard' })) return
+    if (musicDraft?.url?.startsWith('blob:')) URL.revokeObjectURL(musicDraft.url)
     setMusicDraft(null)
   }
 
@@ -753,36 +759,10 @@ function AdminDashboard() {
     }
   }
 
-  const handleApproveTemplate = async (tpl) => {
-    const id = tpl.templateId || tpl.id
-    if (!id) return
-    try {
-      await approveTemplate(id)
-      showMsg(`Approved "${tpl.title}".`)
-      loadTabData('Templates')
-    } catch (err) {
-      showMsg(err.message || 'Approve failed.', false)
-    }
-  }
-
-  const handleRejectTemplate = async (tpl) => {
-    const id = tpl.templateId || tpl.id
-    if (!id) return
-    const reason = window.prompt(`Reject "${tpl.title}"? Optional reason:`, '')
-    if (reason === null) return
-    try {
-      await rejectTemplate(id, reason)
-      showMsg(`Rejected "${tpl.title}".`)
-      loadTabData('Templates')
-    } catch (err) {
-      showMsg(err.message || 'Reject failed.', false)
-    }
-  }
-
   const handleAdminDeleteTemplate = async (tpl) => {
     const id = tpl.templateId || tpl.id
     if (!id) return
-    if (!window.confirm(`Delete template "${tpl.title}"? This cannot be undone.`)) return
+    if (!await appConfirm('Delete Template', `Delete "${tpl.title}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     const res = await deleteMarketplaceTemplate?.(id)
     if (res?.ok) {
       showMsg('Template deleted.')
@@ -826,7 +806,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteTrack = async (track) => {
-    if (!window.confirm('Delete this track?')) return
+    if (!await appConfirm('Delete Track', 'Delete this track? This cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })) return
     const nameKey = track?.nameKey || track?.name || track?.title
     if (!nameKey) { showMsg('Missing track identifier.', false); return }
     try {
@@ -864,9 +844,6 @@ function AdminDashboard() {
           <h2>Platform Dashboard</h2>
         </div>
 
-        {actionMsg.text && (
-          <p className={`store-earn-msg ${actionMsg.ok ? 'success' : 'error'}`}>{actionMsg.text}</p>
-        )}
 
         {/* Tab Navigation */}
         <div className="admin-tabs">
@@ -1014,7 +991,7 @@ function AdminDashboard() {
             {/* Set Role Form */}
             <div className="admin-sub-section">
               <h4>Assign Role</h4>
-              <p className="admin-sub-hint">Assignable roles: <code>enterprise</code>, <code>moderator</code></p>
+              <p className="admin-sub-hint">Change any user's role. Use the table below to assign roles directly from a row.</p>
               <div className="admin-inline-form">
                 <label className="admin-field">
                   <span>User ID or Username</span>
@@ -1025,13 +1002,15 @@ function AdminDashboard() {
                   />
                 </label>
                 <label className="admin-field">
-                  <span>Role</span>
+                  <span>New Role</span>
                   <select value={roleForm.role} onChange={e => setRoleForm(p => ({ ...p, role: e.target.value }))}>
                     <option value="moderator">Moderator</option>
                     <option value="enterprise">Enterprise</option>
+                    <option value="artist">Artist</option>
+                    <option value="user">User (reset)</option>
                   </select>
                 </label>
-                <button className="primary" type="button" onClick={handleSetRole}>Set Role</button>
+                <button className="primary" type="button" onClick={() => openRoleConfirm()}>Assign Role</button>
               </div>
             </div>
 
@@ -1051,14 +1030,47 @@ function AdminDashboard() {
                   {users.map(user => {
                     const uid = user._id || user.id
                     const uname = user.username || user.name || uid
+                    const currentRole = (user.role || 'user').toLowerCase()
+                    const isMod = currentRole === 'moderator'
+                    const isEnterprise = currentRole === 'enterprise'
                     return (
                       <tr key={uid}>
                         <td>{uname}</td>
                         <td>{user.email}</td>
-                        <td><span className={`admin-role-chip ${(user.role || 'user').toLowerCase()}`}>{user.role || 'User'}</span></td>
+                        <td><span className={`admin-role-chip ${currentRole}`}>{user.role || 'User'}</span></td>
                         <td>{user.cc ?? user.balance ?? 0}</td>
                         <td>{user.isVerified ? 'Yes' : 'No'}</td>
-                        <td style={{ display: 'flex', gap: 4 }}>
+                        <td className="admin-actions-cell">
+                          {!isMod && !isEnterprise && (
+                            <button
+                              type="button"
+                              className="admin-action-btn neutral"
+                              onClick={() => openRoleConfirm(uid || uname, 'moderator')}
+                              title="Promote to Moderator"
+                            >
+                              +Mod
+                            </button>
+                          )}
+                          {isMod && (
+                            <button
+                              type="button"
+                              className="admin-action-btn neutral"
+                              onClick={() => openRoleConfirm(uid || uname, 'user')}
+                              title="Remove Moderator role"
+                            >
+                              −Mod
+                            </button>
+                          )}
+                          {isEnterprise && (
+                            <button
+                              type="button"
+                              className="admin-action-btn neutral"
+                              onClick={() => openRoleConfirm(uid || uname, 'user')}
+                              title="Remove Enterprise role"
+                            >
+                              −Ent
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="admin-action-btn reject"
@@ -1073,7 +1085,6 @@ function AdminDashboard() {
                             type="button"
                             className="admin-action-btn approve"
                             onClick={async () => {
-                              if (!window.confirm(`Unban "${uname}"?`)) return
                               try { await unbanUser({ userId: uid || uname }); showMsg(`"${uname}" unbanned.`); loadTabData('Users') }
                               catch (err) { showMsg(err.message || 'Failed', false) }
                             }}
@@ -1166,13 +1177,11 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* TEMPLATES — review & delete */}
+        {/* TEMPLATES — live marketplace only (backend doesn't gate by approval) */}
         {activeTab === 'Templates' && !loading && (() => {
-          const pending = allTemplates.filter(t => t.status === 'pending')
-          const live = allTemplates.filter(t => t.status === 'approved' || t.status === 'live' || !t.status || t.status === '')
-          const rejected = allTemplates.filter(t => t.status === 'rejected')
+          const live = allTemplates
 
-          const renderTable = (rows, showReviewActions) => (
+          const renderTable = (rows) => (
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
@@ -1210,31 +1219,13 @@ function AdminDashboard() {
                         </span>
                       </td>
                       <td style={{ display: 'flex', gap: 6 }}>
-                        {showReviewActions && (
-                          <>
-                            <button
-                              type="button"
-                              className="admin-action-btn accept"
-                              onClick={() => handleApproveTemplate(tpl)}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-action-btn reject"
-                              onClick={() => handleRejectTemplate(tpl)}
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
                         <button
                           type="button"
                           className="admin-action-btn warn"
                           onClick={async () => {
                             const id = tpl.templateId || tpl.id
                             if (!id) return
-                            if (!window.confirm(`Disable template "${tpl.title}"?`)) return
+                            if (!await appConfirm('Disable Template', `Disable "${tpl.title}"?`, { variant: 'warning', confirmLabel: 'Disable' })) return
                             try { await disableAdminTemplate(id); showMsg('Template disabled.'); loadTabData('Templates') }
                             catch (err) { showMsg(err.message || 'Disable failed', false) }
                           }}
@@ -1257,80 +1248,19 @@ function AdminDashboard() {
           )
 
           return (
-            <>
-              <div className="admin-section">
-                <h3 className="admin-section-title">
-                  Pending Review {pending.length > 0 ? `(${pending.length})` : ''}
-                </h3>
-                {pending.length > 0 ? renderTable(pending, true) : (
-                  <div className="admin-empty">
-                    <span className="admin-empty-icon">{"\u{1F4E5}"}</span>
-                    <p>No templates awaiting review.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="admin-section">
-                <h3 className="admin-section-title">
-                  Live Marketplace {live.length > 0 ? `(${live.length})` : ''}
-                </h3>
-                {live.length > 0 ? renderTable(live, false) : (
-                  <div className="admin-empty">
-                    <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
-                    <p>No approved templates in the marketplace yet.</p>
-                  </div>
-                )}
-              </div>
-
-              {rejected.length > 0 && (
-                <div className="admin-section">
-                  <h3 className="admin-section-title">Rejected ({rejected.length})</h3>
-                  {renderTable(rejected, false)}
+            <div className="admin-section">
+              <h3 className="admin-section-title">
+                Live Templates {live.length > 0 ? `(${live.length})` : ''}
+              </h3>
+              {live.length > 0 ? renderTable(live) : (
+                <div className="admin-empty">
+                  <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
+                  <p>No templates in the marketplace yet.</p>
                 </div>
               )}
-            </>
+            </div>
           )
         })()}
-
-        {/* ARTISTS — applications */}
-        {activeTab === 'Artists' && !loading && (
-          <div className="admin-section">
-            <h3 className="admin-section-title">Artist Applications</h3>
-            {applications.length > 0 ? (
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>User</th>
-                      <th>Portfolio</th>
-                      <th>Bio</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {applications.map(app => (
-                      <tr key={app._id || app.id}>
-                        <td>{app.username || app.user?.username || '-'}</td>
-                        <td><a href={app.portfolio} target="_blank" rel="noopener noreferrer">{app.portfolio ? 'View' : '-'}</a></td>
-                        <td>{app.bio || '-'}</td>
-                        <td><span className={`admin-template-status ${app.status || 'pending'}`}>{app.status || 'pending'}</span></td>
-                        <td>
-                          <button type="button" className="admin-action-btn approve" onClick={() => handleAcceptApplication(app._id || app.id)}>Accept</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="admin-empty">
-                <span className="admin-empty-icon">{"\u{1F4CB}"}</span>
-                <p>No artist applications pending.</p>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* PACKAGES */}
         {activeTab === 'Packages' && !loading && (
@@ -1754,14 +1684,14 @@ function AdminDashboard() {
                 </div>
               )}
 
-              {/* Music list — themed editor with playback + trim controls */}
+              {/* Music library — read-only saved tracks (delete only) */}
               {mediaMusic.length > 0 ? (
                 <div className="admin-media-music-list">
                   {mediaMusic.map(track => (
                     <AdminMusicTrack
                       key={track._id || track.id}
+                      mode="library"
                       track={track}
-                      onSave={handleSaveTrack}
                       onDelete={handleDeleteTrack}
                     />
                   ))}
@@ -1850,6 +1780,49 @@ function AdminDashboard() {
       </div>
       <ScreenNav />
 
+      {roleConfirm && (
+        <div className="ban-confirm-overlay" role="dialog" aria-modal="true">
+          <div className="ban-confirm-backdrop" onClick={() => { if (!roleSubmitting) { setRoleConfirm(null); setRoleError('') } }} />
+          <div className="ban-confirm-card">
+            <h3 className="ban-confirm-title">Confirm role change</h3>
+            {roleConfirm.user ? (
+              <div className="ban-confirm-user">
+                <div className="ban-confirm-avatar">
+                  {roleConfirm.user.profilePictureUrl
+                    ? <img src={roleConfirm.user.profilePictureUrl} alt={roleConfirm.user.username || ''} />
+                    : <span>{(roleConfirm.user.username || '?').slice(0, 1).toUpperCase()}</span>}
+                </div>
+                <div className="ban-confirm-info">
+                  <div className="ban-confirm-username">{roleConfirm.user.username || '—'}</div>
+                  <div className="ban-confirm-email">{roleConfirm.user.email || '—'}</div>
+                  <div className="ban-confirm-meta">
+                    <span className={`admin-role-chip ${(roleConfirm.user.role || 'user').toLowerCase()}`}>{roleConfirm.user.role || 'User'}</span>
+                    <span>→</span>
+                    <span className={`admin-role-chip ${roleConfirm.role}`}>{roleConfirm.role.charAt(0).toUpperCase() + roleConfirm.role.slice(1)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="ban-confirm-user ban-confirm-user-missing">
+                <p>User not found in loaded list. Role change will be attempted using:</p>
+                <code>{roleConfirm.identifier}</code>
+                <p style={{ marginTop: 6 }}>New role: <strong>{roleConfirm.role}</strong></p>
+              </div>
+            )}
+            <p className="ban-confirm-warn">This will immediately update the user's permissions. Proceed?</p>
+            {roleError && <p style={{ color: '#ff6b9d', fontSize: '0.82rem', margin: '8px 0 0' }}>{roleError}</p>}
+            <div className="ban-confirm-actions">
+              <button type="button" className="ban-confirm-cancel" onClick={() => { setRoleConfirm(null); setRoleError('') }} disabled={roleSubmitting}>
+                Cancel
+              </button>
+              <button type="button" className="ban-confirm-submit" onClick={confirmSetRole} disabled={roleSubmitting}>
+                {roleSubmitting ? 'Updating…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {banConfirm && (
         <div className="ban-confirm-overlay" role="dialog" aria-modal="true">
           <div className="ban-confirm-backdrop" onClick={() => !banSubmitting && setBanConfirm(null)} />
@@ -1909,6 +1882,16 @@ function AdminDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {ConfirmModal}
+      {statusModal && (
+        <StatusModal
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          onClose={() => setStatusModal(null)}
+        />
       )}
     </div>
   )
