@@ -50,15 +50,22 @@ function AnonSend() {
 
   const handleSend = async () => {
     if (!message.trim()) { setError('Write something before sending.'); return }
-    const slug = cardStyle?.cardSlug
-    if (!slug) { setError('This inbox isn\'t ready to receive messages yet.'); return }
+    // The anonymous card slug is needed to post to /cards/:slug/anonymous-message.
+    // It comes from either the cardStyle (if the recipient's anon card was loaded)
+    // or from the URL slug param when accessed via /card/:slug directly.
+    const slug = cardStyle?.cardSlug || cardStyle?.slug
+    if (!slug) {
+      setError('This user hasn\'t created an anonymous inbox card yet, or their card link is unavailable. Ask them to share their Cardora card link directly.')
+      return
+    }
     setError('')
     setIsSending(true)
     try {
-      await sendCardAnonymousMessage(slug, { content: message.trim() })
+      // Backend expects { message } per handbook §7 (Anonymous Cards)
+      await sendCardAnonymousMessage(slug, { message: message.trim() })
       setSent(true)
-    } catch {
-      setError('Something went wrong. Please try again.')
+    } catch (err) {
+      setError(err?.message || 'Something went wrong. Please try again.')
     } finally {
       setIsSending(false)
     }

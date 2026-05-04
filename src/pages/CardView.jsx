@@ -142,7 +142,15 @@ function CardView() {
 
   const handlePollVote = async () => {
     try {
-      await submitPollVote(card.slug || id, { optionIndexes: pollVotes, password: passwordInput || undefined })
+      // Backend expects optionId — poll options are { id, text } objects.
+      // pollVotes holds selected indices; map them to their stable IDs.
+      const options = poll?.options || []
+      const selectedIds = pollVotes.map(i => {
+        const opt = options[i]
+        return typeof opt === 'object' ? opt.id : `opt_${i}`
+      }).filter(Boolean)
+      await submitPollVote(card.slug || id, { optionId: selectedIds[0] || '', password: passwordInput || undefined })
+      setPollSubmitted(true)
       setInteractionMsg('Vote submitted!')
     } catch (err) {
       setInteractionMsg(err.message || 'Could not submit vote.')
@@ -481,7 +489,7 @@ function CardView() {
                 {chain && !chainSubmitted && (
                   <div className="cv-type-section cv-chain-section">
                     <p className="cv-type-eyebrow" style={{ color: accentColor }}>Chain Card</p>
-                    <h4 className="cv-chain-prompt">{chain.topic || 'Add your message'}</h4>
+                    <h4 className="cv-chain-prompt">{chain.challenge || chain.topic || chain.prompt || 'Add your message'}</h4>
                     <textarea
                       className="cv-chain-input"
                       rows={4}

@@ -550,26 +550,39 @@ function MainLayout() {
 
       const payload = {
         type: resolvedType,
-        tier: resolvedTier,
         ...backendPayload,
       }
       if (couponType) payload.couponType = couponType
       if (useCoupons) payload.useCoupons = useCoupons
-      const endpoint = resolvedType === 'poll'
-        ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-        : resolvedType === 'chain'
-          ? `/create-card/chain/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-          : resolvedType === 'trivia'
-            ? `/create-card/trivia/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-            : resolvedType === 'anonymous' || anonTemplate
-              ? `/create-card/anonymous/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-              : `/create-card/${resolvedTier}`
+
+      // Determine the endpoint. Forced-tier/type routes already encode type+tier
+      // in the URL, so we do NOT include them in the body (avoids "'tier' is not allowed").
+      let endpoint
+      let isForcedRoute = true
+      if (resolvedType === 'poll') {
+        endpoint = `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+      } else if (resolvedType === 'chain') {
+        endpoint = `/create-card/chain/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+      } else if (resolvedType === 'trivia') {
+        endpoint = `/create-card/trivia/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+      } else if (resolvedType === 'anonymous' || anonTemplate) {
+        endpoint = `/create-card/anonymous/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
+      } else {
+        endpoint = `/create-card/${resolvedTier}`
+      }
+
+      // For the generic /create-card route (not currently used), we'd need type+tier in body.
+      // For forced routes, the backend infers them from the URL path.
 
       console.group(`%c[CardCreate] POST ${endpoint}`, 'color:#7ef7ff;font-weight:bold')
-      console.log('%cFull payload:', 'color:#62ffa2;font-weight:bold', JSON.parse(JSON.stringify(payload)))
-      console.log('%cconfig.content:', 'color:#ffcc80;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.config?.content)))
-      console.log('%cenhancements:', 'color:#a0b8ff;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.enhancements)))
-      console.log('%clayoutdata:', 'color:#a0b8ff;font-weight:bold', JSON.parse(JSON.stringify(backendPayload.layoutdata)))
+      try {
+        console.log('%cFull payload:', 'color:#62ffa2;font-weight:bold', structuredClone(payload))
+        console.log('%cconfig.content:', 'color:#ffcc80;font-weight:bold', structuredClone(backendPayload.config?.content ?? {}))
+        console.log('%cenhancements:', 'color:#a0b8ff;font-weight:bold', structuredClone(backendPayload.enhancements ?? {}))
+        console.log('%clayoutdata:', 'color:#a0b8ff;font-weight:bold', structuredClone(backendPayload.layoutdata ?? {}))
+      } catch (logErr) {
+        console.log('(could not clone payload for debug logging)', logErr)
+      }
       console.groupEnd()
 
       let response

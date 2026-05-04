@@ -476,6 +476,15 @@ export function cardObjectToBackendPayload(cardObject, {
   // Classic cards send empty object — backend rejects non-default enhancements.
   let enhancements = {}
 
+  // ── Strict enum whitelists (backend validates these even when layoutdata is freeform)
+  const VALID_AMBIENT   = new Set(['none', 'starfield', 'snow', 'bubbles', 'fountain', 'fireflies', 'floating'])
+  const VALID_OPEN_FX   = new Set(['none', 'confetti', 'fireworks', 'heartsBurst', 'starShower', 'balloons', 'emojiRain'])
+  const VALID_LOCK      = new Set(['none', 'tap', 'scratch', 'timer', 'password'])
+  const VALID_BG        = new Set(['color', 'gradient', 'video', 'animated'])
+  const VALID_ENTRY     = new Set(['fade', 'slide', 'zoom'])
+
+  const safeEnum = (val, allowed, fallback = 'none') => allowed.has(val) ? val : fallback
+
   if (resolvedTier !== 'classic') {
     const isElite = resolvedTier === 'elite'
 
@@ -483,11 +492,25 @@ export function cardObjectToBackendPayload(cardObject, {
     let bgType = cardObject.background?.type || 'color'
     if (!isElite && (bgType === 'video' || bgType === 'image')) bgType = 'animated'
     if (bgType === 'image') bgType = 'color'
+    bgType = safeEnum(bgType, VALID_BG, 'color')
 
     // background.value: color hex for solid, video URL for video, '' for gradient/animated
     let bgValue = ''
     if (bgType === 'color') bgValue = normaliseHex(feColors[0] || colors.background, FB.background)
     else if (bgType === 'video') bgValue = cardObject.background?.videoUrl || ''
+
+    // lock.type: FE uses 'time', backend requires 'timer' (handbook Common AI Mistakes #3)
+    const rawLock = cardObject.interaction?.lock?.type || 'none'
+    const lockType = safeEnum(rawLock === 'time' ? 'timer' : rawLock, VALID_LOCK)
+
+    // ambientEffect.type: whitelist to backend-allowed values only
+    const rawAmbient = cardObject.animation?.backgroundEffect?.type || 'none'
+    const ambientType = safeEnum(rawAmbient, VALID_AMBIENT)
+
+    // animation.entry: whitelist
+    const rawEntry = Number(cardObject.card?.textBodyAnimation?.selfTypeSpeed) > 0 ? 'slide'
+      : Number(cardObject.card?.textBodyAnimation?.fadeInDuration) > 0 ? 'fade'
+      : 'fade'
 
     enhancements = {
       background: {
@@ -504,21 +527,17 @@ export function cardObjectToBackendPayload(cardObject, {
           duration: Number(cardObject.background?.animationDuration) || 8,
         },
       },
-      // lock.type: FE uses 'time', backend requires 'timer' (handbook Common AI Mistakes #3)
       lock: {
-        type: (() => { const lt = cardObject.interaction?.lock?.type || 'none'; return lt === 'time' ? 'timer' : lt })(),
+        type: lockType,
         value: String(cardObject.interaction?.lock?.value || ''),
       },
       ambientEffect: {
-        type: cardObject.animation?.backgroundEffect?.type || 'none',
+        type: ambientType,
         emojis: Array.isArray(cardObject.animation?.backgroundEffect?.emojis)
           ? cardObject.animation.backgroundEffect.emojis : [],
       },
       animation: {
-        // Map FE text animations → card entry animation
-        entry: Number(cardObject.card?.textBodyAnimation?.selfTypeSpeed) > 0 ? 'slide'
-          : Number(cardObject.card?.textBodyAnimation?.fadeInDuration) > 0 ? 'fade'
-          : 'fade',
+        entry: safeEnum(rawEntry, VALID_ENTRY, 'fade'),
         speed: (() => {
           const sp = Number(cardObject.card?.textBodyAnimation?.selfTypeSpeed) || 0
           const fd = Number(cardObject.card?.textBodyAnimation?.fadeInDuration) || 0
@@ -535,9 +554,10 @@ export function cardObjectToBackendPayload(cardObject, {
         volume: typeof music.volume === 'number' ? music.volume : 0,
       }
 
+      const rawOpenFx = cardObject.animation?.openEffect || 'none'
       const cc = Array.isArray(cardObject.animation?.confettiColors) ? cardObject.animation.confettiColors : []
       enhancements.openEffect = {
-        type: cardObject.animation?.openEffect || 'none',
+        type: safeEnum(rawOpenFx, VALID_OPEN_FX),
         colors: [cc[0] || '', cc[1] || '', cc[2] || ''],
       }
 
@@ -780,15 +800,27 @@ export function mapBackendCard(card) {
     templateId: card.templateId || '',
     tier,
     createdAt: card.createdAt || '',
-    poll: content.question ? { question: content.question, options: content.options || [] } : null,
-    chain: content.challenge ? { challenge: content.challenge, rules: content.rules || [] } : null,
-    trivia: content.questions ? { questions: content.questions } : null,
+    // Use card.type as primary signal — content field heuristics as fallback.
+    poll: type === 'poll'
+      ? { question: content.question || '', options: content.options || [], allowMultiple: !!content.allowMultiple }
+      : (content.question && !content.header ? { question: content.question, options: content.options || [] } : null),
+    chain: type === 'chain'
+      ? { challenge: content.challenge || '', rules: content.rules || [] }
+      : (content.challenge ? { challenge: content.challenge, rules: content.rules || [] } : null),
+    trivia: type === 'trivia'
+      ? { questions: content.questions || [] }
+      : (content.questions ? { questions: content.questions } : null),
+    anonymous: type === 'anonymous'
+      ? { message: content.message || '' }
+      : null,
     layoutdata: card.layoutdata || {},
     cardObject: backendCardToCardObject(card),
     tag: type === 'personal' ? '' : capitalize(type),
     interaction: enhancements,
     locked: lockType !== 'none',
     lockType,
+    // Carry forward backend state for interaction rendering (vote counts, responses, etc.)
+    state: card.state || {},
   }
 }
 
