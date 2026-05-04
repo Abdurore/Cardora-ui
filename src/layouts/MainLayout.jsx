@@ -574,9 +574,40 @@ function MainLayout() {
       // So: personal cards need { type, config, enhancements, layoutdata }
       //     typed cards need    { config, enhancements, layoutdata }
       const isPersonal = resolvedType === 'personal'
+
+      // For typed routes (poll/chain/trivia/anon), the backend may still have strict
+      // Joi validation on enhancements (freeform change was applied to personal routes).
+      // Strip empty/default values so the backend fills them with its own safe defaults.
+      let finalPayload = backendPayload
+      if (!isPersonal) {
+        const enh = backendPayload.enhancements ? { ...backendPayload.enhancements } : {}
+
+        // Strip lock if type is 'none' — let backend fill default
+        if (enh.lock?.type === 'none') delete enh.lock
+
+        // Strip music if no track
+        if (enh.music && !enh.music.track) delete enh.music
+
+        // Strip openEffect if type is 'none'
+        if (enh.openEffect?.type === 'none') delete enh.openEffect
+
+        // Strip ambientEffect if type is 'none'
+        if (enh.ambientEffect?.type === 'none') delete enh.ambientEffect
+
+        // Strip empty media array
+        if (Array.isArray(enh.media) && enh.media.length === 0) delete enh.media
+
+        // Strip videoSettings if background type is not video
+        if (enh.background && enh.background.type !== 'video') {
+          delete enh.background.videoSettings
+        }
+
+        finalPayload = { ...backendPayload, enhancements: enh }
+      }
+
       const payload = isPersonal
-        ? { type: 'personal', ...backendPayload }
-        : backendPayload
+        ? { type: 'personal', ...finalPayload }
+        : finalPayload
 
       const endpoint = resolvedType === 'poll'
         ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
@@ -628,7 +659,8 @@ function MainLayout() {
       console.group('%c[CardCreate] ✗ Error', 'color:#ff6b6b;font-weight:bold')
       console.error('message:', error.message)
       console.error('status:', error.status)
-      console.error('payload (backend response body):', error.payload)
+      console.error('full payload:', error.payload)
+      if (error.payload?.details) console.error('validation details:', error.payload.details)
       console.error('debug info:', error.debug)
       console.groupEnd()
       return { ok: false, message: error.message || 'Card creation failed.' }
