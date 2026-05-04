@@ -11702,25 +11702,35 @@ a {
 
 .chat-msg {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
   align-items: flex-start;
   animation: fadeInOpacity 0.25s ease;
+  max-width: 78%;
 }
 
 .chat-msg.me {
-  flex-direction: row-reverse;
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat-msg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 2px;
 }
 
 .chat-msg-avatar {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: linear-gradient(135deg, #7ef7ff, #62ffa2);
   display: grid;
   place-items: center;
   flex-shrink: 0;
   overflow: hidden;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: #041015;
 }
@@ -11735,13 +11745,19 @@ a {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  max-width: 75%;
+  width: 100%;
 }
 
 .chat-msg-name {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
   color: #7ef7ff;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.01em;
+}
+
+.chat-msg-head .chat-msg-time {
+  margin-left: auto;
+  padding-left: 8px;
 }
 
 .chat-msg.me .chat-msg-name {
@@ -17708,6 +17724,21 @@ a {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.chat-profile-id {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.02em;
+  opacity: 0.65;
+}
+.chat-profile-empty {
+  margin-top: 12px;
+  padding: 12px 14px;
+  font-size: 0.78rem;
+  color: rgba(220, 240, 247, 0.5);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  text-align: center;
+}
 .chat-profile-meta-item {
   display: flex;
   align-items: center;

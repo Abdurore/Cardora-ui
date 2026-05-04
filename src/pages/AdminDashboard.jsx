@@ -1,6 +1,7 @@
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
+import { trimAudioFile, getAudioDuration } from '../lib/audioTrim.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import Dropdown from '../components/Dropdown.jsx'
@@ -676,64 +677,71 @@ function AdminDashboard() {
     }
     setMediaMusicUploading(true)
     try {
-      // Cloudinary stores audio under the `video` resource type — 'auto' can
-      // misclassify some codecs and return 4xx. Use 'video' explicitly so mp3
-      // and wav uploads work consistently.
-      const url = await uploadToCloudinary(file, 'video')
+      // Hold the file locally so the admin can trim it BEFORE we burn a
+      // Cloudinary slot. Only the trimmed segment will be uploaded on save —
+      // the original raw file is discarded if they discard the draft.
+      const localUrl = URL.createObjectURL(file)
+      const duration = await getAudioDuration(file).catch(() => 0)
       const defaultName = (newTrack.name || '').trim() ||
         file.name.replace(/\.[^.]+$/, '').slice(0, 80)
-      // Park as a draft. The admin will trim + name, then save once.
-      setMusicDraft({ url, name: defaultName })
+      setMusicDraft({
+        url: localUrl,
+        name: defaultName,
+        file,                  // raw file kept in state for the eventual trim+upload
+        duration,
+        startSec: 0,
+        endSec: duration,
+      })
       setNewTrack({ name: '', url: '' })
       if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
-      showMsg('Trim and name your clip, then save to the library.')
+      showMsg('Set the play span, then save — only the trimmed clip is uploaded.')
     } catch (err) {
-      console.error('[Admin] Cloudinary audio upload failed', err)
-      showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
+      console.error('[Admin] audio file load failed', err)
+      showMsg(`Could not read audio: ${err.message || 'unknown error'}`, false)
     } finally {
       setMediaMusicUploading(false)
     }
   }
 
-  // Single-shot save for a freshly-uploaded clip. The backend's validator
-  // currently only accepts { name, url, duration:int } — startSec/endSec are
-  // rejected as "not allowed". Until the backend extends the schema, trim
-  // metadata is held client-side only (the studio music picker honours it via
-  // the in-memory record but it won't survive a page reload).
+  // Single-shot save for a freshly-uploaded clip. The trim is applied
+  // client-side BEFORE the upload — only the chosen play span ends up in
+  // Cloudinary and the library. The full file never leaves the browser.
   const handleSaveDraftTrack = async (draft) => {
     try {
       const startSec = Number(draft.startSec || 0)
       const endSec = Number(draft.endSec || 0)
-      const trimmed = endSec > 0 && (startSec > 0 || endSec < Number(draft.duration || 0) - 0.5)
-      // Persist trim points keyed by URL so they survive the round-trip to the
-      // backend (which doesn't store startSec/endSec yet). After refresh the
-      // mergeTrimData pass reattaches them using the same URL key.
-      if (trimmed && draft.url) {
-        const store = readTrimStore()
-        store[draft.url] = { startSec, endSec }
-        writeTrimStore(store)
+      const fullDuration = Number(draft.duration || 0)
+      const trimmed = endSec > 0 && (startSec > 0 || endSec < fullDuration - 0.05)
+      const sourceFile = draft.file
+      if (!sourceFile) {
+        showMsg('Original audio file is missing — please re-upload.', false)
+        return
       }
+      const fileToUpload = trimmed
+        ? await trimAudioFile(sourceFile, startSec, endSec)
+        : sourceFile
+      const url = await uploadToCloudinary(fileToUpload, 'video')
+      const finalDuration = trimmed ? Math.max(1, Math.round(endSec - startSec)) : Math.max(1, Math.round(fullDuration))
       await uploadMediaMusic({
         name: draft.name,
-        url: draft.url,
-        duration: Math.round(Number(draft.duration || 0)),
+        url,
+        duration: finalDuration,
       })
-      showMsg(
-        trimmed
-          ? 'Track added — trim will apply in the studio.'
-          : 'Track added to library!',
-      )
+      // Release the local blob URL — we no longer need it.
+      if (draft.url?.startsWith('blob:')) URL.revokeObjectURL(draft.url)
+      showMsg(trimmed ? 'Trimmed clip added to library!' : 'Track added to library!')
       setMusicDraft(null)
       await refreshMediaSilent()
     } catch (err) {
-      console.error('[Admin] uploadMediaMusic (draft) failed', err)
+      console.error('[Admin] trim+upload music failed', err)
       showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
       throw err
     }
   }
 
   const handleDiscardDraft = async () => {
-    if (!await appConfirm('Discard Upload', 'Discard this upload? The Cloudinary file will not be added to the library.', { variant: 'warning', confirmLabel: 'Discard' })) return
+    if (!await appConfirm('Discard Upload', 'Discard this upload? The audio is held only in your browser and will not be saved.', { variant: 'warning', confirmLabel: 'Discard' })) return
+    if (musicDraft?.url?.startsWith('blob:')) URL.revokeObjectURL(musicDraft.url)
     setMusicDraft(null)
   }
 
