@@ -8795,18 +8795,26 @@ a {
   .cs-mobile-edit-bar {
     flex-shrink: 0;
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
+    align-items: stretch;
     background: rgba(8, 14, 22, 0.98);
     border-top: 1px solid rgba(126, 239, 255, 0.22);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     animation: slideUpBar 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    min-height: 58px;
+  }
+  /* Scrollable inner strip */
+  .cs-mobile-edit-scroll {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
     overflow-x: auto;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
-  .cs-mobile-edit-bar::-webkit-scrollbar { display: none; }
+  .cs-mobile-edit-scroll::-webkit-scrollbar { display: none; }
   @keyframes slideUpBar {
     from { transform: translateY(100%); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
@@ -8820,6 +8828,57 @@ a {
     flex-shrink: 0;
     padding-right: 8px;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  /* Color swatch with a label underneath */
+  .cs-mobile-edit-color-wrap {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .cs-mobile-edit-color-label {
+    font-size: 0.58rem;
+    color: rgba(255, 255, 255, 0.45);
+    white-space: nowrap;
+    text-align: center;
+  }
+  /* Size value display between A−/A+ */
+  .cs-mobile-edit-size-val {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.7);
+    min-width: 26px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  /* Slider wrap (X/Y/H position controls) */
+  .cs-mobile-edit-slider-wrap {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 80px;
+  }
+  .cs-mobile-edit-slider {
+    width: 80px;
+    accent-color: var(--type-accent, #7ef7ff);
+  }
+  /* Font chip row */
+  .cs-mobile-font-chip {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2eaf0;
+    font-size: 0.78rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .cs-mobile-font-chip.active {
+    border-color: var(--type-accent, #7ef7ff);
+    background: rgba(126, 239, 255, 0.12);
+    color: var(--type-accent, #7ef7ff);
   }
   .cs-mobile-edit-btn {
     flex-shrink: 0;
@@ -8858,8 +8917,9 @@ a {
     font-size: 0.8rem;
   }
   .cs-mobile-edit-done {
-    margin-left: auto;
     flex-shrink: 0;
+    align-self: center;
+    margin: 0 10px 0 4px;
     padding: 8px 16px;
     border-radius: 999px;
     background: var(--type-accent, #7ef7ff);
