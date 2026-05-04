@@ -1,9 +1,12 @@
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
+import { trimAudioFile, getAudioDuration } from '../lib/audioTrim.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import Dropdown from '../components/Dropdown.jsx'
+import StatusModal from '../components/StatusModal.jsx'
+import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import {
   getAdminDashboard,
   getAdminStatsUsers,
@@ -140,6 +143,8 @@ function normalizeOverviewStats(overview, dashboard, usersStats, cardsStats, tem
 function AdminDashboard() {
   const { currentUser, balance, openAuthModal, marketplaceTemplates, deleteMarketplaceTemplate } = useOutletContext()
   const navigate = useNavigate()
+  const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
+  const [statusModal, setStatusModal] = useState(null) // { type, title?, message }
   const [activeTab, setActiveTab] = useState('Overview')
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
@@ -154,7 +159,6 @@ function AdminDashboard() {
   const [mediaMusic, setMediaMusic] = useState([])
   const [allTemplates, setAllTemplates] = useState([])
   const [loading, setLoading] = useState(false)
-  const [actionMsg, setActionMsg] = useState({ text: '', ok: false })
 
   // New package form
   const [newPkg, setNewPkg] = useState({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false })
@@ -205,8 +209,7 @@ function AdminDashboard() {
   const isAdminGate = currentUser && currentUser.role === 'Admin'
 
   const showMsg = (text, ok = true) => {
-    setActionMsg({ text, ok })
-    setTimeout(() => setActionMsg({ text: '', ok: false }), 3000)
+    setStatusModal({ type: ok ? 'success' : 'error', message: text })
   }
 
   // Backend response shapes drift across endpoints. This helper looks for a
@@ -395,7 +398,7 @@ function AdminDashboard() {
   const handleUnbanUser = async () => {
     const id = unbanIdentifier.trim()
     if (!id) { showMsg('User ID or username required', false); return }
-    if (!window.confirm(`Unban user "${id}"?`)) return
+    if (!await appConfirm('Unban User', `Unban "${id}"?`)) return
     try {
       await unbanUser({ userId: id })
       showMsg(`User "${id}" unbanned.`)
@@ -447,7 +450,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteAd = async (ad) => {
-    if (!window.confirm(`Delete ad "${ad.name || 'this ad'}"? This cannot be undone.`)) return
+    if (!await appConfirm('Delete Ad', `Delete "${ad.name || 'this ad'}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     const id = ad._id || ad.id
     try {
       await deleteAdminAd(id)
@@ -459,7 +462,7 @@ function AdminDashboard() {
   }
 
   const handleDisableCode = async (code) => {
-    if (!window.confirm(`Disable code "${code.code}"?`)) return
+    if (!await appConfirm('Disable Code', `Disable code "${code.code}"?`, { variant: 'warning', confirmLabel: 'Disable' })) return
     try {
       await disableAdminRedeemCode(code.code)
       showMsg('Code disabled.')
@@ -470,7 +473,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteCode = async (code) => {
-    if (!window.confirm(`Delete code "${code.code}"? This cannot be undone.`)) return
+    if (!await appConfirm('Delete Code', `Delete code "${code.code}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     try {
       await deleteAdminRedeemCode(code.code)
       showMsg('Code deleted.')
@@ -653,7 +656,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteVideo = async (video) => {
-    if (!window.confirm('Delete this video?')) return
+    if (!await appConfirm('Delete Video', 'Delete this video? This cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })) return
     const nameKey = video?.nameKey || video?.title || video?.name
     if (!nameKey) { showMsg('Missing video identifier.', false); return }
     try {
@@ -674,64 +677,71 @@ function AdminDashboard() {
     }
     setMediaMusicUploading(true)
     try {
-      // Cloudinary stores audio under the `video` resource type — 'auto' can
-      // misclassify some codecs and return 4xx. Use 'video' explicitly so mp3
-      // and wav uploads work consistently.
-      const url = await uploadToCloudinary(file, 'video')
+      // Hold the file locally so the admin can trim it BEFORE we burn a
+      // Cloudinary slot. Only the trimmed segment will be uploaded on save —
+      // the original raw file is discarded if they discard the draft.
+      const localUrl = URL.createObjectURL(file)
+      const duration = await getAudioDuration(file).catch(() => 0)
       const defaultName = (newTrack.name || '').trim() ||
         file.name.replace(/\.[^.]+$/, '').slice(0, 80)
-      // Park as a draft. The admin will trim + name, then save once.
-      setMusicDraft({ url, name: defaultName })
+      setMusicDraft({
+        url: localUrl,
+        name: defaultName,
+        file,                  // raw file kept in state for the eventual trim+upload
+        duration,
+        startSec: 0,
+        endSec: duration,
+      })
       setNewTrack({ name: '', url: '' })
       if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
-      showMsg('Trim and name your clip, then save to the library.')
+      showMsg('Set the play span, then save — only the trimmed clip is uploaded.')
     } catch (err) {
-      console.error('[Admin] Cloudinary audio upload failed', err)
-      showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
+      console.error('[Admin] audio file load failed', err)
+      showMsg(`Could not read audio: ${err.message || 'unknown error'}`, false)
     } finally {
       setMediaMusicUploading(false)
     }
   }
 
-  // Single-shot save for a freshly-uploaded clip. The backend's validator
-  // currently only accepts { name, url, duration:int } — startSec/endSec are
-  // rejected as "not allowed". Until the backend extends the schema, trim
-  // metadata is held client-side only (the studio music picker honours it via
-  // the in-memory record but it won't survive a page reload).
+  // Single-shot save for a freshly-uploaded clip. The trim is applied
+  // client-side BEFORE the upload — only the chosen play span ends up in
+  // Cloudinary and the library. The full file never leaves the browser.
   const handleSaveDraftTrack = async (draft) => {
     try {
       const startSec = Number(draft.startSec || 0)
       const endSec = Number(draft.endSec || 0)
-      const trimmed = endSec > 0 && (startSec > 0 || endSec < Number(draft.duration || 0) - 0.5)
-      // Persist trim points keyed by URL so they survive the round-trip to the
-      // backend (which doesn't store startSec/endSec yet). After refresh the
-      // mergeTrimData pass reattaches them using the same URL key.
-      if (trimmed && draft.url) {
-        const store = readTrimStore()
-        store[draft.url] = { startSec, endSec }
-        writeTrimStore(store)
+      const fullDuration = Number(draft.duration || 0)
+      const trimmed = endSec > 0 && (startSec > 0 || endSec < fullDuration - 0.05)
+      const sourceFile = draft.file
+      if (!sourceFile) {
+        showMsg('Original audio file is missing — please re-upload.', false)
+        return
       }
+      const fileToUpload = trimmed
+        ? await trimAudioFile(sourceFile, startSec, endSec)
+        : sourceFile
+      const url = await uploadToCloudinary(fileToUpload, 'video')
+      const finalDuration = trimmed ? Math.max(1, Math.round(endSec - startSec)) : Math.max(1, Math.round(fullDuration))
       await uploadMediaMusic({
         name: draft.name,
-        url: draft.url,
-        duration: Math.round(Number(draft.duration || 0)),
+        url,
+        duration: finalDuration,
       })
-      showMsg(
-        trimmed
-          ? 'Track added — trim will apply in the studio.'
-          : 'Track added to library!',
-      )
+      // Release the local blob URL — we no longer need it.
+      if (draft.url?.startsWith('blob:')) URL.revokeObjectURL(draft.url)
+      showMsg(trimmed ? 'Trimmed clip added to library!' : 'Track added to library!')
       setMusicDraft(null)
       await refreshMediaSilent()
     } catch (err) {
-      console.error('[Admin] uploadMediaMusic (draft) failed', err)
+      console.error('[Admin] trim+upload music failed', err)
       showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
       throw err
     }
   }
 
-  const handleDiscardDraft = () => {
-    if (!window.confirm('Discard this upload? The Cloudinary file will not be added to the library.')) return
+  const handleDiscardDraft = async () => {
+    if (!await appConfirm('Discard Upload', 'Discard this upload? The audio is held only in your browser and will not be saved.', { variant: 'warning', confirmLabel: 'Discard' })) return
+    if (musicDraft?.url?.startsWith('blob:')) URL.revokeObjectURL(musicDraft.url)
     setMusicDraft(null)
   }
 
@@ -752,7 +762,7 @@ function AdminDashboard() {
   const handleAdminDeleteTemplate = async (tpl) => {
     const id = tpl.templateId || tpl.id
     if (!id) return
-    if (!window.confirm(`Delete template "${tpl.title}"? This cannot be undone.`)) return
+    if (!await appConfirm('Delete Template', `Delete "${tpl.title}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     const res = await deleteMarketplaceTemplate?.(id)
     if (res?.ok) {
       showMsg('Template deleted.')
@@ -796,7 +806,7 @@ function AdminDashboard() {
   }
 
   const handleDeleteTrack = async (track) => {
-    if (!window.confirm('Delete this track?')) return
+    if (!await appConfirm('Delete Track', 'Delete this track? This cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })) return
     const nameKey = track?.nameKey || track?.name || track?.title
     if (!nameKey) { showMsg('Missing track identifier.', false); return }
     try {
@@ -834,9 +844,6 @@ function AdminDashboard() {
           <h2>Platform Dashboard</h2>
         </div>
 
-        {actionMsg.text && (
-          <p className={`store-earn-msg ${actionMsg.ok ? 'success' : 'error'}`}>{actionMsg.text}</p>
-        )}
 
         {/* Tab Navigation */}
         <div className="admin-tabs">
@@ -1218,7 +1225,7 @@ function AdminDashboard() {
                           onClick={async () => {
                             const id = tpl.templateId || tpl.id
                             if (!id) return
-                            if (!window.confirm(`Disable template "${tpl.title}"?`)) return
+                            if (!await appConfirm('Disable Template', `Disable "${tpl.title}"?`, { variant: 'warning', confirmLabel: 'Disable' })) return
                             try { await disableAdminTemplate(id); showMsg('Template disabled.'); loadTabData('Templates') }
                             catch (err) { showMsg(err.message || 'Disable failed', false) }
                           }}
@@ -1877,11 +1884,14 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* Fixed toast — visible regardless of scroll */}
-      {actionMsg.text && (
-        <div className={`admin-fixed-toast ${actionMsg.ok ? 'success' : 'error'}`}>
-          {actionMsg.ok ? '✓' : '✕'} {actionMsg.text}
-        </div>
+      {ConfirmModal}
+      {statusModal && (
+        <StatusModal
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          onClose={() => setStatusModal(null)}
+        />
       )}
     </div>
   )

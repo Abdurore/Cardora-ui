@@ -314,36 +314,43 @@ function WorldChat() {
           ) : (
             messages.map((msg) => {
               const isMe = msg.userId === currentUser.id
+              const openProfile = () => setProfileCard({
+                userId: msg.userId,
+                username: msg.username,
+                avatarUrl: msg.profilePictureUrl,
+                role: msg.role,
+              })
               return (
                 <div key={msg.id} className={`chat-msg ${isMe ? 'me' : ''}`}>
                   {!isMe && (
-                    <button
-                      type="button"
-                      className="chat-msg-avatar chat-msg-avatar-btn"
-                      onClick={() => setProfileCard({ userId: msg.userId, username: msg.username, avatarUrl: msg.profilePictureUrl, role: msg.role })}
-                      title={`View ${msg.username}'s profile`}
-                    >
-                      {msg.profilePictureUrl ? (
-                        <img src={msg.profilePictureUrl} alt="" />
-                      ) : (
-                        <span>{msg.username?.charAt(0)?.toUpperCase() || '?'}</span>
-                      )}
-                    </button>
-                  )}
-                  <div className="chat-msg-body">
-                    {!isMe && (
+                    <div className="chat-msg-head">
+                      <button
+                        type="button"
+                        className="chat-msg-avatar chat-msg-avatar-btn"
+                        onClick={openProfile}
+                        title={`View ${msg.username}'s profile`}
+                      >
+                        {msg.profilePictureUrl ? (
+                          <img src={msg.profilePictureUrl} alt="" />
+                        ) : (
+                          <span>{msg.username?.charAt(0)?.toUpperCase() || '?'}</span>
+                        )}
+                      </button>
                       <button
                         type="button"
                         className="chat-msg-name chat-msg-name-btn"
-                        onClick={() => setProfileCard({ userId: msg.userId, username: msg.username, avatarUrl: msg.profilePictureUrl, role: msg.role })}
+                        onClick={openProfile}
                       >
                         {msg.username}
                       </button>
-                    )}
+                      <span className="chat-msg-time">{formatAge(msg.createdAt)}</span>
+                    </div>
+                  )}
+                  <div className="chat-msg-body">
                     <div className="chat-msg-bubble">
                       {msg.content}
                     </div>
-                    <span className="chat-msg-time">{formatAge(msg.createdAt)}</span>
+                    {isMe && <span className="chat-msg-time">{formatAge(msg.createdAt)}</span>}
                   </div>
                 </div>
               )
@@ -416,19 +423,26 @@ function WorldChat() {
                 </div>
               </div>
             ) : (() => {
-              const displayAvatarUrl = profileDetails?.profilePictureUrl || profileDetails?.avatarUrl || profileCard.avatarUrl
-              const displayName = profileDetails?.username || profileCard.username
-              const role = normalizeRole(profileDetails?.role || profileCard.role)
-              const bio = profileDetails?.bio || profileDetails?.about || null
-              const joined = formatJoined(profileDetails?.createdAt || profileDetails?.joinedAt)
-              const referrals = typeof profileDetails?.referralsCount === 'number' ? profileDetails.referralsCount : null
-              const cardsSent = profileDetails?.cardsSent ?? profileDetails?.cardsCount ?? profileDetails?.totalCards ?? null
-              const followers = profileDetails?.followersCount ?? profileDetails?.followers ?? null
-              const following = profileDetails?.followingCount ?? profileDetails?.following ?? null
-              const isVerified = profileDetails?.isVerified || profileDetails?.verified || false
-              const status = profileDetails?.status || profileDetails?.customStatus || null
-              const fullName = profileDetails?.fullName || profileDetails?.displayName || null
-              const location = profileDetails?.location || profileDetails?.country || null
+              // Backend response shapes drift between endpoints. Try every
+              // plausible field name so the modal never looks empty when the
+              // data IS there under a slightly different key.
+              const p = profileDetails || {}
+              const num = (v) => (typeof v === 'number' ? v : null)
+              const displayAvatarUrl = p.profilePictureUrl || p.avatarUrl || p.avatar || p.picture || profileCard.avatarUrl
+              const displayName = p.username || profileCard.username
+              const role = normalizeRole(p.role || p.userRole || profileCard.role)
+              const bio = p.bio || p.about || p.description || null
+              const joined = formatJoined(p.createdAt || p.joinedAt || p.created_at || p.signupDate || p.dateJoined)
+              const referrals = num(p.referralsCount ?? p.referrals ?? p.referredCount)
+              const cardsSent = num(p.cardsSent ?? p.cardsCount ?? p.totalCards ?? p.cards)
+              const followers = num(p.followersCount ?? p.followers)
+              const following = num(p.followingCount ?? p.following)
+              const isVerified = !!(p.isVerified || p.verified)
+              const status = p.status || p.customStatus || null
+              const fullName = p.fullName || p.displayName || p.name || null
+              const location = p.location || p.country || p.city || null
+              const userIdShort = String(p.id || p._id || profileCard.userId || '').slice(-8)
+              const hasAnyDetail = !!(bio || joined || cardsSent !== null || followers !== null || following !== null || referrals !== null || location || fullName)
 
               return (
                 <>
@@ -484,21 +498,31 @@ function WorldChat() {
                     </div>
                   )}
 
-                  {(joined || location) && (
-                    <div className="chat-profile-meta">
-                      {joined && (
-                        <span className="chat-profile-meta-item">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                          Joined {joined}
-                        </span>
-                      )}
-                      {location && (
-                        <span className="chat-profile-meta-item">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                          {location}
-                        </span>
-                      )}
-                    </div>
+                  <div className="chat-profile-meta">
+                    {joined && (
+                      <span className="chat-profile-meta-item">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        Joined {joined}
+                      </span>
+                    )}
+                    {location && (
+                      <span className="chat-profile-meta-item">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        {location}
+                      </span>
+                    )}
+                    {userIdShort && (
+                      <span className="chat-profile-meta-item chat-profile-id">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.6c1.4-2.5 3-3.6 5-3.6s3.6 1.1 5 3.6"/></svg>
+                        ID …{userIdShort}
+                      </span>
+                    )}
+                  </div>
+
+                  {!hasAnyDetail && (
+                    <p className="chat-profile-empty">
+                      This member hasn't added any extra details yet.
+                    </p>
                   )}
                 </>
               )

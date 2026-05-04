@@ -21,6 +21,7 @@ import { getTierLimits } from '../lib/tierLimits.js'
 import { getPalettesForTier, applyPalette, getPaletteById } from '../lib/palettes.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
+const STUDIO_AUTOSAVE_PREFIX = 'cardora:studioAutoSave:'
 const BRAND_LOGO = '/cardora-logo.png?v=4'
 
 const steps = ['closed', 'card', 'questions', 'preview']
@@ -298,6 +299,37 @@ function CardStudio() {
   const draftStorageKey = currentUser?.id
     ? `${STUDIO_DRAFT_PREFIX}${currentUser.id}`
     : `${STUDIO_DRAFT_PREFIX}guest`
+  const autoSaveKey = currentUser?.id
+    ? `${STUDIO_AUTOSAVE_PREFIX}${currentUser.id}`
+    : `${STUDIO_AUTOSAVE_PREFIX}guest`
+
+  // Read the most recent autosave for this user/context. Used on mount to
+  // restore unsaved work — survives reloads, browser closes, accidental
+  // navigation away. Scoped by studioType+studioTier so we don't restore a
+  // poll draft into a personal-card session, etc.
+  const readAutoSave = () => {
+    try {
+      const raw = localStorage.getItem(autoSaveKey)
+      if (!raw) return null
+      const saved = JSON.parse(raw)
+      if (!saved || typeof saved !== 'object') return null
+      // Only restore when the user is opening the same type+tier — otherwise
+      // a poll/elite draft would clobber a fresh personal/classic session.
+      if (saved.studioType !== studioType || saved.studioTier !== studioTier) return null
+      return saved
+    } catch {
+      return null
+    }
+  }
+  const autoSavedRef = useRef(null)
+  if (autoSavedRef.current === null && !location.state?.draftCardObject) {
+    // Lazy-init once. Skip when an explicit draft is being opened from the
+    // drafts list — that path takes priority.
+    autoSavedRef.current = readAutoSave() || false
+  }
+  const initialAutoSaved = autoSavedRef.current && autoSavedRef.current.cardObject
+    ? autoSavedRef.current
+    : null
 
   // -- Card type + tier from URL --
   const studioType = searchParams.get('type') || 'personal'
@@ -354,13 +386,15 @@ function CardStudio() {
   )
   const defaultToolId = activeTools[0]?.id || 'content'
 
-  const [cardObject, setCardObject] = useState(() =>
-    existingDraftObject ? structuredClone(existingDraftObject) : resolveTemplateCardObject(cardData),
-  )
+  const [cardObject, setCardObject] = useState(() => {
+    if (existingDraftObject) return structuredClone(existingDraftObject)
+    if (initialAutoSaved?.cardObject) return structuredClone(initialAutoSaved.cardObject)
+    return resolveTemplateCardObject(cardData)
+  })
   const [activeTool, setActiveTool] = useState(defaultToolId)
   const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'closed' : 'card')
   const [showPreview, setShowPreview] = useState(false)
-  const [savedState, setSavedState] = useState('Unsaved draft')
+  const [savedState, setSavedState] = useState(initialAutoSaved ? 'Restored from last session' : 'Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
   const [publishForm, setPublishForm] = useState({
     name: cardData?.title || existingDraftObject?.content?.heading || resolveTemplateCardObject(cardData).content.heading,
@@ -387,14 +421,121 @@ function CardStudio() {
   const editPopoverRef = useRef(null)
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
 
-  // Poll / Trivia / Chain / Anonymous template state
-  const [pollData, setPollData] = useState({ question: '', options: ['', ''], allowMultiple: false })
-  const [triviaData, setTriviaData] = useState({
-    questions: [{ text: '', options: ['', '', '', ''], correctIndex: 0 }],
-  })
-  const [chainData, setChainData] = useState({ enabled: false, prompt: '' })
-  const [anonTemplate, setAnonTemplate] = useState({ enabled: false, tier: studioTier || 'classic' })
+  // Undo history. Each entry is a JSON-string snapshot of cardObject taken
+  // BEFORE a mutation. Cap to 30 to keep memory bounded — anything older
+  // gets dropped off the bottom. Strings (not deep clones) so snapshots are
+  // both compact and trivially comparable.
+  const undoStackRef = useRef([])
+  const skipNextSnapshotRef = useRef(false)
+  const pushUndoSnapshot = (snapshot) => {
+    if (skipNextSnapshotRef.current) {
+      skipNextSnapshotRef.current = false
+      return
+    }
+    const last = undoStackRef.current[undoStackRef.current.length - 1]
+    if (last === snapshot) return
+    undoStackRef.current.push(snapshot)
+    if (undoStackRef.current.length > 30) undoStackRef.current.shift()
+  }
+  const handleUndo = () => {
+    const prev = undoStackRef.current.pop()
+    if (!prev) return
+    try {
+      skipNextSnapshotRef.current = true
+      setCardObject(JSON.parse(prev))
+      setActiveEditEl(null)
+    } catch { /* ignore */ }
+  }
+
+  // Poll / Trivia / Chain / Anonymous template state. Seed from the autosave
+  // payload when one exists so a poll/trivia/chain in progress survives a
+  // reload, just like the rest of cardObject does.
+  const [pollData, setPollData] = useState(() =>
+    initialAutoSaved?.pollData || { question: '', options: ['', ''], allowMultiple: false }
+  )
+  const [triviaData, setTriviaData] = useState(() =>
+    initialAutoSaved?.triviaData || {
+      questions: [{ text: '', options: ['', '', '', ''], correctIndex: 0 }],
+    }
+  )
+  const [chainData, setChainData] = useState(() =>
+    initialAutoSaved?.chainData || { enabled: false, prompt: '' }
+  )
+  const [anonTemplate, setAnonTemplate] = useState(() =>
+    initialAutoSaved?.anonTemplate || { enabled: false, tier: studioTier || 'classic' }
+  )
   const [anonPreviewTab, setAnonPreviewTab] = useState('sender') // 'sender' | 'recipient'
+
+  // Auto-save: every change persists to localStorage after a short debounce so
+  // an accidental reload, browser close, or navigation away doesn't lose the
+  // user's work. The blob: URLs in c.media.images can't be revived after a
+  // reload (they belong to the previous page session), so they're stripped
+  // before saving — only http(s)/data URLs are kept.
+  const autoSaveTimerRef = useRef(null)
+  const skipFirstAutoSaveRef = useRef(true)
+  // Always points at the latest "write a snapshot" function so the unload
+  // handler (registered once) sees current state instead of the first render's.
+  const writeAutoSaveRef = useRef(() => {})
+  writeAutoSaveRef.current = () => {
+    try {
+      const sanitized = structuredClone(cardObject)
+      if (Array.isArray(sanitized?.media?.images)) {
+        sanitized.media.images = sanitized.media.images.filter(
+          (img) => img?.url && /^(https?:|data:)/.test(img.url)
+        )
+      }
+      if (sanitized?.background?.value && sanitized.background.value.startsWith('blob:')) {
+        sanitized.background.value = ''
+      }
+      const payload = {
+        draftId: draftIdRef.current,
+        studioType,
+        studioTier,
+        cardObject: sanitized,
+        pollData,
+        triviaData,
+        chainData,
+        anonTemplate,
+        updatedAt: new Date().toISOString(),
+      }
+      localStorage.setItem(autoSaveKey, JSON.stringify(payload))
+      setSavedState('Auto-saved just now')
+    } catch {
+      // Quota errors etc. — fail silently, keep user typing.
+    }
+  }
+
+  useEffect(() => {
+    if (skipFirstAutoSaveRef.current) {
+      skipFirstAutoSaveRef.current = false
+      return
+    }
+    setSavedState('Saving…')
+    clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(() => writeAutoSaveRef.current(), 600)
+    return () => clearTimeout(autoSaveTimerRef.current)
+  }, [cardObject, pollData, triviaData, chainData, anonTemplate])
+
+  // Flush a pending autosave synchronously before unload so the very last
+  // edit (within the debounce window) isn't lost when the user closes the
+  // tab or hits reload.
+  useEffect(() => {
+    const flush = () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current)
+        autoSaveTimerRef.current = null
+      }
+      writeAutoSaveRef.current()
+    }
+    window.addEventListener('beforeunload', flush)
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('beforeunload', flush)
+      window.removeEventListener('pagehide', flush)
+      // Component unmount: flush so navigating away within the SPA also persists.
+      flush()
+    }
+  }, [])
 
   // Admin-curated media
   const [adminVideos, setAdminVideos] = useState([])
@@ -517,6 +658,7 @@ function CardStudio() {
       setSavedState('Template submitted for review')
       setPublishSuccess({ name: publishForm.name.trim(), previewImage })
       setPublishScreenshot(null)
+      try { localStorage.removeItem(autoSaveKey) } catch { /* ignore */ }
     } catch (error) {
       setPublishError(error.message || 'Could not submit the template.')
     } finally {
@@ -528,6 +670,7 @@ function CardStudio() {
   // Updater helpers
   const update = (path, value) => {
     setCardObject(prev => {
+      pushUndoSnapshot(JSON.stringify(prev))
       const keys = path.split('.')
       const result = structuredClone(prev)
       let current = result
@@ -541,6 +684,22 @@ function CardStudio() {
       return result
     })
   }
+
+  // Cmd/Ctrl+Z undoes the last cardObject mutation. Skip when the user is
+  // actually typing in a contentEditable element so the browser's native
+  // undo stack handles in-flight character edits.
+  useEffect(() => {
+    const onKey = (e) => {
+      const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')
+      if (!isUndo) return
+      const t = e.target
+      if (t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+      e.preventDefault()
+      handleUndo()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const goToStep = (step) => {
     setActiveStep(step)
@@ -602,6 +761,9 @@ function CardStudio() {
       }
       setSendResult({ ok: true, slug, message: result.message })
       refreshBalance?.()
+      // Card sent successfully — clear the autosave so the next studio visit
+      // starts fresh instead of restoring the just-sent card.
+      try { localStorage.removeItem(autoSaveKey) } catch { /* ignore */ }
     } else {
       setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
     }
@@ -647,13 +809,48 @@ function CardStudio() {
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const blobUrl = URL.createObjectURL(file)
-    pendingUploadsRef.current.set(blobUrl, { file, type: 'image' })
-    update('media.images', [
-      ...c.media.images,
-      { url: blobUrl, caption: '', fit: 'cover', positionX: 50, positionY: 50 },
-    ])
+    addImageFiles([file])
     e.target.value = ''
+  }
+
+  // Shared add-images entry point so drag-and-drop and the file picker share
+  // exactly one code path. Respects the tier's image cap and ignores files
+  // that aren't actually images.
+  const addImageFiles = (files) => {
+    const cap = tierLimits.maxImages ?? Infinity
+    const remaining = Math.max(0, cap - c.media.images.length)
+    if (remaining <= 0) return
+    const accepted = Array.from(files)
+      .filter(f => f && f.type?.startsWith('image/'))
+      .slice(0, remaining)
+    if (!accepted.length) return
+    const newEntries = accepted.map(file => {
+      const blobUrl = URL.createObjectURL(file)
+      pendingUploadsRef.current.set(blobUrl, { file, type: 'image' })
+      return { url: blobUrl, caption: '', fit: 'cover', positionX: 50, positionY: 50 }
+    })
+    update('media.images', [...c.media.images, ...newEntries])
+  }
+
+  // Drag-and-drop image upload onto the preview frame. Stops the default
+  // browser navigation that would otherwise open the dropped file in a new
+  // tab. previewDragOver toggles a CSS class so users see a clear drop zone.
+  const [previewDragOver, setPreviewDragOver] = useState(false)
+  const onPreviewDragOver = (e) => {
+    if (!e.dataTransfer?.types?.includes('Files')) return
+    e.preventDefault()
+    setPreviewDragOver(true)
+  }
+  const onPreviewDragLeave = (e) => {
+    // Only clear when leaving the card itself, not when crossing to a child.
+    if (e.currentTarget.contains(e.relatedTarget)) return
+    setPreviewDragOver(false)
+  }
+  const onPreviewDrop = (e) => {
+    e.preventDefault()
+    setPreviewDragOver(false)
+    const files = e.dataTransfer?.files
+    if (files && files.length) addImageFiles(files)
   }
 
   const removeImage = (idx) => {
@@ -2215,6 +2412,8 @@ function CardStudio() {
         key="heading"
         contentEditable={!compact}
         suppressContentEditableWarning
+        data-placeholder="Click to add a heading"
+        data-edit-hint="Click to edit"
         className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
         style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
         onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
@@ -2230,6 +2429,8 @@ function CardStudio() {
         <p
           contentEditable={!compact}
           suppressContentEditableWarning
+          data-placeholder="Click to add your message"
+          data-edit-hint="Click to edit"
           className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
           style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
           onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
@@ -2258,10 +2459,19 @@ function CardStudio() {
 
     return (
       <div
-        className={`cs-preview-card ${compact ? 'compact' : ''}`}
+        className={`cs-preview-card ${compact ? 'compact' : ''}${previewDragOver && !compact ? ' cs-drop-active' : ''}`}
         style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}
         onClick={() => setActiveEditEl(null)}
+        onDragOver={!compact ? onPreviewDragOver : undefined}
+        onDragLeave={!compact ? onPreviewDragLeave : undefined}
+        onDrop={!compact ? onPreviewDrop : undefined}
       >
+        {!compact && previewDragOver && (
+          <div className="cs-preview-drop-overlay">
+            <div className="cs-preview-drop-icon">⬇</div>
+            <p>Drop to add image</p>
+          </div>
+        )}
         {/* Render elements in user-defined order */}
         {elementOrder.map(key => elementMap[key] ?? null)}
 
@@ -2322,6 +2532,15 @@ function CardStudio() {
           <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
           <span className="cs-type-badge">{typeMeta.label || 'Personal Card'}</span>
           <div className="cs-status">{savedState}</div>
+          <button
+            type="button"
+            className="cs-nav-btn cs-undo-btn"
+            onClick={handleUndo}
+            disabled={undoStackRef.current.length === 0}
+            title="Undo last change (Ctrl/Cmd+Z)"
+          >
+            ↶ Undo
+          </button>
         </div>
         <div className="cs-progress">
           <div className="cs-wordmark">
