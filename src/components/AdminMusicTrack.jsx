@@ -101,7 +101,7 @@ export default function AdminMusicTrack({ track, onSave, onDelete, mode = 'libra
     setSaving(true)
     try {
       await onSave({
-        ...track,
+        ...track,                                  // keeps `file` (raw blob) for trim+upload
         name,
         startSec: Number(startSec.toFixed(2)),
         endSec: Number(endSec.toFixed(2)),
