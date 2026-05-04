@@ -1,4 +1,4 @@
-﻿/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    ENVELOPE (cinematic card reveal)
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .envelope-scene {
@@ -18398,6 +18398,101 @@ a {
 .cs-send-modal-cc-icon {
   font-size: 0.85rem;
   opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SEND MODAL — CC Confirmation Step (before deduction)
+   ════════════════════════════════════════════════════════════════ */
+.cs-send-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 8px 0 4px;
+  gap: 4px;
+}
+.cs-send-confirm-icon {
+  font-size: 2.2rem;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 0 12px rgba(118, 239, 255, 0.3));
+}
+.cs-send-confirm-text {
+  font-size: 0.88rem;
+  color: rgba(201, 247, 255, 0.75);
+  margin: 0;
+  line-height: 1.5;
+}
+.cs-send-confirm-text strong {
+  color: #e0f7ff;
+  text-transform: capitalize;
+}
+.cs-send-confirm-cost {
+  margin: 6px 0 4px;
+}
+.cs-send-confirm-amount {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #76efff, #62ffa2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.cs-send-confirm-balance {
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.7);
+  margin: 0 0 10px;
+}
+.cs-send-confirm-balance strong {
+  color: rgba(201, 247, 255, 0.9);
+}
+.cs-send-confirm-short {
+  color: #fca5a5;
+}
+.cs-send-confirm-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+.cs-send-confirm-cancel {
+  flex: 1;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.5);
+  color: rgba(201, 247, 255, 0.7);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.cs-send-confirm-cancel:hover {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #e0f7ff;
+}
+.cs-send-confirm-btn {
+  flex: 1.5;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #76efff, #62ffa2);
+  color: #041015;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(118, 239, 255, 0.2);
+}
+.cs-send-confirm-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(118, 239, 255, 0.3);
+}
+.cs-send-confirm-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════

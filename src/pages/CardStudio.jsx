@@ -774,9 +774,18 @@ function CardStudio() {
       openAuthModal?.()
       return
     }
-    // Open modal immediately so the user sees a loading state, then fill it with the result.
     setSendResult(null)
     setShowSendModal(true)
+    // If the card costs CC, show confirmation first — don't send yet.
+    // Free cards (classic tier) skip confirmation and send immediately.
+    if (tierCost > 0) {
+      // Modal will show the confirm step; handleSend() is called when user clicks "Confirm & Send"
+      return
+    }
+    await handleSend()
+  }
+
+  const handleConfirmSend = async () => {
     await handleSend()
   }
 
@@ -3302,6 +3311,42 @@ function CardStudio() {
                 ×
               </button>
             </div>
+
+            {/* ── CC Confirmation Step (shown before sending when cost > 0) ── */}
+            {!isSending && !sendResult && tierCost > 0 && (
+              <div className="cs-send-confirm">
+                <div className="cs-send-confirm-icon">💎</div>
+                <p className="cs-send-confirm-text">
+                  Sending this <strong>{tierLabel}</strong> card will cost
+                </p>
+                <div className="cs-send-confirm-cost">
+                  <span className="cs-send-confirm-amount">{tierCost} CC</span>
+                </div>
+                <p className="cs-send-confirm-balance">
+                  Your current balance: <strong>{balance ?? 0} CC</strong>
+                  {(balance ?? 0) < tierCost && (
+                    <span className="cs-send-confirm-short"> — You need {tierCost - (balance ?? 0)} more CC</span>
+                  )}
+                </p>
+                <div className="cs-send-confirm-actions">
+                  <button
+                    type="button"
+                    className="cs-send-confirm-cancel"
+                    onClick={() => { setShowSendModal(false); setSendResult(null) }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="cs-send-confirm-btn"
+                    disabled={(balance ?? 0) < tierCost}
+                    onClick={handleConfirmSend}
+                  >
+                    Confirm & Send
+                  </button>
+                </div>
+              </div>
+            )}
 
             {isSending && (
               <div className="cs-send-loading">
