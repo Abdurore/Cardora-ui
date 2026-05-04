@@ -421,6 +421,32 @@ function CardStudio() {
   const editPopoverRef = useRef(null)
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
 
+  // Undo history. Each entry is a JSON-string snapshot of cardObject taken
+  // BEFORE a mutation. Cap to 30 to keep memory bounded — anything older
+  // gets dropped off the bottom. Strings (not deep clones) so snapshots are
+  // both compact and trivially comparable.
+  const undoStackRef = useRef([])
+  const skipNextSnapshotRef = useRef(false)
+  const pushUndoSnapshot = (snapshot) => {
+    if (skipNextSnapshotRef.current) {
+      skipNextSnapshotRef.current = false
+      return
+    }
+    const last = undoStackRef.current[undoStackRef.current.length - 1]
+    if (last === snapshot) return
+    undoStackRef.current.push(snapshot)
+    if (undoStackRef.current.length > 30) undoStackRef.current.shift()
+  }
+  const handleUndo = () => {
+    const prev = undoStackRef.current.pop()
+    if (!prev) return
+    try {
+      skipNextSnapshotRef.current = true
+      setCardObject(JSON.parse(prev))
+      setActiveEditEl(null)
+    } catch { /* ignore */ }
+  }
+
   // Poll / Trivia / Chain / Anonymous template state. Seed from the autosave
   // payload when one exists so a poll/trivia/chain in progress survives a
   // reload, just like the rest of cardObject does.
@@ -644,6 +670,7 @@ function CardStudio() {
   // Updater helpers
   const update = (path, value) => {
     setCardObject(prev => {
+      pushUndoSnapshot(JSON.stringify(prev))
       const keys = path.split('.')
       const result = structuredClone(prev)
       let current = result
@@ -657,6 +684,22 @@ function CardStudio() {
       return result
     })
   }
+
+  // Cmd/Ctrl+Z undoes the last cardObject mutation. Skip when the user is
+  // actually typing in a contentEditable element so the browser's native
+  // undo stack handles in-flight character edits.
+  useEffect(() => {
+    const onKey = (e) => {
+      const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')
+      if (!isUndo) return
+      const t = e.target
+      if (t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+      e.preventDefault()
+      handleUndo()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const goToStep = (step) => {
     setActiveStep(step)
@@ -766,13 +809,48 @@ function CardStudio() {
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const blobUrl = URL.createObjectURL(file)
-    pendingUploadsRef.current.set(blobUrl, { file, type: 'image' })
-    update('media.images', [
-      ...c.media.images,
-      { url: blobUrl, caption: '', fit: 'cover', positionX: 50, positionY: 50 },
-    ])
+    addImageFiles([file])
     e.target.value = ''
+  }
+
+  // Shared add-images entry point so drag-and-drop and the file picker share
+  // exactly one code path. Respects the tier's image cap and ignores files
+  // that aren't actually images.
+  const addImageFiles = (files) => {
+    const cap = tierLimits.maxImages ?? Infinity
+    const remaining = Math.max(0, cap - c.media.images.length)
+    if (remaining <= 0) return
+    const accepted = Array.from(files)
+      .filter(f => f && f.type?.startsWith('image/'))
+      .slice(0, remaining)
+    if (!accepted.length) return
+    const newEntries = accepted.map(file => {
+      const blobUrl = URL.createObjectURL(file)
+      pendingUploadsRef.current.set(blobUrl, { file, type: 'image' })
+      return { url: blobUrl, caption: '', fit: 'cover', positionX: 50, positionY: 50 }
+    })
+    update('media.images', [...c.media.images, ...newEntries])
+  }
+
+  // Drag-and-drop image upload onto the preview frame. Stops the default
+  // browser navigation that would otherwise open the dropped file in a new
+  // tab. previewDragOver toggles a CSS class so users see a clear drop zone.
+  const [previewDragOver, setPreviewDragOver] = useState(false)
+  const onPreviewDragOver = (e) => {
+    if (!e.dataTransfer?.types?.includes('Files')) return
+    e.preventDefault()
+    setPreviewDragOver(true)
+  }
+  const onPreviewDragLeave = (e) => {
+    // Only clear when leaving the card itself, not when crossing to a child.
+    if (e.currentTarget.contains(e.relatedTarget)) return
+    setPreviewDragOver(false)
+  }
+  const onPreviewDrop = (e) => {
+    e.preventDefault()
+    setPreviewDragOver(false)
+    const files = e.dataTransfer?.files
+    if (files && files.length) addImageFiles(files)
   }
 
   const removeImage = (idx) => {
@@ -2334,6 +2412,8 @@ function CardStudio() {
         key="heading"
         contentEditable={!compact}
         suppressContentEditableWarning
+        data-placeholder="Click to add a heading"
+        data-edit-hint="Click to edit"
         className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
         style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
         onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
@@ -2349,6 +2429,8 @@ function CardStudio() {
         <p
           contentEditable={!compact}
           suppressContentEditableWarning
+          data-placeholder="Click to add your message"
+          data-edit-hint="Click to edit"
           className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
           style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
           onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
@@ -2377,10 +2459,19 @@ function CardStudio() {
 
     return (
       <div
-        className={`cs-preview-card ${compact ? 'compact' : ''}`}
+        className={`cs-preview-card ${compact ? 'compact' : ''}${previewDragOver && !compact ? ' cs-drop-active' : ''}`}
         style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}
         onClick={() => setActiveEditEl(null)}
+        onDragOver={!compact ? onPreviewDragOver : undefined}
+        onDragLeave={!compact ? onPreviewDragLeave : undefined}
+        onDrop={!compact ? onPreviewDrop : undefined}
       >
+        {!compact && previewDragOver && (
+          <div className="cs-preview-drop-overlay">
+            <div className="cs-preview-drop-icon">⬇</div>
+            <p>Drop to add image</p>
+          </div>
+        )}
         {/* Render elements in user-defined order */}
         {elementOrder.map(key => elementMap[key] ?? null)}
 
@@ -2441,6 +2532,15 @@ function CardStudio() {
           <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
           <span className="cs-type-badge">{typeMeta.label || 'Personal Card'}</span>
           <div className="cs-status">{savedState}</div>
+          <button
+            type="button"
+            className="cs-nav-btn cs-undo-btn"
+            onClick={handleUndo}
+            disabled={undoStackRef.current.length === 0}
+            title="Undo last change (Ctrl/Cmd+Z)"
+          >
+            ↶ Undo
+          </button>
         </div>
         <div className="cs-progress">
           <div className="cs-wordmark">
