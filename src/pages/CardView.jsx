@@ -42,21 +42,39 @@ function CardView() {
     ;(async () => {
       try {
         const res = await getCardBySlug(id)
-        if (!cancelled) {
-          const backendCard = res?.card || res?.data?.card || res?.data || res
-          if (backendCard && typeof backendCard === 'object' &&
-              (backendCard.slug || backendCard._id || backendCard.cardId ||
-               backendCard.config || backendCard.title ||
-               backendCard.layoutdata || backendCard.layoutData)) {
-            const mapped = mapBackendCard(backendCard)
-            setCard(mapped)
-            if (mapped.locked && mapped.lockType === 'password') {
-              setNeedsPassword(true)
-            }
-            setLoading(false)
-            return
+        if (cancelled) return
+
+        // Backend may wrap the card under `card`, `data.card`, `data`, or
+        // return either the raw card or the renderModel directly. Try every
+        // candidate and pick the first one that looks like a card/renderModel.
+        const candidates = [
+          res?.card,
+          res?.data?.card,
+          res?.renderModel,
+          res?.data?.renderModel,
+          res?.data,
+          res,
+        ]
+        const isCardLike = (c) =>
+          c && typeof c === 'object' &&
+          (c.slug || c._id || c.cardId || c.id ||
+           c.config || c.title ||
+           c.layoutdata || c.layoutData ||
+           c.visuals || c.content || c.type)
+
+        const backendCard = candidates.find(isCardLike)
+
+        if (backendCard) {
+          const mapped = mapBackendCard(backendCard)
+          setCard(mapped)
+          if (mapped.locked && mapped.lockType === 'password') {
+            setNeedsPassword(true)
           }
+          setLoading(false)
+          return
         }
+
+        console.warn('[CardView] Backend response did not contain a card. Response:', res)
       } catch (err) {
         // If 403/locked, prompt for password
         if (err.status === 403 || err.payload?.locked) {
@@ -64,6 +82,7 @@ function CardView() {
           setLoading(false)
           if (!cancelled) return
         }
+        console.warn('[CardView] Fetch failed:', err.status, err.message)
         // Fall through to local lookup
       }
 

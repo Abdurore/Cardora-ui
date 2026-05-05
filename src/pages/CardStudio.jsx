@@ -414,6 +414,7 @@ function CardStudio() {
   const [showPublish, setShowPublish] = useState(false)
   const [publishForm, setPublishForm] = useState({
     name: cardData?.title || existingDraftObject?.content?.heading || resolveTemplateCardObject(cardData).content.heading,
+    category: 'birthday',
   })
   const [publishError, setPublishError] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
@@ -655,11 +656,13 @@ function CardStudio() {
         name: publishForm.name.trim(),
         type: publishedType,
         tier: studioTier,
+        category: publishForm.category || 'birthday',
         previewImage,
         layoutConfig: structuredClone({
           ...flushedForPublish,
           type: publishedType,
           tier: studioTier,
+          category: publishForm.category || 'birthday',
           previewImage,
           previewUrl: previewImage,
         }),
@@ -2584,66 +2587,79 @@ function CardStudio() {
       <div className="cs-topbar">
         {/* Left: back + branding */}
         <div className="cs-top-left">
-          <button type="button" className="cs-nav-btn cs-back-btn" onClick={() => navigate(-1)}>←</button>
+          <button type="button" className="cs-back-btn" onClick={() => navigate(-1)} title="Back">
+            <span className="cs-back-arrow">←</span>
+          </button>
           <div className="cs-wordmark">
             <img src={BRAND_LOGO} alt="Cardora" className="cs-top-logo" />
             <span>Studio</span>
           </div>
+          <span className="cs-top-divider" />
+          <div className="cs-top-meta">
+            <span className={`cs-type-badge ${typeMeta.badge}`}>
+              <span className="cs-type-badge-emoji">{typeMeta.emoji}</span>
+              {typeMeta.label} · {tierLabel}
+            </span>
+            <span className="cs-top-card-title" title={c.content?.heading || c.closedState?.headingText || ''}>
+              {c.content?.heading || c.closedState?.headingText || 'Untitled card'}
+            </span>
+          </div>
         </div>
 
-        {/* Center: card identity */}
-        <div className="cs-top-center">
-          <span className={`cs-type-badge ${typeMeta.badge}`}>
-            <span className="cs-type-badge-emoji">{typeMeta.emoji}</span>
-            {typeMeta.label} · {tierLabel}
-          </span>
-          <p className="cs-top-card-title" title={c.content?.heading || c.closedState?.headingText || ''}>
-            {c.content?.heading || c.closedState?.headingText || 'Untitled card'}
-          </p>
-        </div>
-
-        {/* Right: status + actions */}
+        {/* Right: balance + status + actions */}
         <div className="cs-top-actions">
-          <span className="cs-status">{savedState}</span>
-          <button
-            type="button"
-            className="cs-nav-btn cs-undo-btn"
-            onClick={handleUndo}
-            disabled={undoStackRef.current.length === 0}
-            title="Undo last change (Ctrl/Cmd+Z)"
-          >↶</button>
-          <button type="button" className="cs-nav-btn" onClick={handleSave}>Save</button>
-          {isArtist && (
-            <button type="button" className="cs-nav-btn publish" onClick={() => setShowPublish(true)}>
-              Publish
-            </button>
-          )}
           {!isArtist && (() => {
             const bal = balance ?? 0
             const short = tierCost > 0 && bal < tierCost
-            return tierCost > 0 ? (
-              <span
-                className={`cs-cc-cost-badge ${short ? 'short' : ''}`}
-                title={short ? `Need ${tierCost - bal} more CC` : `Your balance: ${bal} CC`}
-              >
-                <strong>{tierCost} CC</strong>
-                {short && <span className="cs-cc-cost-sub">{tierCost - bal} short</span>}
-              </span>
-            ) : (
-              <span className="cs-cc-cost-badge free" title="Classic tier — free to send">Free</span>
+            return (
+              <div className={`cs-cc-pill${short ? ' short' : ''}`} title={`Your balance: ${bal} CC`}>
+                <span className="cs-cc-pill-icon">◈</span>
+                <div className="cs-cc-pill-stack">
+                  <span className="cs-cc-pill-balance">{bal} CC</span>
+                  <span className="cs-cc-pill-cost">
+                    {tierCost === 0 ? 'Free to send' : `${tierCost} CC to send`}
+                  </span>
+                </div>
+              </div>
             )
           })()}
+          <span className="cs-status">
+            <span className={`cs-status-dot${savedState.includes('saved') || savedState.includes('Saved') ? ' saved' : ''}`} />
+            {savedState}
+          </span>
+          <div className="cs-top-action-group">
+            <button
+              type="button"
+              className="cs-icon-btn"
+              onClick={handleUndo}
+              disabled={undoStackRef.current.length === 0}
+              title="Undo (Ctrl/Cmd+Z)"
+            >↶</button>
+            <button type="button" className="cs-icon-btn" onClick={handleSave} title="Save draft">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+              </svg>
+            </button>
+          </div>
           <button type="button" className="cs-nav-btn accent" onClick={enterPreview}>
             <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
           </button>
-          <button
-            type="button"
-            className="cs-nav-btn send"
-            disabled={isSending}
-            onClick={handleSendClick}
-          >
-            {isSending ? 'Sending...' : 'Send'}
-          </button>
+          {isArtist ? (
+            <button type="button" className="cs-nav-btn publish" onClick={() => setShowPublish(true)}>
+              Publish
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="cs-nav-btn send"
+              disabled={isSending}
+              onClick={handleSendClick}
+            >
+              {isSending ? 'Sending…' : 'Send'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -3105,6 +3121,29 @@ function CardStudio() {
                   }
                   placeholder="Give your template a memorable name"
                 />
+              </label>
+              <label className="cs-field cs-publish-field">
+                <span className="cs-publish-field-label">Category</span>
+                <select
+                  value={publishForm.category || 'birthday'}
+                  onChange={(event) =>
+                    setPublishForm((prev) => ({ ...prev, category: event.target.value }))
+                  }
+                >
+                  <option value="birthday">Birthday</option>
+                  <option value="anniversary">Anniversary</option>
+                  <option value="wedding">Wedding</option>
+                  <option value="proposal">Proposal</option>
+                  <option value="graduation">Graduation</option>
+                  <option value="holiday">Holiday</option>
+                  <option value="thank-you">Thank You</option>
+                  <option value="apology">Apology</option>
+                  <option value="celebration">Celebration</option>
+                  <option value="just-because">Just Because</option>
+                  <option value="get-well">Get Well</option>
+                  <option value="sympathy">Sympathy</option>
+                  <option value="other">Other</option>
+                </select>
               </label>
             </div>
 
