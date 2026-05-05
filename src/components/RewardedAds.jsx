@@ -3,7 +3,6 @@ import { getRewardedAd, completeAd, getAdStats } from '../lib/api.js'
 
 const AD_COOLDOWN_SECS = 30
 const MIN_WATCH_PCT = 80   // must watch 80% to get full reward
-const SKIP_AFTER_SECS = 5  // skip button appears after 5s
 
 function RewardedAds({ onBalanceUpdate }) {
   const [ad, setAd] = useState(null)
@@ -14,12 +13,10 @@ function RewardedAds({ onBalanceUpdate }) {
   const [error, setError] = useState('')
   const [cooldown, setCooldown] = useState(0)
   const [muted, setMuted] = useState(false)
-  const [canSkip, setCanSkip] = useState(false)
   const [watchedSecs, setWatchedSecs] = useState(0)
 
   const timerRef = useRef(null)       // fallback interval for non-video ads
   const cooldownRef = useRef(null)
-  const skipTimerRef = useRef(null)
   const videoRef = useRef(null)
 
   useEffect(() => {
@@ -37,7 +34,6 @@ function RewardedAds({ onBalanceUpdate }) {
     return () => {
       clearInterval(timerRef.current)
       clearInterval(cooldownRef.current)
-      clearTimeout(skipTimerRef.current)
     }
   }, [])
 
@@ -55,7 +51,6 @@ function RewardedAds({ onBalanceUpdate }) {
 
   const handleComplete = useCallback(async (adData) => {
     clearInterval(timerRef.current)
-    clearTimeout(skipTimerRef.current)
     setPhase('completing')
     try {
       const res = await completeAd({ adId: adData.id || adData._id })
@@ -72,7 +67,6 @@ function RewardedAds({ onBalanceUpdate }) {
     setPhase('loading')
     setError('')
     setReward(null)
-    setCanSkip(false)
     setWatchedSecs(0)
     setProgress(0)
     try {
@@ -92,9 +86,6 @@ function RewardedAds({ onBalanceUpdate }) {
       }
       setAd(adData)
       setPhase('watching')
-
-      // Skip button after SKIP_AFTER_SECS
-      skipTimerRef.current = setTimeout(() => setCanSkip(true), SKIP_AFTER_SECS * 1000)
 
       // Fallback timer for non-video ads (image/placeholder)
       if (!adData.videoUrl) {
@@ -138,10 +129,6 @@ function RewardedAds({ onBalanceUpdate }) {
     if (v.requestFullscreen) v.requestFullscreen()
     else if (v.webkitRequestFullscreen) v.webkitRequestFullscreen()
     else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen()
-  }
-
-  const handleSkip = () => {
-    if (ad) handleComplete(ad)
   }
 
   const adsWatched = stats?.adsWatchedToday ?? stats?.watched ?? 0
@@ -212,12 +199,9 @@ function RewardedAds({ onBalanceUpdate }) {
             </div>
           )}
 
-          {/* Top overlay: brand label + skip */}
+          {/* Top overlay: brand label */}
           <div className="rad-overlay-top">
             <span className="rad-brand-pill">{ad.brand || ad.name || ad.advertiser || 'Sponsored'}</span>
-            {canSkip && (
-              <button type="button" className="rad-skip-btn" onClick={handleSkip}>Skip Ad →</button>
-            )}
           </div>
 
           {/* Bottom overlay: CTA + controls */}
@@ -244,7 +228,7 @@ function RewardedAds({ onBalanceUpdate }) {
           <div className="rad-progress-bar">
             <div className="rad-progress-fill" style={{ width: `${progress}%` }} />
           </div>
-          <p className="rad-progress-text">{Math.round(progress)}% watched — {canSkip ? 'You can skip' : `Skip in ${Math.max(0, SKIP_AFTER_SECS - Math.floor(watchedSecs))}s`}</p>
+          <p className="rad-progress-text">{Math.round(progress)}% watched — watch to the end to earn CC</p>
         </div>
       )}
 
