@@ -462,13 +462,15 @@ function MainLayout() {
     }
   }
 
-  const publishTemplate = async ({ name, type, tier, previewImage, layoutConfig }) => {
+  const publishTemplate = async ({ name, type, tier, category, previewImage, layoutConfig }) => {
     try {
+      const resolvedCategory = category || layoutConfig?.category || 'birthday'
       const resolvedPreviewImage = previewImage || layoutConfig?.previewImage || layoutConfig?.previewUrl || ''
       const normalizedLayoutConfig = structuredClone({
         ...layoutConfig,
         type: type || layoutConfig?.type || 'personal',
         tier: tier || layoutConfig?.tier || 'classic',
+        category: resolvedCategory,
         previewImage: resolvedPreviewImage,
         previewUrl: resolvedPreviewImage,
       })
@@ -476,6 +478,7 @@ function MainLayout() {
         name,
         type: type || 'personal',
         tier: tier || 'classic',
+        category: resolvedCategory,
         previewImage: resolvedPreviewImage,
         layoutConfig: normalizedLayoutConfig,
       })

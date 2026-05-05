@@ -140,6 +140,60 @@ function normalizeOverviewStats(overview, dashboard, usersStats, cardsStats, tem
   }
 }
 
+// Client-side pagination helper. `data` is the full array; returns the
+// sliced page along with controls to render the page indicator.
+function usePagination(data, pageSize = 20) {
+  const [page, setPage] = useState(1)
+  const total = data?.length || 0
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  // Clamp page if data shrinks (e.g. after a delete).
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+  const pagedData = (data || []).slice((page - 1) * pageSize, page * pageSize)
+  return { pagedData, page, setPage, totalPages, total, pageSize }
+}
+
+function TablePagination({ page, setPage, totalPages, total, pageSize }) {
+  if (totalPages <= 1) return null
+  const start = (page - 1) * pageSize + 1
+  const end = Math.min(page * pageSize, total)
+  return (
+    <div className="admin-pagination">
+      <span className="admin-pagination-info">
+        Showing {start}–{end} of {total}
+      </span>
+      <div className="admin-pagination-controls">
+        <button
+          type="button"
+          className="admin-pagination-btn"
+          onClick={() => setPage(1)}
+          disabled={page === 1}
+        >« First</button>
+        <button
+          type="button"
+          className="admin-pagination-btn"
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          disabled={page === 1}
+        >‹ Prev</button>
+        <span className="admin-pagination-page">Page {page} of {totalPages}</span>
+        <button
+          type="button"
+          className="admin-pagination-btn"
+          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          disabled={page === totalPages}
+        >Next ›</button>
+        <button
+          type="button"
+          className="admin-pagination-btn"
+          onClick={() => setPage(totalPages)}
+          disabled={page === totalPages}
+        >Last »</button>
+      </div>
+    </div>
+  )
+}
+
 function AdminDashboard() {
   const { currentUser, balance, openAuthModal, marketplaceTemplates, deleteMarketplaceTemplate } = useOutletContext()
   const navigate = useNavigate()
@@ -207,6 +261,22 @@ function AdminDashboard() {
   // null to Admin during auth hydration changes the hook count between renders
   // and React silently aborts the load effects, leaving the dashboard empty.
   const isAdminGate = currentUser && currentUser.role === 'Admin'
+
+  // Pagination state for long admin tables
+  const usersPaging = usePagination(users, 20)
+  const reportsPaging = usePagination(reports, 20)
+  const adsPaging = usePagination(ads, 20)
+  const couponsPaging = usePagination(coupons, 20)
+  const logsPaging = usePagination(logs, 25)
+  const modLogsPaging = usePagination(modLogs, 25)
+  const allTemplatesPaging = usePagination(allTemplates, 20)
+  const pagedUsers = usersPaging.pagedData
+  const pagedReports = reportsPaging.pagedData
+  const pagedAds = adsPaging.pagedData
+  const pagedCoupons = couponsPaging.pagedData
+  const pagedLogs = logsPaging.pagedData
+  const pagedModLogs = modLogsPaging.pagedData
+  const pagedAllTemplates = allTemplatesPaging.pagedData
 
   const showMsg = (text, ok = true) => {
     setStatusModal({ type: ok ? 'success' : 'error', message: text })
@@ -1027,11 +1097,10 @@ function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(user => {
+                  {pagedUsers.map(user => {
                     const uid = user._id || user.id
                     const uname = user.username || user.name || uid
                     const currentRole = (user.role || 'user').toLowerCase()
-                    const isMod = currentRole === 'moderator'
                     const isEnterprise = currentRole === 'enterprise'
                     return (
                       <tr key={uid}>
@@ -1041,26 +1110,6 @@ function AdminDashboard() {
                         <td>{user.cc ?? user.balance ?? 0}</td>
                         <td>{user.isVerified ? 'Yes' : 'No'}</td>
                         <td className="admin-actions-cell">
-                          {!isMod && !isEnterprise && (
-                            <button
-                              type="button"
-                              className="admin-action-btn neutral"
-                              onClick={() => openRoleConfirm(uid || uname, 'moderator')}
-                              title="Promote to Moderator"
-                            >
-                              +Mod
-                            </button>
-                          )}
-                          {isMod && (
-                            <button
-                              type="button"
-                              className="admin-action-btn neutral"
-                              onClick={() => openRoleConfirm(uid || uname, 'user')}
-                              title="Remove Moderator role"
-                            >
-                              −Mod
-                            </button>
-                          )}
                           {isEnterprise && (
                             <button
                               type="button"
@@ -1099,6 +1148,7 @@ function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            <TablePagination {...usersPaging} />
           </div>
         )}
 
@@ -1157,7 +1207,7 @@ function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reports.map((rep, i) => (
+                  {pagedReports.map((rep, i) => (
                     <tr key={rep.reportId || rep._id || i}>
                       <td><span className={`admin-role-chip ${rep.type || 'user'}`}>{rep.type || '—'}</span></td>
                       <td className="admin-cell-mono">{rep.targetId || '—'}</td>
@@ -1174,6 +1224,7 @@ function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            <TablePagination {...reportsPaging} />
           </div>
         )}
 
@@ -1252,7 +1303,12 @@ function AdminDashboard() {
               <h3 className="admin-section-title">
                 Live Templates {live.length > 0 ? `(${live.length})` : ''}
               </h3>
-              {live.length > 0 ? renderTable(live) : (
+              {live.length > 0 ? (
+                <>
+                  {renderTable(pagedAllTemplates)}
+                  <TablePagination {...allTemplatesPaging} />
+                </>
+              ) : (
                 <div className="admin-empty">
                   <span className="admin-empty-icon">{"\u{1F4C4}"}</span>
                   <p>No templates in the marketplace yet.</p>
@@ -1491,7 +1547,7 @@ function AdminDashboard() {
                   <tr><th>Name</th><th>Type</th><th>Reward</th><th>Duration</th><th>Views</th><th>CTA</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
-                  {ads.map(ad => (
+                  {pagedAds.map(ad => (
                     <tr key={ad._id || ad.id}>
                       <td>{ad.name || '—'}</td>
                       <td>{ad.type}</td>
@@ -1514,6 +1570,7 @@ function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            <TablePagination {...adsPaging} />
           </div>
         )}
 
@@ -1716,7 +1773,7 @@ function AdminDashboard() {
                   <tr><th>Code</th><th>Type</th><th>Value</th><th>Used</th><th>Status</th></tr>
                 </thead>
                 <tbody>
-                  {coupons.map((c, i) => (
+                  {pagedCoupons.map((c, i) => (
                     <tr key={c._id || c.code || i}>
                       <td><code>{c.code || '-'}</code></td>
                       <td>{c.type || c.kind || '-'}</td>
@@ -1729,6 +1786,7 @@ function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            <TablePagination {...couponsPaging} />
           </div>
         )}
 
@@ -1742,7 +1800,7 @@ function AdminDashboard() {
                   <tr><th>Actor</th><th>Role</th><th>Action</th><th>Status</th><th>Date</th></tr>
                 </thead>
                 <tbody>
-                  {logs.map((log, i) => (
+                  {pagedLogs.map((log, i) => (
                     <tr key={log._id || i}>
                       <td>{log.actorUsername || log.adminId || log.admin || '—'}</td>
                       <td><span className={`admin-role-chip ${(log.actorRole || 'admin').toLowerCase()}`}>{log.actorRole || 'Admin'}</span></td>
@@ -1755,6 +1813,7 @@ function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            <TablePagination {...logsPaging} />
 
             <h3 className="admin-section-title" style={{ marginTop: 32 }}>Moderator Action Logs</h3>
             <div className="admin-table-wrap">
@@ -1763,7 +1822,7 @@ function AdminDashboard() {
                   <tr><th>Moderator</th><th>Action</th><th>Status</th><th>Date</th></tr>
                 </thead>
                 <tbody>
-                  {modLogs.map((log, i) => (
+                  {pagedModLogs.map((log, i) => (
                     <tr key={log._id || i}>
                       <td>{log.actorUsername || log.moderatorId || log.actor || '—'}</td>
                       <td>{log.action || log.type || '—'}</td>
@@ -1775,6 +1834,7 @@ function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            <TablePagination {...modLogsPaging} />
           </div>
         )}
       </div>
