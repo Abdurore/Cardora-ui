@@ -7545,6 +7545,134 @@ a {
   background: rgba(255,255,255,0.7);
 }
 
+/* ——— ANIMATED GRADIENT BACKGROUND ——— */
+@property --cs-bg-pos {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+.cs-phone-screen.cs-bg-anim,
+.cs-mobile-preview.cs-bg-anim {
+  animation: csBgPan 8s ease infinite !important;
+  background-attachment: local;
+}
+@keyframes csBgPan {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ——— ANIMATED GRADIENT CARD BORDER ——— */
+@property --cs-border-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+.cs-border-glow {
+  position: relative;
+  z-index: 0;
+}
+.cs-border-glow::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 26px;
+  background: conic-gradient(from var(--cs-border-angle), var(--bdr-c1, #7ef7ff), var(--bdr-c2, #62ffa2), var(--bdr-c1, #7ef7ff));
+  animation: csBorderRotate 4s linear infinite;
+  z-index: -1;
+}
+@keyframes csBorderRotate {
+  to { --cs-border-angle: 360deg; }
+}
+
+/* ——— IMAGE HORIZONTAL AUTO-SCROLL STRIP ——— */
+.cs-preview-media-strip-wrap {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 14px;
+}
+.cs-preview-media-strip {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.cs-preview-media-item--strip {
+  flex-shrink: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: grab;
+  position: relative;
+  user-select: none;
+  transition: box-shadow 0.15s;
+}
+.cs-preview-media-item--strip:active { cursor: grabbing; }
+.cs-preview-media-item--strip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+.cs-preview-media-item--strip.cs-edit-active {
+  box-shadow: 0 0 0 2px rgba(126,239,255,0.7);
+}
+.cs-img-autoscroll {
+  animation: csImgPan 10s ease-in-out 2s infinite;
+}
+@keyframes csImgPan {
+  0%, 15%  { transform: translateX(0); }
+  40%, 70% { transform: translateX(calc(-82% - 8px)); }
+  90%, 100% { transform: translateX(0); }
+}
+.cs-preview-add-image--strip {
+  flex-shrink: 0;
+  min-width: 80px;
+  height: 180px;
+  border-radius: 14px;
+  border: 1.5px dashed rgba(126,239,255,0.3);
+  background: rgba(126,239,255,0.04);
+  color: rgba(126,239,255,0.6);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ——— BODY CONTENT AUTO-SCROLL + TYPEWRITER ——— */
+.cs-preview-body-wrap {
+  overflow: hidden;
+  position: relative;
+  max-height: 200px;
+}
+.cs-preview-body-wrap.cs-body-has-scroll {
+  max-height: 200px;
+}
+.cs-preview-body-wrap.cs-body-has-scroll::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 36px;
+  background: linear-gradient(to bottom, transparent, var(--card-bg, #07111a));
+  pointer-events: none;
+  z-index: 1;
+}
+@keyframes csTypeReveal {
+  from { clip-path: inset(0 0 100% 0); }
+  to   { clip-path: inset(0 0 0%   0); }
+}
+.cs-preview-body-text {
+  animation: csTypeReveal 1.6s steps(1, end) both;
+}
+@keyframes csBodyScroll {
+  0%, 12%  { transform: translateY(0); }
+  78%, 88% { transform: translateY(calc(-100% + 200px)); }
+  96%, 100% { transform: translateY(0); }
+}
+.cs-preview-body-wrap.cs-body-has-scroll .cs-preview-body-text {
+  animation: csTypeReveal 1.6s steps(1, end) both, csBodyScroll 18s linear 2s infinite;
+}
+
 /* Per-image controls overlay (fit toggle, remove) */
 .cs-image-selected-bar {
   position: absolute;
@@ -8532,12 +8660,13 @@ a {
     -webkit-overflow-scrolling: touch;
     border-radius: 0;
     transition: background 0.3s ease;
-    padding: 20px 16px;
+    /* add padding so card doesn't fill full area */
+    padding: 16px;
   }
   .cs-mobile-preview .cs-preview-card {
     max-width: 320px;
     width: 84%;
-    max-height: calc(100% - 40px);
+    max-height: calc(100% - 32px);
     overflow-y: auto;
   }
   /* Hide desktop inline edit toolbar on mobile — use cs-mobile-edit-bar instead */
@@ -20380,6 +20509,101 @@ a {
   transition: color 0.15s;
 }
 .app-status-dismiss:hover { color: rgba(233, 251, 255, 0.75); }
+
+/* ——— INLINE COLOR PICKER ——— */
+.icp-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.icp-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.18);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s, border-color 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+.icp-swatch:hover { transform: scale(1.12); border-color: rgba(126,239,255,0.5); }
+.icp-label {
+  font-size: 0.58rem;
+  color: rgba(255,255,255,0.45);
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1;
+}
+.icp-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 18, 28, 0.98);
+  border: 1px solid rgba(126,239,255,0.2);
+  border-radius: 14px;
+  padding: 12px;
+  z-index: 9000;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 160px;
+}
+.icp-presets {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.icp-preset {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s;
+}
+.icp-preset:hover { transform: scale(1.2); }
+.icp-preset.active { border-color: #7ef7ff; box-shadow: 0 0 0 2px rgba(126,239,255,0.4); }
+.icp-hex-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.icp-hex-input {
+  flex: 1;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e2eaf0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 0.78rem;
+  font-family: monospace;
+  outline: none;
+}
+.icp-hex-input:focus { border-color: rgba(126,239,255,0.4); }
+.icp-more-btn {
+  background: rgba(126,239,255,0.08);
+  border: 1px solid rgba(126,239,255,0.18);
+  color: #7ef7ff;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.icp-native-hidden {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* ——— ANIMATED GRADIENT BACKGROUND ——— */
 .cs-phone-screen.cs-bg-anim,

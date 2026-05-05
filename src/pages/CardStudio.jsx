@@ -2889,18 +2889,9 @@ function CardStudio() {
               {activeEditEl.type === 'closedHeading' && (
                 <>
                   <span className="cs-mobile-edit-label">Envelope Title</span>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Color</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Heading color" value={c.closedState.headingColor || '#ffffff'} onChange={e => update('closedState.headingColor', e.target.value)} />
-                  </div>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Envelope BG</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Envelope background" value={c.closedState.backgroundColor || '#07111a'} onChange={e => update('closedState.backgroundColor', e.target.value)} />
-                  </div>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Border</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Envelope border" value={c.closedState.borderColor || '#7ef7ff'} onChange={e => update('closedState.borderColor', e.target.value)} />
-                  </div>
+                  <InlineColorPicker value={c.closedState.headingColor || '#ffffff'} onChange={e => update('closedState.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+                  <InlineColorPicker value={c.closedState.backgroundColor || '#07111a'} onChange={e => update('closedState.backgroundColor', e.target.value)} presets={colorPresets} label="Envelope BG" />
+                  <InlineColorPicker value={c.closedState.borderColor || '#7ef7ff'} onChange={e => update('closedState.borderColor', e.target.value)} presets={colorPresets} label="Border" />
                 </>
               )}
 
@@ -2908,14 +2899,8 @@ function CardStudio() {
               {activeEditEl.type === 'closedBody' && (
                 <>
                   <span className="cs-mobile-edit-label">Envelope Text</span>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Color</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Text color" value={c.closedState.textColor || '#e2eaf0'} onChange={e => update('closedState.textColor', e.target.value)} />
-                  </div>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Envelope BG</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Envelope background" value={c.closedState.backgroundColor || '#07111a'} onChange={e => update('closedState.backgroundColor', e.target.value)} />
-                  </div>
+                  <InlineColorPicker value={c.closedState.textColor || '#e2eaf0'} onChange={e => update('closedState.textColor', e.target.value)} presets={colorPresets} label="Color" />
+                  <InlineColorPicker value={c.closedState.backgroundColor || '#07111a'} onChange={e => update('closedState.backgroundColor', e.target.value)} presets={colorPresets} label="Envelope BG" />
                 </>
               )}
 
@@ -2926,18 +2911,9 @@ function CardStudio() {
                   <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.headingSize', Math.max(14, (c.theme.headingSize ?? 28) - 2))}>A−</button>
                   <span className="cs-mobile-edit-size-val">{c.theme.headingSize ?? 28}</span>
                   <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.headingSize', Math.min(56, (c.theme.headingSize ?? 28) + 2))}>A+</button>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Color</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Heading color" value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} />
-                  </div>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Card BG</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Card background" value={c.card.backgroundColor || '#07111a'} onChange={e => update('card.backgroundColor', e.target.value)} />
-                  </div>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Accent</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Accent color" value={c.theme.accentColor || '#7ef7ff'} onChange={e => update('theme.accentColor', e.target.value)} />
-                  </div>
+                  <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+                  <InlineColorPicker value={c.card.backgroundColor || '#07111a'} onChange={e => update('card.backgroundColor', e.target.value)} presets={colorPresets} label="Card BG" />
+                  <InlineColorPicker value={c.theme.accentColor || '#7ef7ff'} onChange={e => update('theme.accentColor', e.target.value)} presets={colorPresets} label="Accent" />
                   <span className="cs-mobile-edit-sep" />
                   <span className="cs-mobile-edit-label" style={{ fontSize: '0.7rem' }}>Font</span>
                   {availableFonts.slice(0, 8).map(f => (
@@ -2959,18 +2935,9 @@ function CardStudio() {
                   <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.bodySize', Math.max(10, (c.theme.bodySize ?? 16) - 1))}>A−</button>
                   <span className="cs-mobile-edit-size-val">{c.theme.bodySize ?? 16}</span>
                   <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.bodySize', Math.min(28, (c.theme.bodySize ?? 16) + 1))}>A+</button>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Color</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Text color" value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} />
-                  </div>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Card BG</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Card background" value={c.card.backgroundColor || '#07111a'} onChange={e => update('card.backgroundColor', e.target.value)} />
-                  </div>
-                  <div className="cs-mobile-edit-color-wrap">
-                    <span className="cs-mobile-edit-color-label">Accent</span>
-                    <input type="color" className="cs-mobile-edit-color" title="Accent color" value={c.theme.accentColor || '#7ef7ff'} onChange={e => update('theme.accentColor', e.target.value)} />
-                  </div>
+                  <InlineColorPicker value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} presets={colorPresets} label="Color" />
+                  <InlineColorPicker value={c.card.backgroundColor || '#07111a'} onChange={e => update('card.backgroundColor', e.target.value)} presets={colorPresets} label="Card BG" />
+                  <InlineColorPicker value={c.theme.accentColor || '#7ef7ff'} onChange={e => update('theme.accentColor', e.target.value)} presets={colorPresets} label="Accent" />
                   <span className="cs-mobile-edit-sep" />
                   <span className="cs-mobile-edit-label" style={{ fontSize: '0.7rem' }}>Font</span>
                   {availableFonts.slice(0, 8).map(f => (
@@ -3034,35 +3001,6 @@ function CardStudio() {
                 )
               })()}
 
-              {/* ── Reorder arrows — only for open card elements ── */}
-              {studioType === 'personal' && !['closedHeading', 'closedBody'].includes(activeEditEl.type) && (() => {
-                const mobileElKey = activeEditEl.type === 'image' ? 'media' : activeEditEl.type === 'heading' ? 'heading' : 'body'
-                const mobileOrder = c.layout?.elementOrder || ['media', 'heading', 'body']
-                const mobileIdx = mobileOrder.indexOf(mobileElKey)
-                return (
-                  <>
-                    <span className="cs-mobile-edit-sep" />
-                    <button
-                      type="button"
-                      className="cs-mobile-edit-btn"
-                      disabled={mobileIdx <= 0}
-                      onClick={() => {
-                        const o = [...mobileOrder]; [o[mobileIdx], o[mobileIdx - 1]] = [o[mobileIdx - 1], o[mobileIdx]]; update('layout.elementOrder', o)
-                      }}
-                      title="Move up"
-                    >↑</button>
-                    <button
-                      type="button"
-                      className="cs-mobile-edit-btn"
-                      disabled={mobileIdx >= mobileOrder.length - 1}
-                      onClick={() => {
-                        const o = [...mobileOrder]; [o[mobileIdx], o[mobileIdx + 1]] = [o[mobileIdx + 1], o[mobileIdx]]; update('layout.elementOrder', o)
-                      }}
-                      title="Move down"
-                    >↓</button>
-                  </>
-                )
-              })()}
 
             </div>{/* end .cs-mobile-edit-scroll */}
             <button type="button" className="cs-mobile-edit-done" onClick={() => setActiveEditEl(null)}>Done</button>
