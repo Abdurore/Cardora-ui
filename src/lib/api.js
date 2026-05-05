@@ -91,7 +91,7 @@ async function request(path, { method = 'GET', body, auth = false, headers = {},
   } catch (fetchErr) {
     clearTimeout(timer)
     if (fetchErr.name === 'AbortError') {
-      const err = new Error('The server is taking too long to respond. It may be waking up — please try again in a moment.')
+      const err = new Error('Connection timed out — please try again.')
       err.status = 0
       err.debug = { url, method, timeout: true }
       throw err
@@ -271,6 +271,10 @@ export async function getWorldChat(query = 'page=1&limit=50') {
    ═══════════════════════════════════════════════ */
 export async function getTemplates(query = 'page=1&limit=24') {
   return request(`/templates?${query}`)
+}
+
+export async function getMyTemplates() {
+  return request('/my-templates', { auth: true })
 }
 
 export async function getPopularTemplates(query = 'days=7&page=1&limit=10') {

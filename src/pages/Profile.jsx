@@ -12,7 +12,8 @@ import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
-import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics } from '../lib/api.js'
+import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics, getMyTemplates } from '../lib/api.js'
+import { mapTemplateToCard } from '../lib/backendMappers.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
@@ -75,6 +76,7 @@ function Profile() {
   const [cardAnalytics, setCardAnalytics] = useState({}) // keyed by slug
   const [loadingCardAnalytics, setLoadingCardAnalytics] = useState({}) // keyed by slug
   const [shareTarget, setShareTarget] = useState(null) // { url, title } | null
+  const [myTemplates, setMyTemplates] = useState(null) // null = not loaded yet
 
   const fetchCardAnalytics = async (slug) => {
     if (!slug || cardAnalytics[slug] !== undefined) return
@@ -101,10 +103,13 @@ function Profile() {
   const isModerator = roleName === 'Moderator'
   const isEnterprise = roleName === 'Enterprise'
 
-  const publishedTemplates = (marketplaceTemplates || []).filter((t) => {
-    if (!isArtist || !currentUser?.id) return false
-    return t.ownerId && String(t.ownerId) === String(currentUser.id)
-  })
+  // Prefer own templates (incl. pending) from dedicated endpoint; fall back to public marketplace filter
+  const publishedTemplates = myTemplates !== null
+    ? myTemplates
+    : (marketplaceTemplates || []).filter((t) => {
+        if (!isArtist || !currentUser?.id) return false
+        return t.ownerId && String(t.ownerId) === String(currentUser.id)
+      })
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -120,16 +125,18 @@ function Profile() {
     return () => URL.revokeObjectURL(cropSrc)
   }, [cropSrc])
 
-  // Load analytics, currencies, user currency
+  // Load analytics, currencies, user currency, and own templates
   useEffect(() => {
     if (!currentUser) return
     let cancelled = false
     ;(async () => {
       try {
-        const [a, c, uc] = await Promise.all([
+        const isArtistRole = (currentUser.role || '').toLowerCase() === 'artist'
+        const [a, c, uc, myT] = await Promise.all([
           getUserAnalytics().catch(() => null),
           getCurrencies().catch(() => null),
           getUserCurrency().catch(() => null),
+          isArtistRole ? getMyTemplates().catch(() => null) : Promise.resolve(null),
         ])
         if (cancelled) return
         if (a) setAnalytics(a.analytics || a.data || a)
@@ -142,6 +149,10 @@ function Profile() {
           setCurrencies(CURRENCY_FALLBACK)
         }
         if (uc) setUserCurrency(uc.currency || uc.code || uc.data?.currency || '')
+        if (myT) {
+          const raw = myT.templates || myT.data?.templates || myT.data || (Array.isArray(myT) ? myT : null)
+          if (Array.isArray(raw)) setMyTemplates(raw.map((t, i) => mapTemplateToCard(t, i)))
+        }
       } catch { /* silent */ }
     })()
     return () => { cancelled = true }
@@ -515,7 +526,11 @@ function Profile() {
                           e.stopPropagation()
                           if (!await appConfirm('Delete Template', `Delete "${card.title}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
                           const res = await deleteMarketplaceTemplate?.(card.templateId || card.id)
-                          if (!res?.ok) setStatusModal({ type: 'error', message: res?.message || 'Delete failed.' })
+                          if (res?.ok) {
+                            setMyTemplates(prev => prev !== null ? prev.filter(t => (t.templateId || t.id) !== (card.templateId || card.id)) : null)
+                          } else {
+                            setStatusModal({ type: 'error', message: res?.message || 'Delete failed.' })
+                          }
                         }}
                         title="Delete template"
                         aria-label="Delete template"

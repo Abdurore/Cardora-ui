@@ -18,6 +18,7 @@ function CardView() {
   const { openCardTypeModal } = useOutletContext() || {}
   const [card, setCard] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
   const [isOpen, setIsOpen] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [passwordInput, setPasswordInput] = useState('')
@@ -44,19 +45,21 @@ function CardView() {
         const res = await getCardBySlug(id)
         if (cancelled) return
 
-        // Backend may wrap the card under `card`, `data.card`, `data`, or
-        // return either the raw card or the renderModel directly. Try every
-        // candidate and pick the first one that looks like a card/renderModel.
+        // Backend may wrap the card under many shapes — try all common ones.
         const candidates = [
           res?.card,
           res?.data?.card,
           res?.renderModel,
           res?.data?.renderModel,
+          res?.payload?.card,
+          res?.payload,
+          res?.result?.card,
+          res?.result,
           res?.data,
           res,
         ]
         const isCardLike = (c) =>
-          c && typeof c === 'object' &&
+          c && typeof c === 'object' && !Array.isArray(c) &&
           (c.slug || c._id || c.cardId || c.id ||
            c.config || c.title ||
            c.layoutdata || c.layoutData ||
@@ -74,7 +77,8 @@ function CardView() {
           return
         }
 
-        console.warn('[CardView] Backend response did not contain a card. Response:', res)
+        console.warn('[CardView] Unrecognised response shape:', JSON.stringify(res)?.slice(0, 400))
+        setFetchError('Card data format unrecognised')
       } catch (err) {
         // If 403/locked, prompt for password
         if (err.status === 403 || err.payload?.locked) {
@@ -83,6 +87,7 @@ function CardView() {
           if (!cancelled) return
         }
         console.warn('[CardView] Fetch failed:', err.status, err.message)
+        setFetchError(err.status ? `${err.status} — ${err.message}` : err.message)
         // Fall through to local lookup
       }
 
@@ -314,6 +319,11 @@ function CardView() {
       <div className="card-view">
         <div className="card-view-empty">
           <p>We could not find that card.</p>
+          {fetchError && (
+            <p style={{ fontSize: '0.78rem', opacity: 0.55, marginTop: 4 }}>
+              {fetchError}
+            </p>
+          )}
           <button className="primary" type="button" onClick={() => navigate('/')}>
             Back to home
           </button>

@@ -162,15 +162,22 @@ export function mapTemplateToCard(template, index = 0) {
   const message = content.body || content.extendedBody || 'A Cardora interactive card experience.'
   const likeCount =
     template.likesCount ??
-    template.likes?.length ??
+    template.likeCount ??
+    template.likes_count ??
+    (Array.isArray(template.likes) ? template.likes.length : undefined) ??
     template.analytics?.likes ??
+    template.stats?.likes ??
     template.popularityScore ??
     0
   const userCount =
     template.viewCount ??
+    template.views ??
+    template.views_count ??
     template.analytics?.views ??
+    template.stats?.views ??
     template.uses ??
     template.usageCount ??
+    template.usage_count ??
     0
 
   const createdBy = template.createdBy || template.artist || template.author || template.owner || template.userId || null
