@@ -2582,77 +2582,57 @@ function CardStudio() {
     <div className="page-body cs-shell" style={{ '--type-accent': TYPE_ACCENT[studioType] || TYPE_ACCENT.personal }}>
       {/* TOPBAR */}
       <div className="cs-topbar">
+        {/* Left: back + branding */}
         <div className="cs-top-left">
-          <button type="button" className="cs-nav-btn" onClick={() => navigate(-1)}>← Back</button>
-          <span className="cs-type-badge">{typeMeta.label || 'Personal Card'}</span>
-          <div className="cs-status">{savedState}</div>
+          <button type="button" className="cs-nav-btn cs-back-btn" onClick={() => navigate(-1)}>←</button>
+          <div className="cs-wordmark">
+            <img src={BRAND_LOGO} alt="Cardora" className="cs-top-logo" />
+            <span>Studio</span>
+          </div>
+        </div>
+
+        {/* Center: card identity */}
+        <div className="cs-top-center">
+          <span className={`cs-type-badge ${typeMeta.badge}`}>
+            <span className="cs-type-badge-emoji">{typeMeta.emoji}</span>
+            {typeMeta.label} · {tierLabel}
+          </span>
+          <p className="cs-top-card-title" title={c.content?.heading || c.closedState?.headingText || ''}>
+            {c.content?.heading || c.closedState?.headingText || 'Untitled card'}
+          </p>
+        </div>
+
+        {/* Right: status + actions */}
+        <div className="cs-top-actions">
+          <span className="cs-status">{savedState}</span>
           <button
             type="button"
             className="cs-nav-btn cs-undo-btn"
             onClick={handleUndo}
             disabled={undoStackRef.current.length === 0}
             title="Undo last change (Ctrl/Cmd+Z)"
-          >
-            ↶ Undo
-          </button>
-        </div>
-        <div className="cs-progress">
-          <div className="cs-wordmark">
-            <img src={BRAND_LOGO} alt="Cardora" className="cs-top-logo" />
-            <span>Cardora Studio</span>
-            <span className={`cs-type-badge ${typeMeta.badge}`}>
-              <span className="cs-type-badge-emoji">{typeMeta.emoji}</span>
-              {typeMeta.label} · {tierLabel}
-            </span>
-          </div>
-          <div className="cs-steps">
-            {studioSteps.map((step, i) => {
-              const ai = studioSteps.indexOf(activeStep)
-              const state = i === ai ? 'active' : i < ai ? 'done' : ''
-              return (
-                <button key={step} type="button" className={`cs-step ${state}`} onClick={() => goToStep(step)}>
-                  <span>{stepLabels[step] || step}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-        <div className="cs-top-actions">
+          >↶</button>
           <button type="button" className="cs-nav-btn" onClick={handleSave}>Save</button>
           {isArtist && (
             <button type="button" className="cs-nav-btn publish" onClick={() => setShowPublish(true)}>
-              Publish Template
+              Publish
             </button>
           )}
-          {!isArtist && (
-            (() => {
-              const bal = balance ?? 0
-              const short = tierCost > 0 && bal < tierCost
-              return (
-                <span
-                  className={`cs-cc-cost-badge ${tierCost === 0 ? 'free' : ''} ${short ? 'short' : ''}`}
-                  title={
-                    tierCost === 0
-                      ? 'Classic tier — free to send'
-                      : short
-                      ? `Need ${tierCost - bal} more CC`
-                      : `Your balance: ${bal} CC`
-                  }
-                >
-                  {tierCost === 0 ? (
-                    'Free to send'
-                  ) : (
-                    <>
-                      <strong>{tierCost} CC</strong>
-                      <span className="cs-cc-cost-sub">
-                        {short ? `${tierCost - bal} short` : `${bal} in balance`}
-                      </span>
-                    </>
-                  )}
-                </span>
-              )
-            })()
-          )}
+          {!isArtist && (() => {
+            const bal = balance ?? 0
+            const short = tierCost > 0 && bal < tierCost
+            return tierCost > 0 ? (
+              <span
+                className={`cs-cc-cost-badge ${short ? 'short' : ''}`}
+                title={short ? `Need ${tierCost - bal} more CC` : `Your balance: ${bal} CC`}
+              >
+                <strong>{tierCost} CC</strong>
+                {short && <span className="cs-cc-cost-sub">{tierCost - bal} short</span>}
+              </span>
+            ) : (
+              <span className="cs-cc-cost-badge free" title="Classic tier — free to send">Free</span>
+            )
+          })()}
           <button type="button" className="cs-nav-btn accent" onClick={enterPreview}>
             <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
           </button>
@@ -2662,7 +2642,7 @@ function CardStudio() {
             disabled={isSending}
             onClick={handleSendClick}
           >
-            {isSending ? 'Sending...' : 'Send Now'}
+            {isSending ? 'Sending...' : 'Send'}
           </button>
         </div>
       </div>
@@ -2690,13 +2670,10 @@ function CardStudio() {
                         else if (tool.id === 'questions') setActiveStep('questions')
                         else setActiveStep('card')
                       }}
-                      title={tool.label}
+                      title={tool.hint}
                     >
-                      <span className="cs-tool-icon"><Icon size={20} /></span>
-                      <span className="cs-tool-meta">
-                        <span className="cs-tool-label">{tool.label}</span>
-                        <small>{tool.hint}</small>
-                      </span>
+                      <span className="cs-tool-icon"><Icon size={18} /></span>
+                      <span className="cs-tool-label">{tool.label}</span>
                     </button>
                   )
                 })}
@@ -2709,12 +2686,12 @@ function CardStudio() {
         <main className="cs-canvas-wrap">
           <div className="cs-canvas">
             <div className="cs-canvas-head">
-              <div>
-                <p className="eyebrow">Live Preview</p>
-                <h2>Editable card preview</h2>
-              </div>
+              <p className="cs-canvas-head-label">
+                <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 5, opacity: 0.5 }} />
+                Live Preview — click any element to edit
+              </p>
               <button type="button" className="cs-preview-toggle" onClick={enterPreview}>
-                <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 6 }} /> Full Preview
+                Full Preview
               </button>
             </div>
 
