@@ -48,6 +48,8 @@ import {
   deleteMediaMusic,
   getAdminTemplates,
   getTemplates,
+  approveTemplate,
+  rejectTemplate,
 } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
 import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
@@ -344,13 +346,21 @@ function AdminDashboard() {
             getAdminTemplates('page=1&limit=200'),
             getTemplates('page=1&limit=200'),
           ])
+          const pickList = (res) => {
+            const d = res?.data ?? res
+            if (Array.isArray(d?.templates)) return d.templates
+            if (Array.isArray(d?.items)) return d.items
+            if (Array.isArray(d)) return d
+            if (Array.isArray(res?.templates)) return res.templates
+            return []
+          }
           const fromAdmin =
             adminRes.status === 'fulfilled'
-              ? (adminRes.value?.data?.templates || adminRes.value?.templates || [])
+              ? pickList(adminRes.value)
               : []
           const fromPublic =
             publicRes.status === 'fulfilled'
-              ? (publicRes.value?.data?.templates || publicRes.value?.templates || [])
+              ? pickList(publicRes.value)
               : []
           if (adminRes.status === 'rejected') {
             console.warn('[Admin] /admin/templates failed, using public list', adminRes.reason)
@@ -1101,7 +1111,6 @@ function AdminDashboard() {
                     const uid = user._id || user.id
                     const uname = user.username || user.name || uid
                     const currentRole = (user.role || 'user').toLowerCase()
-                    const isEnterprise = currentRole === 'enterprise'
                     return (
                       <tr key={uid}>
                         <td>{uname}</td>
@@ -1110,16 +1119,6 @@ function AdminDashboard() {
                         <td>{user.cc ?? user.balance ?? 0}</td>
                         <td>{user.isVerified ? 'Yes' : 'No'}</td>
                         <td className="admin-actions-cell">
-                          {isEnterprise && (
-                            <button
-                              type="button"
-                              className="admin-action-btn neutral"
-                              onClick={() => openRoleConfirm(uid || uname, 'user')}
-                              title="Remove Enterprise role"
-                            >
-                              −Ent
-                            </button>
-                          )}
                           <button
                             type="button"
                             className="admin-action-btn reject"
@@ -1269,7 +1268,35 @@ function AdminDashboard() {
                           {tpl.tag || 'Live'}
                         </span>
                       </td>
-                      <td style={{ display: 'flex', gap: 6 }}>
+                      <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {(tpl.status === 'pending' || tpl.status === 'review') && (
+                          <>
+                            <button
+                              type="button"
+                              className="admin-action-btn approve"
+                              onClick={async () => {
+                                const id = tpl.templateId || tpl.id
+                                if (!id) return
+                                try { await approveTemplate(id); showMsg('Template approved.'); loadTabData('Templates') }
+                                catch (err) { showMsg(err.message || 'Approve failed', false) }
+                              }}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-action-btn reject"
+                              onClick={async () => {
+                                const id = tpl.templateId || tpl.id
+                                if (!id) return
+                                try { await rejectTemplate(id, 'Does not meet guidelines'); showMsg('Template rejected.'); loadTabData('Templates') }
+                                catch (err) { showMsg(err.message || 'Reject failed', false) }
+                              }}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           className="admin-action-btn warn"
