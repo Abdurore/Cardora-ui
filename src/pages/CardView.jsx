@@ -44,7 +44,10 @@ function CardView() {
         const res = await getCardBySlug(id)
         if (!cancelled) {
           const backendCard = res?.card || res?.data?.card || res?.data || res
-          if (backendCard && (backendCard.layoutdata || backendCard.layoutData || backendCard.title)) {
+          if (backendCard && typeof backendCard === 'object' &&
+              (backendCard.slug || backendCard._id || backendCard.cardId ||
+               backendCard.config || backendCard.title ||
+               backendCard.layoutdata || backendCard.layoutData)) {
             const mapped = mapBackendCard(backendCard)
             setCard(mapped)
             if (mapped.locked && mapped.lockType === 'password') {

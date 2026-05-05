@@ -162,7 +162,8 @@ function WorldChat() {
     return () => clearTimeout(timer)
   }, [joinLeave])
 
-  // Fetch extended profile details when a profile card is opened
+  // Fetch extended profile details when a profile card is opened.
+  // Try authenticated first (richer data), fall back gracefully on failure.
   useEffect(() => {
     if (!profileCard) { setProfileDetails(null); return }
     let cancelled = false
@@ -170,10 +171,11 @@ function WorldChat() {
     setProfileLoading(true)
     ;(async () => {
       try {
-        const res = await getPublicProfile(profileCard.username)
+        const identifier = profileCard.userId || profileCard.username
+        const res = await getPublicProfile(identifier)
         if (cancelled) return
-        const u = res?.data?.user || res?.user || res?.data || res
-        setProfileDetails(u || null)
+        const u = res?.data?.user || res?.data?.profile || res?.user || res?.profile || res?.data || res
+        setProfileDetails(u && typeof u === 'object' && (u.username || u.id || u._id) ? u : null)
       } catch {
         if (!cancelled) setProfileDetails(null)
       } finally {
@@ -216,13 +218,14 @@ function WorldChat() {
   const canSend = Boolean(canType && !cooldown)
 
   function normalizeRole(raw) {
-    if (!raw) return null
+    if (!raw) return 'User'
     const r = String(raw).toLowerCase()
     if (r === 'admin') return 'Admin'
     if (r === 'artist') return 'Artist'
     if (r === 'moderator') return 'Moderator'
     if (r === 'enterprise') return 'Enterprise'
-    return null
+    if (r === 'user' || r === 'creator' || r === 'member') return 'User'
+    return 'User'
   }
 
   function roleBadgeClass(role) {
@@ -230,7 +233,7 @@ function WorldChat() {
     if (role === 'Artist') return 'role-artist'
     if (role === 'Moderator') return 'role-moderator'
     if (role === 'Enterprise') return 'role-enterprise'
-    return ''
+    return 'role-visitor'
   }
 
   function roleIcon(role) {
@@ -238,7 +241,7 @@ function WorldChat() {
     if (role === 'Artist') return '🎨'
     if (role === 'Moderator') return '🛡'
     if (role === 'Enterprise') return '🏢'
-    return ''
+    return '👤'
   }
 
   function formatJoined(isoStr) {
@@ -446,6 +449,7 @@ function WorldChat() {
 
               return (
                 <>
+                  {/* Avatar + identity */}
                   <div className="chat-profile-header">
                     <div className="chat-profile-avatar-wrap">
                       {displayAvatarUrl
@@ -457,18 +461,21 @@ function WorldChat() {
                       {fullName && <p className="chat-profile-fullname">{fullName}</p>}
                       <p className="chat-profile-name">@{displayName}</p>
                       <div className="chat-profile-badges">
-                        {role && (
-                          <span className={`profile-role-badge ${roleBadgeClass(role)}`}>
-                            {roleIcon(role)} {role}
-                          </span>
-                        )}
+                        <span className={`profile-role-badge ${roleBadgeClass(role)}`}>
+                          {roleIcon(role)} {role}
+                        </span>
                         {status && <span className="chat-profile-status-pill">{status}</span>}
                       </div>
                     </div>
                   </div>
 
-                  {bio && <p className="chat-profile-bio">{bio}</p>}
+                  {/* Bio — shown prominently when available */}
+                  {bio
+                    ? <p className="chat-profile-bio">{bio}</p>
+                    : <p className="chat-profile-bio chat-profile-bio--empty">No bio yet.</p>
+                  }
 
+                  {/* Stats row */}
                   {(cardsSent !== null || followers !== null || following !== null || referrals !== null) && (
                     <div className="chat-profile-stats">
                       {cardsSent !== null && (
@@ -498,6 +505,7 @@ function WorldChat() {
                     </div>
                   )}
 
+                  {/* Meta — joined, location, ID */}
                   <div className="chat-profile-meta">
                     {joined && (
                       <span className="chat-profile-meta-item">
@@ -518,12 +526,6 @@ function WorldChat() {
                       </span>
                     )}
                   </div>
-
-                  {!hasAnyDetail && (
-                    <p className="chat-profile-empty">
-                      This member hasn't added any extra details yet.
-                    </p>
-                  )}
                 </>
               )
             })()}

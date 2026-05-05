@@ -17897,6 +17897,10 @@ a {
   color: rgba(201, 230, 240, 0.7);
   word-break: break-word;
 }
+.chat-profile-bio--empty {
+  font-style: italic;
+  opacity: 0.4;
+}
 
 .chat-profile-meta {
   display: flex;
