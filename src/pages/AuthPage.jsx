@@ -241,13 +241,7 @@ function AuthPage({ mode = 'login' }) {
   }
 
   const getSubmitLabel = () => {
-    if (isSubmitting) {
-      return slowHint
-        ? (verifyFlow || pendingVerification || forgotFlow
-            ? 'Sending… this may take a moment'
-            : 'Waking up the server… hang tight')
-        : 'Please wait…'
-    }
+    if (isSubmitting) return 'Please wait…'
     if (verifyFlow === 'email') return 'Send Code'
     if (verifyFlow === 'otp') return 'Verify'
     if (forgotFlow === 'email') return 'Send Reset Code'
@@ -465,12 +459,12 @@ function AuthPage({ mode = 'login' }) {
               {getSubmitLabel()}
             </button>
 
-            {isSubmitting && slowHint && (
-              <p className="auth-slow-hint">
-                {verifyFlow || pendingVerification || forgotFlow
-                  ? "Sending the email can take a little while — please don't close this page."
-                  : 'The server is starting up. This can take 30–60 seconds on first use. Hang tight!'}
-              </p>
+            {isSubmitting && (
+              <div className="auth-loading-bar">
+                <span className="auth-loading-dot" />
+                <span className="auth-loading-dot" />
+                <span className="auth-loading-dot" />
+              </div>
             )}
 
             {/* Resend code — post-signup verification only */}
