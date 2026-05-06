@@ -56,6 +56,8 @@ function CardPreviewModal({
   const [revealStep, setRevealStep] = useState(0)
   const audioRef = useRef(null)
   const containerRef = useRef(null)
+  const openCardInnerRef = useRef(null)
+  const previewTimersRef = useRef([])
 
   // Device-frame preview. Fullscreen by default; lets the sender see how the
   // card scales on phone / tablet / desktop without leaving the modal.
@@ -192,18 +194,40 @@ function CardPreviewModal({
     fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
   }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits])
 
-  const handleOpen = () => {
-    triggerOpenEffect()
-    setStage('open')
-    setBodyVisible(false)
-    setRevealStep(0)
-    if (hasFadeIn) {
-      setTimeout(() => setFadeBody(true), 200)
-      setTimeout(() => setBodyVisible(true), 300)
-    } else {
-      setFadeBody(true)
-      setBodyVisible(true)
+  const schedulePreviewTimer = useCallback((fn, delay) => {
+    const id = window.setTimeout(() => {
+      previewTimersRef.current = previewTimersRef.current.filter((timer) => timer !== id)
+      fn()
+    }, delay)
+    previewTimersRef.current.push(id)
+    return id
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      previewTimersRef.current.forEach(window.clearTimeout)
+      previewTimersRef.current = []
     }
+  }, [])
+
+  const handleOpen = () => {
+    previewTimersRef.current.forEach(window.clearTimeout)
+    previewTimersRef.current = []
+    setStage('revealing')
+    setBodyVisible(false)
+    setFadeBody(false)
+    setRevealStep(0)
+    schedulePreviewTimer(() => {
+      triggerOpenEffect()
+      setStage('open')
+      if (hasFadeIn) {
+        schedulePreviewTimer(() => setFadeBody(true), 260)
+        schedulePreviewTimer(() => setBodyVisible(true), 420)
+      } else {
+        setFadeBody(true)
+        setBodyVisible(true)
+      }
+    }, 1050)
   }
 
   const handleContinue = () => {
@@ -240,6 +264,8 @@ function CardPreviewModal({
   }
 
   const handleReset = () => {
+    previewTimersRef.current.forEach(window.clearTimeout)
+    previewTimersRef.current = []
     setStage(envelopeEnabled ? 'closed' : 'open')
     setQuestionIdx(0)
     setFadeBody(!envelopeEnabled)
@@ -364,16 +390,54 @@ function CardPreviewModal({
     if (stage !== 'open') return undefined
 
     const sequence = [
-      setTimeout(() => setRevealStep(1), 220),
-      setTimeout(() => setRevealStep(2), 820),
-      setTimeout(() => setRevealStep(3), 1420),
-      setTimeout(() => setRevealStep(4), 2060),
+      setTimeout(() => setRevealStep(1), 320),
+      setTimeout(() => setRevealStep(2), 1080),
+      setTimeout(() => setRevealStep(3), 1840),
+      setTimeout(() => setRevealStep(4), 2660),
     ]
 
     return () => {
       sequence.forEach(clearTimeout)
     }
   }, [stage, primaryImage])
+
+  useEffect(() => {
+    if (stage !== 'open' || revealStep < 4) return undefined
+    const el = openCardInnerRef.current
+    if (!el) return undefined
+
+    el.scrollTop = 0
+    const maxScroll = el.scrollHeight - el.clientHeight
+    if (maxScroll < 24) return undefined
+
+    let frame = 0
+    let startTime = 0
+    const delay = window.setTimeout(() => {
+      const duration = Math.min(11000, Math.max(4200, maxScroll * 34))
+      const animate = (time) => {
+        if (!startTime) startTime = time
+        const progress = Math.min(1, (time - startTime) / duration)
+        const eased = progress < 0.5
+          ? 2 * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 2) / 2
+        el.scrollTop = maxScroll * eased
+        if (progress < 1) frame = window.requestAnimationFrame(animate)
+      }
+      frame = window.requestAnimationFrame(animate)
+    }, 900)
+
+    return () => {
+      window.clearTimeout(delay)
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [
+    stage,
+    revealStep,
+    c.content.heading,
+    c.content.body,
+    c.content.extendedBody,
+    c.media.images.length,
+  ])
 
   // Continue label for the open card
   const continueLabel = studioType === 'poll' ? 'Vote Now'
@@ -500,6 +564,13 @@ function CardPreviewModal({
       )}
 
       {/* OPEN CARD — also gated by lock for non-envelope card types. */}
+      {unlocked && stage === 'revealing' && (
+        <div className="cp-reveal-bridge">
+          <div className="cp-reveal-bridge-orbit" />
+          <p>Opening your card</p>
+        </div>
+      )}
+
       {unlocked && stage === 'open' && (
         <div className="cp-card-wrap cp-card-wrap-full">
           {renderGradientBorder(
@@ -507,7 +578,7 @@ function CardPreviewModal({
               className="cp-card cp-card-full"
               style={cardSurfaceStyle({ ...borderStyle, '--scrollbar-color': c.card.scrollbarColor })}
             >
-              <div className="cp-card-inner cp-card-inner-full" style={{ '--scrollbar-color': c.card.scrollbarColor }}>
+              <div ref={openCardInnerRef} className="cp-card-inner cp-card-inner-full" style={{ '--scrollbar-color': c.card.scrollbarColor }}>
                 {/* Render card body elements in the user-defined order */}
                 {(c.layout?.elementOrder || ['media', 'heading', 'body']).map(key => {
                   if (key === 'heading') return (
