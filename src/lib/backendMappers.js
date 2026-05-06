@@ -544,9 +544,16 @@ export function cardObjectToBackendPayload(cardObject, {
     const rawLock = cardObject.interaction?.lock?.type || 'none'
     const lockType = safeEnum(rawLock === 'time' ? 'timer' : rawLock, VALID_LOCK)
 
+    const AMBIENT_EFFECT_MAP = {
+      shimmer: 'starfield',
+      aurora: 'starfield',
+      lanterns: 'floating',
+      petals: 'floating',
+    }
+
     // ambientEffect.type: whitelist to backend-allowed values only
     const rawAmbient = cardObject.animation?.backgroundEffect?.type || 'none'
-    const ambientType = safeEnum(rawAmbient, VALID_AMBIENT)
+    const ambientType = safeEnum(AMBIENT_EFFECT_MAP[rawAmbient] || rawAmbient, VALID_AMBIENT)
 
     // animation.entry: whitelist
     const rawEntry = Number(cardObject.card?.textBodyAnimation?.selfTypeSpeed) > 0 ? 'slide'
@@ -585,7 +592,7 @@ export function cardObjectToBackendPayload(cardObject, {
         return { type: lockType, value: lockValue }
       })(),
       ambientEffect: {
-        type: safeEnum(cardObject.animation?.backgroundEffect?.type || 'none', VALID_AMBIENT),
+        type: ambientType,
         emojis: Array.isArray(cardObject.animation?.backgroundEffect?.emojis)
           ? cardObject.animation.backgroundEffect.emojis : [],
       },
@@ -614,6 +621,10 @@ export function cardObjectToBackendPayload(cardObject, {
       const OPEN_EFFECT_MAP = {
         hearts: 'heartsBurst',
         stars: 'starShower',
+        glitterBurst: 'confetti',
+        goldenBloom: 'confetti',
+        rosePetals: 'heartsBurst',
+        cometTrail: 'starShower',
         heartsBurst: 'heartsBurst',
         starShower: 'starShower',
         confetti: 'confetti',

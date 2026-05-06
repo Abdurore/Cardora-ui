@@ -7567,10 +7567,10 @@ a {
 .cs-preview-card {
   width: 100%;
   max-width: 340px;
-  padding: 20px 18px;
+  padding: 22px 18px;
   border-radius: 24px;
   display: grid;
-  gap: 12px;
+  gap: 18px;
   animation: csSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   box-shadow: 0 18px 50px rgba(0,0,0,0.3), 0 2px 0 rgba(255,255,255,0.04) inset;
   position: relative;
@@ -7727,7 +7727,7 @@ a {
 }
 .cs-preview-media-strip {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: stretch;
 }
 .cs-preview-media-item--strip {
@@ -7778,6 +7778,7 @@ a {
   overflow: hidden;
   position: relative;
   max-height: 200px;
+  margin-top: 2px;
 }
 .cs-preview-body-wrap.cs-body-has-scroll {
   max-height: 200px;
@@ -8051,12 +8052,12 @@ a {
 }
 
 .cs-preview-questions {
-  margin-top: 8px;
+  margin-top: 4px;
   padding: 12px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .cs-q-label {
@@ -9631,6 +9632,38 @@ a {
   height: 110px;
 }
 
+.cp-reveal-bridge {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  gap: 18px;
+  color: rgba(234, 252, 255, 0.9);
+  text-align: center;
+  animation: cpRevealBridgeIn 0.55s ease both;
+}
+
+.cp-reveal-bridge p {
+  margin: 0;
+  font-family: 'Cinzel', serif;
+  font-size: clamp(0.95rem, 2vw, 1.25rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(234, 252, 255, 0.72);
+}
+
+.cp-reveal-bridge-orbit {
+  width: 96px;
+  height: 96px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 247, 255, 0.22);
+  background:
+    radial-gradient(circle, rgba(126, 247, 255, 0.22), transparent 38%),
+    conic-gradient(from 0deg, transparent, rgba(126, 247, 255, 0.82), rgba(98, 255, 162, 0.6), transparent);
+  box-shadow: 0 0 42px rgba(126, 247, 255, 0.18);
+  animation: cpRevealBridgeSpin 1.35s ease-in-out infinite;
+}
+
 /* Card wrap */
 .cp-card-wrap {
   position: relative;
@@ -9692,9 +9725,11 @@ a {
   max-height: min(820px, 86vh);
   padding: 74px 24px 24px;
   align-content: start;
-  gap: 14px;
-  overflow: hidden;
-  grid-template-rows: auto auto auto 1fr auto;
+  gap: 24px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  grid-template-rows: auto;
+  overscroll-behavior: contain;
 }
 
 .cp-card-inner::-webkit-scrollbar {
@@ -9708,7 +9743,7 @@ a {
 
 .cp-media-section {
   display: grid;
-  gap: 10px;
+  gap: 16px;
 }
 
 .cp-media-section-full {
@@ -9794,7 +9829,7 @@ a {
 
 .cp-body p {
   margin: 0;
-  line-height: 1.65;
+  line-height: 1.78;
   font-size: 0.9rem;
 }
 
@@ -9804,7 +9839,7 @@ a {
 }
 
 .cp-extended {
-  margin-top: 8px;
+  margin-top: 18px;
   opacity: 0.7;
   font-size: 0.85rem;
 }
@@ -10084,6 +10119,34 @@ a {
   }
 }
 
+@keyframes cpRevealBridgeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+    filter: blur(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes cpRevealBridgeSpin {
+  0% {
+    transform: rotate(0deg) scale(0.94);
+    opacity: 0.78;
+  }
+  50% {
+    transform: rotate(180deg) scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(360deg) scale(0.94);
+    opacity: 0.78;
+  }
+}
+
 @keyframes cpFadeUp {
   from {
     opacity: 0;
@@ -10229,8 +10292,9 @@ a {
     max-height: 100vh;
     max-height: 100dvh;
     padding: 64px 16px 20px;
-    gap: 12px;
-    grid-template-rows: auto auto auto 1fr auto;
+    gap: 20px;
+    grid-template-rows: auto;
+    overflow-y: auto;
   }
 
   .cp-gradient-border.cp-gradient-border-full {
@@ -20880,7 +20944,7 @@ a {
 }
 .cs-preview-media-strip {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: stretch;
 }
 .cs-preview-media-item--strip {
@@ -20930,6 +20994,8 @@ a {
 .cs-preview-body-wrap {
   overflow: hidden;
   position: relative;
+  max-height: 200px;
+  margin-top: 2px;
 }
 .cs-preview-body-wrap.cs-body-has-scroll {
   max-height: 200px;
@@ -21330,6 +21396,15 @@ a {
     align-items: center;
     justify-content: center;
   }
+  .cs-m2-ctrl-btn:not(:disabled):active {
+    color: #7ef7ff;
+    border-color: rgba(118,239,255,0.25);
+    background: rgba(118,239,255,0.1);
+  }
+  .cs-m2-ctrl-btn:disabled {
+    opacity: 0.32;
+    color: rgba(200,230,240,0.25);
+  }
 
   /* ── Canvas tap hint ── */
   .cs-m2-tap-hint {
@@ -21509,11 +21584,13 @@ a {
     display: flex;
     align-items: stretch;
     flex-shrink: 0;
-    background: rgba(4,8,12,0.97);
+    gap: 6px;
+    background:
+      linear-gradient(180deg, rgba(9,18,25,0.99), rgba(4,8,12,0.99));
     border-top: 1px solid rgba(118, 239, 255, 0.07);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    padding-bottom: max(env(safe-area-inset-bottom), 8px);
+    padding: 8px 8px max(env(safe-area-inset-bottom), 8px);
   }
   .cs-m2-tool-tab {
     flex: 1;
@@ -21522,8 +21599,10 @@ a {
     align-items: center;
     justify-content: center;
     gap: 3px;
-    padding: 9px 4px 6px;
-    border-right: 1px solid rgba(255,255,255,0.05);
+    padding: 8px 4px 7px;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.025);
     color: rgba(200,230,240,0.4);
     font-size: 0.58rem;
     letter-spacing: 0.04em;
@@ -21531,9 +21610,9 @@ a {
   }
   .cs-m2-tool-tab.active {
     color: #7ef7ff;
-    background: rgba(118,239,255,0.05);
+    border-color: rgba(118,239,255,0.22);
+    background: rgba(118,239,255,0.07);
   }
-  .cs-m2-tool-tab:last-of-type { border-right: 1px solid rgba(255,255,255,0.05); }
   .cs-m2-tool-icon {
     font-size: 1rem;
     line-height: 1;
@@ -21543,20 +21622,32 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    padding: 0 16px;
-    min-width: 90px;
-    background: linear-gradient(135deg, #c9a96e, #e8c97a);
-    color: #1a0e02;
-    font-size: 0.75rem;
+    gap: 7px;
+    padding: 0 14px;
+    min-width: 108px;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(255,255,255,0.28), transparent 34%),
+      linear-gradient(135deg, var(--type-accent, #7ef7ff), #62ffa2);
+    color: #041015;
+    font-size: 0.76rem;
     font-weight: 700;
     letter-spacing: 0.04em;
-    border-radius: 0;
+    border-radius: 14px;
     flex-shrink: 0;
-    border-left: 1px solid rgba(201,169,110,0.2);
+    border: 1px solid color-mix(in srgb, var(--type-accent, #7ef7ff) 65%, white 20%);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--type-accent, #7ef7ff) 24%, transparent);
   }
   .cs-m2-send-btn:disabled { opacity: 0.6; }
-  .cs-m2-send-arrow { font-size: 0.9rem; }
+  .cs-m2-send-btn:not(:disabled):active { transform: translateY(1px); }
+  .cs-m2-send-arrow {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: rgba(4,16,21,0.16);
+    font-size: 0.82rem;
+  }
 
   /* ── Bottom sheet overlay ── */
   .cs-m2-sheet-wrap {
@@ -21833,24 +21924,66 @@ a {
   .cs-m2-layers-list {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 14px;
+  }
+  .cs-m2-layer-group {
+    display: grid;
+    gap: 7px;
+  }
+  .cs-m2-layer-group-title {
+    margin: 0;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(118,239,255,0.48);
   }
   .cs-m2-layer-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 11px 14px;
-    border-radius: 12px;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.065);
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018));
     color: rgba(200,230,240,0.6);
     font-size: 0.8rem;
-    transition: background 0.15s;
+    text-align: left;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
   }
   .cs-m2-layer-row.active {
-    background: rgba(118,239,255,0.07);
+    background:
+      radial-gradient(circle at 0% 50%, rgba(118,239,255,0.14), transparent 44%),
+      rgba(118,239,255,0.065);
+    border-color: rgba(118,239,255,0.22);
     color: #7ef7ff;
   }
-  .cs-m2-layer-name { font-weight: 500; color: #e2eaf0; min-width: 70px; }
-  .cs-m2-layer-hint { font-size: 0.68rem; color: rgba(200,230,240,0.35); flex: 1; }
+  .cs-m2-layer-row:active { transform: scale(0.99); }
+  .cs-m2-layer-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    background: rgba(118,239,255,0.075);
+    color: var(--type-accent, #7ef7ff);
+    flex-shrink: 0;
+  }
+  .cs-m2-layer-copy {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+    flex: 1;
+  }
+  .cs-m2-layer-name { font-weight: 700; color: #e2eaf0; }
+  .cs-m2-layer-hint {
+    font-size: 0.68rem;
+    color: rgba(200,230,240,0.4);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .cs-m2-layer-arrow { margin-left: auto; color: rgba(200,230,240,0.3); }
 
   /* More list */
@@ -21869,6 +22002,9 @@ a {
     border: 1px solid rgba(255,255,255,0.06);
     text-align: left;
     margin-bottom: 6px;
+  }
+  .cs-m2-more-row:disabled {
+    opacity: 0.38;
   }
   .cs-m2-more-icon { font-size: 1.2rem; flex-shrink: 0; }
   .cs-m2-more-label { font-size: 0.82rem; font-weight: 600; color: #e2eaf0; }

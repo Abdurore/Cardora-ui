@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import {
@@ -446,7 +446,10 @@ function CardStudio() {
   // gets dropped off the bottom. Strings (not deep clones) so snapshots are
   // both compact and trivially comparable.
   const undoStackRef = useRef([])
+  const redoStackRef = useRef([])
+  const [historyVersion, setHistoryVersion] = useState(0)
   const skipNextSnapshotRef = useRef(false)
+  const refreshHistoryState = useCallback(() => setHistoryVersion((version) => version + 1), [])
   const pushUndoSnapshot = (snapshot) => {
     if (skipNextSnapshotRef.current) {
       skipNextSnapshotRef.current = false
@@ -456,16 +459,35 @@ function CardStudio() {
     if (last === snapshot) return
     undoStackRef.current.push(snapshot)
     if (undoStackRef.current.length > 30) undoStackRef.current.shift()
+    redoStackRef.current = []
+    refreshHistoryState()
   }
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     const prev = undoStackRef.current.pop()
     if (!prev) return
     try {
-      skipNextSnapshotRef.current = true
-      setCardObject(JSON.parse(prev))
+      setCardObject((current) => {
+        redoStackRef.current.push(JSON.stringify(current))
+        if (redoStackRef.current.length > 30) redoStackRef.current.shift()
+        return JSON.parse(prev)
+      })
       setActiveEditEl(null)
+      refreshHistoryState()
     } catch { /* ignore */ }
-  }
+  }, [refreshHistoryState])
+  const handleRedo = useCallback(() => {
+    const next = redoStackRef.current.pop()
+    if (!next) return
+    try {
+      setCardObject((current) => {
+        undoStackRef.current.push(JSON.stringify(current))
+        if (undoStackRef.current.length > 30) undoStackRef.current.shift()
+        return JSON.parse(next)
+      })
+      setActiveEditEl(null)
+      refreshHistoryState()
+    } catch { /* ignore */ }
+  }, [refreshHistoryState])
 
   // Poll / Trivia / Chain / Anonymous template state. Seed from the autosave
   // payload when one exists so a poll/trivia/chain in progress survives a
@@ -614,6 +636,8 @@ function CardStudio() {
   }
 
   const c = cardObject
+  const canUndo = historyVersion >= 0 && undoStackRef.current.length > 0
+  const canRedo = redoStackRef.current.length > 0
 
   const handleScreenshotFile = async (file) => {
     if (!file) return
@@ -707,21 +731,58 @@ function CardStudio() {
     })
   }
 
+  const applyPaletteWithHistory = (palette) => {
+    setCardObject(prev => {
+      pushUndoSnapshot(JSON.stringify(prev))
+      return applyPalette(prev, palette)
+    })
+  }
+
+  const applyPrimaryColor = (color) => {
+    setCardObject(prev => {
+      pushUndoSnapshot(JSON.stringify(prev))
+      const next = structuredClone(prev)
+      next.palette = {
+        ...(next.palette || {}),
+        id: null,
+        primary: color,
+      }
+      next.theme = next.theme || {}
+      next.card = next.card || {}
+      next.closedState = next.closedState || {}
+      next.theme.headingColor = color
+      next.card.headingColor = color
+      next.card.scrollbarColor = color
+      next.closedState.headingColor = color
+      next.closedState.borderColor = color
+      next.closedState.button = next.closedState.button || {}
+      next.closedState.button.backgroundColor = color
+      next.closedState.button.borderColor = color
+      next.questions = next.questions || {}
+      next.questions.button = next.questions.button || {}
+      next.questions.button.backgroundColor = color
+      next.questions.button.borderColor = color
+      return next
+    })
+  }
+
   // Cmd/Ctrl+Z undoes the last cardObject mutation. Skip when the user is
   // actually typing in a contentEditable element so the browser's native
   // undo stack handles in-flight character edits.
   useEffect(() => {
     const onKey = (e) => {
       const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')
-      if (!isUndo) return
+      const isRedo = ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) || ((e.metaKey || e.ctrlKey) && (e.key === 'y' || e.key === 'Y'))
+      if (!isUndo && !isRedo) return
       const t = e.target
       if (t && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
       e.preventDefault()
-      handleUndo()
+      if (isRedo) handleRedo()
+      else handleUndo()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [handleRedo, handleUndo])
 
   const studioSteps = STEPS_BY_TYPE[studioType] || STEPS_BY_TYPE.personal
   const stepLabels = STEP_LABELS_BY_TYPE[studioType] || STEP_LABELS_BY_TYPE.personal
@@ -1419,7 +1480,7 @@ function CardStudio() {
                   key={p.id}
                   type="button"
                   className={`cs-palette-chip ${activePaletteId === p.id ? 'active' : ''}`}
-                  onClick={() => setCardObject((prev) => applyPalette(prev, p))}
+                  onClick={() => applyPaletteWithHistory(p)}
                   title={p.label}
                 >
                   <span className="cs-palette-swatches" aria-hidden="true">
@@ -2635,9 +2696,16 @@ function CardStudio() {
               type="button"
               className="cs-icon-btn"
               onClick={handleUndo}
-              disabled={undoStackRef.current.length === 0}
+              disabled={!canUndo}
               title="Undo (Ctrl/Cmd+Z)"
             >↶</button>
+            <button
+              type="button"
+              className="cs-icon-btn"
+              onClick={handleRedo}
+              disabled={!canRedo}
+              title="Redo (Ctrl/Cmd+Shift+Z)"
+            >↷</button>
             <button type="button" className="cs-icon-btn" onClick={handleSave} title="Save draft">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -2809,7 +2877,15 @@ function CardStudio() {
               <span className="cs-m2-card-name">{c.content.heading || typeMeta.label || 'Untitled Card'}</span>
               <span className="cs-m2-save-status">{savedState.toUpperCase()}</span>
             </div>
-            <button type="button" className="cs-m2-menu-btn" onClick={handleSave} title="Save">···</button>
+            <button
+              type="button"
+              className="cs-m2-menu-btn"
+              onClick={() => setMobileBottomSheet(prev => prev === 'more' ? null : 'more')}
+              title="More actions"
+              aria-label="More actions"
+            >
+              ···
+            </button>
           </div>
           {/* Row 2: tier badge · type · tool count · CC balance */}
           <div className="cs-m2-meta-row">
@@ -2829,8 +2905,8 @@ function CardStudio() {
               <span className="cs-m2-live-dot" />LIVE
             </span>
             <div className="cs-m2-ctrl-group">
-              <button type="button" className="cs-m2-ctrl-btn" onClick={handleUndo} title="Undo">↶</button>
-              <button type="button" className="cs-m2-ctrl-btn" onClick={() => {}} title="Redo">↷</button>
+              <button type="button" className="cs-m2-ctrl-btn" onClick={handleUndo} disabled={!canUndo} title="Undo">↶</button>
+              <button type="button" className="cs-m2-ctrl-btn" onClick={handleRedo} disabled={!canRedo} title="Redo">↷</button>
             </div>
           </div>
         </div>
@@ -2987,7 +3063,6 @@ function CardStudio() {
             <div className="cs-m2-toolbar">
               {[
                 { id: 'content', label: 'Content', icon: 'T' },
-                { id: 'style',   label: 'Style',   icon: '◐' },
                 { id: 'layers',  label: 'Layers',  icon: '⊞' },
                 { id: 'more',    label: 'More',    icon: '···' },
               ].map(tab => (
@@ -3029,9 +3104,9 @@ function CardStudio() {
                     <button type="button" className="cs-m2-sheet-close" onClick={() => setMobileBottomSheet(null)}>×</button>
                   </div>
                   <div className="cs-m2-sheet-tab-row">
-                    {['Palette', 'Typography', 'Texture', 'Border'].map(t => (
+                    {['Palette', 'Typography', 'Border'].map(t => (
                       <button key={t} type="button" className={`cs-m2-sheet-tab${mobileStyleTab === t ? ' active' : ''}`} onClick={() => setMobileStyleTab(t)}>
-                        {t}{t === 'Texture' && ' ★'}
+                        {t}
                       </button>
                     ))}
                   </div>
@@ -3045,7 +3120,7 @@ function CardStudio() {
                         <div className="cs-m2-palette-row">
                           {availablePalettes.map(p => (
                             <button key={p.id} type="button" className={`cs-m2-palette-item${c.palette.id === p.id ? ' active' : ''}`}
-                              onClick={() => setCardObject(prev => applyPalette(p, prev))}>
+                              onClick={() => applyPaletteWithHistory(p)}>
                               <div className="cs-m2-palette-preview">
                                 <span className="cs-m2-pal-swatch" style={{ background: p.surface }} />
                                 <span className="cs-m2-pal-swatch" style={{ background: p.primary }} />
@@ -3059,7 +3134,7 @@ function CardStudio() {
                         <div className="cs-m2-section-hd"><span>ACCENT METAL</span></div>
                         <div className="cs-m2-dot-row">
                           {['#c9a96e', '#b89cf0', '#62ffa2', '#ff9bd2', '#7ef7ff', '#ff6b6b', '#ffaa22'].map(col => (
-                            <button key={col} type="button" className={`cs-m2-dot-lg${c.palette.primary === col ? ' active' : ''}`} style={{ background: col }} onClick={() => update('palette.primary', col)} />
+                            <button key={col} type="button" className={`cs-m2-dot-lg${c.palette.primary === col ? ' active' : ''}`} style={{ background: col }} onClick={() => applyPrimaryColor(col)} />
                           ))}
                         </div>
 
@@ -3119,9 +3194,6 @@ function CardStudio() {
                         )}
                       </>
                     )}
-                    {mobileStyleTab === 'Texture' && (
-                      <p className="cs-m2-coming-soon">Paper textures — coming soon</p>
-                    )}
                   </div>
                 </>
               )}
@@ -3148,16 +3220,37 @@ function CardStudio() {
                   </div>
                   <div className="cs-m2-sheet-body">
                     <div className="cs-m2-layers-list">
-                      {TOOL_GROUP_ORDER.flatMap(group => activeTools.filter(t => t.group === group)).map(tool => {
-                        const Icon = tool.icon
+                      {TOOL_GROUP_ORDER.map(group => {
+                        const groupTools = activeTools.filter(t => t.group === group)
+                        if (!groupTools.length) return null
                         return (
-                          <button key={tool.id} type="button" className={`cs-m2-layer-row${activeTool === tool.id ? ' active' : ''}`}
-                            onClick={() => { setActiveTool(tool.id); setMobileBottomSheet('content') }}>
-                            <Icon size={16} />
-                            <span className="cs-m2-layer-name">{tool.label}</span>
-                            <span className="cs-m2-layer-hint">{tool.hint}</span>
-                            <span className="cs-m2-layer-arrow">›</span>
-                          </button>
+                          <section key={group} className="cs-m2-layer-group">
+                            <p className="cs-m2-layer-group-title">{group}</p>
+                            {groupTools.map(tool => {
+                              const Icon = tool.icon
+                              return (
+                                <button
+                                  key={tool.id}
+                                  type="button"
+                                  className={`cs-m2-layer-row${activeTool === tool.id ? ' active' : ''}`}
+                                  onClick={() => {
+                                    setActiveTool(tool.id)
+                                    if (tool.id === 'closedState') setActiveStep('closed')
+                                    else if (tool.id === 'questions') setActiveStep('questions')
+                                    else setActiveStep('card')
+                                    setMobileBottomSheet('content')
+                                  }}
+                                >
+                                  <span className="cs-m2-layer-icon"><Icon size={16} /></span>
+                                  <span className="cs-m2-layer-copy">
+                                    <span className="cs-m2-layer-name">{tool.label}</span>
+                                    <span className="cs-m2-layer-hint">{tool.hint}</span>
+                                  </span>
+                                  <span className="cs-m2-layer-arrow">›</span>
+                                </button>
+                              )
+                            })}
+                          </section>
                         )
                       })}
                     </div>
@@ -3186,6 +3279,20 @@ function CardStudio() {
                         <div>
                           <div className="cs-m2-more-label">Save Draft</div>
                           <div className="cs-m2-more-desc">{savedState}</div>
+                        </div>
+                      </button>
+                      <button type="button" className="cs-m2-more-row" disabled={!canUndo} onClick={() => { handleUndo(); setMobileBottomSheet(null) }}>
+                        <span className="cs-m2-more-icon">↶</span>
+                        <div>
+                          <div className="cs-m2-more-label">Undo last change</div>
+                          <div className="cs-m2-more-desc">Step back through recent edits</div>
+                        </div>
+                      </button>
+                      <button type="button" className="cs-m2-more-row" disabled={!canRedo} onClick={() => { handleRedo(); setMobileBottomSheet(null) }}>
+                        <span className="cs-m2-more-icon">↷</span>
+                        <div>
+                          <div className="cs-m2-more-label">Redo change</div>
+                          <div className="cs-m2-more-desc">Restore an edit you just undid</div>
                         </div>
                       </button>
                     </div>
