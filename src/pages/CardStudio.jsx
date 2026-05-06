@@ -8,6 +8,7 @@ import {
   HiOutlineGift, HiOutlineChartBarSquare, HiOutlineLightBulb,
   HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash
 } from 'react-icons/hi2'
+import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 import { IoColorPaletteOutline } from 'react-icons/io5'
 import { defaultCardObject, resolveTemplateCardObject, musicPresets, getFontsForTier } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
@@ -106,11 +107,11 @@ const TOOLS_BY_TYPE_TIER = {
 }
 
 const STUDIO_TYPE_META = {
-  personal:  { emoji: '💌', label: 'Personal Card', badge: 'badge-moment' },
-  poll:      { emoji: '📊', label: 'Poll Card',   badge: 'badge-poll' },
-  trivia:    { emoji: '💡', label: 'Trivia Card', badge: 'badge-trivia' },
-  chain:     { emoji: '🔗', label: 'Chain Card',  badge: 'badge-chain' },
-  anonymous: { emoji: '👁', label: 'Anonymous',   badge: 'badge-anon' },
+  personal:  { Icon: PersonalCardIcon, label: 'Personal Card', badge: 'badge-moment' },
+  poll:      { Icon: PollCardIcon,     label: 'Poll Card',     badge: 'badge-poll' },
+  trivia:    { Icon: TriviaCardIcon,   label: 'Trivia Card',   badge: 'badge-trivia' },
+  chain:     { Icon: ChainCardIcon,    label: 'Chain Card',    badge: 'badge-chain' },
+  anonymous: { Icon: AnonCardIcon,     label: 'Anonymous',     badge: 'badge-anon' },
 }
 
 const TYPE_ACCENT = {
@@ -2599,7 +2600,7 @@ function CardStudio() {
           <span className="cs-top-divider" />
           <div className="cs-top-meta">
             <span className={`cs-type-badge ${typeMeta.badge}`}>
-              <span className="cs-type-badge-emoji">{typeMeta.emoji}</span>
+              <typeMeta.Icon size={13} className="cs-type-badge-icon" />
               {typeMeta.label} · {tierLabel}
             </span>
             <span className="cs-top-card-title" title={c.content?.heading || c.closedState?.headingText || ''}>
@@ -3625,7 +3626,7 @@ function CardStudio() {
 
             {!isSending && (
             <p className="cs-send-modal-tier-note">
-              {typeMeta.emoji} {TYPE_LABEL[studioType] || 'Card'} · {tierLabel} tier
+              <typeMeta.Icon size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} /> {TYPE_LABEL[studioType] || 'Card'} · {tierLabel} tier
             </p>
             )}
           </div>

@@ -14496,7 +14496,7 @@ a {
 .hero-format-chip.chip-trivia   { background: rgba(255,120,140,0.12); color: #ff96aa; animation-delay: 0.8s; }
 .hero-format-chip.chip-anon     { background: rgba(80,240,200,0.12);  color: #4ff0c8; animation-delay: 1.2s; }
 
-.hfc-icon { font-size: 1rem; }
+.hfc-icon { width: 14px; height: 14px; flex-shrink: 0; }
 .hfc-label { font-size: 0.82rem; }
 
 @keyframes chipFloat {
@@ -14547,9 +14547,22 @@ a {
 .format-card.mint::before  { background: radial-gradient(circle at 30% 20%, rgba(80,240,190,0.08), transparent 60%); }
 
 .format-card-icon {
-  font-size: 1.6rem;
-  margin-bottom: 2px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  margin-bottom: 8px;
+  color: var(--text-accent, #7ef7ff);
 }
+.format-card.warm .format-card-icon { color: #f0c060; background: rgba(240, 192, 96, 0.08); border-color: rgba(240, 192, 96, 0.15); }
+.format-card.cool .format-card-icon { color: #60a5fa; background: rgba(96, 165, 250, 0.08); border-color: rgba(96, 165, 250, 0.15); }
+.format-card.rose .format-card-icon { color: #f472b6; background: rgba(244, 114, 182, 0.08); border-color: rgba(244, 114, 182, 0.15); }
+.format-card.mint .format-card-icon { color: #34d399; background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.15); }
+.format-card.teal .format-card-icon { color: #2dd4bf; background: rgba(45, 212, 191, 0.08); border-color: rgba(45, 212, 191, 0.15); }
 
 .format-card h4 {
   font-size: 0.98rem;
@@ -15713,7 +15726,18 @@ a {
   transform: translateY(-2px);
 }
 
-.ccp-type-icon { font-size: 2rem; line-height: 1; }
+.ccp-type-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: var(--type-accent, #7ef7ff);
+  flex-shrink: 0;
+}
 .ccp-type-label { font-size: 1rem; font-weight: 700; color: #fff; }
 .ccp-type-desc { font-size: 0.8rem; color: rgba(255,255,255,0.5); line-height: 1.4; }
 
@@ -16003,20 +16027,38 @@ a {
 
 /* Card icon wrap */
 .ctm-card-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  transition: background 0.2s, box-shadow 0.2s;
 }
 
-.ctm-card-emoji {
-  font-size: 1.6rem;
-  line-height: 1;
+.ctm-card:hover .ctm-card-icon-wrap {
+  background: rgba(var(--ctm-accent-rgb, 126, 247, 255), 0.1);
+  box-shadow: 0 4px 20px rgba(var(--ctm-accent-rgb, 126, 247, 255), 0.15);
 }
 
 .ctm-card-icon {
   color: var(--ctm-accent, #7ef7ff);
-  opacity: 0.65;
+}
+
+.ctm-type-summary-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
 .ctm-card h3 {
@@ -16219,9 +16261,9 @@ a {
   white-space: nowrap;
 }
 
-.cs-type-badge-emoji {
-  font-size: 0.9rem;
-  line-height: 1;
+.cs-type-badge-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 .cs-type-badge.badge-moment { border-color: rgba(255, 160, 100, 0.25); background: rgba(255, 160, 100, 0.06); color: #ffb07a; }

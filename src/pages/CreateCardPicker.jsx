@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 
 const CARD_TYPES = [
   {
     id: 'personal',
     label: 'Personal Card',
-    icon: '✉',
+    Icon: PersonalCardIcon,
     desc: 'A cinematic card with envelope reveal, music, media, and effects.',
     accent: '#f0c060',
     tiers: [
@@ -17,7 +18,7 @@ const CARD_TYPES = [
   {
     id: 'poll',
     label: 'Poll',
-    icon: '📊',
+    Icon: PollCardIcon,
     desc: 'Ask your audience a question. See live results when they answer.',
     accent: '#60a5fa',
     tiers: [
@@ -28,7 +29,7 @@ const CARD_TYPES = [
   {
     id: 'trivia',
     label: 'Trivia',
-    icon: '💡',
+    Icon: TriviaCardIcon,
     desc: 'Quiz your friends. They see their score and correct answers.',
     accent: '#a78bfa',
     tiers: [
@@ -39,7 +40,7 @@ const CARD_TYPES = [
   {
     id: 'chain',
     label: 'Chain',
-    icon: '🔗',
+    Icon: ChainCardIcon,
     desc: 'Send a card that invites the recipient to reply with their own card back.',
     accent: '#f97316',
     tiers: [
@@ -50,7 +51,7 @@ const CARD_TYPES = [
   {
     id: 'anonymous',
     label: 'Anonymous',
-    icon: '👁',
+    Icon: AnonCardIcon,
     desc: 'Let anyone send you anonymous messages wrapped in a designed card.',
     accent: '#7ef7ff',
     tiers: [
@@ -81,7 +82,7 @@ function CreateCardPicker() {
                   style={{ '--type-accent': type.accent }}
                   onClick={() => { setSelectedType(type); setStep('tier') }}
                 >
-                  <span className="ccp-type-icon">{type.icon}</span>
+                  <type.Icon size={32} className="ccp-type-icon" />
                   <strong className="ccp-type-label">{type.label}</strong>
                   <p className="ccp-type-desc">{type.desc}</p>
                 </button>
@@ -92,7 +93,7 @@ function CreateCardPicker() {
         {step === 'tier' && selectedType && (
           <>
             <button className="ccp-back" onClick={() => setStep('type')}>← Back</button>
-            <p className="eyebrow" style={{ color: selectedType.accent }}>{selectedType.icon} {selectedType.label}</p>
+            <p className="eyebrow" style={{ color: selectedType.accent, display: 'flex', alignItems: 'center', gap: 6 }}><selectedType.Icon size={14} color={selectedType.accent} /> {selectedType.label}</p>
             <h2 className="ccp-heading">Choose a tier</h2>
             <div className="ccp-tier-list">
               {selectedType.tiers.map(tier => (

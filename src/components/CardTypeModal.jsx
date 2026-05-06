@@ -1,18 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  HiOutlineEnvelope,
-  HiOutlineChartBarSquare,
-  HiOutlineLightBulb,
-  HiOutlineEyeSlash,
-  HiOutlineArrowPathRoundedSquare,
-} from 'react-icons/hi2'
+import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
 
 const CARD_TYPES = [
   {
     id: 'personal',
-    icon: HiOutlineEnvelope,
-    emoji: '💌',
+    icon: PersonalCardIcon,
     label: 'Personal Card',
     tagline: 'The full cinematic experience',
     description: 'Envelope reveals, background music, animations, images, gifts, questions — everything.',
@@ -21,8 +14,7 @@ const CARD_TYPES = [
   },
   {
     id: 'poll',
-    icon: HiOutlineChartBarSquare,
-    emoji: '📊',
+    icon: PollCardIcon,
     label: 'Poll Card',
     tagline: 'Ask and see who answers',
     description: 'Embed a live poll. Recipients vote and see real-time results.',
@@ -31,8 +23,7 @@ const CARD_TYPES = [
   },
   {
     id: 'trivia',
-    icon: HiOutlineLightBulb,
-    emoji: '💡',
+    icon: TriviaCardIcon,
     label: 'Trivia Card',
     tagline: 'Quiz your people',
     description: 'Create a scored quiz. Recipients see their score and correct answers at the end.',
@@ -41,8 +32,7 @@ const CARD_TYPES = [
   },
   {
     id: 'chain',
-    icon: HiOutlineArrowPathRoundedSquare,
-    emoji: '🔗',
+    icon: ChainCardIcon,
     label: 'Chain Card',
     tagline: 'Send and receive back',
     description: 'Send a card that invites the recipient to reply with their own card back.',
@@ -51,8 +41,7 @@ const CARD_TYPES = [
   },
   {
     id: 'anonymous',
-    icon: HiOutlineEyeSlash,
-    emoji: '👁',
+    icon: AnonCardIcon,
     label: 'Anonymous Card',
     tagline: 'Receive honest messages',
     description: 'Share a link and let anyone send you a message — anonymously, beautifully wrapped.',
@@ -150,8 +139,7 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
                   onClick={() => handleSelectType(type.id)}
                 >
                   <div className="ctm-card-icon-wrap">
-                    <span className="ctm-card-emoji">{type.emoji}</span>
-                    <Icon size={28} className="ctm-card-icon" />
+                    <Icon size={36} className="ctm-card-icon" />
                   </div>
                   <h3>{type.label}</h3>
                   <p className="ctm-card-tagline">{type.tagline}</p>
@@ -166,10 +154,14 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
         )}
 
         {/* Tier Selection */}
-        {selectedType && activeType && (
+        {selectedType && activeType && (() => {
+          const Icon = activeType.icon
+          return (
           <div className="ctm-tier-section">
             <div className={`ctm-type-summary ctm-${activeType.accent}`}>
-              <span className="ctm-type-summary-emoji">{activeType.emoji}</span>
+              <div className="ctm-type-summary-icon">
+                <Icon size={28} className="ctm-card-icon" />
+              </div>
               <div>
                 <h3>{activeType.label}</h3>
                 <p>{activeType.description}</p>
@@ -208,7 +200,8 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
               {isArtist ? 'Open the Artist Studio →' : 'Start Creating →'}
             </button>
           </div>
-        )}
+          )
+        })()}
       </div>
     </section>
   )
