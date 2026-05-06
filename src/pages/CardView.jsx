@@ -139,7 +139,8 @@ function CardView() {
   const heading = content.heading || card?.title || ''
   const body = content.body || card?.message || ''
   const extendedBody = content.extendedBody || ''
-  const questions = layout?.questions?.items || []
+  const questionsEnabled = layout?.questions?.enabled === true
+  const questions = questionsEnabled ? (layout?.questions?.items || []) : []
   const poll = card?.poll || null
   const chain = card?.chain || null
   const trivia = card?.trivia || null
@@ -399,7 +400,6 @@ function CardView() {
               <div className="card-open-content">
                 <div className="card-open-meta-row">
                   <p className="entry-sub">To {card.recipient || 'You'}</p>
-                  <span className="cv-type-chip">{cardType === 'personal' ? 'Personal Card' : cardType === 'poll' ? 'Poll Card' : cardType === 'trivia' ? 'Trivia Card' : cardType === 'chain' ? 'Chain Card' : 'Card Experience'}</span>
                 </div>
                 <h3 style={{ color: cardHeadingColor }}>{card.subtitle || heading}</h3>
 
@@ -468,9 +468,10 @@ function CardView() {
                   </div>
                 ) : null}
 
-                {!responseSubmitted && !poll && !chain && !trivia && (
+                {questionsEnabled && !responseSubmitted && !poll && !chain && !trivia && layout?.questions?.question && (
                   <div className="experience-questions cv-type-section">
                     <p className="cv-type-eyebrow" style={{ color: accentColor }}>Interactive Moment</p>
+                    <p className="cv-question-text">{layout.questions.question}</p>
                     <div className="question-actions">
                       <button className="yes" type="button" onClick={() => handleResponse('yes')}>Yes, absolutely</button>
                       <button className="no" type="button" onClick={() => handleResponse('no')}>Tell me more</button>
@@ -591,20 +592,9 @@ function CardView() {
                   </div>
                 )}
 
-                <div className="experience-end">
-                  <Link className="ghost" to="/profile">
-                    Save this card
-                  </Link>
-                  <button className="primary" type="button" onClick={() => openCardTypeModal?.()}>
-                    Create yours
-                  </button>
-                </div>
-
                 <div className="cv-watermark">
                   <span>Made with</span>
                   <Link to="/" className="cv-watermark-brand">Cardora</Link>
-                  <span className="cv-watermark-sep">·</span>
-                  <Link to="/create" className="cv-watermark-cta">Create yours →</Link>
                   <button
                     type="button"
                     className="cv-report-btn"
