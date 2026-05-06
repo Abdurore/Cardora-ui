@@ -4,18 +4,19 @@ import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
 import { getSignupBonusAvailability } from '../lib/api.js'
+import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 
 const FORMAT_CHIPS = [
-  { icon: '✉', label: 'Greeting', cls: 'chip-greeting' },
-  { icon: '📊', label: 'Poll',     cls: 'chip-poll' },
-  { icon: '💡', label: 'Trivia',   cls: 'chip-trivia' },
-  { icon: '👁', label: 'Anonymous', cls: 'chip-anon' },
-  { icon: '🔗', label: 'Chain',    cls: 'chip-chain' },
+  { Icon: PersonalCardIcon, label: 'Greeting', cls: 'chip-greeting' },
+  { Icon: PollCardIcon,     label: 'Poll',     cls: 'chip-poll' },
+  { Icon: TriviaCardIcon,  label: 'Trivia',   cls: 'chip-trivia' },
+  { Icon: AnonCardIcon,    label: 'Anonymous', cls: 'chip-anon' },
+  { Icon: ChainCardIcon,   label: 'Chain',    cls: 'chip-chain' },
 ]
 
 const CARD_FORMATS = [
   {
-    icon: '💌',
+    Icon: PersonalCardIcon,
     title: 'Personal Cards',
     tagline: 'Cinematic reveals with music.',
     description: 'Envelope, glow, music, and a more personal kind of message.',
@@ -24,7 +25,7 @@ const CARD_FORMATS = [
     typePreselect: 'personal',
   },
   {
-    icon: '📊',
+    Icon: PollCardIcon,
     title: 'Poll Cards',
     tagline: 'Ask and measure the mood.',
     description: 'Drop a live poll into the card and let people vote in place.',
@@ -33,7 +34,7 @@ const CARD_FORMATS = [
     typePreselect: 'poll',
   },
   {
-    icon: '💡',
+    Icon: TriviaCardIcon,
     title: 'Trivia Cards',
     tagline: 'Turn the card into a challenge.',
     description: 'Build a short quiz and reveal the score at the end.',
@@ -42,7 +43,7 @@ const CARD_FORMATS = [
     typePreselect: 'trivia',
   },
   {
-    icon: '👁',
+    Icon: AnonCardIcon,
     title: 'Anonymous Inbox',
     tagline: 'Open the door to honest messages.',
     description: 'Share one link and collect anonymous notes inside your card design.',
@@ -51,7 +52,7 @@ const CARD_FORMATS = [
     typePreselect: 'anonymous',
   },
   {
-    icon: '🔗',
+    Icon: ChainCardIcon,
     title: 'Chain Cards',
     tagline: 'Send one. Pull one back.',
     description: 'Invite the recipient to answer with a card of their own.',
@@ -179,7 +180,7 @@ function Home() {
                 key={chip.label}
                 className={`hero-format-chip ${chip.cls} fc${i + 1}`}
               >
-                <span className="hfc-icon">{chip.icon}</span>
+                <chip.Icon size={14} className="hfc-icon" />
                 <span className="hfc-label">{chip.label}</span>
               </span>
             ))}
@@ -235,7 +236,7 @@ function Home() {
         <div className="format-grid">
           {CARD_FORMATS.map((format) => (
             <article key={format.title} className={`format-card ${format.accent}`}>
-              <div className="format-card-icon">{format.icon}</div>
+              <div className="format-card-icon"><format.Icon size={28} /></div>
               <h4>{format.title}</h4>
               <p className="format-card-tagline">{format.tagline}</p>
               <p className="format-card-desc">{format.description}</p>

@@ -8,6 +8,7 @@ import {
   HiOutlineGift, HiOutlineChartBarSquare, HiOutlineLightBulb,
   HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash
 } from 'react-icons/hi2'
+import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 import { IoColorPaletteOutline } from 'react-icons/io5'
 import { defaultCardObject, resolveTemplateCardObject, musicPresets, getFontsForTier } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
@@ -106,11 +107,11 @@ const TOOLS_BY_TYPE_TIER = {
 }
 
 const STUDIO_TYPE_META = {
-  personal:  { emoji: '💌', label: 'Personal Card', badge: 'badge-moment' },
-  poll:      { emoji: '📊', label: 'Poll Card',   badge: 'badge-poll' },
-  trivia:    { emoji: '💡', label: 'Trivia Card', badge: 'badge-trivia' },
-  chain:     { emoji: '🔗', label: 'Chain Card',  badge: 'badge-chain' },
-  anonymous: { emoji: '👁', label: 'Anonymous',   badge: 'badge-anon' },
+  personal:  { Icon: PersonalCardIcon, label: 'Personal Card', badge: 'badge-moment' },
+  poll:      { Icon: PollCardIcon,     label: 'Poll Card',     badge: 'badge-poll' },
+  trivia:    { Icon: TriviaCardIcon,   label: 'Trivia Card',   badge: 'badge-trivia' },
+  chain:     { Icon: ChainCardIcon,    label: 'Chain Card',    badge: 'badge-chain' },
+  anonymous: { Icon: AnonCardIcon,     label: 'Anonymous',     badge: 'badge-anon' },
 }
 
 const TYPE_ACCENT = {
@@ -437,6 +438,8 @@ function CardStudio() {
   const dragStateRef = useRef(null)
   const editPopoverRef = useRef(null)
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
+  const [mobileBottomSheet, setMobileBottomSheet] = useState(null) // null|'style'|'content'|'layers'|'more'
+  const [mobileStyleTab, setMobileStyleTab] = useState('Palette')
 
   // Undo history. Each entry is a JSON-string snapshot of cardObject taken
   // BEFORE a mutation. Cap to 30 to keep memory bounded — anything older
@@ -2597,7 +2600,7 @@ function CardStudio() {
           <span className="cs-top-divider" />
           <div className="cs-top-meta">
             <span className={`cs-type-badge ${typeMeta.badge}`}>
-              <span className="cs-type-badge-emoji">{typeMeta.emoji}</span>
+              <typeMeta.Icon size={13} className="cs-type-badge-icon" />
               {typeMeta.label} · {tierLabel}
             </span>
             <span className="cs-top-card-title" title={c.content?.heading || c.closedState?.headingText || ''}>
@@ -2797,34 +2800,39 @@ function CardStudio() {
 
       {/* Mobile layout */}
       <div className="cs-mobile-shell">
-        {/* Header */}
-        <div className="cs-mobile-header">
-          <button type="button" className="cs-mobile-back" onClick={() => navigate(-1)}>‹</button>
-          <div className="cs-mobile-title">{typeMeta.emoji} {typeMeta.label}</div>
-          <button type="button" className="cs-mobile-save" onClick={handleSave}>Save</button>
-        </div>
-
-        {/* State nav — simplified: only card states + tools shortcut */}
-        <div className="cs-mobile-state-nav">
-          {studioType === 'personal' && (
-            <button type="button" className={`cs-mobile-state-btn${activeStep === 'closed' ? ' active' : ''}`} onClick={() => goToStep('closed')}>
-              <span className="cs-mobile-state-icon">🎁</span>Envelope
-            </button>
-          )}
-          <button type="button" className={`cs-mobile-state-btn${activeStep === 'card' ? ' active' : ''}`} onClick={() => goToStep('card')}>
-            <span className="cs-mobile-state-icon">✉</span>{stepLabels.card || 'Card'}
-          </button>
-          {studioType === 'personal' && (
-            <button type="button" className={`cs-mobile-state-btn${activeStep === 'questions' ? ' active' : ''}`} onClick={() => goToStep('questions')}>
-              <span className="cs-mobile-state-icon">💬</span>Q&amp;A
-            </button>
-          )}
-          <button type="button" className="cs-mobile-state-btn" onClick={() => setMobilePanelOpen(true)}>
-            <span className="cs-mobile-state-icon">🎨</span>Customize
-          </button>
-          <button type="button" className="cs-mobile-state-btn" onClick={enterPreview}>
-            <span className="cs-mobile-state-icon">👁</span>Preview
-          </button>
+        {/* ── 3-row header ── */}
+        <div className="cs-m2-header">
+          {/* Row 1: back · title/status · menu */}
+          <div className="cs-m2-title-row">
+            <button type="button" className="cs-m2-back" onClick={() => navigate(-1)}>←</button>
+            <div className="cs-m2-title-block">
+              <span className="cs-m2-card-name">{c.content.heading || typeMeta.label || 'Untitled Card'}</span>
+              <span className="cs-m2-save-status">{savedState.toUpperCase()}</span>
+            </div>
+            <button type="button" className="cs-m2-menu-btn" onClick={handleSave} title="Save">···</button>
+          </div>
+          {/* Row 2: tier badge · type · tool count · CC balance */}
+          <div className="cs-m2-meta-row">
+            <span className={`cs-m2-tier-badge cs-m2-tier-${studioTier}`}>
+              {studioTier === 'elite' && <span className="cs-m2-star">★</span>}{tierLabel.toUpperCase()}
+            </span>
+            <span className="cs-m2-meta-sep" />
+            <span className="cs-m2-meta-type">{TYPE_LABEL[studioType] || 'Personal Card'}</span>
+            <span className="cs-m2-meta-sep" />
+            <span className="cs-m2-meta-tools">{activeTools.length} tools</span>
+            <span className="cs-m2-cc-pill">◈ {balance ?? 0} CC</span>
+          </div>
+          {/* Row 3: dimensions · live · undo/redo */}
+          <div className="cs-m2-controls-row">
+            <span className="cs-m2-dimensions">320 × 568</span>
+            <span className="cs-m2-live-pill">
+              <span className="cs-m2-live-dot" />LIVE
+            </span>
+            <div className="cs-m2-ctrl-group">
+              <button type="button" className="cs-m2-ctrl-btn" onClick={handleUndo} title="Undo">↶</button>
+              <button type="button" className="cs-m2-ctrl-btn" onClick={() => {}} title="Redo">↷</button>
+            </div>
+          </div>
         </div>
 
         {/* Full-height interactive preview */}
@@ -2867,167 +2875,328 @@ function CardStudio() {
           ) : (
             renderStudioContentPreview(false)
           )}
-          {/* Tap hint — fades after first edit */}
-          {!activeEditEl && studioType === 'personal' && c.media.images.length === 0 && (
-            <p className="cs-mobile-tap-hint">Tap text to edit directly</p>
+          {/* Tap hint */}
+          {!activeEditEl && (
+            <p className="cs-m2-tap-hint">
+              <span className="cs-m2-hint-dot" />
+              Tap any element to edit
+            </p>
           )}
         </div>
 
-        {/* Element-specific edit bar — slides up when element tapped (mobile only) */}
-        {activeEditEl && (
-          <div className="cs-mobile-edit-bar">
-            <div className="cs-mobile-edit-scroll">
-
-              {/* ── Closed state: Envelope heading ── */}
+        {/* ── Element edit bar or Step+Toolbar ── */}
+        {activeEditEl ? (
+          <div className="cs-m2-edit-zone">
+            {/* Row 1: element type label + text preview + Done */}
+            <div className="cs-m2-edit-header">
+              <span className="cs-m2-edit-type-label">
+                {activeEditEl.type === 'heading' ? 'HEADING' :
+                 activeEditEl.type === 'body' ? 'BODY' :
+                 activeEditEl.type === 'extendedBody' ? 'BODY' :
+                 activeEditEl.type === 'image' ? 'IMAGE' :
+                 activeEditEl.type === 'closedHeading' ? 'ENVELOPE TITLE' :
+                 activeEditEl.type === 'closedBody' ? 'ENVELOPE TEXT' : 'ELEMENT'}
+              </span>
+              {(activeEditEl.type === 'heading' || activeEditEl.type === 'closedHeading') && (
+                <span className="cs-m2-edit-preview">
+                  "{(activeEditEl.type === 'heading' ? c.content.heading : c.closedState.headingText || '').slice(0, 24)}
+                  {(activeEditEl.type === 'heading' ? c.content.heading : c.closedState.headingText || '').length > 24 ? '…' : ''}"
+                </span>
+              )}
+              <button type="button" className="cs-m2-edit-done-btn" onClick={() => setActiveEditEl(null)}>Done</button>
+            </div>
+            {/* Row 2: controls for the selected element */}
+            <div className="cs-m2-edit-controls">
+              {/* Heading controls */}
+              {activeEditEl.type === 'heading' && (
+                <>
+                  <button type="button" className="cs-m2-sz-btn" onClick={() => update('theme.headingSize', Math.max(14, (c.theme.headingSize ?? 28) - 2))}>A−</button>
+                  <span className="cs-m2-sz-val">{c.theme.headingSize ?? 28}</span>
+                  <button type="button" className="cs-m2-sz-btn" onClick={() => update('theme.headingSize', Math.min(56, (c.theme.headingSize ?? 28) + 2))}>A+</button>
+                  <span className="cs-m2-ctrl-sep" />
+                  {colorPresets.map((col, i) => (
+                    <button key={i} type="button" className={`cs-m2-color-dot${c.card.headingColor === col ? ' active' : ''}`} style={{ background: col }} onClick={() => update('card.headingColor', col)} />
+                  ))}
+                </>
+              )}
+              {/* Body controls */}
+              {(activeEditEl.type === 'body' || activeEditEl.type === 'extendedBody') && (
+                <>
+                  <button type="button" className="cs-m2-sz-btn" onClick={() => update('theme.bodySize', Math.max(10, (c.theme.bodySize ?? 16) - 1))}>A−</button>
+                  <span className="cs-m2-sz-val">{c.theme.bodySize ?? 16}</span>
+                  <button type="button" className="cs-m2-sz-btn" onClick={() => update('theme.bodySize', Math.min(28, (c.theme.bodySize ?? 16) + 1))}>A+</button>
+                  <span className="cs-m2-ctrl-sep" />
+                  {colorPresets.map((col, i) => (
+                    <button key={i} type="button" className={`cs-m2-color-dot${c.card.textColor === col ? ' active' : ''}`} style={{ background: col }} onClick={() => update('card.textColor', col)} />
+                  ))}
+                </>
+              )}
+              {/* Envelope heading controls */}
               {activeEditEl.type === 'closedHeading' && (
                 <>
-                  <span className="cs-mobile-edit-label">Envelope Title</span>
-                  <InlineColorPicker value={c.closedState.headingColor || '#ffffff'} onChange={e => update('closedState.headingColor', e.target.value)} presets={colorPresets} label="Color" />
-                  <InlineColorPicker value={c.closedState.backgroundColor || '#07111a'} onChange={e => update('closedState.backgroundColor', e.target.value)} presets={colorPresets} label="Envelope BG" />
+                  <InlineColorPicker value={c.closedState.headingColor || '#fff'} onChange={e => update('closedState.headingColor', e.target.value)} presets={colorPresets} label="Title" />
+                  <InlineColorPicker value={c.closedState.backgroundColor || '#07111a'} onChange={e => update('closedState.backgroundColor', e.target.value)} presets={colorPresets} label="BG" />
                   <InlineColorPicker value={c.closedState.borderColor || '#7ef7ff'} onChange={e => update('closedState.borderColor', e.target.value)} presets={colorPresets} label="Border" />
                 </>
               )}
-
-              {/* ── Closed state: Envelope body ── */}
+              {/* Envelope body controls */}
               {activeEditEl.type === 'closedBody' && (
                 <>
-                  <span className="cs-mobile-edit-label">Envelope Text</span>
-                  <InlineColorPicker value={c.closedState.textColor || '#e2eaf0'} onChange={e => update('closedState.textColor', e.target.value)} presets={colorPresets} label="Color" />
-                  <InlineColorPicker value={c.closedState.backgroundColor || '#07111a'} onChange={e => update('closedState.backgroundColor', e.target.value)} presets={colorPresets} label="Envelope BG" />
+                  <InlineColorPicker value={c.closedState.textColor || '#e2eaf0'} onChange={e => update('closedState.textColor', e.target.value)} presets={colorPresets} label="Text" />
+                  <InlineColorPicker value={c.closedState.backgroundColor || '#07111a'} onChange={e => update('closedState.backgroundColor', e.target.value)} presets={colorPresets} label="BG" />
                 </>
               )}
-
-              {/* ── Open card: Heading ── */}
-              {activeEditEl.type === 'heading' && (
-                <>
-                  <span className="cs-mobile-edit-label">Heading</span>
-                  <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.headingSize', Math.max(14, (c.theme.headingSize ?? 28) - 2))}>A−</button>
-                  <span className="cs-mobile-edit-size-val">{c.theme.headingSize ?? 28}</span>
-                  <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.headingSize', Math.min(56, (c.theme.headingSize ?? 28) + 2))}>A+</button>
-                  <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
-                  <InlineColorPicker value={c.card.backgroundColor || '#07111a'} onChange={e => update('card.backgroundColor', e.target.value)} presets={colorPresets} label="Card BG" />
-                  <InlineColorPicker value={c.theme.accentColor || '#7ef7ff'} onChange={e => update('theme.accentColor', e.target.value)} presets={colorPresets} label="Accent" />
-                  <span className="cs-mobile-edit-sep" />
-                  <span className="cs-mobile-edit-label" style={{ fontSize: '0.7rem' }}>Font</span>
-                  {availableFonts.slice(0, 8).map(f => (
-                    <button
-                      key={f}
-                      type="button"
-                      className={`cs-mobile-font-chip${c.theme.fontFamily === f ? ' active' : ''}`}
-                      style={{ fontFamily: `'${f}', serif` }}
-                      onClick={() => update('theme.fontFamily', f)}
-                    >{f.split(' ')[0]}</button>
-                  ))}
-                </>
-              )}
-
-              {/* ── Open card: Body / Extended body ── */}
-              {(activeEditEl.type === 'body' || activeEditEl.type === 'extendedBody') && (
-                <>
-                  <span className="cs-mobile-edit-label">Text</span>
-                  <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.bodySize', Math.max(10, (c.theme.bodySize ?? 16) - 1))}>A−</button>
-                  <span className="cs-mobile-edit-size-val">{c.theme.bodySize ?? 16}</span>
-                  <button type="button" className="cs-mobile-edit-btn" onClick={() => update('theme.bodySize', Math.min(28, (c.theme.bodySize ?? 16) + 1))}>A+</button>
-                  <InlineColorPicker value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} presets={colorPresets} label="Color" />
-                  <InlineColorPicker value={c.card.backgroundColor || '#07111a'} onChange={e => update('card.backgroundColor', e.target.value)} presets={colorPresets} label="Card BG" />
-                  <InlineColorPicker value={c.theme.accentColor || '#7ef7ff'} onChange={e => update('theme.accentColor', e.target.value)} presets={colorPresets} label="Accent" />
-                  <span className="cs-mobile-edit-sep" />
-                  <span className="cs-mobile-edit-label" style={{ fontSize: '0.7rem' }}>Font</span>
-                  {availableFonts.slice(0, 8).map(f => (
-                    <button
-                      key={f}
-                      type="button"
-                      className={`cs-mobile-font-chip${c.theme.fontFamily === f ? ' active' : ''}`}
-                      style={{ fontFamily: `'${f}', serif` }}
-                      onClick={() => update('theme.fontFamily', f)}
-                    >{f.split(' ')[0]}</button>
-                  ))}
-                </>
-              )}
-
-              {/* ── Image ── */}
+              {/* Image controls */}
               {activeEditEl.type === 'image' && (() => {
                 const img = c.media.images[activeEditEl.index]
                 if (!img) return null
                 return (
                   <>
-                    <span className="cs-mobile-edit-label">Image</span>
-                    <select
-                      className="cs-mobile-edit-select"
-                      value={img.fit || 'cover'}
-                      onChange={e => updateImageSetting(activeEditEl.index, 'fit', e.target.value)}
-                    >
+                    <select className="cs-m2-select" value={img.fit || 'cover'} onChange={e => updateImageSetting(activeEditEl.index, 'fit', e.target.value)}>
                       <option value="cover">Cover</option>
                       <option value="contain">Contain</option>
                       <option value="fill">Fill</option>
                     </select>
-                    <span className="cs-mobile-edit-sep" />
-                    <div className="cs-mobile-edit-slider-wrap">
-                      <span className="cs-mobile-edit-color-label">X {Math.round(img.positionX ?? 50)}%</span>
-                      <input
-                        type="range" min="0" max="100" step="1"
-                        className="cs-mobile-edit-slider"
-                        value={img.positionX ?? 50}
-                        onChange={e => updateImageSetting(activeEditEl.index, 'positionX', Number(e.target.value))}
-                      />
-                    </div>
-                    <div className="cs-mobile-edit-slider-wrap">
-                      <span className="cs-mobile-edit-color-label">Y {Math.round(img.positionY ?? 50)}%</span>
-                      <input
-                        type="range" min="0" max="100" step="1"
-                        className="cs-mobile-edit-slider"
-                        value={img.positionY ?? 50}
-                        onChange={e => updateImageSetting(activeEditEl.index, 'positionY', Number(e.target.value))}
-                      />
-                    </div>
-                    <div className="cs-mobile-edit-slider-wrap">
-                      <span className="cs-mobile-edit-color-label">H {img.height ?? 200}px</span>
-                      <input
-                        type="range" min="80" max="400" step="10"
-                        className="cs-mobile-edit-slider"
-                        value={img.height ?? 200}
-                        onChange={e => updateImageSetting(activeEditEl.index, 'height', Number(e.target.value))}
-                      />
-                    </div>
-                    <button type="button" className="cs-mobile-edit-btn cs-mobile-edit-remove" onClick={() => { removeImage(activeEditEl.index); setActiveEditEl(null) }}>Remove</button>
+                    <span className="cs-m2-ctrl-sep" />
+                    <span className="cs-m2-slider-label">X</span>
+                    <input type="range" min="0" max="100" value={img.positionX ?? 50} className="cs-m2-slider" onChange={e => updateImageSetting(activeEditEl.index, 'positionX', Number(e.target.value))} />
+                    <span className="cs-m2-ctrl-sep" />
+                    <button type="button" className="cs-m2-remove-btn" onClick={() => { removeImage(activeEditEl.index); setActiveEditEl(null) }}>Remove</button>
                   </>
                 )
               })()}
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* ── Step tabs ── */}
+            <div className="cs-m2-step-tabs">
+              {studioSteps.filter(s => s !== 'preview').map((step, i) => {
+                const icon = step === 'closed' ? '✉' : step === 'questions' ? '💬' : '□'
+                return (
+                  <button key={step} type="button" className={`cs-m2-step-tab${activeStep === step ? ' active' : ''}`} onClick={() => goToStep(step)}>
+                    <span className="cs-m2-step-num">0{i + 1}</span>
+                    <span className="cs-m2-step-icon">{icon}</span>
+                    <span className="cs-m2-step-label">{stepLabels[step] || step}</span>
+                  </button>
+                )
+              })}
+            </div>
 
+            {/* ── Bottom toolbar ── */}
+            <div className="cs-m2-toolbar">
+              {[
+                { id: 'content', label: 'Content', icon: 'T' },
+                { id: 'style',   label: 'Style',   icon: '◐' },
+                { id: 'layers',  label: 'Layers',  icon: '⊞' },
+                { id: 'more',    label: 'More',    icon: '···' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`cs-m2-tool-tab${mobileBottomSheet === tab.id ? ' active' : ''}`}
+                  onClick={() => setMobileBottomSheet(prev => prev === tab.id ? null : tab.id)}
+                >
+                  <span className="cs-m2-tool-icon">{tab.icon}</span>
+                  <span className="cs-m2-tool-label">{tab.label}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                className="cs-m2-send-btn"
+                disabled={isSending}
+                onClick={isArtist ? () => setShowPublish(true) : handleSendClick}
+              >
+                <span className="cs-m2-send-arrow">▷</span>
+                <span>{isArtist ? 'Publish' : tierCost > 0 ? `Send ${tierCost}cc` : 'Send'}</span>
+              </button>
+            </div>
+          </>
+        )}
 
-            </div>{/* end .cs-mobile-edit-scroll */}
-            <button type="button" className="cs-mobile-edit-done" onClick={() => setActiveEditEl(null)}>Done</button>
+        {/* ── Bottom sheets ── */}
+        {mobileBottomSheet && !activeEditEl && (
+          <div className="cs-m2-sheet-wrap">
+            <div className="cs-m2-sheet-backdrop" onClick={() => setMobileBottomSheet(null)} />
+            <div className="cs-m2-sheet">
+              <div className="cs-m2-sheet-handle" />
+
+              {/* Style & Palette sheet */}
+              {mobileBottomSheet === 'style' && (
+                <>
+                  <div className="cs-m2-sheet-header">
+                    <h3 className="cs-m2-sheet-title">Style <em>& palette</em></h3>
+                    <button type="button" className="cs-m2-sheet-close" onClick={() => setMobileBottomSheet(null)}>×</button>
+                  </div>
+                  <div className="cs-m2-sheet-tab-row">
+                    {['Palette', 'Typography', 'Texture', 'Border'].map(t => (
+                      <button key={t} type="button" className={`cs-m2-sheet-tab${mobileStyleTab === t ? ' active' : ''}`} onClick={() => setMobileStyleTab(t)}>
+                        {t}{t === 'Texture' && ' ★'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="cs-m2-sheet-body">
+                    {mobileStyleTab === 'Palette' && (
+                      <>
+                        <div className="cs-m2-section-hd">
+                          <span>CURATED PALETTES</span>
+                          <button type="button" className="cs-m2-reset-btn" onClick={() => update('palette.id', null)}>Reset</button>
+                        </div>
+                        <div className="cs-m2-palette-row">
+                          {availablePalettes.map(p => (
+                            <button key={p.id} type="button" className={`cs-m2-palette-item${c.palette.id === p.id ? ' active' : ''}`}
+                              onClick={() => setCardObject(prev => applyPalette(p, prev))}>
+                              <div className="cs-m2-palette-preview">
+                                <span className="cs-m2-pal-swatch" style={{ background: p.surface }} />
+                                <span className="cs-m2-pal-swatch" style={{ background: p.primary }} />
+                                <span className="cs-m2-pal-swatch" style={{ background: p.accent }} />
+                              </div>
+                              <span className="cs-m2-palette-label">{p.label}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="cs-m2-section-hd"><span>ACCENT METAL</span></div>
+                        <div className="cs-m2-dot-row">
+                          {['#c9a96e', '#b89cf0', '#62ffa2', '#ff9bd2', '#7ef7ff', '#ff6b6b', '#ffaa22'].map(col => (
+                            <button key={col} type="button" className={`cs-m2-dot-lg${c.palette.primary === col ? ' active' : ''}`} style={{ background: col }} onClick={() => update('palette.primary', col)} />
+                          ))}
+                        </div>
+
+                        <div className="cs-m2-section-hd"><span>CARD SURFACE</span></div>
+                        <div className="cs-m2-surface-grid">
+                          {['#0b0f12','#0f1117','#1a1410','#0c1a13','#0a1922','#3d2a1a',
+                            '#faf6ef','#f5f0e8','#e8edf2','#d8e8f0','#e8e0f0','#0a0a0a'].map(col => (
+                            <button key={col} type="button" className={`cs-m2-surface-dot${c.card.backgroundColor === col ? ' active' : ''}`} style={{ background: col }} onClick={() => update('card.backgroundColor', col)} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {mobileStyleTab === 'Typography' && (
+                      <>
+                        <div className="cs-m2-section-hd"><span>FONT FAMILY</span></div>
+                        <div className="cs-m2-font-row">
+                          {availableFonts.map(f => (
+                            <button key={f} type="button" className={`cs-m2-font-chip${c.theme.fontFamily === f ? ' active' : ''}`}
+                              style={{ fontFamily: `'${f}', serif` }} onClick={() => update('theme.fontFamily', f)}>
+                              {f.split(' ')[0]}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="cs-m2-section-hd" style={{ marginTop: 16 }}><span>HEADING</span></div>
+                        <div className="cs-m2-size-row">
+                          <button type="button" className="cs-m2-sz-btn" onClick={() => update('theme.headingSize', Math.max(14, (c.theme.headingSize ?? 28) - 2))}>A−</button>
+                          <span className="cs-m2-sz-val">{c.theme.headingSize ?? 28}</span>
+                          <button type="button" className="cs-m2-sz-btn" onClick={() => update('theme.headingSize', Math.min(56, (c.theme.headingSize ?? 28) + 2))}>A+</button>
+                        </div>
+                        <div className="cs-m2-section-hd" style={{ marginTop: 12 }}><span>BODY TEXT</span></div>
+                        <div className="cs-m2-size-row">
+                          <button type="button" className="cs-m2-sz-btn" onClick={() => update('theme.bodySize', Math.max(10, (c.theme.bodySize ?? 16) - 1))}>A−</button>
+                          <span className="cs-m2-sz-val">{c.theme.bodySize ?? 16}</span>
+                          <button type="button" className="cs-m2-sz-btn" onClick={() => update('theme.bodySize', Math.min(28, (c.theme.bodySize ?? 16) + 1))}>A+</button>
+                        </div>
+                      </>
+                    )}
+                    {mobileStyleTab === 'Border' && (
+                      <>
+                        <div className="cs-m2-section-hd"><span>BORDER STYLE</span></div>
+                        <div className="cs-m2-chip-row">
+                          {['none', 'solid', 'gradient', 'animated'].map(type => (
+                            <button key={type} type="button" className={`cs-m2-chip${c.card.cardBorder.type === type ? ' active' : ''}`} onClick={() => update('card.cardBorder.type', type)}>
+                              {type.charAt(0).toUpperCase() + type.slice(1)}
+                            </button>
+                          ))}
+                        </div>
+                        {c.card.cardBorder.type !== 'none' && (
+                          <>
+                            <div className="cs-m2-section-hd" style={{ marginTop: 14 }}><span>BORDER COLOR</span></div>
+                            <div className="cs-m2-dot-row">
+                              {colorPresets.map((col, i) => (
+                                <button key={i} type="button" className={`cs-m2-dot-lg${c.card.cardBorder.colors?.[0] === col ? ' active' : ''}`} style={{ background: col }} onClick={() => update('card.cardBorder.colors', [col, c.card.cardBorder.colors?.[1] || col])} />
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                    {mobileStyleTab === 'Texture' && (
+                      <p className="cs-m2-coming-soon">Paper textures — coming soon</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Content sheet: shows the active sidebar panel */}
+              {mobileBottomSheet === 'content' && (
+                <>
+                  <div className="cs-m2-sheet-header">
+                    <h3 className="cs-m2-sheet-title">Content</h3>
+                    <button type="button" className="cs-m2-sheet-close" onClick={() => setMobileBottomSheet(null)}>×</button>
+                  </div>
+                  <div className="cs-m2-sheet-body">
+                    {renderPanel()}
+                  </div>
+                </>
+              )}
+
+              {/* Layers sheet */}
+              {mobileBottomSheet === 'layers' && (
+                <>
+                  <div className="cs-m2-sheet-header">
+                    <h3 className="cs-m2-sheet-title">Layers</h3>
+                    <button type="button" className="cs-m2-sheet-close" onClick={() => setMobileBottomSheet(null)}>×</button>
+                  </div>
+                  <div className="cs-m2-sheet-body">
+                    <div className="cs-m2-layers-list">
+                      {TOOL_GROUP_ORDER.flatMap(group => activeTools.filter(t => t.group === group)).map(tool => {
+                        const Icon = tool.icon
+                        return (
+                          <button key={tool.id} type="button" className={`cs-m2-layer-row${activeTool === tool.id ? ' active' : ''}`}
+                            onClick={() => { setActiveTool(tool.id); setMobileBottomSheet('content') }}>
+                            <Icon size={16} />
+                            <span className="cs-m2-layer-name">{tool.label}</span>
+                            <span className="cs-m2-layer-hint">{tool.hint}</span>
+                            <span className="cs-m2-layer-arrow">›</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* More sheet */}
+              {mobileBottomSheet === 'more' && (
+                <>
+                  <div className="cs-m2-sheet-header">
+                    <h3 className="cs-m2-sheet-title">More</h3>
+                    <button type="button" className="cs-m2-sheet-close" onClick={() => setMobileBottomSheet(null)}>×</button>
+                  </div>
+                  <div className="cs-m2-sheet-body">
+                    <div className="cs-m2-more-list">
+                      <button type="button" className="cs-m2-more-row" onClick={enterPreview}>
+                        <span className="cs-m2-more-icon">👁</span>
+                        <div>
+                          <div className="cs-m2-more-label">Preview Card</div>
+                          <div className="cs-m2-more-desc">See the full recipient experience</div>
+                        </div>
+                      </button>
+                      <button type="button" className="cs-m2-more-row" onClick={() => { handleSave(); setMobileBottomSheet(null) }}>
+                        <span className="cs-m2-more-icon">💾</span>
+                        <div>
+                          <div className="cs-m2-more-label">Save Draft</div>
+                          <div className="cs-m2-more-desc">{savedState}</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Slim bottom bar: Tools button only (state nav is at top) */}
-        <div className="cs-mobile-bottom-bar">
-          <button type="button" className="cs-mobile-tools-btn" onClick={() => setMobilePanelOpen(true)}>
-            <HiOutlineSparkles size={16} />
-            <span>Tools &amp; Settings</span>
-          </button>
-        </div>
-
-        {/* Footer */}
-        <div className="cs-mobile-footer">
-          <button type="button" className="cs-mobile-ghost" onClick={enterPreview}>
-            <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 4 }} /> Preview
-          </button>
-          {isArtist ? (
-            <button type="button" className="cs-mobile-primary" onClick={() => setShowPublish(true)}>Publish</button>
-          ) : (
-            <button
-              type="button"
-              className={`cs-mobile-primary${isSending ? ' disabled' : ''}`}
-              disabled={isSending}
-              onClick={handleSendClick}
-            >
-              {isSending ? 'Sending…' : 'Send Now'}
-            </button>
-          )}
-        </div>
-
-        {/* Tool panel bottom sheet */}
+        {/* ───────────── Legacy panel sheet (kept for back-compat) ──────────── */}
         {mobilePanelOpen && (
           <div className="cs-mobile-panel-sheet">
             <div className="cs-mobile-panel-backdrop" onClick={() => setMobilePanelOpen(false)} />
@@ -3457,7 +3626,7 @@ function CardStudio() {
 
             {!isSending && (
             <p className="cs-send-modal-tier-note">
-              {typeMeta.emoji} {TYPE_LABEL[studioType] || 'Card'} · {tierLabel} tier
+              <typeMeta.Icon size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} /> {TYPE_LABEL[studioType] || 'Card'} · {tierLabel} tier
             </p>
             )}
           </div>
