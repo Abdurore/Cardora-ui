@@ -1,4 +1,4 @@
-import { backfillEnvelope } from '../data/cardDefaults.js'
+import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
 
 const ROLE_MAP = {
   admin: 'Admin',
