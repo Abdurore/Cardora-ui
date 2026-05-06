@@ -10261,6 +10261,7 @@ a {
     min-height: 100dvh;
     border-radius: 0;
     box-shadow: none;
+    border: none !important;
   }
 
   .cp-card-inner-full {

@@ -873,25 +873,51 @@ function CardPreviewModal({
             style={cardSurfaceStyle(borderStyle)}
           >
             <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>✓</div>
-            <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
-              Card Complete
-            </h3>
-            <p style={{ color: c.card.textColor }}>
-              This is how the recipient will experience your card.
-            </p>
-            <div className="cp-end-actions">
-              {hasGift && (
-                <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleEndDone}>
-                  Continue
-                </button>
-              )}
-              <button className="cp-end-btn" style={{ backgroundColor: hasGift ? 'transparent' : c.theme.accentColor, color: hasGift ? c.theme.accentColor : c.card.backgroundColor, border: hasGift ? `1.5px solid ${c.theme.accentColor}` : 'none' }} onClick={handleReset}>
-                Replay
-              </button>
-              <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={onClose}>
-                Back to Editor
-              </button>
-            </div>
+            {pageMode ? (
+              <>
+                <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                  That's the whole card
+                </h3>
+                <p style={{ color: c.card.textColor, opacity: 0.65, fontSize: '0.9rem' }}>
+                  Made with Cardora
+                </p>
+                <div className="cp-end-actions">
+                  {hasGift && (
+                    <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleEndDone}>
+                      Continue
+                    </button>
+                  )}
+                  <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleReset}>
+                    Replay
+                  </button>
+                  <a className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href="/studio">
+                    Create yours →
+                  </a>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                  Card Complete
+                </h3>
+                <p style={{ color: c.card.textColor }}>
+                  This is how the recipient will experience your card.
+                </p>
+                <div className="cp-end-actions">
+                  {hasGift && (
+                    <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleEndDone}>
+                      Continue
+                    </button>
+                  )}
+                  <button className="cp-end-btn" style={{ backgroundColor: hasGift ? 'transparent' : c.theme.accentColor, color: hasGift ? c.theme.accentColor : c.card.backgroundColor, border: hasGift ? `1.5px solid ${c.theme.accentColor}` : 'none' }} onClick={handleReset}>
+                    Replay
+                  </button>
+                  <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={onClose}>
+                    Back to Editor
+                  </button>
+                </div>
+              </>
+            )}
           </article>
         </div>
       )}
@@ -949,16 +975,22 @@ function CardPreviewModal({
               <button
                 className="cp-end-btn"
                 style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                onClick={() => { /* Dummy â€” future: claim via backend */ }}
+                onClick={() => { /* future: claim via backend */ }}
               >
                 Claim Gift
               </button>
               <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={handleReset}>
                 Replay
               </button>
-              <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={onClose}>
-                Back to Editor
-              </button>
+              {pageMode ? (
+                <a className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href="/studio">
+                  Create yours →
+                </a>
+              ) : (
+                <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={onClose}>
+                  Back to Editor
+                </button>
+              )}
             </div>
           </article>
         </div>
