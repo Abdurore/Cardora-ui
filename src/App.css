@@ -3988,20 +3988,54 @@
   color: #e9fbff;
 }
 
-.card-view {
-  min-height: 100dvh;
-  width: 100%;
+/* Card view page — loading / error / gate states */
+.cv-page-loading {
+  position: fixed;
+  inset: 0;
+  background: #080e14;
   display: flex;
   flex-direction: column;
-  gap: 20px;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px 80px;
-  background: radial-gradient(circle at top, rgba(98, 255, 162, 0.08), transparent 55%),
-    linear-gradient(160deg, rgba(6, 12, 16, 0.96), rgba(10, 18, 24, 0.98));
-  border-radius: 32px;
-  position: relative;
-  overflow: hidden;
+  gap: 12px;
+  color: rgba(220, 242, 247, 0.7);
+  z-index: 5000;
+}
+
+.cv-page-gate {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 12, 0.97);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5000;
+  padding: 24px;
+}
+
+.cv-gate-card {
+  background: rgba(14, 22, 30, 0.95);
+  border: 1px solid rgba(126, 247, 255, 0.14);
+  border-radius: 24px;
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(420px, 100%);
+  text-align: center;
+}
+
+.cv-gate-lock { font-size: 2.2rem; }
+
+.cv-gate-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(126, 247, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2eaf0;
+  font-size: 1rem;
 }
 
 .card-view-top {
@@ -9540,6 +9574,12 @@ a {
   border-color: rgba(255, 255, 255, 0.3);
   color: #ffffff;
   transform: scale(1.1);
+}
+
+/* Back arrow variant — left side when in page mode */
+.cp-back-btn {
+  right: auto;
+  left: 18px;
 }
 
 .cp-reset-btn {

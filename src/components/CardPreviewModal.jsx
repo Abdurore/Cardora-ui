@@ -36,6 +36,11 @@ function CardPreviewModal({
   pollData = null,
   triviaData = null,
   anonTemplate = null,
+  pageMode = false,
+  onPollSubmit = null,
+  onTriviaComplete = null,
+  onChainReply = null,
+  onQuestionResponse = null,
 }) {
   // `allowedTools` gates tool visibility; `tierLimits` caps the content a
   // visible tool is allowed to contribute (e.g. music allowed, images > 1).
@@ -376,27 +381,29 @@ function CardPreviewModal({
     : studioType === 'anonymous' ? 'Preview Inbox'
     : hasQuestions ? 'Continue' : 'Done'
 
-  return createPortal(
-    <section className={`cp-overlay cp-device-${previewDevice}`} ref={containerRef}>
-      <div className="cp-device-toolbar" role="tablist" aria-label="Preview device">
-        {[
-          { id: 'fullscreen', label: 'Full' },
-          { id: 'phone', label: 'Phone' },
-          { id: 'tablet', label: 'Tablet' },
-          { id: 'desktop', label: 'Desktop' },
-        ].map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={previewDevice === id}
-            className={`cp-device-tab ${previewDevice === id ? 'active' : ''}`}
-            onClick={() => setPreviewDevice(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+  const inner = (
+    <section className={`cp-overlay cp-device-${pageMode ? 'fullscreen' : previewDevice}`} ref={containerRef}>
+      {!pageMode && (
+        <div className="cp-device-toolbar" role="tablist" aria-label="Preview device">
+          {[
+            { id: 'fullscreen', label: 'Full' },
+            { id: 'phone', label: 'Phone' },
+            { id: 'tablet', label: 'Tablet' },
+            { id: 'desktop', label: 'Desktop' },
+          ].map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={previewDevice === id}
+              className={`cp-device-tab ${previewDevice === id ? 'active' : ''}`}
+              onClick={() => setPreviewDevice(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className={`cp-backdrop${c.background.type === 'animated' ? ' animated' : ''}`} style={bgStyle}>
         {c.background.type === 'video' && c.background.videoUrl && limit('allowVideoBackground') ? (
           <video className="cp-backdrop-video" src={c.background.videoUrl} autoPlay muted loop playsInline />
@@ -413,14 +420,20 @@ function CardPreviewModal({
         <audio ref={audioRef} src={c.background.music.url} loop preload="auto" />
       )}
 
-      <div className="cp-close-btn" onClick={onClose}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
+      <div className={`cp-close-btn ${pageMode ? 'cp-back-btn' : ''}`} onClick={onClose}>
+        {pageMode ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        )}
       </div>
 
-      {/* Reset button */}
-      {stage !== 'closed' && (
+      {/* Reset button — studio only */}
+      {!pageMode && stage !== 'closed' && (
         <button className="cp-reset-btn" onClick={handleReset}>
           Reset
         </button>
@@ -616,7 +629,17 @@ function CardPreviewModal({
                       className="cp-poll-submit"
                       style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
                       disabled={previewPollVotes.length === 0}
-                      onClick={() => setPreviewPollSubmitted(true)}
+                      onClick={() => {
+                        setPreviewPollSubmitted(true)
+                        if (onPollSubmit) {
+                          const opts = pollData?.options || []
+                          const optId = previewPollVotes.map(i => {
+                            const o = opts[i]
+                            return typeof o === 'object' ? o.id : `opt_${i}`
+                          })[0]
+                          onPollSubmit(optId)
+                        }
+                      }}
                     >
                       Submit Vote
                     </button>
@@ -692,6 +715,7 @@ function CardPreviewModal({
                         setPreviewTriviaIdx(i => i + 1)
                       } else {
                         setStage('triviaResults')
+                        if (onTriviaComplete) onTriviaComplete(previewTriviaAnswers)
                       }
                     }}
                   >
@@ -939,9 +963,10 @@ function CardPreviewModal({
           </article>
         </div>
       )}
-    </section>,
-    document.body
+    </section>
   )
+
+  return pageMode ? inner : createPortal(inner, document.body)
 }
 
 export default CardPreviewModal
