@@ -947,7 +947,7 @@ function CardPreviewModal({
       {stage === 'giftIntro' && (
         <div className="cp-card-wrap cp-card-wrap-full">
           <article className="cp-card cp-card-full cp-gift-intro" style={cardSurfaceStyle(borderStyle)}>
-            <div className="cp-gift-sparkle">ðŸŽ</div>
+            <div className="cp-gift-sparkle">Gift</div>
             <h3 className="cp-gift-intro-heading" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               Wait... there's more
             </h3>
@@ -980,7 +980,7 @@ function CardPreviewModal({
       {stage === 'giftReceive' && (
         <div className="cp-card-wrap cp-card-wrap-full">
           <article className="cp-card cp-card-full cp-gift-receive" style={cardSurfaceStyle(borderStyle)}>
-            <div className="cp-gift-received-icon">ðŸŽ‰</div>
+            <div className="cp-gift-received-icon">Gift</div>
             <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
               You received a gift!
             </h3>
@@ -996,7 +996,7 @@ function CardPreviewModal({
               <button
                 className="cp-end-btn"
                 style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                onClick={() => { /* Dummy â€” future: claim via backend */ }}
+                onClick={() => { /* Future: claim via backend */ }}
               >
                 Claim Gift
               </button>

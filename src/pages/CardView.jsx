@@ -12,6 +12,39 @@ import { shouldShowEnvelope } from '../lib/tierLimits.js'
 const fallbackMusic =
   'data:audio/wav;base64,UklGRjQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA='
 
+const CARD_TYPE_VIEW = {
+  personal: {
+    label: 'Personal Card',
+    eyebrow: 'A message made for you',
+    titleFallback: 'A moment for you',
+    intro: 'Read the note, then respond when you are ready.',
+  },
+  poll: {
+    label: 'Poll Card',
+    eyebrow: 'Cast your vote',
+    titleFallback: 'Choose your answer',
+    intro: 'Pick an option and see how the room is leaning.',
+  },
+  trivia: {
+    label: 'Trivia Card',
+    eyebrow: 'Play the challenge',
+    titleFallback: 'Test your knowledge',
+    intro: 'Answer each question and reveal your score at the end.',
+  },
+  chain: {
+    label: 'Chain Card',
+    eyebrow: 'Keep the chain going',
+    titleFallback: 'Reply with your own message',
+    intro: 'Read the prompt, add your response, and pass the moment forward.',
+  },
+  anonymous: {
+    label: 'Anonymous Inbox',
+    eyebrow: 'Send without your name',
+    titleFallback: 'Anonymous messages are open',
+    intro: 'This card is an inbox. Use the anonymous link to leave a private note.',
+  },
+}
+
 function CardView() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -87,7 +120,7 @@ function CardView() {
           if (!cancelled) return
         }
         console.warn('[CardView] Fetch failed:', err.status, err.message)
-        setFetchError(err.status ? `${err.status} — ${err.message}` : err.message)
+        setFetchError(err.status ? `${err.status} - ${err.message}` : err.message)
         // Fall through to local lookup
       }
 
@@ -146,6 +179,9 @@ function CardView() {
   const primaryImage = layout?.media?.images?.[0] || null
   const rawCardType = (card?.type || layout?.type || (poll ? 'poll' : trivia ? 'trivia' : chain ? 'chain' : 'personal')).toLowerCase()
   const cardType = rawCardType === 'standard' || rawCardType === 'moment' ? 'personal' : rawCardType
+  const typeView = CARD_TYPE_VIEW[cardType] || CARD_TYPE_VIEW.personal
+  const ownerUsername = card?.ownerUsername || card?.username || card?.createdBy?.username || card?.user?.username || card?.recipient || ''
+  const anonymousLink = ownerUsername ? `/ask/${String(ownerUsername).replace(/^@/, '')}` : '/inbox'
   const accentColor = layout?.theme?.accentColor || '#76efff'
   const cardTextColor = layout?.card?.textColor || '#edf8ff'
   const cardHeadingColor = layout?.card?.headingColor || '#ffffff'
@@ -161,7 +197,7 @@ function CardView() {
     try {
       await submitCardResponse(card.slug || id, { response, password: passwordInput || undefined })
       setResponseSubmitted(true)
-      setInteractionMsg(response === 'yes' ? 'Thank you! ðŸ’›' : 'Response noted.')
+      setInteractionMsg(response === 'yes' ? 'Thank you!' : 'Response noted.')
     } catch (err) {
       setInteractionMsg(err.message || 'Could not submit response.')
     }
@@ -294,7 +330,7 @@ function CardView() {
     return (
       <div className="card-view">
         <div className="card-view-empty card-password-gate">
-          <span className="card-lock-icon">ðŸ”’</span>
+          <span className="card-lock-icon">Lock</span>
           <h2>This card is locked</h2>
           <p>Enter the password to view this card.</p>
           <input
@@ -333,7 +369,7 @@ function CardView() {
   }
 
   return (
-    <div className={`card-view tier-${tierInfo.key}`}>
+    <div className={`card-view tier-${tierInfo.key} card-view-${cardType}`}>
       <div className="card-view-top">
         <Link className="ghost" to="/">
           Back Home
@@ -399,9 +435,13 @@ function CardView() {
               <div className="card-open-content">
                 <div className="card-open-meta-row">
                   <p className="entry-sub">To {card.recipient || 'You'}</p>
-                  <span className="cv-type-chip">{cardType === 'personal' ? 'Personal Card' : cardType === 'poll' ? 'Poll Card' : cardType === 'trivia' ? 'Trivia Card' : cardType === 'chain' ? 'Chain Card' : 'Card Experience'}</span>
+                  <span className="cv-type-chip">{typeView.label}</span>
                 </div>
-                <h3 style={{ color: cardHeadingColor }}>{card.subtitle || heading}</h3>
+                <div className="cv-recipient-intro">
+                  <p className="cv-type-eyebrow" style={{ color: accentColor }}>{typeView.eyebrow}</p>
+                  <h3 style={{ color: cardHeadingColor }}>{heading || card.subtitle || typeView.titleFallback}</h3>
+                  <p style={{ color: cardTextColor }}>{typeView.intro}</p>
+                </div>
 
                 {primaryImage ? (
                   <div className="card-open-hero-media">
@@ -416,8 +456,9 @@ function CardView() {
                   </div>
                 ) : null}
 
-                <div className="card-open-message" style={{ color: cardTextColor }}>
-                  {tierInfo.key === 'signature' ? (
+                {cardType !== 'anonymous' && (
+                  <div className="card-open-message" style={{ color: cardTextColor }}>
+                    {tierInfo.key === 'signature' ? (
                     messageLines.map((line, index) => (
                       <motion.p
                         key={`line-${index}`}
@@ -428,7 +469,7 @@ function CardView() {
                         {line}
                       </motion.p>
                     ))
-                  ) : (
+                    ) : (
                     <motion.p
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -436,8 +477,8 @@ function CardView() {
                     >
                       {body || card.message}
                     </motion.p>
-                  )}
-                  {extendedBody && (
+                    )}
+                    {extendedBody && (
                     <motion.p
                       className="card-extended-body"
                       initial={{ opacity: 0 }}
@@ -446,8 +487,9 @@ function CardView() {
                     >
                       {extendedBody}
                     </motion.p>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 {backgroundMusic ? (
                   <div className="music-row">
@@ -468,7 +510,24 @@ function CardView() {
                   </div>
                 ) : null}
 
-                {!responseSubmitted && !poll && !chain && !trivia && (
+                {cardType === 'anonymous' && (
+                  <div className="cv-type-section cv-anonymous-section">
+                    <p className="cv-type-eyebrow" style={{ color: accentColor }}>Anonymous Inbox</p>
+                    <h4 className="cv-anonymous-heading">{card.anonymous?.message || body || 'Leave an anonymous note.'}</h4>
+                    <p className="cv-anonymous-copy">
+                      Your identity is not shown to the recipient. Open the inbox link, write the message, and Cardora delivers it privately.
+                    </p>
+                    <Link
+                      className="cv-anonymous-submit"
+                      to={anonymousLink}
+                      style={{ background: `linear-gradient(135deg, ${accentColor}, rgba(255,255,255,0.9))`, color: '#041015' }}
+                    >
+                      Send Anonymous Message
+                    </Link>
+                  </div>
+                )}
+
+                {cardType === 'personal' && !responseSubmitted && !poll && !chain && !trivia && (
                   <div className="experience-questions cv-type-section">
                     <p className="cv-type-eyebrow" style={{ color: accentColor }}>Interactive Moment</p>
                     <div className="question-actions">
@@ -580,7 +639,7 @@ function CardView() {
 
                 {interactionMsg && <p className="cv-interaction-msg">{interactionMsg}</p>}
 
-                {questions.length > 0 && (
+                {cardType === 'personal' && questions.length > 0 && (
                   <div className="experience-questions cv-type-section">
                     <p className="cv-type-eyebrow" style={{ color: accentColor }}>Questions for you</p>
                     {questions.map((q, i) => (

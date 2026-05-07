@@ -28,6 +28,7 @@ function CardItem({
   onClick,
   isFavorite,
   onToggleFavorite,
+  showTypeBadge = true,
 }) {
   const tierInfo = getTierInfo(tier)
   const audienceCount = String(meta || '').replace(/views?/i, '').trim()
@@ -65,7 +66,7 @@ function CardItem({
         <div className="card-thumb-aura" />
       </div>
 
-      {TYPE_BADGE[type] && (
+      {showTypeBadge && TYPE_BADGE[type] && (
         <span className={`card-type-badge ${TYPE_BADGE[type].cls}`}>
           {TYPE_BADGE[type].label}
         </span>

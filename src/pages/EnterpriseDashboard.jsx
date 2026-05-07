@@ -2,14 +2,16 @@ import { useOutletContext, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
-import { getEnterpriseAdStats } from '../lib/api.js'
+import { getEnterpriseAdStats, updateEnterpriseAd } from '../lib/api.js'
 
 function EnterpriseDashboard() {
   const { currentUser, balance, openAuthModal } = useOutletContext()
   const navigate = useNavigate()
   const [stats, setStats] = useState(null)
+  const [ads, setAds] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [updatingAdId, setUpdatingAdId] = useState('')
 
   const isEnterprise = currentUser?.role === 'Enterprise'
 
@@ -17,10 +19,33 @@ function EnterpriseDashboard() {
     if (!isEnterprise) return
     setLoading(true)
     getEnterpriseAdStats()
-      .then(res => setStats(res?.data || res))
+      .then(res => {
+        const payload = res?.data || res
+        setStats(payload)
+        setAds(payload?.ads || [])
+      })
       .catch(err => setError(err?.message || 'Failed to load stats.'))
       .finally(() => setLoading(false))
   }, [isEnterprise])
+
+  const handleToggleAd = async (ad) => {
+    const adId = ad._id || ad.id || ad.adId
+    if (!adId) return
+    const nextActive = !(ad.active || ad.isActive)
+    setUpdatingAdId(adId)
+    setError('')
+    try {
+      await updateEnterpriseAd(adId, { isActive: nextActive, active: nextActive })
+      setAds(prev => prev.map(item => {
+        const itemId = item._id || item.id || item.adId
+        return itemId === adId ? { ...item, isActive: nextActive, active: nextActive } : item
+      }))
+    } catch (err) {
+      setError(err?.message || 'Could not update this ad.')
+    } finally {
+      setUpdatingAdId('')
+    }
+  }
 
   if (!isEnterprise) {
     return (
@@ -39,7 +64,6 @@ function EnterpriseDashboard() {
   }
 
   const adStats = stats?.stats || stats?.adStats || stats
-  const ads = stats?.ads || []
 
   return (
     <div className="page-body">
@@ -97,7 +121,7 @@ function EnterpriseDashboard() {
             {ads.length > 0 && (
               <div className="admin-section">
                 <h3 className="admin-section-title">Your Ads</h3>
-                <p className="admin-section-note">Read-only. Contact support to create or modify ads.</p>
+                <p className="admin-section-note">Toggle active status for ads assigned to your Enterprise account.</p>
                 <div className="admin-table-wrap">
                   <table className="admin-table">
                     <thead>
@@ -108,6 +132,7 @@ function EnterpriseDashboard() {
                         <th>Duration</th>
                         <th>Views / Max</th>
                         <th>Status</th>
+                        <th>Control</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -122,6 +147,18 @@ function EnterpriseDashboard() {
                             <span className={`admin-status-chip ${ad.active || ad.isActive ? 'open' : 'resolved'}`}>
                               {ad.active || ad.isActive ? 'Active' : 'Inactive'}
                             </span>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="admin-action-btn approve"
+                              onClick={() => handleToggleAd(ad)}
+                              disabled={updatingAdId === (ad._id || ad.id || ad.adId)}
+                            >
+                              {updatingAdId === (ad._id || ad.id || ad.adId)
+                                ? 'Saving...'
+                                : (ad.active || ad.isActive ? 'Pause' : 'Resume')}
+                            </button>
                           </td>
                         </tr>
                       ))}

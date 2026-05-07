@@ -1,16 +1,32 @@
-# React + Vite
+# Cardora UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Cardora UI is a Vite + React single-page app for creating, previewing, sharing, and managing interactive digital cards.
 
-Currently, two official plugins are available:
+## What Is Here
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `src/pages` contains route-level screens such as Home, Explore, Studio, Profile, Store, dashboards, chat, and card viewing.
+- `src/components` contains reusable UI and card-experience pieces such as modals, envelopes, reveal effects, navigation, and template cards.
+- `src/lib` contains API wrappers, backend mapping helpers, tier limits, palettes, Cloudinary helpers, and studio effects.
+- `src/data` contains local defaults and static content used by the studio and legal pages.
+- `Backend files` contains backend reference files copied into this project folder.
 
-## React Compiler
+There is also a separate sibling copy at `../preview shi/Cardora-ui`; treat `Cardora-ui` as the main working app unless you intentionally want to change the preview copy too.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Scripts
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev
+npm run build
+npm run lint
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Routes
+
+The app is routed from `src/App.jsx`. Main routes include `/`, `/explore`, `/store`, `/studio`, `/create`, `/profile`, `/chat`, `/inbox`, dashboard routes, and the public anonymous-send route `/ask/:username`.
+
+## Notes
+
+- The app currently builds successfully with Vite.
+- The production bundle is large enough to trigger Vite's chunk-size warning, so route-level code splitting is a good future improvement.
+- `src/App.css` is very large and mixes many page/component styles; splitting it by feature would make later UI work safer.
