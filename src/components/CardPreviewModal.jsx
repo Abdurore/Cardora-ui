@@ -5,8 +5,17 @@ import Envelope from './Envelope.jsx'
 import AmbientParticles from './AmbientParticles.jsx'
 import { fireOpenEffect } from '../lib/studioEffects.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
+import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
 
 const LEGACY_EMOJI_AMBIENTS = new Set(['floating', 'reverse'])
+
+const ENTRY_DEFAULTS = {
+  personal:  { label: 'Personal Card',   Icon: PersonalCardIcon, hint: 'Someone sent you a card',            color: '#e2b96e' },
+  poll:      { label: 'Poll Card',        Icon: PollCardIcon,     hint: "You've been asked to vote",          color: '#7eb3ff' },
+  trivia:    { label: 'Trivia Card',      Icon: TriviaCardIcon,   hint: "You've been challenged",             color: '#ffe066' },
+  chain:     { label: 'Chain Card',       Icon: ChainCardIcon,    hint: 'A chain was started for you',        color: '#62ffa2' },
+  anonymous: { label: 'Anonymous Card',   Icon: AnonCardIcon,     hint: 'Open to send an anonymous message',  color: '#c084fc' },
+}
 
 // Typewriter hook
 function useTypewriter(text, speed, active) {
@@ -37,6 +46,7 @@ function CardPreviewModal({
   triviaData = null,
   anonTemplate = null,
   pageMode = false,
+  cardTitle = '',
   onPollSubmit = null,
   onTriviaComplete = null,
   onChainReply = null,
@@ -50,7 +60,7 @@ function CardPreviewModal({
   const limit = (key, fallback = true) => (tierLimits ? !!tierLimits[key] : fallback)
   const maxImages = tierLimits ? (tierLimits.maxImages ?? Infinity) : Infinity
   const envelopeEnabled = shouldShowEnvelope(studioType)
-  const [stage, setStage] = useState(envelopeEnabled ? 'closed' : 'open')
+  const [stage, setStage] = useState(pageMode ? 'entry' : (envelopeEnabled ? 'closed' : 'open'))
   const [questionIdx, setQuestionIdx] = useState(0)
   const [fadeBody, setFadeBody] = useState(!envelopeEnabled)
   const [bodyVisible, setBodyVisible] = useState(!envelopeEnabled)
@@ -215,6 +225,16 @@ function CardPreviewModal({
       previewTimersRef.current = []
     }
   }, [])
+
+  const handleEntryOpen = () => {
+    if (envelopeEnabled) {
+      setStage('closed')
+    } else {
+      setFadeBody(true)
+      setBodyVisible(true)
+      setStage('open')
+    }
+  }
 
   const handleOpen = () => {
     previewTimersRef.current.forEach(window.clearTimeout)
@@ -483,7 +503,7 @@ function CardPreviewModal({
         ) : null}
       </div>
 
-      {stage !== 'closed' && (
+      {stage !== 'closed' && stage !== 'entry' && (
         <div className="cp-ambient-overlay" aria-hidden="true">
           {renderBgEffect()}
         </div>
@@ -493,7 +513,7 @@ function CardPreviewModal({
         <audio ref={audioRef} src={c.background.music.url} loop preload="auto" />
       )}
 
-      <div className={`cp-close-btn ${pageMode ? 'cp-back-btn' : ''}`} onClick={onClose}>
+      <div className={`cp-close-btn ${pageMode ? 'cp-back-btn' : ''} ${stage === 'entry' ? 'cp-close-btn-hidden' : ''}`} onClick={onClose}>
         {pageMode ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 5l-7 7 7 7" />
@@ -554,6 +574,69 @@ function CardPreviewModal({
           </div>
         </div>
       )}
+
+      {/* CINEMATIC ENTRY SCREEN — shown first in pageMode before the card opens */}
+      {stage === 'entry' && (() => {
+        const entryMeta = ENTRY_DEFAULTS[studioType] || ENTRY_DEFAULTS.personal
+        const EntryIcon = entryMeta.Icon
+        const bg = c.card.backgroundColor || '#0b0f14'
+        const accent = c.theme.accentColor || entryMeta.color
+        const g1 = c.theme?.palette?.gradient?.[0] || accent
+        const g2 = c.theme?.palette?.gradient?.[1] || bg
+        return (
+          <div
+            className="cp-entry-screen"
+            style={{ '--entry-bg': bg, '--entry-g1': g1, '--entry-g2': g2, '--entry-accent': accent }}
+          >
+            {/* Atmospheric orbs */}
+            <div className="cp-entry-orb cp-entry-orb-1" />
+            <div className="cp-entry-orb cp-entry-orb-2" />
+            <div className="cp-entry-orb cp-entry-orb-3" />
+
+            {/* Particle layer */}
+            <div className="cp-entry-particles" aria-hidden="true">
+              {renderBgEffect()}
+            </div>
+
+            {/* Center content */}
+            <div className="cp-entry-content">
+              <div className="cp-entry-brand">
+                <img src="/cardora-logo.png?v=4" alt="" className="cp-entry-brand-logo" />
+                <span className="cp-entry-brand-name">Cardora</span>
+              </div>
+
+              <div className="cp-entry-type-chip" style={{ color: accent, borderColor: `${accent}40` }}>
+                <EntryIcon size={14} color={accent} />
+                <span>{entryMeta.label}</span>
+              </div>
+
+              <h1
+                className="cp-entry-title"
+                style={{
+                  color: c.card.headingColor || '#ffffff',
+                  fontFamily: `'${c.theme.fontFamily}', serif`,
+                }}
+              >
+                {cardTitle || entryMeta.hint}
+              </h1>
+
+              <button
+                className="cp-entry-open-btn"
+                style={{ '--btn-color': accent }}
+                onClick={handleEntryOpen}
+              >
+                <span className="cp-entry-open-ring" />
+                <span className="cp-entry-open-ring cp-entry-open-ring-2" />
+                <span className="cp-entry-open-label">
+                  {studioType === 'anonymous' ? 'Open' : 'Open Card'}
+                </span>
+              </button>
+
+              <p className="cp-entry-tap-hint">tap to reveal</p>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ENVELOPE (closed state) — only Personal + Chain cards get the reveal metaphor */}
       {unlocked && stage === 'closed' && envelopeEnabled && (

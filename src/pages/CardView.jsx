@@ -162,6 +162,7 @@ function CardView() {
         onClose={() => navigate('/')}
         tier={card.tier || 'classic'}
         studioType={studioType}
+        cardTitle={card.title || ''}
         recipientEmail={card.recipient || card.recipientEmail || ''}
         pollData={pollData}
         triviaData={triviaData}
