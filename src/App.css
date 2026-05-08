@@ -9535,6 +9535,105 @@ a {
   letter-spacing: 0.06em;
 }
 
+/* ─── TAP LOCK ─── */
+.cp-tap-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tap-bg, #0b0f14);
+  cursor: pointer;
+  user-select: none;
+}
+.cp-tap-rings {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+@keyframes cpTapRing {
+  0%   { transform: scale(0.6); opacity: 0.6; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.cp-tap-ring {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid var(--tap-accent, #7ef7ff);
+  animation: cpTapRing 2.4s ease-out infinite;
+}
+.cp-tap-ring.r2 { animation-delay: 0.8s; }
+.cp-tap-ring.r3 { animation-delay: 1.6s; }
+.cp-tap-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  z-index: 1;
+}
+.cp-tap-icon { font-size: 2.4rem; }
+.cp-tap-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tap-accent, #7ef7ff);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.cp-tap-hint {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.45);
+  margin: 0;
+}
+
+/* ─── SCRATCH LOCK ─── */
+.cp-scratch-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+}
+.cp-scratch-canvas {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+.cp-scratch-bar {
+  position: relative;
+  height: 36px;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cp-scratch-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--scratch-accent, #7ef7ff), rgba(126,247,255,0.5));
+  opacity: 0.35;
+  transition: width 0.1s linear;
+}
+.cp-scratch-hint {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  z-index: 1;
+  pointer-events: none;
+}
+
 /* Reveal hint above the envelope */
 .cp-reveal-hint {
   position: absolute;

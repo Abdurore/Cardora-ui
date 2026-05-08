@@ -1903,18 +1903,24 @@ function CardStudio() {
           <div className="cs-sub-section">
             <p className="cs-sub-label">Lock</p>
             <div className="cs-choice-row">
-              {['none', 'time', 'password'].map(type => (
+              {[
+                { id: 'none',     label: 'None' },
+                { id: 'tap',      label: 'Tap' },
+                { id: 'scratch',  label: 'Scratch' },
+                { id: 'time',     label: 'Timer' },
+                { id: 'password', label: 'Password' },
+              ].map(({ id, label }) => (
                 <button
-                  key={type}
+                  key={id}
                   type="button"
-                  className={`cs-chip ${c.interaction.lock.type === type ? 'active' : ''}`}
-                  onClick={() => update('interaction.lock.type', type)}
+                  className={`cs-chip ${c.interaction.lock.type === id ? 'active' : ''}`}
+                  onClick={() => update('interaction.lock.type', id)}
                 >
-                  {type}
+                  {label}
                 </button>
               ))}
             </div>
-            {c.interaction.lock.type !== 'none' && (
+            {(c.interaction.lock.type === 'time' || c.interaction.lock.type === 'password') && (
               <label className="cs-field">
                 <span>{c.interaction.lock.type === 'time' ? 'Unlock Date/Time' : 'Password'}</span>
                 <input
@@ -1923,6 +1929,12 @@ function CardStudio() {
                   onChange={e => update('interaction.lock.value', e.target.value)}
                 />
               </label>
+            )}
+            {c.interaction.lock.type === 'tap' && (
+              <p className="cs-hint">Recipient taps anywhere on the card to reveal it — creates a sense of anticipation.</p>
+            )}
+            {c.interaction.lock.type === 'scratch' && (
+              <p className="cs-hint">Recipient scratches through an overlay to reveal the card — like a scratch card.</p>
             )}
           </div>
 

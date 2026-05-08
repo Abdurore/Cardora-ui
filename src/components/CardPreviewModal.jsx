@@ -89,10 +89,16 @@ function CardPreviewModal({
   // matches what the recipient will actually experience.
   const lockSpec = cardObject?.interaction?.lock || { type: 'none', value: '' }
   const revealSpec = cardObject?.interaction?.reveal || { type: 'tap', hint: '' }
-  const [unlocked, setUnlocked] = useState(lockSpec.type === 'none')
+  const [unlocked, setUnlocked] = useState(
+    lockSpec.type === 'none' || (lockSpec.type !== 'password' && lockSpec.type !== 'time' && lockSpec.type !== 'tap' && lockSpec.type !== 'scratch')
+  )
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState('')
   const [now, setNow] = useState(() => Date.now())
+  // Scratch lock state
+  const scratchCanvasRef = useRef(null)
+  const scratchingRef = useRef(false)
+  const [scratchPct, setScratchPct] = useState(0)
   // Tick once per second while the time-lock is active so the countdown updates.
   useEffect(() => {
     if (lockSpec.type !== 'time' || unlocked) return undefined
@@ -104,6 +110,52 @@ function CardPreviewModal({
   useEffect(() => {
     if (lockSpec.type === 'time' && unlockAt && now >= unlockAt) setUnlocked(true)
   }, [lockSpec.type, unlockAt, now])
+
+  // Scratch canvas: fill with overlay color when gate mounts
+  useEffect(() => {
+    if (lockSpec.type !== 'scratch' || unlocked) return
+    const canvas = scratchCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.globalCompositeOperation = 'source-over'
+    const bg = cardObject?.card?.backgroundColor || '#0b0f14'
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    // Decorative overlay text
+    ctx.font = 'bold 15px system-ui'
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'
+    ctx.textAlign = 'center'
+    const rows = ['SCRATCH', 'TO', 'REVEAL']
+    rows.forEach((t, i) => ctx.fillText(t, canvas.width / 2, canvas.height / 2 - 18 + i * 22))
+    setScratchPct(0)
+  }, [lockSpec.type, unlocked, cardObject?.card?.backgroundColor])
+
+  const handleScratch = useCallback((e) => {
+    if (!scratchingRef.current || unlocked) return
+    const canvas = scratchCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const rect = canvas.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const x = (clientX - rect.left) * (canvas.width / rect.width)
+    const y = (clientY - rect.top) * (canvas.height / rect.height)
+    ctx.globalCompositeOperation = 'destination-out'
+    ctx.beginPath()
+    ctx.arc(x, y, 32, 0, Math.PI * 2)
+    ctx.fill()
+    // Sample every 8th pixel for performance
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+    let cleared = 0
+    for (let i = 3; i < data.length; i += 32) {
+      if (data[i] < 128) cleared++
+    }
+    const total = (canvas.width * canvas.height) / 8
+    const pct = Math.round((cleared / total) * 100)
+    setScratchPct(pct)
+    if (pct >= 55) setUnlocked(true)
+  }, [unlocked])
 
   const handlePasswordSubmit = (e) => {
     e?.preventDefault?.()
@@ -592,6 +644,55 @@ function CardPreviewModal({
                 : `This card unlocks on ${new Date(unlockAt).toLocaleString()}.`}
             </p>
             <p className="cp-lock-countdown">{formatCountdown(unlockAt - now)}</p>
+          </div>
+        </div>
+      )}
+
+      {/* TAP LOCK — tap anywhere to reveal */}
+      {!unlocked && lockSpec.type === 'tap' && stage !== 'entry' && (
+        <div
+          className="cp-tap-gate"
+          style={{
+            '--tap-accent': c.theme.accentColor || '#7ef7ff',
+            '--tap-bg': c.card.backgroundColor || '#0b0f14',
+          }}
+          onClick={() => setUnlocked(true)}
+        >
+          <div className="cp-tap-rings" aria-hidden="true">
+            <div className="cp-tap-ring r1" />
+            <div className="cp-tap-ring r2" />
+            <div className="cp-tap-ring r3" />
+          </div>
+          <div className="cp-tap-center">
+            <div className="cp-tap-icon">👆</div>
+            <p className="cp-tap-label">Tap to reveal</p>
+            {lockSpec.value && <p className="cp-tap-hint">{lockSpec.value}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* SCRATCH LOCK — scratch to reveal */}
+      {!unlocked && lockSpec.type === 'scratch' && stage !== 'entry' && (
+        <div
+          className="cp-scratch-gate"
+          style={{ '--scratch-accent': c.theme.accentColor || '#7ef7ff' }}
+        >
+          <canvas
+            ref={scratchCanvasRef}
+            className="cp-scratch-canvas"
+            width={360}
+            height={640}
+            onPointerDown={() => { scratchingRef.current = true }}
+            onPointerUp={() => { scratchingRef.current = false }}
+            onPointerLeave={() => { scratchingRef.current = false }}
+            onPointerMove={handleScratch}
+            onTouchStart={e => { e.preventDefault(); scratchingRef.current = true }}
+            onTouchEnd={() => { scratchingRef.current = false }}
+            onTouchMove={e => { e.preventDefault(); handleScratch(e) }}
+          />
+          <div className="cp-scratch-bar">
+            <div className="cp-scratch-fill" style={{ width: `${Math.min(scratchPct, 100)}%` }} />
+            <span className="cp-scratch-hint">{scratchPct < 55 ? 'Scratch to reveal the card' : 'Revealing…'}</span>
           </div>
         </div>
       )}
