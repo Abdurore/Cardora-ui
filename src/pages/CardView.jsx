@@ -42,6 +42,8 @@ function CardView() {
         const backendCard = candidates.find(isCardLike)
         if (backendCard) {
           const mapped = mapBackendCard(backendCard)
+          // Preserve raw state for chain replies feed
+          mapped._chainState = backendCard.state || res?.state || null
           setCard(mapped)
           if (mapped.locked && mapped.lockType === 'password') setNeedsPassword(true)
           setLoading(false)
@@ -171,6 +173,7 @@ function CardView() {
         onTriviaComplete={handleTriviaComplete}
         onChainReply={handleChainReply}
         onAnonSubmit={handleAnonSubmit}
+        chainState={card._chainState}
       />
       {showReport && (
         <ReportModal

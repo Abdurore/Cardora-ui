@@ -52,6 +52,7 @@ function CardPreviewModal({
   onChainReply = null,
   onQuestionResponse = null,
   onAnonSubmit = null,
+  chainState = null,
 }) {
   // `allowedTools` gates tool visibility; `tierLimits` caps the content a
   // visible tool is allowed to contribute (e.g. music allowed, images > 1).
@@ -143,6 +144,12 @@ function CardPreviewModal({
   const [anonMessage, setAnonMessage] = useState('')
   const [anonSubmitting, setAnonSubmitting] = useState(false)
   const [anonSubmitted, setAnonSubmitted] = useState(false)
+
+  // Chain reply state (pageMode only)
+  const [chainMessage, setChainMessage] = useState('')
+  const [chainSubmitting, setChainSubmitting] = useState(false)
+  const [chainSubmitted, setChainSubmitted] = useState(false)
+  const [localChainReplies, setLocalChainReplies] = useState([])
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const c = cardObject
@@ -169,7 +176,7 @@ function CardPreviewModal({
 
     audioRef.current.volume = c.background.music.volume
 
-    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply') {
+    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply' || stage === 'chainReplies') {
       // Honour trim window: jump to start point if we're outside the segment.
       if (musicTrimmed) {
         const t = audioRef.current.currentTime
@@ -209,6 +216,13 @@ function CardPreviewModal({
     if (!c.animation.openEffect || c.animation.openEffect === 'none') return
     fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
   }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits])
+
+  // Seed localChainReplies from chainState prop when it becomes available
+  useEffect(() => {
+    if (chainState?.responses?.length) {
+      setLocalChainReplies(chainState.responses)
+    }
+  }, [chainState])
 
   const schedulePreviewTimer = useCallback((fn, delay) => {
     const id = window.setTimeout(() => {
@@ -273,6 +287,10 @@ function CardPreviewModal({
       setStage(pageMode ? 'anonReply' : 'anonPreview')
       return
     }
+    if (studioType === 'chain' && pageMode) {
+      setStage('chainReplies')
+      return
+    }
     if (hasQuestions) {
       setStage('questions')
       setQuestionIdx(0)
@@ -305,6 +323,9 @@ function CardPreviewModal({
     setAnonMessage('')
     setAnonSubmitting(false)
     setAnonSubmitted(false)
+    setChainMessage('')
+    setChainSubmitting(false)
+    setChainSubmitted(false)
   }
 
   const handleEndDone = () => {
@@ -1095,6 +1116,103 @@ function CardPreviewModal({
                   </button>
                 </div>
               )}
+            </article>,
+            'cp-gradient-border-full'
+          )}
+        </div>
+      )}
+
+      {/* CHAIN REPLIES — live public feed + reply form, pageMode only */}
+      {stage === 'chainReplies' && (
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article
+              className="cp-card cp-card-full cp-chain-replies-card"
+              style={cardSurfaceStyle(borderStyle)}
+            >
+              <div className="cp-chain-replies-inner">
+                {/* Header */}
+                <div className="cp-chain-header">
+                  <p className="cp-chain-eyebrow" style={{ color: c.theme.accentColor }}>Chain Card</p>
+                  {c.content.heading && (
+                    <h3 className="cp-chain-challenge" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                      {c.content.heading}
+                    </h3>
+                  )}
+                </div>
+
+                {/* Existing replies feed */}
+                <div className="cp-chain-feed">
+                  {localChainReplies.length === 0 ? (
+                    <p className="cp-chain-empty" style={{ color: c.card.textColor }}>
+                      No replies yet — be the first!
+                    </p>
+                  ) : (
+                    localChainReplies.slice().reverse().map((r, i) => (
+                      <div key={r.userId || r.id || i} className="cp-chain-reply">
+                        <div className="cp-chain-reply-avatar" style={{ background: `${c.theme.accentColor}30`, color: c.theme.accentColor }}>
+                          {(r.name || '?')[0].toUpperCase()}
+                        </div>
+                        <div className="cp-chain-reply-body">
+                          <span className="cp-chain-reply-name" style={{ color: c.theme.accentColor }}>{r.name || 'Someone'}</span>
+                          <p className="cp-chain-reply-text" style={{ color: c.card.textColor }}>{r.response || r.message}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Reply form */}
+                {!chainSubmitted ? (
+                  <div className="cp-chain-reply-form">
+                    <textarea
+                      className="cp-anon-textarea"
+                      style={{ background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${c.theme.accentColor}40`, color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif` }}
+                      placeholder="Add your reply to the chain…"
+                      maxLength={500}
+                      value={chainMessage}
+                      onChange={e => setChainMessage(e.target.value)}
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="cp-continue-btn visible"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor, flex: 1, opacity: chainSubmitting ? 0.6 : 1 }}
+                        disabled={!chainMessage.trim() || chainSubmitting}
+                        onClick={async () => {
+                          if (!chainMessage.trim()) return
+                          setChainSubmitting(true)
+                          try {
+                            if (onChainReply) await onChainReply(chainMessage.trim())
+                            setLocalChainReplies(prev => [...prev, { response: chainMessage.trim(), name: 'You', timestamp: new Date().toISOString() }])
+                          } catch (e) { /* swallow */ }
+                          setChainSubmitting(false)
+                          setChainSubmitted(true)
+                        }}
+                      >
+                        {chainSubmitting ? 'Sending…' : 'Reply to Chain'}
+                      </button>
+                      <button
+                        type="button"
+                        style={{ background: 'none', border: `1.5px solid ${c.theme.accentColor}40`, color: c.theme.accentColor, borderRadius: 999, padding: '0 16px', cursor: 'pointer', fontSize: '0.82rem' }}
+                        onClick={() => setStage('end')}
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="cp-chain-reply-sent">
+                    <p className="cp-chain-sent-msg" style={{ color: c.theme.accentColor }}>✓ Reply added to the chain!</p>
+                    <button
+                      className="cp-continue-btn visible"
+                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      onClick={() => setStage('end')}
+                    >
+                      Continue
+                    </button>
+                  </div>
+                )}
+              </div>
             </article>,
             'cp-gradient-border-full'
           )}

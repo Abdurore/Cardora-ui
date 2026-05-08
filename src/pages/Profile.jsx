@@ -570,7 +570,10 @@ function Profile() {
                       showTypeBadge={false}
                       isFavorite={favorites.includes(card.id)}
                       onToggleFavorite={toggleFavorite}
-                      onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
+                      onClick={() => card.slug
+                        ? navigate(`/card/${card.slug}/responses`)
+                        : openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })
+                      }
                     />
                     <div className="profile-card-actions">
                       {card.slug && (
