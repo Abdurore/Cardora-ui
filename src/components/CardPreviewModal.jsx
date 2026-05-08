@@ -807,14 +807,30 @@ function CardPreviewModal({
                       Submit Vote
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      className="cp-continue-btn visible"
-                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                      onClick={() => setStage('end')}
-                    >
-                      Continue
-                    </button>
+                    <div className="cp-poll-voted-confirm">
+                      <div className="cp-poll-voted-icon" style={{ color: c.theme.accentColor }}>✓</div>
+                      <p className="cp-poll-voted-msg" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                        Vote submitted!
+                      </p>
+                      <div className="cp-poll-voted-choices">
+                        {(pollData.options || []).map((opt, i) => (
+                          previewPollVotes.includes(i) ? (
+                            <div key={i} className="cp-poll-voted-choice" style={{ background: `${c.theme.accentColor}20`, borderColor: `${c.theme.accentColor}60`, color: c.card.textColor }}>
+                              <span className="cp-poll-voted-check" style={{ color: c.theme.accentColor }}>✓</span>
+                              <span>{opt || `Option ${i + 1}`}</span>
+                            </div>
+                          ) : null
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        className="cp-continue-btn visible"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        onClick={() => setStage('end')}
+                      >
+                        Continue
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -901,28 +917,48 @@ function CardPreviewModal({
               style={cardSurfaceStyle(borderStyle)}
             >
               <div className="cp-card-inner cp-card-inner-full">
-                <div className="cp-trivia-results">
-                  <div
-                    className="cp-trivia-score-circle"
-                    style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                  >
-                    {triviaData.questions.filter((q, i) => previewTriviaAnswers[i] === q.correctIndex).length}/{triviaData.questions.length}
+                {(() => {
+                  const correct = triviaData.questions.filter((q, i) => previewTriviaAnswers[i] === q.correctIndex).length
+                  const total = triviaData.questions.length
+                  const pct = total > 0 ? correct / total : 0
+                  const circumference = 2 * Math.PI * 44
+                  const dashOffset = circumference * (1 - pct)
+                  const perfMsg = pct === 1 ? 'Perfect score!' : pct >= 0.75 ? 'Great job!' : pct >= 0.5 ? 'Not bad!' : 'Keep practicing!'
+                  const perfEmoji = pct === 1 ? '🏆' : pct >= 0.75 ? '🎉' : pct >= 0.5 ? '👏' : '💪'
+                  return (
+                  <div className="cp-trivia-results">
+                    <svg className="cp-trivia-score-ring" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="7" />
+                      <circle
+                        cx="50" cy="50" r="44" fill="none"
+                        stroke={c.theme.accentColor}
+                        strokeWidth="7"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={dashOffset}
+                        style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1)', transformOrigin: 'center', transform: 'rotate(-90deg)' }}
+                      />
+                      <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fill={c.card.headingColor} fontSize="20" fontWeight="800" fontFamily="inherit">
+                        {correct}/{total}
+                      </text>
+                    </svg>
+                    <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, margin: 0 }}>
+                      {perfMsg} {perfEmoji}
+                    </h3>
+                    <p className="cp-trivia-score-label" style={{ color: c.card.textColor }}>
+                      {correct} out of {total} correct
+                    </p>
+                    <button
+                      type="button"
+                      className="cp-continue-btn visible"
+                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      onClick={() => setStage('end')}
+                    >
+                      Continue
+                    </button>
                   </div>
-                  <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, margin: 0 }}>
-                    Quiz Complete!
-                  </h3>
-                  <p className="cp-trivia-score-label" style={{ color: c.card.textColor }}>
-                    You got {triviaData.questions.filter((q, i) => previewTriviaAnswers[i] === q.correctIndex).length} out of {triviaData.questions.length} correct
-                  </p>
-                  <button
-                    type="button"
-                    className="cp-continue-btn visible"
-                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                    onClick={() => setStage('end')}
-                  >
-                    Continue
-                  </button>
-                </div>
+                  )
+                })()}
               </div>
             </article>,
             'cp-gradient-border-full'
@@ -1127,15 +1163,29 @@ function CardPreviewModal({
             className="cp-card cp-card-full cp-end-card"
             style={cardSurfaceStyle(borderStyle)}
           >
-            <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>✓</div>
             {pageMode ? (
-              <>
-                <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+              <div className="cp-end-outro">
+                {/* Animated sparkle burst */}
+                <div className="cp-end-sparkle-ring" style={{ '--end-accent': c.theme.accentColor }}>
+                  {[0,1,2,3,4,5,6,7].map(i => (
+                    <div key={i} className="cp-end-sparkle" style={{ '--i': i, background: c.theme.accentColor }} />
+                  ))}
+                  <div className="cp-end-outro-check" style={{ color: c.theme.accentColor }}>✓</div>
+                </div>
+
+                <h3 className="cp-end-outro-heading" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
                   That's the whole card
                 </h3>
-                <p style={{ color: c.card.textColor, opacity: 0.65, fontSize: '0.9rem' }}>
-                  Made with Cardora
+                <p className="cp-end-outro-sub" style={{ color: c.card.textColor }}>
+                  Hope it made your day
                 </p>
+
+                {/* Cardora branding */}
+                <div className="cp-end-brand">
+                  <img src="/cardora-logo.png?v=4" alt="" className="cp-end-brand-logo" />
+                  <span style={{ color: c.card.textColor, opacity: 0.5, fontSize: '0.78rem' }}>Made with Cardora</span>
+                </div>
+
                 <div className="cp-end-actions">
                   {hasGift && (
                     <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleEndDone}>
@@ -1145,11 +1195,11 @@ function CardPreviewModal({
                   <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleReset}>
                     Replay
                   </button>
-                  <a className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href="/studio">
+                  <a className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: `${c.theme.accentColor}60`, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href="/studio">
                     Create yours →
                   </a>
                 </div>
-              </>
+              </div>
             ) : (
               <>
                 <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
