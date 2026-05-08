@@ -41,6 +41,7 @@ function CardPreviewModal({
   onTriviaComplete = null,
   onChainReply = null,
   onQuestionResponse = null,
+  onAnonSubmit = null,
 }) {
   // `allowedTools` gates tool visibility; `tierLimits` caps the content a
   // visible tool is allowed to contribute (e.g. music allowed, images > 1).
@@ -127,6 +128,11 @@ function CardPreviewModal({
   // Trivia preview state
   const [previewTriviaIdx, setPreviewTriviaIdx] = useState(0)
   const [previewTriviaAnswers, setPreviewTriviaAnswers] = useState([])
+
+  // Anonymous reply state (pageMode only)
+  const [anonMessage, setAnonMessage] = useState('')
+  const [anonSubmitting, setAnonSubmitting] = useState(false)
+  const [anonSubmitted, setAnonSubmitted] = useState(false)
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const c = cardObject
@@ -153,7 +159,7 @@ function CardPreviewModal({
 
     audioRef.current.volume = c.background.music.volume
 
-    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview') {
+    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply') {
       // Honour trim window: jump to start point if we're outside the segment.
       if (musicTrimmed) {
         const t = audioRef.current.currentTime
@@ -244,7 +250,7 @@ function CardPreviewModal({
       return
     }
     if (studioType === 'anonymous') {
-      setStage('anonPreview')
+      setStage(pageMode ? 'anonReply' : 'anonPreview')
       return
     }
     if (hasQuestions) {
@@ -276,6 +282,9 @@ function CardPreviewModal({
     setPreviewTriviaIdx(0)
     setPreviewTriviaAnswers([])
     setPreviewTriviaSubmitted(false)
+    setAnonMessage('')
+    setAnonSubmitting(false)
+    setAnonSubmitted(false)
   }
 
   const handleEndDone = () => {
@@ -875,6 +884,98 @@ function CardPreviewModal({
                   </button>
                 </div>
               </div>
+            </article>,
+            'cp-gradient-border-full'
+          )}
+        </div>
+      )}
+
+      {/* ANONYMOUS REPLY — shown in pageMode when recipient opens an anonymous card */}
+      {stage === 'anonReply' && (
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article
+              className="cp-card cp-card-full cp-anon-reply-card"
+              style={cardSurfaceStyle(borderStyle)}
+            >
+              {anonSubmitted ? (
+                <div className="cp-anon-reply-sent">
+                  <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>✓</div>
+                  <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                    Sent anonymously
+                  </h3>
+                  <p style={{ color: c.card.textColor, opacity: 0.7, fontSize: '0.9rem' }}>
+                    Your message was delivered. The creator won't know it was you.
+                  </p>
+                  <div className="cp-end-actions">
+                    <button
+                      className="cp-end-btn"
+                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      onClick={handleReset}
+                    >
+                      Replay card
+                    </button>
+                    <a
+                      className="cp-end-btn ghost"
+                      style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      href="/studio"
+                    >
+                      Create yours →
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="cp-anon-reply-form">
+                  <p className="cp-anon-reply-label" style={{ color: c.theme.accentColor }}>
+                    Anonymous Message
+                  </p>
+                  <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, marginBottom: 8 }}>
+                    Send a message anonymously
+                  </h3>
+                  <p style={{ color: c.card.textColor, opacity: 0.7, fontSize: '0.85rem', marginBottom: 20 }}>
+                    The creator will receive your message but won't know who sent it.
+                  </p>
+                  <textarea
+                    className="cp-anon-textarea"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: `1.5px solid ${c.theme.accentColor}40`,
+                      color: c.card.textColor,
+                      fontFamily: `'${c.theme.fontFamily}', sans-serif`,
+                    }}
+                    placeholder="Write your message here… (max 500 characters)"
+                    maxLength={500}
+                    value={anonMessage}
+                    onChange={e => setAnonMessage(e.target.value)}
+                  />
+                  <div className="cp-anon-char-count" style={{ color: c.card.textColor, opacity: 0.45 }}>
+                    {anonMessage.length} / 500
+                  </div>
+                  <button
+                    className="cp-continue-btn visible"
+                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor, opacity: anonSubmitting ? 0.6 : 1 }}
+                    disabled={!anonMessage.trim() || anonSubmitting}
+                    onClick={async () => {
+                      if (!anonMessage.trim()) return
+                      setAnonSubmitting(true)
+                      try {
+                        if (onAnonSubmit) await onAnonSubmit(anonMessage.trim())
+                      } catch (e) { /* swallow */ }
+                      setAnonSubmitting(false)
+                      setAnonSubmitted(true)
+                    }}
+                  >
+                    {anonSubmitting ? 'Sending…' : 'Send Anonymously'}
+                  </button>
+                  <button
+                    type="button"
+                    style={{ background: 'none', border: 'none', color: c.card.textColor, opacity: 0.4, fontSize: '0.8rem', marginTop: 8, cursor: 'pointer' }}
+                    onClick={() => setStage('end')}
+                  >
+                    Skip
+                  </button>
+                </div>
+              )}
             </article>,
             'cp-gradient-border-full'
           )}

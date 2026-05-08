@@ -24,6 +24,7 @@ function CardItem({
   type,
   variant = 'one',
   showOccasion = true,
+  showTypeBadge = true,
   previewImage,
   onClick,
   isFavorite,
@@ -65,7 +66,7 @@ function CardItem({
         <div className="card-thumb-aura" />
       </div>
 
-      {TYPE_BADGE[type] && (
+      {showTypeBadge && TYPE_BADGE[type] && (
         <span className={`card-type-badge ${TYPE_BADGE[type].cls}`}>
           {TYPE_BADGE[type].label}
         </span>

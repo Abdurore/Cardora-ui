@@ -567,6 +567,7 @@ function Profile() {
                     <CardItem
                       {...card}
                       variant={`v${(index % 4) + 1}`}
+                      showTypeBadge={false}
                       isFavorite={favorites.includes(card.id)}
                       onToggleFavorite={toggleFavorite}
                       onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}

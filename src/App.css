@@ -17085,6 +17085,44 @@ a {
   font-style: italic;
 }
 
+/* Anonymous reply stage (pageMode recipient view) */
+.cp-anon-reply-card .cp-anon-reply-form,
+.cp-anon-reply-card .cp-anon-reply-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 24px 20px;
+  width: 100%;
+}
+.cp-anon-reply-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.cp-anon-textarea {
+  width: 100%;
+  min-height: 120px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.cp-anon-textarea:focus {
+  border-color: currentColor !important;
+}
+.cp-anon-char-count {
+  font-size: 0.75rem;
+  align-self: flex-end;
+  margin-top: -6px;
+}
+
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    CARD VIEW Â· STYLED TYPE-SPECIFIC INTERACTIONS

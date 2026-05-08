@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getCardBySlug, submitPollVote, submitTriviaAnswer, submitChainReply } from '../lib/api.js'
+import { getCardBySlug, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage } from '../lib/api.js'
 import { mapBackendCard } from '../lib/backendMappers.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import ReportModal from '../components/ReportModal.jsx'
@@ -151,6 +151,9 @@ function CardView() {
   const handleChainReply = async (message) => {
     try { await submitChainReply(card.slug || id, { message }) } catch (e) { console.warn('Chain reply failed', e) }
   }
+  const handleAnonSubmit = async (message) => {
+    await sendCardAnonymousMessage(card.slug || id, { message })
+  }
 
   return (
     <>
@@ -166,6 +169,7 @@ function CardView() {
         onPollSubmit={handlePollSubmit}
         onTriviaComplete={handleTriviaComplete}
         onChainReply={handleChainReply}
+        onAnonSubmit={handleAnonSubmit}
       />
       {showReport && (
         <ReportModal
