@@ -21,6 +21,7 @@ function Explore() {
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [activeTag, setActiveTag] = useState(searchParams.get('tag') || 'all')
   const [activeType, setActiveType] = useState(searchParams.get('type') || 'all')
+  const [activeOccasion, setActiveOccasion] = useState(searchParams.get('occasion') || 'all')
   const [visibleCount, setVisibleCount] = useState(12)
   const [trendingTemplates, setTrendingTemplates] = useState([])
   const CARDS_PER_PAGE = 12
@@ -43,14 +44,26 @@ function Explore() {
     if (query) params.q = query
     if (activeTag && activeTag !== 'all') params.tag = activeTag
     if (activeType && activeType !== 'all') params.type = activeType
+    if (activeOccasion && activeOccasion !== 'all') params.occasion = activeOccasion
     setSearchParams(params, { replace: true })
-  }, [activeTag, activeType, query, setSearchParams])
+  }, [activeTag, activeType, activeOccasion, query, setSearchParams])
+
+  const occasions = useMemo(() => {
+    const seen = new Set()
+    cardSource.forEach(c => {
+      const occ = (c.category || c.occasion || '').trim()
+      if (occ) seen.add(occ)
+    })
+    return Array.from(seen).sort()
+  }, [cardSource])
 
   const filteredCards = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return cardSource.filter((card) => {
       const matchesQuery = normalizedQuery
         ? card.title.toLowerCase().includes(normalizedQuery)
+          || (card.category || '').toLowerCase().includes(normalizedQuery)
+          || (card.occasion || '').toLowerCase().includes(normalizedQuery)
         : true
       const matchesFavorites = activeTag === 'favorites' ? favorites.includes(card.id) : true
       const cardType = (card.type || '').toLowerCase()
@@ -60,13 +73,15 @@ function Explore() {
           : activeType === 'personal'
             ? !cardType || cardType === 'personal' || cardType === 'standard' || cardType === 'moment'
             : cardType === activeType
-      return matchesQuery && matchesFavorites && matchesType
+      const cardOcc = (card.category || card.occasion || '').toLowerCase()
+      const matchesOccasion = activeOccasion === 'all' ? true : cardOcc === activeOccasion.toLowerCase()
+      return matchesQuery && matchesFavorites && matchesType && matchesOccasion
     })
-  }, [activeTag, activeType, cardSource, favorites, query])
+  }, [activeTag, activeType, activeOccasion, cardSource, favorites, query])
 
   useEffect(() => {
     setVisibleCount(CARDS_PER_PAGE)
-  }, [activeTag, activeType, query])
+  }, [activeTag, activeType, activeOccasion, query])
 
   const pagedCards = filteredCards.slice(0, visibleCount)
   const hasMore = filteredCards.length > visibleCount
@@ -133,6 +148,27 @@ function Explore() {
             </button>
           ))}
         </div>
+
+        {/* Occasion/category filter — only shown when there are occasions to filter by */}
+        {occasions.length > 0 && (
+          <div className="tag-list explore-occasion-filter">
+            <button
+              className={`tag ${activeOccasion === 'all' ? 'active' : ''}`}
+              onClick={() => setActiveOccasion('all')}
+            >
+              All Occasions
+            </button>
+            {occasions.map(occ => (
+              <button
+                key={occ}
+                className={`tag ${activeOccasion === occ ? 'active' : ''}`}
+                onClick={() => setActiveOccasion(occ)}
+              >
+                {occ}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Favorites filter row */}
         <div className="tag-list">

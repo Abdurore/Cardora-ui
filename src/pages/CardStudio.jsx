@@ -2773,10 +2773,28 @@ function CardStudio() {
         <main className="cs-canvas-wrap">
           <div className="cs-canvas">
             <div className="cs-canvas-head">
-              <p className="cs-canvas-head-label">
-                <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 5, opacity: 0.5 }} />
-                Live Preview — click any element to edit
-              </p>
+              {studioSteps.filter(s => s !== 'preview').length > 1 ? (
+                <div className="cs-step-timeline">
+                  {studioSteps.filter(s => s !== 'preview').map((step, i, arr) => (
+                    <span key={step} className="cs-step-timeline-item">
+                      <button
+                        type="button"
+                        className={`cs-step-node${activeStep === step ? ' active' : ''}`}
+                        onClick={() => goToStep(step)}
+                      >
+                        <span className="cs-step-num">{i + 1}</span>
+                        <span className="cs-step-name">{stepLabels[step]}</span>
+                      </button>
+                      {i < arr.length - 1 && <span className="cs-step-arrow">→</span>}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="cs-canvas-head-label">
+                  <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 5, opacity: 0.5 }} />
+                  Live Preview
+                </p>
+              )}
               <button type="button" className="cs-preview-toggle" onClick={enterPreview}>
                 Full Preview
               </button>

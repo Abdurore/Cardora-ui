@@ -7478,7 +7478,67 @@ a {
   box-shadow: 0 8px 20px rgba(118, 239, 255, 0.1);
 }
 
-/* â€”â€”â€” PHONE FRAME â€”â€”â€” */
+/* ─── CANVAS STEP TIMELINE (desktop) ─── */
+.cs-step-timeline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.cs-step-timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cs-step-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(118, 239, 255, 0.12);
+  background: transparent;
+  color: rgba(180, 220, 230, 0.45);
+  font-size: 0.72rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cs-step-node:hover {
+  border-color: rgba(118, 239, 255, 0.28);
+  color: rgba(180, 220, 230, 0.75);
+  background: rgba(118, 239, 255, 0.05);
+}
+.cs-step-node.active {
+  border-color: rgba(118, 239, 255, 0.4);
+  background: rgba(118, 239, 255, 0.1);
+  color: #b8f6ff;
+  font-weight: 600;
+}
+.cs-step-num {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: rgba(118, 239, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.cs-step-node.active .cs-step-num {
+  background: rgba(118, 239, 255, 0.25);
+  color: #7ef7ff;
+}
+.cs-step-name { font-size: 0.72rem; }
+.cs-step-arrow {
+  font-size: 0.65rem;
+  color: rgba(118, 239, 255, 0.2);
+  user-select: none;
+}
+
+/* ─── PHONE FRAME ─── */
 .cs-phone-frame {
   width: min(400px, 100%);
   margin: 20px auto 0;
@@ -14633,6 +14693,15 @@ a {
 .explore-category-filter {
   margin-bottom: 8px;
 }
+
+.explore-occasion-filter {
+  margin-bottom: 8px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.explore-occasion-filter::-webkit-scrollbar { display: none; }
 
 .tag-sm {
   font-size: 0.75rem;
