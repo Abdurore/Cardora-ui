@@ -19,7 +19,7 @@ import { getMediaVideos, getMediaMusic } from '../lib/api.js'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
 import { getMusicPresetsForTier } from '../data/cardDefaults.js'
 import { getTierLimits } from '../lib/tierLimits.js'
-import { getPalettesForTier, applyPalette, getPaletteById } from '../lib/palettes.js'
+import { PALETTES, getPalettesForTier, applyPalette, getPaletteById } from '../lib/palettes.js'
 import InlineColorPicker from '../components/InlineColorPicker.jsx'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
@@ -373,8 +373,10 @@ function CardStudio() {
     () => getTierLimits(studioTier, { isArtist }),
     [studioTier, isArtist],
   )
-  const availablePalettes = useMemo(
-    () => (isArtist ? getPalettesForTier('elite') : getPalettesForTier(studioTier)),
+  // Show all palettes; mark above-tier ones as locked (visual upgrade prompt)
+  const availablePalettes = PALETTES
+  const allowedPaletteIds = useMemo(
+    () => new Set((isArtist ? getPalettesForTier('elite') : getPalettesForTier(studioTier)).map(p => p.id)),
     [studioTier, isArtist],
   )
 
@@ -1473,23 +1475,27 @@ function CardStudio() {
               Pick a palette — it applies across the envelope, card, buttons and borders in one go.
             </p>
             <div className="cs-palette-grid">
-              {availablePalettes.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`cs-palette-chip ${activePaletteId === p.id ? 'active' : ''}`}
-                  onClick={() => applyPaletteWithHistory(p)}
-                  title={p.label}
-                >
-                  <span className="cs-palette-swatches" aria-hidden="true">
-                    <span style={{ background: p.surface }} />
-                    <span style={{ background: p.primary }} />
-                    <span style={{ background: p.accent }} />
-                    <span style={{ background: p.ink }} />
-                  </span>
-                  <span className="cs-palette-label">{p.label}</span>
-                </button>
-              ))}
+              {availablePalettes.map((p) => {
+                const locked = !allowedPaletteIds.has(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`cs-palette-chip${activePaletteId === p.id && !locked ? ' active' : ''}${locked ? ' locked' : ''}`}
+                    onClick={() => locked ? null : applyPaletteWithHistory(p)}
+                    title={locked ? `Upgrade to ${p.tier} to unlock` : p.label}
+                  >
+                    <span className="cs-swatch-bg" aria-hidden="true" style={{ background: `linear-gradient(145deg, ${p.surface} 30%, ${p.primary}55 100%)` }} />
+                    {locked && <span className="cs-swatch-lock" aria-hidden="true">🔒</span>}
+                    <span className="cs-palette-swatches" aria-hidden="true">
+                      <span style={{ background: p.primary }} />
+                      <span style={{ background: p.accent }} />
+                      <span style={{ background: p.ink, opacity: 0.75 }} />
+                    </span>
+                    <span className="cs-palette-label">{p.label}</span>
+                  </button>
+                )
+              })}
             </div>
             <p className="cs-field-hint">
               {availablePalettes.length} palettes on {tierLabel}
@@ -3261,17 +3267,20 @@ function CardStudio() {
                           <button type="button" className="cs-m2-reset-btn" onClick={() => update('palette.id', null)}>Reset</button>
                         </div>
                         <div className="cs-m2-palette-row">
-                          {availablePalettes.map(p => (
-                            <button key={p.id} type="button" className={`cs-m2-palette-item${c.palette.id === p.id ? ' active' : ''}`}
-                              onClick={() => applyPaletteWithHistory(p)}>
-                              <div className="cs-m2-palette-preview">
-                                <span className="cs-m2-pal-swatch" style={{ background: p.surface }} />
-                                <span className="cs-m2-pal-swatch" style={{ background: p.primary }} />
-                                <span className="cs-m2-pal-swatch" style={{ background: p.accent }} />
+                          {PALETTES.map(p => {
+                            const locked = !allowedPaletteIds.has(p.id)
+                            return (
+                            <button key={p.id} type="button"
+                              className={`cs-m2-palette-item${c.palette.id === p.id && !locked ? ' active' : ''}${locked ? ' locked' : ''}`}
+                              onClick={() => locked ? null : applyPaletteWithHistory(p)}
+                              title={locked ? `Upgrade to ${p.tier} to unlock` : p.label}>
+                              <div className="cs-m2-palette-preview" style={{ background: `linear-gradient(145deg, ${p.surface} 30%, ${p.primary}55 100%)` }}>
+                                {locked && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', background: 'rgba(0,0,0,0.35)', borderRadius: 'inherit' }}>🔒</span>}
                               </div>
                               <span className="cs-m2-palette-label">{p.label}</span>
                             </button>
-                          ))}
+                            )
+                          })}
                         </div>
 
                         <div className="cs-m2-section-hd"><span>ACCENT METAL</span></div>

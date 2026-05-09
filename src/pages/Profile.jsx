@@ -208,9 +208,17 @@ function Profile() {
   }, [currentUser, getUserCardsFromBackend])
 
   const handleDeleteCard = async (cardId) => {
-    const result = await deleteCardOnBackend(cardId)
-    if (result.ok) {
-      setUserCards(prev => prev.filter(c => c.id !== cardId))
+    const confirmed = await appConfirm('Delete Card', 'This card and its link will be permanently deleted.', { confirm: 'Delete', danger: true })
+    if (!confirmed) return
+    try {
+      const result = await deleteCardOnBackend(cardId)
+      if (result.ok) {
+        setUserCards(prev => prev.filter(c => (c._id || c.id) !== cardId))
+      } else {
+        setStatusModal({ type: 'error', message: result.message || 'Could not delete this card.' })
+      }
+    } catch {
+      setStatusModal({ type: 'error', message: 'Could not delete this card. Please try again.' })
     }
   }
 
@@ -604,7 +612,7 @@ function Profile() {
                       <button
                         className="profile-card-action-btn delete"
                         type="button"
-                        onClick={() => handleDeleteCard(card.id)}
+                        onClick={() => handleDeleteCard(card._id || card.id)}
                         title="Delete card"
                       >
                         🗑
