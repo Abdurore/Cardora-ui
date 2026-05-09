@@ -193,7 +193,8 @@ export async function updateCard(payload) {
 }
 
 export async function deleteCard(payload) {
-  return request('/delete-card', { method: 'DELETE', auth: true, body: payload })
+  const cardId = payload?.cardId || payload?.id
+  return request('/delete-card', { method: 'DELETE', auth: true, body: { cardId, id: cardId } })
 }
 
 export async function getCardBySlug(slug, password) {

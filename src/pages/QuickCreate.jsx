@@ -30,20 +30,16 @@ function QuickCreate() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const cardType = params.get('type') || 'personal'
-  const cardTier = params.get('tier') || 'classic'
+  const cardTierRaw = params.get('tier') || 'classic'
+  const cardTier = cardTierRaw.toLowerCase()
 
   const { handleCreateCard, currentUser, openAuthModal } = useOutletContext()
 
-  const allowedTiers = cardTier === 'elite'
-    ? ['classic', 'premium', 'elite']
-    : cardTier === 'premium'
-      ? ['classic', 'premium']
-      : ['classic']
-
-  const allowedPaletteIds = new Set(getPalettesForTier(allowedTiers).map(p => p.id))
+  // getPalettesForTier expects a string and handles the hierarchy internally
+  const allowedPaletteIds = new Set(getPalettesForTier(cardTier).map(p => p.id))
 
   const [selectedPalette, setSelectedPalette] = useState(
-    getPalettesForTier(allowedTiers)[0] || PALETTES[0]
+    getPalettesForTier(cardTier)[0] || PALETTES[0]
   )
   const [selectedFont, setSelectedFont] = useState('Poppins')
 
@@ -276,6 +272,46 @@ function QuickCreate() {
           {/* ── Form pane ── */}
           <div className="qc-form-pane">
 
+            {/* Mobile-only live preview (desktop shows preview pane on right) */}
+            <div className="qc-mobile-preview">
+              <p className="qc-preview-label">Live Preview</p>
+              <div
+                className="qc-card-mini"
+                style={{
+                  backgroundColor: selectedPalette.surface,
+                  borderColor: `${selectedPalette.primary}30`,
+                  boxShadow: `0 16px 48px rgba(0,0,0,0.4), 0 0 0 1px ${selectedPalette.primary}18`,
+                }}
+              >
+                <div className="qc-mini-header">
+                  <span className="qc-mini-seal" style={{ background: selectedPalette.primary }} />
+                  <span className="qc-mini-brand" style={{ color: selectedPalette.ink }}>Cardora</span>
+                </div>
+                {imageBlobUrl && (
+                  <div className="qc-mini-img-wrap">
+                    <img src={imageBlobUrl} alt="" className="qc-mini-img" />
+                  </div>
+                )}
+                <h3
+                  className="qc-mini-heading"
+                  style={{ fontFamily: `'${selectedFont}', serif`, color: selectedPalette.primary }}
+                >
+                  {previewHeading || 'Your heading here'}
+                </h3>
+                <p
+                  className="qc-mini-body"
+                  style={{ fontFamily: `'${selectedFont}', sans-serif`, color: selectedPalette.ink }}
+                >
+                  {previewBody || 'Your message will appear here…'}
+                </p>
+                <div className="qc-mini-footer" style={{ borderTopColor: `${selectedPalette.primary}22` }}>
+                  <span className="qc-mini-btn" style={{ background: selectedPalette.primary, color: selectedPalette.surface }}>
+                    Open Card
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Step 1: Theme */}
             <section className="qc-step">
               <div className="qc-step-header">
@@ -283,9 +319,9 @@ function QuickCreate() {
                 <div>
                   <h3 className="qc-step-title">Choose a Theme</h3>
                   <p className="qc-step-sub">
-                    {getPalettesForTier(allowedTiers).length} unlocked
-                    {PALETTES.length - getPalettesForTier(allowedTiers).length > 0
-                      ? ` · ${PALETTES.length - getPalettesForTier(allowedTiers).length} locked`
+                    {getPalettesForTier(cardTier).length} unlocked
+                    {PALETTES.length - getPalettesForTier(cardTier).length > 0
+                      ? ` · ${PALETTES.length - getPalettesForTier(cardTier).length} locked`
                       : ''}
                   </p>
                 </div>

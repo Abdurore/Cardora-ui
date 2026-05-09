@@ -1628,7 +1628,7 @@ function AdminDashboard() {
                       <td>{ad.name || '—'}</td>
                       <td>
                         <select
-                          value={ad.enterpriseId || ad.enterpriseUserId || ad.enterprise?._id || ad.enterprise?.id || ad.enterpriseOwner?._id || ''}
+                          value={ad.enterpriseAccountId || ad.enterpriseId || ad.enterpriseUserId || ad.enterprise?._id || ''}
                           onChange={async e => {
                             const enterpriseId = e.target.value
                             const owner = enterpriseUsers.find(user => String(user._id || user.id) === enterpriseId)
@@ -1636,14 +1636,14 @@ function AdminDashboard() {
                             if (!adId) return
                             try {
                               await updateAdminAd(adId, {
-                                enterpriseId,
-                                enterpriseUserId: enterpriseId,
+                                enterpriseAccountId: enterpriseId || null,
+                                enterpriseUserId: enterpriseId || null,
                                 enterpriseName: owner?.username || owner?.name || owner?.email || '',
                               })
-                              showMsg('Enterprise owner updated.')
+                              showMsg('Enterprise account assigned.')
                               loadTabData('Ads')
                             } catch (err) {
-                              showMsg(err.message || 'Could not update enterprise owner.', false)
+                              showMsg(err.message || 'Could not assign enterprise account.', false)
                             }
                           }}
                         >
