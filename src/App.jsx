@@ -17,6 +17,7 @@ import AnonSend from './pages/AnonSend.jsx'
 import AnonInbox from './pages/AnonInbox.jsx'
 import CreateCardPicker from './pages/CreateCardPicker.jsx'
 import CardResponses from './pages/CardResponses.jsx'
+import QuickCreate from './pages/QuickCreate.jsx'
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         <Route path="/card/:id" element={<CardView />} />
         <Route path="/card/:slug/responses" element={<CardResponses />} />
         <Route path="/studio" element={<CardStudio />} />
+        <Route path="/quick" element={<QuickCreate />} />
         <Route path="/create" element={<CreateCardPicker />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/moderator" element={<ModeratorDashboard />} />

@@ -435,6 +435,7 @@ function CardStudio() {
   const [activeEditEl, setActiveEditEl] = useState(null) // { type:'heading'|'body'|'extendedBody'|'image', index:number }
   const dragStateRef = useRef(null)
   const editPopoverRef = useRef(null)
+  const imgStripRef = useRef(null)
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
   const [mobileBottomSheet, setMobileBottomSheet] = useState(null) // null|'style'|'content'|'layers'|'more'
   const [mobileStyleTab, setMobileStyleTab] = useState('Palette')
@@ -781,6 +782,22 @@ function CardStudio() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [handleRedo, handleUndo])
+
+  // Auto-scroll image strip when multiple images are loaded
+  useEffect(() => {
+    const wrap = imgStripRef.current
+    const imgCount = c.media?.images?.length || 0
+    if (!wrap || imgCount <= 1) return
+    let idx = 0
+    const id = setInterval(() => {
+      idx = (idx + 1) % imgCount
+      const items = wrap.querySelectorAll('.cs-preview-media-item--strip')
+      if (items[idx]) {
+        items[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+      }
+    }, 3000)
+    return () => clearInterval(id)
+  }, [c.media?.images?.length])
 
   const studioSteps = STEPS_BY_TYPE[studioType] || STEPS_BY_TYPE.personal
   const stepLabels = STEP_LABELS_BY_TYPE[studioType] || STEP_LABELS_BY_TYPE.personal
@@ -2301,15 +2318,33 @@ function CardStudio() {
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
             >{previewQuestion.text || 'Place your first quiz question here.'}</p>
           </div>
-          <div className="cs-preview-trivia-opts" onClick={e => { e.stopPropagation(); setActiveTool('trivia'); setActiveStep('card') }} style={{ cursor: 'pointer' }}>
+          <div className="cs-preview-trivia-opts" onClick={e => e.stopPropagation()}>
             {(previewQuestion.options?.length ? previewQuestion.options : ['', '', '', '']).map((opt, oi) => (
               <div
                 key={oi}
-                className={`cs-preview-trivia-opt cs-clickable-preview ${hasRealOptions && previewQuestion.correctIndex === oi ? 'correct' : ''}`}
+                className={`cs-preview-trivia-opt ${hasRealOptions && previewQuestion.correctIndex === oi ? 'correct' : ''}`}
                 style={{ color: c.card.textColor }}
+                onClick={e => e.stopPropagation()}
               >
                 <span className="cs-preview-trivia-opt-index">{String.fromCharCode(65 + oi)}</span>
-                <span>{opt || `Option ${oi + 1}`}</span>
+                <span
+                  contentEditable={!compact}
+                  suppressContentEditableWarning
+                  style={{ outline: 'none', flex: 1, display: 'block', cursor: !compact ? 'text' : 'default' }}
+                  onBlur={e => {
+                    if (compact) return
+                    const text = e.currentTarget.textContent.trim()
+                    setTriviaData(prev => {
+                      const qs = [...prev.questions]
+                      const opts = [...(qs[0]?.options || [])]
+                      while (opts.length <= oi) opts.push('')
+                      opts[oi] = text
+                      qs[0] = { ...qs[0], options: opts }
+                      return { ...prev, questions: qs }
+                    })
+                  }}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+                >{opt || ''}</span>
               </div>
             ))}
           </div>
@@ -2588,8 +2623,8 @@ function CardStudio() {
 
     // ─── Per-element JSX blocks ───────────────────────────────────────────
     const mediaBlock = !compact && imgs.length > 0 ? (
-      <div key="media" className="cs-preview-media-strip-wrap" onClick={e => e.stopPropagation()}>
-        <div className={`cs-preview-media-strip${imgs.length > 1 ? ' cs-img-autoscroll' : ''}`}>
+      <div key="media" ref={imgStripRef} className="cs-preview-media-strip-wrap" onClick={e => e.stopPropagation()}>
+        <div className="cs-preview-media-strip">
           {imgs.map((img, i) => {
             const isActive = activeEditEl?.type === 'image' && activeEditEl.index === i
             return (
@@ -2849,6 +2884,7 @@ function CardStudio() {
                     >
                       <span className="cs-tool-icon"><Icon size={18} /></span>
                       <span className="cs-tool-label">{tool.label}</span>
+                      {tool.hint && <span className="cs-tool-hint" title={tool.hint} aria-label={tool.hint}>?</span>}
                     </button>
                   )
                 })}
