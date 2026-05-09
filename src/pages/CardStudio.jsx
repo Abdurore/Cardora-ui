@@ -2150,7 +2150,7 @@ function CardStudio() {
           <p className="cs-panel-eyebrow">Gifts</p>
           <h3>End-of-card gift reveal</h3>
           <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.7, lineHeight: 1.55 }}>
-            Attach a purchased gift to play after the card reveal. Recipients see a heart-particle
+            Attach a purchased gift to play after the card reveal. Recipients see a particle
             animation in the gift's signature colours before they receive it.
           </p>
           <div className="cs-sub-section">

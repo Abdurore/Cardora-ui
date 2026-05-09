@@ -1,83 +1,83 @@
 import { useEffect, useRef } from 'react'
 
-// Heart silhouette path — kept for GiftCard static icons (not used in the animation canvas)
+// Heart silhouette path — kept for GiftCard static icons only
 const HEART_PATH =
   'M100 170s-66-45-88-78C-6 60 10 22 44 16c23-4 44 7 56 28 12-21 33-32 56-28 34 6 50 44 32 76-22 33-88 78-88 78z'
 
 const HEART_SHAPE = 'heart'
 
 const EFFECTS = {
-  heart: {
+  spark: {
     gradient: ['#ff6b9d', '#ff4f98'],
     price: 2,
     phases: ['form'],
     duration: 1500,
     intensity: 1,
   },
-  diamond: {
+  ember: {
     gradient: ['#5de0ff', '#7b82ff'],
     price: 3,
     phases: ['explode', 'form'],
     duration: 1800,
     intensity: 1.2,
   },
-  rose: {
+  bloom: {
     gradient: ['#7b0016', '#ff4f98'],
     price: 5,
     phases: ['explode', 'form'],
     duration: 2200,
     intensity: 1.45,
   },
-  star: {
+  glow: {
     gradient: ['#ffd56a', '#ff7ad1'],
     price: 7,
     phases: ['explode', 'form'],
     duration: 2500,
     intensity: 1.7,
   },
-  orb: {
+  radiance: {
     gradient: ['#7ef7ff', '#62ffa2'],
     price: 10,
     phases: ['orbit', 'form'],
     duration: 3000,
     intensity: 2,
   },
-  ring: {
+  bliss: {
     gradient: ['#ffe07a', '#ff9bd2'],
     price: 30,
     phases: ['orbit', 'form'],
     duration: 3400,
     intensity: 2.4,
   },
-  candle: {
+  euphoria: {
     gradient: ['#ffce7a', '#ff7ad1'],
     price: 50,
     phases: ['explode', 'orbit', 'form'],
     duration: 3800,
     intensity: 2.8,
   },
-  christmas_tree: {
+  cosmos: {
     gradient: ['#3cffb1', '#7ef7ff'],
     price: 60,
     phases: ['explode', 'orbit', 'form'],
     duration: 4100,
     intensity: 3.1,
   },
-  crescent_moon: {
+  eternal: {
     gradient: ['#ffe59a', '#ffd1f0'],
     price: 80,
     phases: ['orbit', 'form', 'glow'],
     duration: 4400,
     intensity: 3.35,
   },
-  meteorite: {
+  legend: {
     gradient: ['#ff9bd2', '#7ef7ff'],
     price: 99,
     phases: ['explode', 'orbit', 'form', 'glow'],
     duration: 4700,
     intensity: 3.7,
   },
-  necklace: {
+  divine: {
     gradient: ['#ffd56a', '#7ef7ff'],
     price: 150,
     phases: ['explode', 'orbit', 'form', 'glow'],
@@ -86,7 +86,6 @@ const EFFECTS = {
   },
 }
 
-// Inject static SVG path for GiftCard icons only — not used by the canvas animation
 Object.values(EFFECTS).forEach((effect) => {
   effect.path = HEART_PATH
   effect.shape = HEART_SHAPE
@@ -105,7 +104,7 @@ export const giftConfigs = Object.values(EFFECTS).reduce((acc, effect) => {
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
 const easeOutQuad = (t) => 1 - (1 - t) * (1 - t)
 
-export const getGiftEffect = (key) => EFFECTS[key] || EFFECTS.heart
+export const getGiftEffect = (key) => EFFECTS[key] || EFFECTS.spark
 
 function phaseProgress(elapsed, config) {
   const phases = config.phases
@@ -121,6 +120,13 @@ function phaseProgress(elapsed, config) {
   }
 }
 
+// Heart parametric curve — particles target positions on this curve
+function heartPoint(t, centerX, centerY, scale) {
+  const x = 16 * Math.pow(Math.sin(t), 3)
+  const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
+  return { x: centerX + x * scale, y: centerY + y * scale }
+}
+
 function isLowPowerDevice() {
   if (typeof window === 'undefined') return false
   const cores = navigator.hardwareConcurrency || 4
@@ -129,7 +135,7 @@ function isLowPowerDevice() {
   return narrow || cores <= 4 || reduceMotion
 }
 
-function PremiumGiftReveal({ effect = 'heart', onComplete }) {
+function PremiumGiftReveal({ effect = 'spark', onComplete }) {
   const canvasRef = useRef(null)
   const rafRef = useRef(null)
   const startRef = useRef(0)
@@ -166,17 +172,16 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
       : Math.min(190, Math.round(118 + config.intensity * 16))
     const particleCount = baseCount
 
-    // Radial burst — particles explode outward from center along their baseAngle
     const particles = Array.from({ length: particleCount }, (_, index) => {
-      const angle = (index / particleCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3
+      const angle = (index / particleCount) * Math.PI * 2
       return {
         x: 0,
         y: 0,
         vx: 0,
         vy: 0,
-        baseAngle: angle,
-        maxRadius: (0.16 + Math.random() * 0.38) * Math.min(window.innerWidth, window.innerHeight),
-        explodeForce: (2.8 + Math.random() * 1.6) * config.intensity,
+        angle,
+        orbitRadius: 18 + Math.random() * (16 + config.intensity * 12),
+        targetAngle: Math.random() * Math.PI * 2,
         size: 1 + Math.random() * (1.8 + config.intensity * 0.28),
         glow: 8 + Math.random() * (6 + config.intensity * 3),
         opacity: 0.24 + Math.random() * 0.55,
@@ -185,11 +190,17 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
 
     const initParticles = () => {
       const { x: cx, y: cy } = center()
-      particles.forEach((p) => {
-        p.x = cx + (Math.random() - 0.5) * 24
-        p.y = cy + (Math.random() - 0.5) * 24
+      const scale = Math.min(width(), height()) / 42
+      particles.forEach((p, index) => {
+        const target = heartPoint((index / particleCount) * Math.PI * 2, cx, cy, scale)
+        p.x = cx
+        p.y = cy
+        p.tx = target.x
+        p.ty = target.y
         p.vx = 0
         p.vy = 0
+        p.baseAngle = Math.atan2(target.y - cy, target.x - cx)
+        p.explodeForce = (2.8 + Math.random() * 1.6) * config.intensity
       })
     }
 
@@ -209,6 +220,7 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
       const elapsed = time - startRef.current
       const { phase, localProgress, totalProgress } = phaseProgress(elapsed, config)
       const { x: cx, y: cy } = center()
+      const scale = Math.min(width(), height()) / 42
 
       ctx.fillStyle = `rgba(2, 2, 5, ${phase === 'glow' ? 0.09 : lowPower ? 0.22 : 0.15})`
       ctx.fillRect(0, 0, width(), height())
@@ -217,6 +229,10 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
       const gradEnd = config.gradient[0]
 
       particles.forEach((p, index) => {
+        const target = heartPoint((index / particleCount) * Math.PI * 2, cx, cy, scale)
+        p.tx = target.x
+        p.ty = target.y
+
         if (phase === 'explode') {
           const boost = easeOutQuad(localProgress)
           const angle = p.baseAngle + Math.sin(totalProgress * Math.PI * 2 + index) * 0.18
@@ -225,21 +241,18 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
         }
 
         if (phase === 'orbit') {
-          const orbitAngle = p.baseAngle + time * 0.0018 * (0.8 + config.intensity * 0.1)
-          const orbitR = p.maxRadius * (0.3 + localProgress * 0.35)
-          const ox = cx + Math.cos(orbitAngle) * orbitR
-          const oy = cy + Math.sin(orbitAngle) * orbitR
+          const orbitAngle = time * 0.0018 * (0.8 + config.intensity * 0.1) + p.baseAngle
+          const orbitRadius = p.orbitRadius * (0.9 + localProgress * 0.4)
+          const ox = cx + Math.cos(orbitAngle) * orbitRadius
+          const oy = cy + Math.sin(orbitAngle) * orbitRadius
           p.vx += (ox - p.x) * 0.014
           p.vy += (oy - p.y) * 0.014
         }
 
         if (phase === 'form' || config.phases.includes('form')) {
-          // Pull toward a radial position at ~55% of maxRadius
-          const tx = cx + Math.cos(p.baseAngle) * p.maxRadius * 0.55
-          const ty = cy + Math.sin(p.baseAngle) * p.maxRadius * 0.55
           const force = phase === 'form' ? 0.028 : 0.008
-          p.vx += (tx - p.x) * force
-          p.vy += (ty - p.y) * force
+          p.vx += (p.tx - p.x) * force
+          p.vy += (p.ty - p.y) * force
         }
 
         p.vx *= phase === 'glow' ? 0.82 : 0.9

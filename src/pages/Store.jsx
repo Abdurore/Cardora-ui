@@ -366,7 +366,7 @@ function Store() {
             <div className="store-gifts-intro">
               <h4>Send a gift with your card</h4>
               <p>
-                Each gift plays a unique heart-particle animation in its own colour palette before
+                Each gift plays a unique particle animation in its own colour palette before
                 the recipient receives it. Buy once, attach from Studio.
               </p>
             </div>
