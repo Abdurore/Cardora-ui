@@ -5,26 +5,30 @@ import { PALETTES, applyPalette, getPalettesForTier } from '../lib/palettes.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
 
 const QUICK_FONTS = [
-  { label: 'Poppins',          value: 'Poppins',          sample: 'Modern & Clean' },
-  { label: 'Playfair Display', value: 'Playfair Display', sample: 'Elegant Serif' },
-  { label: 'Montserrat',       value: 'Montserrat',       sample: 'Bold Geometric' },
-  { label: 'Dancing Script',   value: 'Dancing Script',   sample: 'Handwritten' },
-  { label: 'Lora',             value: 'Lora',             sample: 'Literary Charm' },
-  { label: 'Raleway',          value: 'Raleway',          sample: 'Sleek & Thin' },
-  { label: 'Cinzel',           value: 'Cinzel',           sample: 'Classic Roman' },
-  { label: 'Nunito',           value: 'Nunito',           sample: 'Friendly Round' },
+  { label: 'Poppins',          value: 'Poppins',          sample: 'Modern & Clean',   tier: 'classic' },
+  { label: 'Lora',             value: 'Lora',             sample: 'Literary Charm',   tier: 'classic' },
+  { label: 'Nunito',           value: 'Nunito',           sample: 'Friendly Round',   tier: 'classic' },
+  { label: 'Playfair Display', value: 'Playfair Display', sample: 'Elegant Serif',    tier: 'premium' },
+  { label: 'Montserrat',       value: 'Montserrat',       sample: 'Bold Geometric',   tier: 'premium' },
+  { label: 'Dancing Script',   value: 'Dancing Script',   sample: 'Handwritten',      tier: 'elite' },
+  { label: 'Raleway',          value: 'Raleway',          sample: 'Sleek & Thin',     tier: 'elite' },
+  { label: 'Cinzel',           value: 'Cinzel',           sample: 'Classic Roman',    tier: 'elite' },
 ]
 
+const TIER_RANK = { classic: 0, premium: 1, elite: 2 }
 const TIER_LABELS = { classic: 'Free', premium: 'Premium', elite: 'Elite' }
 const TIER_COLORS = { classic: null, premium: '#f4c28a', elite: '#c9a3ff' }
 
 const STEP3_CONFIG = {
-  personal:  { title: 'Your Message',     sub: 'What do you want to say?' },
-  poll:      { title: 'Your Poll',         sub: 'Ask your audience a question' },
-  chain:     { title: 'Challenge',         sub: 'What do you challenge them to do?' },
-  trivia:    { title: 'Your Quiz',         sub: 'Create a question for your recipients' },
-  anonymous: { title: 'Your Message',     sub: 'Recipients can reply anonymously' },
+  personal:  { title: 'Your Message',  sub: 'What do you want to say?' },
+  poll:      { title: 'Your Poll',      sub: 'Ask your audience a question' },
+  chain:     { title: 'Challenge',      sub: 'What do you challenge them to do?' },
+  trivia:    { title: 'Your Quiz',      sub: 'Create a question for your recipients' },
+  anonymous: { title: 'Your Message',  sub: 'Recipients can reply anonymously' },
 }
+
+const MAX_IMAGES = 3
+const PALETTE_INITIAL_COUNT = 5
 
 function QuickCreate() {
   const [params] = useSearchParams()
@@ -33,15 +37,19 @@ function QuickCreate() {
   const cardTierRaw = params.get('tier') || 'classic'
   const cardTier = cardTierRaw.toLowerCase()
 
-  const { handleCreateCard, currentUser, openAuthModal } = useOutletContext()
+  const { createCardOnBackend, currentUser, openAuthModal } = useOutletContext()
 
-  // getPalettesForTier expects a string and handles the hierarchy internally
   const allowedPaletteIds = new Set(getPalettesForTier(cardTier).map(p => p.id))
+  const tierRank = TIER_RANK[cardTier] ?? 0
+  const allowedFontValues = new Set(
+    QUICK_FONTS.filter(f => (TIER_RANK[f.tier] ?? 0) <= tierRank).map(f => f.value)
+  )
 
   const [selectedPalette, setSelectedPalette] = useState(
     getPalettesForTier(cardTier)[0] || PALETTES[0]
   )
   const [selectedFont, setSelectedFont] = useState('Poppins')
+  const [showAllPalettes, setShowAllPalettes] = useState(false)
 
   // Personal
   const [heading, setHeading] = useState('')
@@ -54,7 +62,7 @@ function QuickCreate() {
   // Chain
   const [chainChallenge, setChainChallenge] = useState('')
 
-  // Trivia (single question for Quick Create)
+  // Trivia
   const [triviaQuestion, setTriviaQuestion] = useState('')
   const [triviaOptions, setTriviaOptions] = useState(['', '', '', ''])
   const [triviaCorrect, setTriviaCorrect] = useState(0)
@@ -63,8 +71,8 @@ function QuickCreate() {
   const [anonMessage, setAnonMessage] = useState('')
 
   const [recipient, setRecipient] = useState('')
-  const [imageUrl, setImageUrl] = useState(null)
-  const [imageBlobUrl, setImageBlobUrl] = useState(null)
+  // Multiple images: array of { blobUrl, dataUrl }
+  const [images, setImages] = useState([])
   const [isDragOver, setIsDragOver] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState(null)
@@ -85,19 +93,26 @@ function QuickCreate() {
     )
   }
 
-  const handleImageFile = (file) => {
+  const addImageFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return
-    const blob = URL.createObjectURL(file)
-    setImageBlobUrl(blob)
+    if (images.length >= MAX_IMAGES) return
+    const blobUrl = URL.createObjectURL(file)
     const reader = new FileReader()
-    reader.onload = (e) => setImageUrl(e.target.result)
+    reader.onload = (e) => {
+      setImages(prev => [...prev, { blobUrl, dataUrl: e.target.result }])
+    }
     reader.readAsDataURL(file)
+  }
+
+  const removeImage = (i) => {
+    setImages(prev => prev.filter((_, idx) => idx !== i))
   }
 
   const handleDrop = (e) => {
     e.preventDefault()
     setIsDragOver(false)
-    handleImageFile(e.dataTransfer.files?.[0])
+    const file = e.dataTransfer.files?.[0]
+    if (file) addImageFile(file)
   }
 
   const addPollOption = () => {
@@ -115,7 +130,6 @@ function QuickCreate() {
 
   const handleSend = async () => {
     setError(null)
-    // Validate per type
     if (cardType === 'personal') {
       if (!heading.trim()) { setError('Please add a heading.'); return }
       if (!body.trim()) { setError('Please add a message.'); return }
@@ -144,9 +158,13 @@ function QuickCreate() {
             : baseCard.content,
         media: {
           ...(baseCard.media || {}),
-          images: imageUrl
-            ? [{ url: imageUrl, fit: 'cover', positionX: 50, positionY: 50, height: 180 }]
-            : [],
+          images: images.map(img => ({
+            url: img.dataUrl,
+            fit: 'cover',
+            positionX: 50,
+            positionY: 50,
+            height: 180,
+          })),
         },
       }
 
@@ -166,7 +184,7 @@ function QuickCreate() {
           }
         : undefined
 
-      const result = await handleCreateCard(cardObject, {
+      const result = await createCardOnBackend(cardObject, {
         type: cardType,
         tier: cardTier,
         poll: pollData,
@@ -243,6 +261,9 @@ function QuickCreate() {
     : cardType === 'poll' ? pollOptions.filter(o => o.trim()).join(' · ')
     : ''
 
+  const visiblePalettes = showAllPalettes ? PALETTES : PALETTES.slice(0, PALETTE_INITIAL_COUNT)
+  const hiddenCount = PALETTES.length - PALETTE_INITIAL_COUNT
+
   return (
     <div className="qc-shell">
       {/* Topbar */}
@@ -272,7 +293,7 @@ function QuickCreate() {
           {/* ── Form pane ── */}
           <div className="qc-form-pane">
 
-            {/* Mobile-only live preview (desktop shows preview pane on right) */}
+            {/* Mobile-only live preview */}
             <div className="qc-mobile-preview">
               <p className="qc-preview-label">Live Preview</p>
               <div
@@ -287,9 +308,9 @@ function QuickCreate() {
                   <span className="qc-mini-seal" style={{ background: selectedPalette.primary }} />
                   <span className="qc-mini-brand" style={{ color: selectedPalette.ink }}>Cardora</span>
                 </div>
-                {imageBlobUrl && (
+                {images[0] && (
                   <div className="qc-mini-img-wrap">
-                    <img src={imageBlobUrl} alt="" className="qc-mini-img" />
+                    <img src={images[0].blobUrl} alt="" className="qc-mini-img" />
                   </div>
                 )}
                 <h3
@@ -327,7 +348,7 @@ function QuickCreate() {
                 </div>
               </div>
               <div className="qc-palette-grid">
-                {PALETTES.map((p) => {
+                {visiblePalettes.map((p) => {
                   const locked = !allowedPaletteIds.has(p.id)
                   return (
                     <button
@@ -358,6 +379,24 @@ function QuickCreate() {
                   )
                 })}
               </div>
+              {!showAllPalettes && hiddenCount > 0 && (
+                <button
+                  type="button"
+                  className="qc-show-more-btn"
+                  onClick={() => setShowAllPalettes(true)}
+                >
+                  Show {hiddenCount} more themes ↓
+                </button>
+              )}
+              {showAllPalettes && (
+                <button
+                  type="button"
+                  className="qc-show-more-btn"
+                  onClick={() => setShowAllPalettes(false)}
+                >
+                  Show less ↑
+                </button>
+              )}
             </section>
 
             {/* Step 2: Font */}
@@ -370,18 +409,28 @@ function QuickCreate() {
                 </div>
               </div>
               <div className="qc-font-strip">
-                {QUICK_FONTS.map((f) => (
-                  <button
-                    key={f.value}
-                    type="button"
-                    className={`qc-font-chip${selectedFont === f.value ? ' active' : ''}`}
-                    onClick={() => setSelectedFont(f.value)}
-                  >
-                    <span className="qc-font-chip-sample" style={{ fontFamily: `'${f.value}', serif` }}>Aa</span>
-                    <span className="qc-font-chip-label">{f.label}</span>
-                    <span className="qc-font-chip-sub">{f.sample}</span>
-                  </button>
-                ))}
+                {QUICK_FONTS.map((f) => {
+                  const locked = !allowedFontValues.has(f.value)
+                  return (
+                    <button
+                      key={f.value}
+                      type="button"
+                      className={`qc-font-chip${selectedFont === f.value && !locked ? ' active' : ''}${locked ? ' locked' : ''}`}
+                      onClick={() => locked ? navigate('/store') : setSelectedFont(f.value)}
+                      title={locked ? `Unlock with ${TIER_LABELS[f.tier]} tier` : f.label}
+                    >
+                      {locked && <span className="qc-font-lock">🔒</span>}
+                      <span className="qc-font-chip-sample" style={{ fontFamily: `'${f.value}', serif` }}>Aa</span>
+                      <span className="qc-font-chip-label">{f.label}</span>
+                      <span className="qc-font-chip-sub">{f.sample}</span>
+                      {locked && (
+                        <span className="qc-font-tier-badge" style={{ color: TIER_COLORS[f.tier] }}>
+                          {TIER_LABELS[f.tier]}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </section>
 
@@ -548,12 +597,14 @@ function QuickCreate() {
               )}
             </section>
 
-            {/* Step 4: Photo */}
+            {/* Step 4: Photos */}
             <section className="qc-step">
               <div className="qc-step-header">
                 <span className="qc-step-num">4</span>
                 <div>
-                  <h3 className="qc-step-title">Photo <span className="qc-optional">optional</span></h3>
+                  <h3 className="qc-step-title">
+                    Photos <span className="qc-optional">optional · up to {MAX_IMAGES}</span>
+                  </h3>
                   <p className="qc-step-sub">Add a personal touch</p>
                 </div>
               </div>
@@ -562,17 +613,36 @@ function QuickCreate() {
                 type="file"
                 accept="image/*"
                 style={{ display: 'none' }}
-                onChange={e => handleImageFile(e.target.files?.[0])}
+                onChange={e => { if (e.target.files?.[0]) addImageFile(e.target.files[0]); e.target.value = '' }}
               />
-              {imageBlobUrl ? (
-                <div className="qc-img-preview">
-                  <img src={imageBlobUrl} alt="preview" className="qc-img-preview-img" />
-                  <div className="qc-img-preview-actions">
-                    <button type="button" className="qc-img-change" onClick={() => fileInputRef.current?.click()}>Change</button>
-                    <button type="button" className="qc-img-remove" onClick={() => { setImageBlobUrl(null); setImageUrl(null) }}>Remove</button>
-                  </div>
+              {images.length > 0 && (
+                <div className="qc-img-grid">
+                  {images.map((img, i) => (
+                    <div key={i} className="qc-img-grid-item">
+                      <img src={img.blobUrl} alt="" className="qc-img-grid-thumb" />
+                      <button
+                        type="button"
+                        className="qc-img-grid-remove"
+                        onClick={() => removeImage(i)}
+                        title="Remove photo"
+                      >✕</button>
+                    </div>
+                  ))}
+                  {images.length < MAX_IMAGES && (
+                    <button
+                      type="button"
+                      className="qc-img-grid-add"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                        <path d="M11 4v14M4 11h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                      </svg>
+                      <span>Add</span>
+                    </button>
+                  )}
                 </div>
-              ) : (
+              )}
+              {images.length === 0 && (
                 <div
                   className={`qc-dropzone${isDragOver ? ' drag-over' : ''}`}
                   onClick={() => fileInputRef.current?.click()}
@@ -586,8 +656,8 @@ function QuickCreate() {
                       <path d="M4 22h20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                     </svg>
                   </div>
-                  <p className="qc-dropzone-text">Drop a photo here or <span>browse</span></p>
-                  <p className="qc-dropzone-hint">PNG, JPG, WEBP</p>
+                  <p className="qc-dropzone-text">Drop photos here or <span>browse</span></p>
+                  <p className="qc-dropzone-hint">PNG, JPG, WEBP · up to {MAX_IMAGES} photos</p>
                 </div>
               )}
             </section>
@@ -650,9 +720,9 @@ function QuickCreate() {
                   <span className="qc-mini-seal" style={{ background: selectedPalette.primary }} />
                   <span className="qc-mini-brand" style={{ color: selectedPalette.ink }}>Cardora</span>
                 </div>
-                {imageBlobUrl && (
+                {images[0] && (
                   <div className="qc-mini-img-wrap">
-                    <img src={imageBlobUrl} alt="" className="qc-mini-img" />
+                    <img src={images[0].blobUrl} alt="" className="qc-mini-img" />
                   </div>
                 )}
                 <h3
