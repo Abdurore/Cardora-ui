@@ -7304,17 +7304,26 @@ a {
 
 .cs-nav-btn.send,
 .cs-nav-btn.publish {
-  background: linear-gradient(135deg, #7ef7ff, #62ffa2);
   border-color: transparent;
   color: #051018;
   font-weight: 600;
-  box-shadow: 0 4px 16px rgba(126, 247, 255, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, filter 0.2s ease;
+}
+
+.cs-nav-btn.publish {
+  background: linear-gradient(135deg, #7ef7ff, #62ffa2);
+}
+
+.cs-nav-btn.send {
+  background: var(--send-gradient, linear-gradient(135deg, #7ef7ff, #62ffa2));
 }
 
 .cs-nav-btn.send:hover,
 .cs-nav-btn.publish:hover {
-  box-shadow: 0 8px 28px rgba(126, 247, 255, 0.4);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
   transform: translateY(-1px);
+  filter: brightness(1.08);
 }
 
 .cs-nav-btn.disabled,
@@ -10532,12 +10541,24 @@ a {
    MOBILE RESPONSIVE FIXES â€” All pages
    ======================================================================== */
 
-/* â€”â€”â€” Small mobile (â‰¤480px) â€” Home, Explore, General â€”â€”â€” */
+/* ——— Small mobile (≤480px) — Home, Explore, General ——— */
 @media (max-width: 768px) {
   /* Card floats inside the backdrop with visible margins */
   .cp-overlay {
     padding: 20px 16px;
     align-items: center;
+  }
+
+  /* In recipient page-mode, the envelope and card fill the full screen */
+  .cp-overlay.cp-device-fullscreen {
+    padding: 0;
+    align-items: stretch;
+  }
+  .cp-overlay.cp-device-fullscreen .envelope-scene {
+    min-height: 100dvh;
+    height: 100%;
+    border-radius: 0;
+    width: 100%;
   }
 
   .cp-card-wrap-full {
@@ -23063,4 +23084,121 @@ a {
 .cp-chain-name-input:focus { border-color: currentColor !important; }
 .cp-chain-reply-sent { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
 .cp-chain-sent-msg { font-size: 0.9rem; font-weight: 700; margin: 0; }
+
+/* ═══════════════════════════════════════════════════════
+   LIGHT THEME
+   Applied when <html data-theme="light">
+   Only overrides the most visible dark backgrounds.
+   Accent colours, gradients and card preview styles stay.
+   ═══════════════════════════════════════════════════════ */
+
+/* Theme toggle button */
+.theme-toggle-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.7); border-radius: 999px;
+  padding: 6px 14px; font-size: 0.78rem; cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.theme-toggle-btn:hover { background: rgba(255,255,255,0.12); color: #e2eaf0; }
+[data-theme="light"] .theme-toggle-btn {
+  background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.15);
+  color: rgba(0,0,0,0.6);
+}
+[data-theme="light"] .theme-toggle-btn:hover { background: rgba(0,0,0,0.1); color: #111; }
+
+[data-theme="light"] body { background: #f3f6fa; color: #1a2332; }
+
+/* App shell */
+[data-theme="light"] .screen-header {
+  background: rgba(245,248,252,0.96) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.09) !important;
+  backdrop-filter: blur(16px);
+}
+[data-theme="light"] .screen-header-logo-wordmark { color: #0c1420 !important; }
+[data-theme="light"] .screen-header-balance { color: #2a6; }
+[data-theme="light"] .screen-header-avatar-initial { color: #0c1420; }
+[data-theme="light"] .screen-nav {
+  background: rgba(245,248,252,0.97) !important;
+  border-top: 1px solid rgba(0,0,0,0.09) !important;
+}
+[data-theme="light"] .screen-nav-item { color: #556070; }
+[data-theme="light"] .screen-nav-item.active { color: #0077cc; }
+
+/* Pages */
+[data-theme="light"] .page-section { background: #f3f6fa; }
+[data-theme="light"] .topbar,
+[data-theme="light"] .hero-shell { background: linear-gradient(160deg, #e8f0fa, #f3f6fa) !important; }
+[data-theme="light"] .section-title { color: #1a2332; }
+[data-theme="light"] .eyebrow { color: #0077cc; }
+
+/* Cards on explore/home */
+[data-theme="light"] .card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08) !important;
+}
+[data-theme="light"] .card h4 { color: #1a2332; }
+[data-theme="light"] .card-stat { color: #556070; }
+[data-theme="light"] .card-overlay { background: rgba(0,40,100,0.7) !important; }
+
+/* Explore */
+[data-theme="light"] .explore-screen { background: #f3f6fa; }
+[data-theme="light"] .explore-filter-row button,
+[data-theme="light"] .explore-occasion-filter button {
+  background: rgba(0,0,0,0.05);
+  border-color: rgba(0,0,0,0.12);
+  color: #334;
+}
+[data-theme="light"] .explore-filter-row button.active,
+[data-theme="light"] .explore-occasion-filter button.active {
+  background: #0077cc;
+  color: #fff;
+  border-color: #0077cc;
+}
+[data-theme="light"] .explore-search-bar input {
+  background: #fff;
+  border-color: rgba(0,0,0,0.15);
+  color: #1a2332;
+}
+
+/* Profile */
+[data-theme="light"] .profile-wrap { background: #f3f6fa; }
+[data-theme="light"] .profile-card-analytics { background: #eef2f7; color: #334; border-radius: 8px; }
+
+/* WorldChat */
+[data-theme="light"] .chat-page { background: #f3f6fa; }
+[data-theme="light"] .chat-header-bar { background: rgba(245,248,252,0.96) !important; border-bottom: 1px solid rgba(0,0,0,0.09) !important; }
+[data-theme="light"] .chat-message-bubble { background: #fff; border-color: rgba(0,0,0,0.08); color: #1a2332; }
+[data-theme="light"] .chat-message-input { background: #fff; border-color: rgba(0,0,0,0.15); color: #1a2332; }
+[data-theme="light"] .chat-input-bar { background: rgba(245,248,252,0.97); border-top: 1px solid rgba(0,0,0,0.09); }
+
+/* Modals */
+[data-theme="light"] .modal-overlay { background: rgba(0,0,0,0.45); }
+[data-theme="light"] .modal-card,
+[data-theme="light"] .auth-modal { background: #fff !important; border-color: rgba(0,0,0,0.1) !important; color: #1a2332; }
+[data-theme="light"] .auth-modal input,
+[data-theme="light"] .auth-modal select { background: #f5f7fa; border-color: rgba(0,0,0,0.15); color: #1a2332; }
+
+/* Card Studio */
+[data-theme="light"] .cs-layout { background: #f3f6fa; }
+[data-theme="light"] .cs-toolrail { background: #fff; border-right-color: rgba(0,0,0,0.09); }
+[data-theme="light"] .cs-panel { background: #fff; border-left-color: rgba(0,0,0,0.09); }
+[data-theme="light"] .cs-panel h3,
+[data-theme="light"] .cs-panel p { color: #1a2332; }
+[data-theme="light"] .cs-field input,
+[data-theme="light"] .cs-field select,
+[data-theme="light"] .cs-field textarea { background: #f5f7fa; border-color: rgba(0,0,0,0.15); color: #1a2332; }
+[data-theme="light"] .cs-topbar { background: #fff; border-bottom-color: rgba(0,0,0,0.09); }
+
+/* Admin */
+[data-theme="light"] .admin-page { background: #f3f6fa; }
+[data-theme="light"] .admin-section { background: #fff; border-color: rgba(0,0,0,0.09); }
+[data-theme="light"] .admin-table th { background: #eef2f7; color: #556070; }
+[data-theme="light"] .admin-table td { border-color: rgba(0,0,0,0.07); color: #1a2332; }
+[data-theme="light"] .admin-stat-card { background: #fff; border-color: rgba(0,0,0,0.09); }
+[data-theme="light"] .admin-stat-value { color: #1a2332; }
+[data-theme="light"] .admin-field input,
+[data-theme="light"] .admin-field select { background: #f5f7fa; border-color: rgba(0,0,0,0.15); color: #1a2332; }
+[data-theme="light"] .admin-field span { color: #556070; }
 

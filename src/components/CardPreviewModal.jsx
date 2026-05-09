@@ -206,7 +206,6 @@ function CardPreviewModal({
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const c = cardObject
-  const hasQuestions = toolAllowed('questions') && limit('allowQuestions') && c.questions.items.length > 0
   const hasGift = toolAllowed('gifts') && limit('allowGifts') && c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
   const hasFadeIn = toolAllowed('cardStyle') && limit('allowFadeIn') && Number(c.card.textBodyAnimation.fadeInDuration) > 0
   const hasTypewriter = toolAllowed('cardStyle') && limit('allowTypewriter') && Number(c.card.textBodyAnimation.selfTypeSpeed) > 0
@@ -229,7 +228,7 @@ function CardPreviewModal({
 
     audioRef.current.volume = c.background.music.volume
 
-    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply' || stage === 'chainReplies') {
+    if (stage === 'open' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply' || stage === 'chainReplies') {
       // Honour trim window: jump to start point if we're outside the segment.
       if (musicTrimmed) {
         const t = audioRef.current.currentTime
@@ -339,12 +338,7 @@ function CardPreviewModal({
       setStage('chainReplies')
       return
     }
-    if (hasQuestions) {
-      setStage('questions')
-      setQuestionIdx(0)
-    } else {
-      setStage('end')
-    }
+    setStage('end')
   }
 
   const handleNextQ = () => {
@@ -541,7 +535,7 @@ function CardPreviewModal({
   const continueLabel = studioType === 'poll' ? 'Vote Now'
     : studioType === 'trivia' ? 'Start Quiz'
     : studioType === 'anonymous' ? 'Preview Inbox'
-    : hasQuestions ? 'Continue' : 'Done'
+    : 'Done'
 
   const inner = (
     <section className={`cp-overlay cp-device-${pageMode ? 'fullscreen' : previewDevice}`} ref={containerRef}>
@@ -1313,61 +1307,6 @@ function CardPreviewModal({
                     </button>
                   </div>
                 )}
-              </div>
-            </article>,
-            'cp-gradient-border-full'
-          )}
-        </div>
-      )}
-
-      {/* QUESTIONS */}
-      {stage === 'questions' && c.questions.items[questionIdx] && (
-        <div className="cp-card-wrap cp-card-wrap-full">
-          {renderGradientBorder(
-            <article
-              className="cp-card cp-card-full cp-question-card"
-              style={cardSurfaceStyle(borderStyle)}
-            >
-              <p className="cp-q-label" style={{ color: c.theme.accentColor }}>
-                Question {questionIdx + 1} of {c.questions.items.length}
-              </p>
-              <h3
-                className="cp-q-text"
-                style={{
-                  color: c.card.headingColor,
-                  fontFamily: `'${c.theme.fontFamily}', serif`,
-                }}
-              >
-                {c.questions.items[questionIdx].text}
-              </h3>
-              <div className="cp-q-actions">
-                <button
-                  className="cp-q-btn yes"
-                  style={{
-                    backgroundColor: c.questions.button.backgroundColor,
-                    color: c.questions.button.textColor,
-                    border: `1.5px solid ${c.questions.button.borderColor}`,
-                  }}
-                  onClick={handleNextQ}
-                >
-                  Yes
-                </button>
-                <button
-                  className={`cp-q-btn no ${c.questions.denyBehavior === 'switch' ? 'deny-switch' : ''}`}
-                  style={{
-                    backgroundColor: 'transparent',
-                    color: c.questions.button.textColor,
-                    border: `1.5px solid ${c.questions.button.borderColor}40`,
-                  }}
-                  onClick={c.questions.denyBehavior === 'switch' ? undefined : handleNextQ}
-                  onMouseEnter={c.questions.denyBehavior === 'switch' ? (e) => {
-                    const x = Math.floor(Math.random() * 120) - 60
-                    const y = Math.floor(Math.random() * 80) - 40
-                    e.currentTarget.style.transform = `translate(${x}px, ${y}px)`
-                  } : undefined}
-                >
-                  No
-                </button>
               </div>
             </article>,
             'cp-gradient-border-full'

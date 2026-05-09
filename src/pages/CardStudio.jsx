@@ -28,7 +28,7 @@ const BRAND_LOGO = '/cardora-logo.png?v=4'
 
 // Steps vary by type — non-personal cards don't have envelope
 const STEPS_BY_TYPE = {
-  personal:  ['closed', 'card', 'questions', 'preview'],
+  personal:  ['closed', 'card', 'preview'],
   poll:      ['card', 'preview'],
   trivia:    ['card', 'preview'],
   chain:     ['card', 'preview'],
@@ -36,7 +36,7 @@ const STEPS_BY_TYPE = {
 }
 
 const STEP_LABELS_BY_TYPE = {
-  personal:  { closed: 'Envelope', card: 'Card', questions: 'Q&A', preview: 'Preview' },
+  personal:  { closed: 'Envelope', card: 'Card', preview: 'Preview' },
   poll:      { card: 'Poll', preview: 'Preview' },
   trivia:    { card: 'Trivia', preview: 'Preview' },
   chain:     { card: 'Chain', preview: 'Preview' },
@@ -52,7 +52,6 @@ const ALL_TOOLS = [
   { id: 'cardStyle', icon: HiOutlineSparkles, label: 'Card Style', hint: 'Border, scrollbar, text FX', group: 'Style' },
   { id: 'animation', icon: HiOutlineSparkles, label: 'Animation', hint: 'Confetti & effects', group: 'Effects' },
   { id: 'gifts', icon: HiOutlineGift, label: 'Gifts', hint: 'End-of-card gift reveal', group: 'Interactive' },
-  { id: 'questions', icon: HiOutlineChatBubbleLeft, label: 'Questions', hint: 'Receiver interaction', group: 'Interactive' },
   { id: 'interaction', icon: HiOutlineLockClosed, label: 'Interaction', hint: 'Lock & reveal', group: 'Interactive' },
   { id: 'poll', icon: HiOutlineChartBarSquare, label: 'Poll', hint: 'Question with selectable choices', group: 'Interactive' },
   { id: 'trivia', icon: HiOutlineLightBulb, label: 'Trivia', hint: 'Scored quiz with correct answers', group: 'Interactive' },
@@ -65,15 +64,6 @@ const TOOL_GROUP_ORDER = ['Content', 'Style', 'Effects', 'Interactive']
 // Curated question prompts. Senders rarely come in with a question already
 // written — these turn the questions panel from a blank array builder into a
 // "pick & remix" surface.
-const QUESTION_PRESETS = [
-  { id: 'one-thing', emoji: '💌', text: 'What\'s one thing you\'ll always remember about us?' },
-  { id: 'feel-now', emoji: '✨', text: 'How do you feel reading this right now?' },
-  { id: 'reply-back', emoji: '🎈', text: 'If you could send one word back, what would it be?' },
-  { id: 'gratitude', emoji: '🌷', text: 'What\'s something you\'ve been grateful for lately?' },
-  { id: 'next-meet', emoji: '📍', text: 'When are we seeing each other next?' },
-  { id: 'secret', emoji: '🔒', text: 'Tell me a secret only you and I would know.' },
-]
-
 // Named gradient/animated border presets. `tier` decides minimum tier. The
 // `mode` field hints whether the preset is best paired with `gradient` or
 // `animated` border type — clicking it writes both `colors` and `type`.
@@ -95,7 +85,7 @@ const BORDER_PRESETS = [
 const TOOLS_BY_TYPE_TIER = {
   'personal:classic': ['closedState', 'content', 'background', 'theme'],
   'personal:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
-  'personal:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'questions', 'interaction', 'gifts'],
+  'personal:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'gifts'],
   'poll:classic':   ['content', 'background', 'theme', 'poll'],
   'poll:premium':   ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'poll'],
   'trivia:classic': ['content', 'background', 'theme', 'trivia'],
@@ -120,6 +110,14 @@ const TYPE_ACCENT = {
   trivia:    '#a78bfa',
   chain:     '#f97316',
   anonymous: '#7ef7ff',
+}
+
+const TYPE_SEND_GRADIENT = {
+  personal:  'linear-gradient(135deg, #fbbf24, #f97316)',
+  poll:      'linear-gradient(135deg, #60a5fa, #818cf8)',
+  trivia:    'linear-gradient(135deg, #c084fc, #a78bfa)',
+  chain:     'linear-gradient(135deg, #34d399, #10b981)',
+  anonymous: 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
 }
 
 const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
@@ -798,7 +796,6 @@ function CardStudio() {
       else if (studioType === 'anonymous') setActiveTool('anon')
       else setActiveTool('content')
     }
-    if (step === 'questions') setActiveTool('questions')
     if (step === 'preview') {
       setShowPreview(true)
     }
@@ -1016,22 +1013,6 @@ function CardStudio() {
     dragStateRef.current = { mode: 'resize', imgIndex }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp, { once: true })
-  }
-
-  const addQuestion = () => {
-    if (c.questions.items.length >= 1) return // max 1 question
-    const items = [...c.questions.items, { text: 'New question?' }]
-    update('questions.items', items)
-  }
-
-  const removeQuestion = (idx) => {
-    update('questions.items', c.questions.items.filter((_, i) => i !== idx))
-  }
-
-  const updateQuestion = (idx, text) => {
-    const items = [...c.questions.items]
-    items[idx] = { ...items[idx], text }
-    update('questions.items', items)
   }
 
   const addConfettiColor = () => {
@@ -1822,78 +1803,6 @@ function CardStudio() {
       )
     }
 
-    // QUESTIONS
-    if (activeTool === 'questions') {
-      const usedTexts = new Set(c.questions.items.map(q => (q.text || '').trim()))
-      return (
-        <>
-          <p className="cs-panel-eyebrow">Questions</p>
-          <h3>Receiver interaction flow</h3>
-
-          <div className="cs-sub-section">
-            <p className="cs-sub-label">Quick-add presets</p>
-            <div className="cs-q-presets">
-              {QUESTION_PRESETS.map((preset) => {
-                const used = usedTexts.has(preset.text)
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    className={`cs-q-preset ${used ? 'used' : ''}`}
-                    onClick={() => {
-                      if (used) return
-                      // Replace existing question (max 1 question)
-                      update('questions.items', [{ text: preset.text }])
-                    }}
-                    disabled={used}
-                    title={used ? 'Already added' : 'Add this prompt'}
-                  >
-                    <span className="cs-q-preset-emoji">{preset.emoji}</span>
-                    <span className="cs-q-preset-text">{preset.text}</span>
-                    {used && <span className="cs-q-preset-check">✓</span>}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {c.questions.items.map((q, i) => (
-            <div key={i} className="cs-question-card">
-              <label className="cs-field">
-                <span>Question {i + 1}</span>
-                <input value={q.text} onChange={e => updateQuestion(i, e.target.value)} />
-              </label>
-              <button type="button" className="cs-remove-btn" onClick={() => removeQuestion(i)}>Remove</button>
-            </div>
-          ))}
-          {c.questions.items.length < 1 && (
-            <button type="button" className="cs-button" onClick={addQuestion}>+ Add custom question</button>
-          )}
-
-          {(tierLimits.allowCustomPalette || isArtist) && (
-            <div className="cs-sub-section">
-              <p className="cs-sub-label">Button Style</p>
-              <ColorInput label="Text Color" value={c.questions.button.textColor} onChange={e => update('questions.button.textColor', e.target.value)} />
-              <ColorInput label="Border Color" value={c.questions.button.borderColor} onChange={e => update('questions.button.borderColor', e.target.value)} />
-              <ColorInput label="Background" value={c.questions.button.backgroundColor} onChange={e => update('questions.button.backgroundColor', e.target.value)} />
-            </div>
-          )}
-
-          <label className="cs-field">
-            <span>Deny Behavior</span>
-            <Dropdown
-              value={c.questions.denyBehavior}
-              onChange={(v) => update('questions.denyBehavior', v)}
-              options={[
-                { value: 'none', label: 'Normal' },
-                { value: 'switch', label: 'Dodge (button moves away)' },
-              ]}
-            />
-          </label>
-        </>
-      )
-    }
-
     // INTERACTION
     if (activeTool === 'interaction') {
       return (
@@ -2294,14 +2203,18 @@ function CardStudio() {
             {c.content.heading}
           </h3>
           <p
-            className="cs-preview-poll-question cs-clickable-preview"
-            style={{ color: c.card.textColor }}
-            onClick={e => { e.stopPropagation(); setActiveTool('poll'); setActiveStep('card') }}
-            title="Click to edit poll question"
+            contentEditable={!compact}
+            suppressContentEditableWarning
+            data-placeholder="Ask a question…"
+            className={`cs-editable cs-preview-poll-question${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
+            style={{ color: c.card.textColor, outline: 'none' }}
+            onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
+            onBlur={e => { if (!compact) setPollData(prev => ({ ...prev, question: e.currentTarget.textContent })) }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
           >
             {pollData.question || 'Ask a question your recipients can answer instantly.'}
           </p>
-          <div className="cs-preview-poll-options" onClick={e => { e.stopPropagation(); setActiveTool('poll'); setActiveStep('card') }} title="Click to edit options" style={{ cursor: 'pointer' }}>
+          <div className="cs-preview-poll-options" onClick={e => e.stopPropagation()} style={{ cursor: 'default' }}>
             {(previewPollOptions.length > 0 ? previewPollOptions : ['Option 1', 'Option 2', 'Option 3']).map((opt, i) => (
               <div key={i} className="cs-preview-poll-option cs-clickable-preview" style={{ color: c.card.textColor }}>
                 <span className="cs-preview-poll-dot" />
@@ -2313,13 +2226,23 @@ function CardStudio() {
             <span>Tap to vote</span>
             <span>Results unlock after submit</span>
           </div>
-          {/* Floating toolbar for heading edits */}
-          {!compact && activeEditEl?.type === 'heading' && (
+          {/* Floating toolbar for heading / question edits */}
+          {!compact && activeEditEl && (activeEditEl.type === 'heading' || activeEditEl.type === 'body') && (
             <div className="cs-edit-toolbar" onClick={e => e.stopPropagation()}>
-              <span className="cs-edit-toolbar-label">Heading</span>
-              <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
-              <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
-              <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+              {activeEditEl.type === 'heading' && (
+                <>
+                  <span className="cs-edit-toolbar-label">Heading</span>
+                  <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
+                  <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
+                  <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+                </>
+              )}
+              {activeEditEl.type === 'body' && (
+                <>
+                  <span className="cs-edit-toolbar-label">Question</span>
+                  <InlineColorPicker value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} presets={colorPresets} label="Color" />
+                </>
+              )}
               <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
             </div>
           )}
@@ -2366,8 +2289,17 @@ function CardStudio() {
           >
             Question 1 of {Math.max(triviaData.questions.length, 1)}
           </p>
-          <div className="cs-preview-trivia-q cs-clickable-preview" style={{ color: c.card.textColor }} onClick={e => { e.stopPropagation(); setActiveTool('trivia'); setActiveStep('card') }} title="Click to edit">
-            <p>{previewQuestion.text || 'Place your first quiz question here.'}</p>
+          <div className="cs-preview-trivia-q" style={{ color: c.card.textColor }}>
+            <p
+              contentEditable={!compact}
+              suppressContentEditableWarning
+              data-placeholder="Place your first quiz question here."
+              className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
+              style={{ outline: 'none' }}
+              onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
+              onBlur={e => { if (!compact) setTriviaData(prev => { const qs = [...prev.questions]; qs[0] = { ...qs[0], text: e.currentTarget.textContent }; return { ...prev, questions: qs } }) }}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+            >{previewQuestion.text || 'Place your first quiz question here.'}</p>
           </div>
           <div className="cs-preview-trivia-opts" onClick={e => { e.stopPropagation(); setActiveTool('trivia'); setActiveStep('card') }} style={{ cursor: 'pointer' }}>
             {(previewQuestion.options?.length ? previewQuestion.options : ['', '', '', '']).map((opt, oi) => (
@@ -2384,13 +2316,23 @@ function CardStudio() {
           <p className="cs-preview-trivia-score">
             {triviaData.questions.length || 1} question{(triviaData.questions.length || 1) !== 1 ? 's' : ''} · interactive result screen
           </p>
-          {/* Floating toolbar for heading edits */}
-          {!compact && activeEditEl?.type === 'heading' && (
+          {/* Floating toolbar for heading / question edits */}
+          {!compact && activeEditEl && (activeEditEl.type === 'heading' || activeEditEl.type === 'body') && (
             <div className="cs-edit-toolbar" onClick={e => e.stopPropagation()}>
-              <span className="cs-edit-toolbar-label">Heading</span>
-              <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
-              <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
-              <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+              {activeEditEl.type === 'heading' && (
+                <>
+                  <span className="cs-edit-toolbar-label">Heading</span>
+                  <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
+                  <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
+                  <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+                </>
+              )}
+              {activeEditEl.type === 'body' && (
+                <>
+                  <span className="cs-edit-toolbar-label">Question</span>
+                  <InlineColorPicker value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} presets={colorPresets} label="Color" />
+                </>
+              )}
               <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
             </div>
           )}
@@ -2482,8 +2424,9 @@ function CardStudio() {
     if (studioType === 'anon' || studioType === 'anonymous') {
       const accent = c.theme.accentColor || '#7ef7ff'
       const cardBg = c.card.backgroundColor || '#07111a'
+      const headingSize = c.theme.headingSize ?? 28
       return (
-        <div className={`cs-preview-anon ${compact ? 'compact' : ''}`}>
+        <div className={`cs-preview-anon ${compact ? 'compact' : ''}`} onClick={() => setActiveEditEl(null)}>
           {/* View toggle */}
           <div className="cs-anon-preview-tabs">
             <button
@@ -2514,12 +2457,28 @@ function CardStudio() {
                   <p className="cs-preview-anon-username" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>@recipient</p>
                 </div>
               </div>
-              {(c.content.heading || c.content.body) && (
-                <div className="cs-preview-anon-copy">
-                  {c.content.heading && <h4 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>{c.content.heading}</h4>}
-                  {c.content.body && <p style={{ color: c.card.textColor }}>{c.content.body}</p>}
-                </div>
-              )}
+              <div className="cs-preview-anon-copy">
+                <h4
+                  contentEditable={!compact}
+                  suppressContentEditableWarning
+                  data-placeholder="Heading (optional)"
+                  className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
+                  style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
+                  onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
+                  onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+                >{c.content.heading || ''}</h4>
+                <p
+                  contentEditable={!compact}
+                  suppressContentEditableWarning
+                  data-placeholder="A note for senders (optional)…"
+                  className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
+                  style={{ color: c.card.textColor, outline: 'none' }}
+                  onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
+                  onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
+                >{c.content.body || ''}</p>
+              </div>
               <div className="cs-preview-anon-textarea-mock" style={{ borderColor: `${accent}28`, color: `${c.card.textColor}88` }}>
                 Write something honest, kind, or surprising…
               </div>
@@ -2540,10 +2499,26 @@ function CardStudio() {
                 <p className="cs-preview-anon-eyebrow">&#x1F441;&#xFE0F; Anonymous Inbox</p>
                 <span className="cs-preview-pill">{anonTemplate.tier === 'premium' ? 'Premium' : 'Classic'}</span>
               </div>
-              <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
-                {c.content.heading || 'Your inbox card'}
-              </h3>
-              {c.content.body && <p style={{ color: c.card.textColor, fontSize: '0.8rem', marginBottom: 10 }}>{c.content.body}</p>}
+              <h3
+                contentEditable={!compact}
+                suppressContentEditableWarning
+                data-placeholder="Your inbox card"
+                className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
+                style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, outline: 'none' }}
+                onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
+                onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+              >{c.content.heading || 'Your inbox card'}</h3>
+              <p
+                contentEditable={!compact}
+                suppressContentEditableWarning
+                data-placeholder="Add a description…"
+                className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
+                style={{ color: c.card.textColor, fontSize: '0.8rem', marginBottom: 10, outline: 'none' }}
+                onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
+                onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
+              >{c.content.body || ''}</p>
               <div className="cs-preview-anon-messages">
                 {[
                   '"You make people feel seen. Keep going."',
@@ -2559,6 +2534,26 @@ function CardStudio() {
             </div>
           )}
 
+          {/* Floating toolbar for anon heading / body */}
+          {!compact && activeEditEl && (activeEditEl.type === 'heading' || activeEditEl.type === 'body') && (
+            <div className="cs-edit-toolbar" onClick={e => e.stopPropagation()}>
+              {activeEditEl.type === 'heading' && (
+                <>
+                  <span className="cs-edit-toolbar-label">Heading</span>
+                  <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
+                  <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
+                  <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+                </>
+              )}
+              {activeEditEl.type === 'body' && (
+                <>
+                  <span className="cs-edit-toolbar-label">Body</span>
+                  <InlineColorPicker value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} presets={colorPresets} label="Color" />
+                </>
+              )}
+              <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
+            </div>
+          )}
           <div className="cs-preview-watermark">
             <span>Made with </span>
             <a href="/" className="cs-preview-watermark-cta">Cardora</a>
@@ -2728,14 +2723,6 @@ function CardStudio() {
           </div>
         )}
 
-        {c.questions.items.length > 0 && (
-          <div className="cs-preview-questions">
-            <p className="cs-q-label">Questions ({c.questions.items.length})</p>
-            {c.questions.items.map((q, i) => (
-              <div key={i} className="cs-q-preview-item"><span>{q.text}</span></div>
-            ))}
-          </div>
-        )}
         <div className="cs-preview-watermark">
           <span>Made with </span>
           <a href="/" className="cs-preview-watermark-cta">Cardora</a>
@@ -2828,8 +2815,9 @@ function CardStudio() {
               className="cs-nav-btn send"
               disabled={isSending}
               onClick={handleSendClick}
+              style={{ '--send-gradient': TYPE_SEND_GRADIENT[studioType] || TYPE_SEND_GRADIENT.personal }}
             >
-              {isSending ? 'Sending…' : 'Send'}
+              {isSending ? 'Creating…' : 'Create Card'}
             </button>
           )}
         </div>
@@ -2855,7 +2843,6 @@ function CardStudio() {
                       onClick={() => {
                         setActiveTool(tool.id)
                         if (tool.id === 'closedState') setActiveStep('closed')
-                        else if (tool.id === 'questions') setActiveStep('questions')
                         else setActiveStep('card')
                       }}
                       title={tool.hint}
@@ -2973,7 +2960,7 @@ function CardStudio() {
                   </div>
                 )}
 
-                {(activeStep === 'card' || activeStep === 'questions') && renderStudioContentPreview(false)}
+                {activeStep === 'card' && renderStudioContentPreview(false)}
               </div>
             </div>
           </div>
@@ -3167,7 +3154,7 @@ function CardStudio() {
             {/* ── Step tabs ── */}
             <div className="cs-m2-step-tabs">
               {studioSteps.filter(s => s !== 'preview').map((step, i) => {
-                const icon = step === 'closed' ? '✉' : step === 'questions' ? '💬' : '□'
+                const icon = step === 'closed' ? '✉' : '□'
                 return (
                   <button key={step} type="button" className={`cs-m2-step-tab${activeStep === step ? ' active' : ''}`} onClick={() => goToStep(step)}>
                     <span className="cs-m2-step-num">0{i + 1}</span>
@@ -3200,9 +3187,10 @@ function CardStudio() {
                 className="cs-m2-send-btn"
                 disabled={isSending}
                 onClick={isArtist ? () => setShowPublish(true) : handleSendClick}
+                style={!isArtist ? { '--type-accent': TYPE_ACCENT[studioType] || TYPE_ACCENT.personal } : undefined}
               >
                 <span className="cs-m2-send-arrow">▷</span>
-                <span>{isArtist ? 'Publish' : tierCost > 0 ? `Send ${tierCost}cc` : 'Send'}</span>
+                <span>{isArtist ? 'Publish' : tierCost > 0 ? `Create (${tierCost}cc)` : 'Create Card'}</span>
               </button>
             </div>
           </>
@@ -3355,7 +3343,6 @@ function CardStudio() {
                                   onClick={() => {
                                     setActiveTool(tool.id)
                                     if (tool.id === 'closedState') setActiveStep('closed')
-                                    else if (tool.id === 'questions') setActiveStep('questions')
                                     else setActiveStep('card')
                                     setMobileBottomSheet('content')
                                   }}
@@ -3440,7 +3427,6 @@ function CardStudio() {
                         onClick={() => {
                           setActiveTool(tool.id)
                           if (tool.id === 'closedState') setActiveStep('closed')
-                          else if (tool.id === 'questions') setActiveStep('questions')
                           else setActiveStep('card')
                         }}
                       >
