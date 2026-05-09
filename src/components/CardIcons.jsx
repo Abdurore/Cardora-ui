@@ -39,12 +39,14 @@ export function TriviaCardIcon({ size = 24, color = 'currentColor', className = 
 export function ChainCardIcon({ size = 24, color = 'currentColor', className = '' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      {/* Front card */}
-      <rect x="2" y="5" width="12" height="9" rx="2" stroke={color} strokeWidth="1.6" />
-      {/* Back card */}
-      <rect x="10" y="10" width="12" height="9" rx="2" stroke={color} strokeWidth="1.5" opacity="0.55" />
-      {/* Link arrow */}
-      <path d="M14 9.5l2.5 2-2.5 2" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Sent card — top left */}
+      <rect x="2" y="3.5" width="12" height="9" rx="2" stroke={color} strokeWidth="1.6" />
+      <path d="M5 7h6M5 9.5h4" stroke={color} strokeWidth="1.1" strokeLinecap="round" opacity="0.45" />
+      {/* Reply card — bottom right */}
+      <rect x="10" y="11.5" width="12" height="9" rx="2" stroke={color} strokeWidth="1.5" opacity="0.55" />
+      <path d="M13 15h6M13 17.5h4" stroke={color} strokeWidth="1.1" strokeLinecap="round" opacity="0.3" />
+      {/* Chain arrow */}
+      <path d="M14 8.5l2.5 2.5-2.5 2.5" stroke={color} strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
