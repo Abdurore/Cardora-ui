@@ -1,17 +1,11 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useRef } from 'react'
 
-// Heart silhouette path — used for ALL gift packages so the reveal feels
-// consistent across the catalog. Differentiation comes from colour, intensity,
-// and duration rather than shape.
+// Heart silhouette path — kept for GiftCard static icons (not used in the animation canvas)
 const HEART_PATH =
   'M100 170s-66-45-88-78C-6 60 10 22 44 16c23-4 44 7 56 28 12-21 33-32 56-28 34 6 50 44 32 76-22 33-88 78-88 78z'
 
 const HEART_SHAPE = 'heart'
 
-// Gradient pairs differentiate each package visually. Order roughly follows
-// price tiers — lower tiers use softer pinks, higher tiers move into rich
-// jewel tones.
 const EFFECTS = {
   heart: {
     gradient: ['#ff6b9d', '#ff4f98'],
@@ -92,8 +86,7 @@ const EFFECTS = {
   },
 }
 
-// All effects render the heart silhouette. Inject the shared shape/path so
-// downstream code (icons, mappers) reads them as before without changes.
+// Inject static SVG path for GiftCard icons only — not used by the canvas animation
 Object.values(EFFECTS).forEach((effect) => {
   effect.path = HEART_PATH
   effect.shape = HEART_SHAPE
@@ -128,14 +121,6 @@ function phaseProgress(elapsed, config) {
   }
 }
 
-// Heart parametric curve — i ∈ [0, 2π) returns a point on the canonical heart.
-function heartPoint(t, centerX, centerY, scale) {
-  const x = 16 * Math.pow(Math.sin(t), 3)
-  const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
-  return { x: centerX + x * scale, y: centerY + y * scale }
-}
-
-// Detect lower-power devices to throttle particle count and effects.
 function isLowPowerDevice() {
   if (typeof window === 'undefined') return false
   const cores = navigator.hardwareConcurrency || 4
@@ -148,7 +133,6 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
   const canvasRef = useRef(null)
   const rafRef = useRef(null)
   const startRef = useRef(0)
-  const rotation = useMemo(() => (Math.random() * 10 - 5).toFixed(2), [])
   const config = getGiftEffect(effect)
 
   useEffect(() => {
@@ -158,7 +142,6 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
     if (!ctx) return undefined
 
     const lowPower = isLowPowerDevice()
-    // Cap DPR on small screens to avoid drawing 3x retina cost on phones.
     const maxDpr = lowPower ? 1.5 : 2
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr)
 
@@ -178,23 +161,22 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
     const height = () => window.innerHeight
     const center = () => ({ x: width() / 2, y: height() / 2 })
 
-    // Particle count scales with intensity but is capped lower on mobile so
-    // weaker GPUs (mid-range Android, older iPhones) stay above 30fps.
     const baseCount = lowPower
       ? Math.min(95, Math.round(60 + config.intensity * 9))
       : Math.min(190, Math.round(118 + config.intensity * 16))
     const particleCount = baseCount
 
+    // Radial burst — particles explode outward from center along their baseAngle
     const particles = Array.from({ length: particleCount }, (_, index) => {
-      const angle = (index / particleCount) * Math.PI * 2
+      const angle = (index / particleCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3
       return {
         x: 0,
         y: 0,
         vx: 0,
         vy: 0,
-        angle,
-        orbitRadius: 18 + Math.random() * (16 + config.intensity * 12),
-        targetAngle: Math.random() * Math.PI * 2,
+        baseAngle: angle,
+        maxRadius: (0.16 + Math.random() * 0.38) * Math.min(window.innerWidth, window.innerHeight),
+        explodeForce: (2.8 + Math.random() * 1.6) * config.intensity,
         size: 1 + Math.random() * (1.8 + config.intensity * 0.28),
         glow: 8 + Math.random() * (6 + config.intensity * 3),
         opacity: 0.24 + Math.random() * 0.55,
@@ -203,25 +185,17 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
 
     const initParticles = () => {
       const { x: cx, y: cy } = center()
-      const scale = Math.min(width(), height()) / 42
-      particles.forEach((p, index) => {
-        const target = heartPoint((index / particleCount) * Math.PI * 2, cx, cy, scale)
-        p.x = cx
-        p.y = cy
-        p.tx = target.x
-        p.ty = target.y
+      particles.forEach((p) => {
+        p.x = cx + (Math.random() - 0.5) * 24
+        p.y = cy + (Math.random() - 0.5) * 24
         p.vx = 0
         p.vy = 0
-        p.baseAngle = Math.atan2(target.y - cy, target.x - cx)
-        p.explodeForce = (2.8 + Math.random() * 1.6) * config.intensity
       })
     }
 
     initParticles()
     startRef.current = performance.now()
 
-    // Throttle to ~50fps on low-power devices to free up the main thread for
-    // the surrounding card stage (Framer Motion + DOM reflow on the heart SVG).
     const minFrameMs = lowPower ? 20 : 0
     let lastFrame = 0
 
@@ -235,25 +209,14 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
       const elapsed = time - startRef.current
       const { phase, localProgress, totalProgress } = phaseProgress(elapsed, config)
       const { x: cx, y: cy } = center()
-      const scale = Math.min(width(), height()) / 42
 
-      // Lighter trail-clear on mobile keeps the canvas from accumulating noise
-      // when frames are dropped.
-      ctx.fillStyle = `rgba(2, 2, 5, ${phase === 'glow' ? 0.09 : (lowPower ? 0.22 : 0.15)})`
+      ctx.fillStyle = `rgba(2, 2, 5, ${phase === 'glow' ? 0.09 : lowPower ? 0.22 : 0.15})`
       ctx.fillRect(0, 0, width(), height())
 
-      // Build the radial gradient once per frame — creating it inside the
-      // particle loop allocated 200+ gradient objects per frame.
-      // We still need per-particle radial centers, so keep colour stops here
-      // and reuse the gradient pair.
       const gradStart = config.gradient[1]
       const gradEnd = config.gradient[0]
 
       particles.forEach((p, index) => {
-        const target = heartPoint((index / particleCount) * Math.PI * 2, cx, cy, scale)
-        p.tx = target.x
-        p.ty = target.y
-
         if (phase === 'explode') {
           const boost = easeOutQuad(localProgress)
           const angle = p.baseAngle + Math.sin(totalProgress * Math.PI * 2 + index) * 0.18
@@ -262,18 +225,21 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
         }
 
         if (phase === 'orbit') {
-          const orbitAngle = time * 0.0018 * (0.8 + config.intensity * 0.1) + p.baseAngle
-          const orbitRadius = p.orbitRadius * (0.9 + localProgress * 0.4)
-          const ox = cx + Math.cos(orbitAngle) * orbitRadius
-          const oy = cy + Math.sin(orbitAngle) * orbitRadius
+          const orbitAngle = p.baseAngle + time * 0.0018 * (0.8 + config.intensity * 0.1)
+          const orbitR = p.maxRadius * (0.3 + localProgress * 0.35)
+          const ox = cx + Math.cos(orbitAngle) * orbitR
+          const oy = cy + Math.sin(orbitAngle) * orbitR
           p.vx += (ox - p.x) * 0.014
           p.vy += (oy - p.y) * 0.014
         }
 
         if (phase === 'form' || config.phases.includes('form')) {
+          // Pull toward a radial position at ~55% of maxRadius
+          const tx = cx + Math.cos(p.baseAngle) * p.maxRadius * 0.55
+          const ty = cy + Math.sin(p.baseAngle) * p.maxRadius * 0.55
           const force = phase === 'form' ? 0.028 : 0.008
-          p.vx += (p.tx - p.x) * force
-          p.vy += (p.ty - p.y) * force
+          p.vx += (tx - p.x) * force
+          p.vy += (ty - p.y) * force
         }
 
         p.vx *= phase === 'glow' ? 0.82 : 0.9
@@ -288,7 +254,6 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
 
         ctx.save()
         ctx.globalAlpha = alpha * p.opacity
-        // Heavy shadowBlur is expensive on mobile GPUs — disable on low-power.
         if (!lowPower) {
           ctx.shadowBlur = p.glow * glowBoost
           ctx.shadowColor = gradStart
@@ -324,137 +289,19 @@ function PremiumGiftReveal({ effect = 'heart', onComplete }) {
         .premium-gift-reveal {
           position: fixed;
           inset: 0;
-          display: grid;
-          place-items: center;
           background: rgba(4, 8, 10, 0.55);
           backdrop-filter: blur(10px);
           -webkit-backdrop-filter: blur(10px);
           overflow: hidden;
           z-index: 10000;
         }
-
-        .premium-gift-reveal::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(circle at center, rgba(255, 107, 157, 0.12), transparent 60%);
-          pointer-events: none;
-        }
-
         .gift-canvas {
           position: absolute;
           inset: 0;
           pointer-events: none;
         }
-
-        .gift-stage {
-          position: relative;
-          width: min(220px, 64vw);
-          aspect-ratio: 1;
-          display: grid;
-          place-items: center;
-          will-change: transform, opacity;
-        }
-
-        .gift-shadow {
-          position: absolute;
-          width: 65%;
-          height: 25%;
-          background: radial-gradient(circle, rgba(0, 0, 0, 0.6), transparent 70%);
-          bottom: 6%;
-          filter: blur(10px);
-          transform: translateY(40px);
-          opacity: 0.7;
-        }
-
-        .gift-glow {
-          position: absolute;
-          inset: 0;
-          filter: blur(20px);
-          opacity: 0.55;
-          transform: scale(1.2);
-        }
-
-        .gift-main {
-          position: relative;
-          z-index: 2;
-          width: 100%;
-          height: 100%;
-          filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.45));
-        }
-
-        .gift-sweep {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.45) 50%, transparent 100%);
-          mix-blend-mode: screen;
-          filter: blur(4px);
-          opacity: 0.7;
-          transform: translateX(-120%) skewX(-20deg);
-          pointer-events: none;
-        }
       `}</style>
       <canvas ref={canvasRef} className="gift-canvas" />
-      <motion.div
-        className="gift-stage"
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{
-          opacity: 1,
-          scale: [0, 1.15, 1],
-          rotate: [rotation, 0],
-        }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      >
-        <div className="gift-shadow" />
-        <motion.svg className="gift-glow" viewBox="0 0 200 200" aria-hidden="true">
-          <defs>
-            <linearGradient id={`giftGlow-${effect}`} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor={config.gradient[0]} />
-              <stop offset="100%" stopColor={config.gradient[1]} />
-            </linearGradient>
-          </defs>
-          <path d={config.path} fill={`url(#giftGlow-${effect})`} />
-        </motion.svg>
-        <motion.svg
-          className="gift-main"
-          viewBox="0 0 200 200"
-          aria-hidden="true"
-          initial={{ y: 0 }}
-          animate={{ y: [0, -6, 0], scale: [1, 1.04, 1] }}
-          transition={{
-            delay: 0.5,
-            duration: 1.1 + config.intensity * 0.12,
-            ease: [0.34, 1.56, 0.64, 1],
-            repeat: Infinity,
-            repeatType: 'mirror',
-          }}
-        >
-          <defs>
-            <linearGradient id={`giftGradient-${effect}`} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor={config.gradient[0]} />
-              <stop offset="100%" stopColor={config.gradient[1]} />
-            </linearGradient>
-            <radialGradient id={`giftHighlight-${effect}`} cx="30%" cy="20%" r="60%">
-              <stop offset="0%" stopColor="rgba(255,255,255,0.6)" />
-              <stop offset="50%" stopColor="rgba(255,255,255,0.15)" />
-              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-            </radialGradient>
-          </defs>
-          <path d={config.path} fill={`url(#giftGradient-${effect})`} />
-          <path d={config.path} fill={`url(#giftHighlight-${effect})`} />
-        </motion.svg>
-        <motion.div
-          className="gift-sweep"
-          animate={{ x: ['-120%', '120%'] }}
-          transition={{ duration: 1.6, delay: 0.6, ease: 'easeInOut' }}
-        />
-      </motion.div>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 1, 0] }}
-        transition={{ duration: config.duration / 1000, ease: 'easeInOut' }}
-        style={{ position: 'absolute', inset: 0 }}
-      />
     </div>
   )
 }
