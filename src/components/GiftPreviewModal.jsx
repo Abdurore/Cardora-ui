@@ -1,21 +1,8 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState } from 'react'
 import PremiumGiftReveal, { getGiftEffect } from './PremiumGiftReveal.jsx'
-import AnimatedShape from './AnimatedShape.jsx'
+import GiftHeartPreview from './GiftHeartPreview.jsx'
 
-const PREVIEW_HUE = {
-  heart: 340,
-  diamond: 200,
-  rose: 330,
-  star: 42,
-  orb: 170,
-  ring: 36,
-  candle: 30,
-  christmas_tree: 155,
-  crescent_moon: 48,
-  meteorite: 290,
-  necklace: 50,
-}
 
 function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false }) {
   const [showEffect, setShowEffect] = useState(autoPreview)
@@ -40,15 +27,7 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
           <div className="preview-glow" />
           {effectConfig ? (
             <div className="preview-shape-wrap">
-              <AnimatedShape
-                shapeType="heart"
-                hue={PREVIEW_HUE[gift.effectKey] ?? 340}
-                width={160}
-                height={140}
-                particleCount={140}
-                traceLength={8}
-                className="preview-shape-canvas"
-              />
+              <GiftHeartPreview effectKey={gift.effectKey} />
             </div>
           ) : null}
         </div>
