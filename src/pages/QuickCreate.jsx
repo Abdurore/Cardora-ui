@@ -169,7 +169,7 @@ function QuickCreate() {
           </div>
         </div>
         <Link to={`/studio?type=${cardType}&tier=${cardTier}`} className="qc-studio-link-btn">
-          Full Studio
+          <span className="qc-studio-text">Full Studio</span>
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.5h8M7 3l3.5 3.5L7 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </Link>
       </div>
