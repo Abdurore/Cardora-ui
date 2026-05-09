@@ -4837,6 +4837,12 @@ a {
   }
 }
 
+@keyframes auroraShiftLight {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  33%       { transform: rotate(60deg) scale(1.08); }
+  66%       { transform: rotate(140deg) scale(0.96); }
+}
+
 @keyframes shimmerSweep {
 
   0%,
@@ -23219,14 +23225,24 @@ a {
 }
 [data-theme="light"] .screen-nav {
   background: rgba(228,246,252,0.97) !important;
-  border-top: 1px solid rgba(10,122,143,0.1) !important;
+  border: 1px solid rgba(10,122,143,0.12) !important;
 }
-[data-theme="light"] .screen-nav-item { color: #4f8fa0; }
-[data-theme="light"] .screen-nav-item.active { color: #0a7a8f; }
-[data-theme="light"] .screen-nav-fab {
-  background: linear-gradient(135deg, #0a7a8f, #0d9ea8);
-  box-shadow: 0 4px 18px rgba(10,122,143,0.35);
+[data-theme="light"] .nav-item { color: #3a7a8e !important; }
+[data-theme="light"] .nav-item.active { color: #065d6e !important; font-weight: 700; }
+[data-theme="light"] .nav-icon-svg {
+  color: #4f8fa0 !important;
+  filter: none !important;
 }
+[data-theme="light"] .nav-item.active .nav-icon-svg {
+  color: #065d6e !important;
+  filter: drop-shadow(0 0 6px rgba(10,122,143,0.35)) !important;
+}
+[data-theme="light"] .nav-create-fab {
+  background: linear-gradient(135deg, #0a7a8f, #0d9ea8) !important;
+  box-shadow: 0 4px 18px rgba(10,122,143,0.35) !important;
+}
+[data-theme="light"] .nav-create-plus { color: #fff !important; }
+[data-theme="light"] .nav-create-label { color: #fff !important; }
 
 /* ── Hero ────────────────────────────────────────────── */
 [data-theme="light"] .topbar,
@@ -23235,15 +23251,17 @@ a {
 }
 [data-theme="light"] .hero-particle { opacity: 0.18; filter: hue-rotate(10deg) saturate(1.4); }
 [data-theme="light"] .hero-aurora {
-  opacity: 0.55;
+  opacity: 0.62;
   background: conic-gradient(from 180deg,
     rgba(10,122,143,0.0),
-    rgba(0,160,120,0.38),
-    rgba(10,180,140,0.30),
-    rgba(20,140,100,0.12),
-    rgba(0,200,150,0.42),
+    rgba(0,160,120,0.55),
+    rgba(10,180,140,0.42),
+    rgba(20,140,100,0.18),
+    rgba(0,200,150,0.60),
+    rgba(10,160,130,0.38),
     rgba(10,122,143,0.0));
-  filter: blur(22px);
+  filter: blur(20px);
+  animation-name: auroraShiftLight;
 }
 [data-theme="light"] .hero-card-halo {
   opacity: 0.5;
@@ -23282,6 +23300,26 @@ a {
   background: rgba(10,122,143,0.09);
   border: 1px solid rgba(10,122,143,0.2);
   color: #0a7a8f;
+}
+[data-theme="light"] .hero-format-chip.chip-greeting {
+  background: rgba(200,130,20,0.10);
+  border-color: rgba(200,130,20,0.25);
+  color: #8a5a00;
+}
+[data-theme="light"] .hero-format-chip.chip-poll {
+  background: rgba(40,100,200,0.09);
+  border-color: rgba(40,100,200,0.22);
+  color: #1a4f9e;
+}
+[data-theme="light"] .hero-format-chip.chip-trivia {
+  background: rgba(190,50,90,0.09);
+  border-color: rgba(190,50,90,0.22);
+  color: #8e1a3d;
+}
+[data-theme="light"] .hero-format-chip.chip-anon {
+  background: rgba(10,140,110,0.10);
+  border-color: rgba(10,140,110,0.24);
+  color: #0a6e56;
 }
 
 /* ── Landing sections ────────────────────────────────── */
@@ -23587,6 +23625,30 @@ a {
 [data-theme="light"] .cs-step-arrow { color: #7aafbd; }
 [data-theme="light"] .cs-step-label { color: #2c5a6e; }
 [data-theme="light"] .cs-step.active .cs-step-label { color: #0a7a8f; }
+[data-theme="light"] .cs-nav-btn {
+  background: rgba(10,122,143,0.1) !important;
+  border-color: rgba(10,122,143,0.28) !important;
+  color: #065d6e !important;
+}
+[data-theme="light"] .cs-nav-btn:hover:not(:disabled) {
+  background: rgba(10,122,143,0.18) !important;
+  color: #044a59 !important;
+}
+[data-theme="light"] .cs-nav-btn.send {
+  background: linear-gradient(135deg, #0a7a8f, #0d9ea8) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+[data-theme="light"] .cs-nav-btn.publish {
+  background: linear-gradient(135deg, #0a7a8f, #0d9ea8) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+[data-theme="light"] .cs-nav-btn.accent {
+  background: rgba(10,122,143,0.12) !important;
+  color: #065d6e !important;
+  border-color: rgba(10,122,143,0.3) !important;
+}
 
 /* ── Admin ───────────────────────────────────────────── */
 [data-theme="light"] .admin-page { background: #e3f2f7; }
