@@ -9979,6 +9979,7 @@ a {
   max-height: min(820px, 86vh);
   padding: 74px 24px 24px;
   align-content: start;
+  justify-items: center;
   gap: 24px;
   overflow-y: auto;
   scroll-behavior: smooth;
@@ -10001,6 +10002,16 @@ a {
 }
 
 .cp-media-section-full {
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  gap: 12px;
+  padding: 0 4px 8px;
+  width: 100%;
+  scrollbar-width: thin;
   opacity: 0;
   transition: opacity 0.6s ease, transform 0.75s cubic-bezier(0.22, 1, 0.36, 1), filter 0.75s ease;
   transform: translateY(26px) scale(0.94);
@@ -10023,13 +10034,15 @@ a {
 }
 
 .cp-media-item-full {
-  width: 100%;
+  flex-shrink: 0;
+  width: min(80%, 280px);
   min-height: clamp(180px, 31vh, 300px);
   max-height: clamp(180px, 31vh, 300px);
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+  scroll-snap-align: center;
 }
 
 .cp-media-item img {
@@ -10056,7 +10069,7 @@ a {
 
 .cp-caption-full {
   padding: 0 4px;
-  text-align: left;
+  text-align: center;
 }
 
 .cp-heading {
@@ -10070,6 +10083,8 @@ a {
   font-size: clamp(1.65rem, 3.6vw, 2.75rem);
   line-height: 1;
   max-width: 12ch;
+  text-align: center;
+  margin: 0 auto;
 }
 
 .cp-body {
@@ -10090,6 +10105,8 @@ a {
 .cp-card-full .cp-body p {
   max-width: 56ch;
   font-size: clamp(0.95rem, 1.2vw, 1.06rem);
+  text-align: center;
+  margin: 0 auto;
 }
 
 .cp-extended {
@@ -11133,6 +11150,7 @@ a {
   .cp-card-full .cp-heading {
     font-size: clamp(1.7rem, 8vw, 2.5rem);
     max-width: none;
+    text-align: center;
   }
 
   .cp-body p {
@@ -11142,12 +11160,14 @@ a {
   .cp-card-full .cp-body p {
     max-width: none;
     font-size: 0.92rem;
+    text-align: center;
   }
 
   .cp-media-item-full {
     min-height: clamp(180px, 28vh, 240px);
     max-height: clamp(180px, 28vh, 240px);
     border-radius: 18px;
+    width: min(85%, 260px);
   }
 
   .cp-continue-btn {
