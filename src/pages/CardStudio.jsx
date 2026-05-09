@@ -2270,31 +2270,38 @@ function CardStudio() {
     const previewQuestion = triviaData.questions[0] || { text: '', options: ['', '', '', ''], correctIndex: 0 }
     const previewPollOptions = pollData.options.filter(Boolean)
     if (studioType === 'poll') {
+      const headingSize = c.theme.headingSize ?? 28
       return (
-        <div className={`cs-preview-poll ${compact ? 'compact' : ''}`} style={{
-          backgroundColor: c.card.backgroundColor,
-          ...cardBorderCss,
-        }}>
+        <div
+          className={`cs-preview-poll ${compact ? 'compact' : ''}`}
+          style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}
+          onClick={() => setActiveEditEl(null)}
+        >
           <div className="cs-preview-poll-head">
             <p className="cs-preview-poll-eyebrow">&#x1F4CA; Live Poll Experience</p>
             <span className="cs-preview-pill">Recipients vote</span>
           </div>
           <h3
-            style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, cursor: 'pointer' }}
-            onClick={() => { setActiveTool('content'); setActiveStep('card') }}
-            title="Click to edit heading"
+            contentEditable={!compact}
+            suppressContentEditableWarning
+            data-placeholder="Card heading"
+            className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
+            style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
+            onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
+            onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
           >
             {c.content.heading}
           </h3>
           <p
             className="cs-preview-poll-question cs-clickable-preview"
             style={{ color: c.card.textColor }}
-            onClick={() => { setActiveTool('poll'); setActiveStep('card') }}
+            onClick={e => { e.stopPropagation(); setActiveTool('poll'); setActiveStep('card') }}
             title="Click to edit poll question"
           >
             {pollData.question || 'Ask a question your recipients can answer instantly.'}
           </p>
-          <div className="cs-preview-poll-options" onClick={() => { setActiveTool('poll'); setActiveStep('card') }} title="Click to edit options" style={{ cursor: 'pointer' }}>
+          <div className="cs-preview-poll-options" onClick={e => { e.stopPropagation(); setActiveTool('poll'); setActiveStep('card') }} title="Click to edit options" style={{ cursor: 'pointer' }}>
             {(previewPollOptions.length > 0 ? previewPollOptions : ['Option 1', 'Option 2', 'Option 3']).map((opt, i) => (
               <div key={i} className="cs-preview-poll-option cs-clickable-preview" style={{ color: c.card.textColor }}>
                 <span className="cs-preview-poll-dot" />
@@ -2306,6 +2313,16 @@ function CardStudio() {
             <span>Tap to vote</span>
             <span>Results unlock after submit</span>
           </div>
+          {/* Floating toolbar for heading edits */}
+          {!compact && activeEditEl?.type === 'heading' && (
+            <div className="cs-edit-toolbar" onClick={e => e.stopPropagation()}>
+              <span className="cs-edit-toolbar-label">Heading</span>
+              <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
+              <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
+              <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+              <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
+            </div>
+          )}
           <div className="cs-preview-watermark">
             <span>Made with </span>
             <a href="/" className="cs-preview-watermark-cta">Cardora</a>
@@ -2317,37 +2334,46 @@ function CardStudio() {
     }
 
     if (studioType === 'trivia') {
+      const headingSize = c.theme.headingSize ?? 28
+      const hasRealOptions = previewQuestion.options?.some(o => o?.trim())
       return (
-        <div className={`cs-preview-trivia ${compact ? 'compact' : ''}`} style={{
-          backgroundColor: c.card.backgroundColor,
-          ...cardBorderCss,
-        }}>
+        <div
+          className={`cs-preview-trivia ${compact ? 'compact' : ''}`}
+          style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}
+          onClick={() => setActiveEditEl(null)}
+        >
           <div className="cs-preview-trivia-head">
             <p className="cs-preview-trivia-eyebrow">&#x1F4A1; Trivia Challenge</p>
             <span className="cs-preview-pill">Score-based card</span>
           </div>
-          <h3 style={{
-            color: c.card.headingColor,
-            fontFamily: `'${c.theme.fontFamily}', serif`,
-          }}>
+          <h3
+            contentEditable={!compact}
+            suppressContentEditableWarning
+            data-placeholder="Card heading"
+            className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
+            style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
+            onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
+            onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+          >
             {c.content.heading}
           </h3>
           <p
             className="cs-preview-trivia-counter"
             style={{ color: c.theme.accentColor, cursor: 'pointer' }}
-            onClick={() => { setActiveTool('trivia'); setActiveStep('card') }}
+            onClick={e => { e.stopPropagation(); setActiveTool('trivia'); setActiveStep('card') }}
             title="Click to edit trivia"
           >
             Question 1 of {Math.max(triviaData.questions.length, 1)}
           </p>
-          <div className="cs-preview-trivia-q cs-clickable-preview" style={{ color: c.card.textColor }} onClick={() => { setActiveTool('trivia'); setActiveStep('card') }} title="Click to edit">
+          <div className="cs-preview-trivia-q cs-clickable-preview" style={{ color: c.card.textColor }} onClick={e => { e.stopPropagation(); setActiveTool('trivia'); setActiveStep('card') }} title="Click to edit">
             <p>{previewQuestion.text || 'Place your first quiz question here.'}</p>
           </div>
-          <div className="cs-preview-trivia-opts" onClick={() => { setActiveTool('trivia'); setActiveStep('card') }} style={{ cursor: 'pointer' }}>
+          <div className="cs-preview-trivia-opts" onClick={e => { e.stopPropagation(); setActiveTool('trivia'); setActiveStep('card') }} style={{ cursor: 'pointer' }}>
             {(previewQuestion.options?.length ? previewQuestion.options : ['', '', '', '']).map((opt, oi) => (
               <div
                 key={oi}
-                className={`cs-preview-trivia-opt cs-clickable-preview ${previewQuestion.correctIndex === oi ? 'correct' : ''}`}
+                className={`cs-preview-trivia-opt cs-clickable-preview ${hasRealOptions && previewQuestion.correctIndex === oi ? 'correct' : ''}`}
                 style={{ color: c.card.textColor }}
               >
                 <span className="cs-preview-trivia-opt-index">{String.fromCharCode(65 + oi)}</span>
@@ -2358,6 +2384,16 @@ function CardStudio() {
           <p className="cs-preview-trivia-score">
             {triviaData.questions.length || 1} question{(triviaData.questions.length || 1) !== 1 ? 's' : ''} · interactive result screen
           </p>
+          {/* Floating toolbar for heading edits */}
+          {!compact && activeEditEl?.type === 'heading' && (
+            <div className="cs-edit-toolbar" onClick={e => e.stopPropagation()}>
+              <span className="cs-edit-toolbar-label">Heading</span>
+              <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
+              <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
+              <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+              <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
+            </div>
+          )}
           <div className="cs-preview-watermark">
             <span>Made with </span>
             <a href="/" className="cs-preview-watermark-cta">Cardora</a>
@@ -2369,17 +2405,70 @@ function CardStudio() {
     }
 
     if (studioType === 'chain') {
+      const headingSize = c.theme.headingSize ?? 28
+      const bodySize = c.theme.bodySize ?? 16
       return (
-        <div className={`cs-mobile-chain-preview ${compact ? 'compact' : ''}`} style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}>
-          <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
-            {c.content.heading || 'Your message here'}
+        <div
+          className={`cs-preview-chain ${compact ? 'compact' : ''}`}
+          style={{ backgroundColor: c.card.backgroundColor, ...cardBorderCss }}
+          onClick={() => setActiveEditEl(null)}
+        >
+          <h3
+            contentEditable={!compact}
+            suppressContentEditableWarning
+            data-placeholder="Card heading"
+            className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
+            style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
+            onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
+            onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+          >
+            {c.content.heading}
           </h3>
-          <p style={{ color: c.card.textColor, fontSize: '0.85rem', opacity: 0.7 }}>{c.content.body}</p>
-          <div className="cs-chain-reply-strip cs-clickable-preview" onClick={() => { setActiveTool('chain'); setActiveStep('card') }} title="Click to edit chain prompt" style={{ cursor: 'pointer' }}>
+          <p
+            contentEditable={!compact}
+            suppressContentEditableWarning
+            data-placeholder="Write your message…"
+            className={`cs-editable cs-preview-body-text${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
+            style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
+            onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
+            onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
+          >
+            {c.content.body}
+          </p>
+          <div
+            className="cs-chain-reply-strip cs-clickable-preview"
+            onClick={e => { e.stopPropagation(); setActiveTool('chain'); setActiveStep('card') }}
+            title="Click to edit chain prompt"
+            style={{ cursor: 'pointer', marginTop: 'auto' }}
+          >
             <span>🔗</span>
             <span>{chainData.prompt || "Now it's your turn…"}</span>
           </div>
           <button type="button" className="cs-chain-reply-btn" disabled>Reply with a card</button>
+          {/* Floating toolbar */}
+          {!compact && activeEditEl && (activeEditEl.type === 'heading' || activeEditEl.type === 'body') && (
+            <div className="cs-edit-toolbar" onClick={e => e.stopPropagation()}>
+              {activeEditEl.type === 'heading' && (
+                <>
+                  <span className="cs-edit-toolbar-label">Heading</span>
+                  <button type="button" onClick={() => update('theme.headingSize', Math.max(14, headingSize - 2))}>A−</button>
+                  <button type="button" onClick={() => update('theme.headingSize', Math.min(56, headingSize + 2))}>A+</button>
+                  <InlineColorPicker value={c.card.headingColor || '#ffffff'} onChange={e => update('card.headingColor', e.target.value)} presets={colorPresets} label="Color" />
+                </>
+              )}
+              {activeEditEl.type === 'body' && (
+                <>
+                  <span className="cs-edit-toolbar-label">Body</span>
+                  <button type="button" onClick={() => update('theme.bodySize', Math.max(10, bodySize - 1))}>A−</button>
+                  <button type="button" onClick={() => update('theme.bodySize', Math.min(28, bodySize + 1))}>A+</button>
+                  <InlineColorPicker value={c.card.textColor || '#e2eaf0'} onChange={e => update('card.textColor', e.target.value)} presets={colorPresets} label="Color" />
+                </>
+              )}
+              <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
+            </div>
+          )}
           <div className="cs-preview-watermark">
             <span>Made with </span>
             <a href="/" className="cs-preview-watermark-cta">Cardora</a>

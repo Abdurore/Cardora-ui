@@ -17890,6 +17890,34 @@ a {
 /* ═══════════════════════════════════════════════════
    CARD STUDIO — CHAIN PREVIEW ELEMENTS
    ═══════════════════════════════════════════════════ */
+.cs-preview-chain {
+  width: 100%;
+  max-width: 340px;
+  padding: 22px 18px;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: csSlideUp 0.5s ease both;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  position: relative;
+}
+.cs-preview-chain h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+.cs-preview-chain .cs-preview-body-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  opacity: 0.82;
+  flex: 1;
+}
+
+/* Legacy mobile chain — keep for mobile layout compat */
 .cs-mobile-chain-preview {
   width: 100%;
   flex: 1;
@@ -19205,6 +19233,7 @@ a {
 .cs-preview-card,
 .cs-preview-poll,
 .cs-preview-trivia,
+.cs-preview-chain,
 .cs-mobile-chain-preview,
 .cs-preview-anon .cs-preview-anon-template {
   display: flex;
