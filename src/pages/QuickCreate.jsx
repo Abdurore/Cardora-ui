@@ -18,6 +18,14 @@ const QUICK_FONTS = [
 const TIER_LABELS = { classic: 'Free', premium: 'Premium', elite: 'Elite' }
 const TIER_COLORS = { classic: null, premium: '#f4c28a', elite: '#c9a3ff' }
 
+const STEP3_CONFIG = {
+  personal:  { title: 'Your Message',     sub: 'What do you want to say?' },
+  poll:      { title: 'Your Poll',         sub: 'Ask your audience a question' },
+  chain:     { title: 'Challenge',         sub: 'What do you challenge them to do?' },
+  trivia:    { title: 'Your Quiz',         sub: 'Create a question for your recipients' },
+  anonymous: { title: 'Your Message',     sub: 'Recipients can reply anonymously' },
+}
+
 function QuickCreate() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -31,12 +39,33 @@ function QuickCreate() {
     : cardTier === 'premium'
       ? ['classic', 'premium']
       : ['classic']
-  const availablePalettes = getPalettesForTier(allowedTiers)
 
-  const [selectedPalette, setSelectedPalette] = useState(availablePalettes[0] || PALETTES[0])
+  const allowedPaletteIds = new Set(getPalettesForTier(allowedTiers).map(p => p.id))
+
+  const [selectedPalette, setSelectedPalette] = useState(
+    getPalettesForTier(allowedTiers)[0] || PALETTES[0]
+  )
   const [selectedFont, setSelectedFont] = useState('Poppins')
+
+  // Personal
   const [heading, setHeading] = useState('')
   const [body, setBody] = useState('')
+
+  // Poll
+  const [pollQuestion, setPollQuestion] = useState('')
+  const [pollOptions, setPollOptions] = useState(['', ''])
+
+  // Chain
+  const [chainChallenge, setChainChallenge] = useState('')
+
+  // Trivia (single question for Quick Create)
+  const [triviaQuestion, setTriviaQuestion] = useState('')
+  const [triviaOptions, setTriviaOptions] = useState(['', '', '', ''])
+  const [triviaCorrect, setTriviaCorrect] = useState(0)
+
+  // Anonymous
+  const [anonMessage, setAnonMessage] = useState('')
+
   const [recipient, setRecipient] = useState('')
   const [imageUrl, setImageUrl] = useState(null)
   const [imageBlobUrl, setImageBlobUrl] = useState(null)
@@ -75,33 +104,90 @@ function QuickCreate() {
     handleImageFile(e.dataTransfer.files?.[0])
   }
 
-  const handleSend = async () => {
-    if (!heading.trim()) { setError('Please add a heading.'); return }
-    if (!body.trim()) { setError('Please add a message.'); return }
-    setError(null)
-    setIsSending(true)
+  const addPollOption = () => {
+    if (pollOptions.length < 6) setPollOptions([...pollOptions, ''])
+  }
+  const removePollOption = (i) => {
+    if (pollOptions.length > 2) setPollOptions(pollOptions.filter((_, idx) => idx !== i))
+  }
+  const updatePollOption = (i, val) => {
+    const next = [...pollOptions]; next[i] = val; setPollOptions(next)
+  }
+  const updateTriviaOption = (i, val) => {
+    const next = [...triviaOptions]; next[i] = val; setTriviaOptions(next)
+  }
 
-    const baseCard = applyPalette({ ...defaultCardObject }, selectedPalette)
-    const cardObject = {
-      ...baseCard,
-      theme: { ...baseCard.theme, fontFamily: selectedFont },
-      content: { ...baseCard.content, heading: heading.trim(), body: body.trim() },
-      media: {
-        ...(baseCard.media || {}),
-        images: imageUrl
-          ? [{ url: imageUrl, fit: 'cover', positionX: 50, positionY: 50, height: 180 }]
-          : [],
-      },
+  const handleSend = async () => {
+    setError(null)
+    // Validate per type
+    if (cardType === 'personal') {
+      if (!heading.trim()) { setError('Please add a heading.'); return }
+      if (!body.trim()) { setError('Please add a message.'); return }
+    } else if (cardType === 'poll') {
+      if (!pollQuestion.trim()) { setError('Please add a poll question.'); return }
+      if (pollOptions.filter(o => o.trim()).length < 2) { setError('Please add at least 2 options.'); return }
+    } else if (cardType === 'chain') {
+      if (!chainChallenge.trim()) { setError('Please add a challenge prompt.'); return }
+    } else if (cardType === 'trivia') {
+      if (!triviaQuestion.trim()) { setError('Please add a trivia question.'); return }
+      if (triviaOptions.filter(o => o.trim()).length < 2) { setError('Add at least 2 answer options.'); return }
+    } else if (cardType === 'anonymous') {
+      if (!anonMessage.trim()) { setError('Please add a message.'); return }
     }
 
-    const result = await handleCreateCard(cardObject, { type: cardType, tier: cardTier })
-    setIsSending(false)
+    setIsSending(true)
+    try {
+      const baseCard = applyPalette({ ...defaultCardObject }, selectedPalette)
+      const cardObject = {
+        ...baseCard,
+        theme: { ...baseCard.theme, fontFamily: selectedFont },
+        content: cardType === 'personal'
+          ? { ...baseCard.content, heading: heading.trim(), body: body.trim() }
+          : cardType === 'anonymous'
+            ? { ...baseCard.content, heading: '', body: anonMessage.trim() }
+            : baseCard.content,
+        media: {
+          ...(baseCard.media || {}),
+          images: imageUrl
+            ? [{ url: imageUrl, fit: 'cover', positionX: 50, positionY: 50, height: 180 }]
+            : [],
+        },
+      }
 
-    if (!result.ok) { setError(result.message || 'Something went wrong.'); return }
+      const pollData = cardType === 'poll'
+        ? { question: pollQuestion.trim(), options: pollOptions.filter(o => o.trim()) }
+        : undefined
+      const chainData = cardType === 'chain'
+        ? { prompt: chainChallenge.trim() }
+        : undefined
+      const triviaData = cardType === 'trivia'
+        ? {
+            questions: [{
+              text: triviaQuestion.trim(),
+              options: triviaOptions.filter(o => o.trim()),
+              correctIndex: triviaCorrect,
+            }],
+          }
+        : undefined
 
-    const rawData = result.data
-    const slug = rawData?.card?.slug || rawData?.slug || rawData?.data?.card?.slug || rawData?.data?.slug || null
-    setSuccess({ slug })
+      const result = await handleCreateCard(cardObject, {
+        type: cardType,
+        tier: cardTier,
+        poll: pollData,
+        chain: chainData,
+        trivia: triviaData,
+      })
+
+      if (!result.ok) { setError(result.message || 'Something went wrong.'); return }
+
+      const rawData = result.data
+      const slug = rawData?.card?.slug || rawData?.slug || rawData?.data?.card?.slug || rawData?.data?.slug || null
+      setSuccess({ slug })
+    } catch (err) {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const cardLink = success?.slug ? `${window.location.origin}/card/${success.slug}` : null
@@ -150,6 +236,16 @@ function QuickCreate() {
   }
 
   const tierColor = TIER_COLORS[cardTier] || 'rgba(126,239,255,0.8)'
+  const s3 = STEP3_CONFIG[cardType] || STEP3_CONFIG.personal
+
+  const previewHeading = cardType === 'poll' ? pollQuestion
+    : cardType === 'chain' ? chainChallenge
+    : cardType === 'trivia' ? triviaQuestion
+    : cardType === 'anonymous' ? anonMessage
+    : heading
+  const previewBody = cardType === 'personal' ? body
+    : cardType === 'poll' ? pollOptions.filter(o => o.trim()).join(' · ')
+    : ''
 
   return (
     <div className="qc-shell">
@@ -186,36 +282,45 @@ function QuickCreate() {
                 <span className="qc-step-num">1</span>
                 <div>
                   <h3 className="qc-step-title">Choose a Theme</h3>
-                  <p className="qc-step-sub">{availablePalettes.length} themes available for {cardTier}</p>
+                  <p className="qc-step-sub">
+                    {getPalettesForTier(allowedTiers).length} unlocked
+                    {PALETTES.length - getPalettesForTier(allowedTiers).length > 0
+                      ? ` · ${PALETTES.length - getPalettesForTier(allowedTiers).length} locked`
+                      : ''}
+                  </p>
                 </div>
               </div>
               <div className="qc-palette-grid">
-                {availablePalettes.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`qc-palette-swatch${selectedPalette.id === p.id ? ' active' : ''}`}
-                    onClick={() => setSelectedPalette(p)}
-                    title={p.label}
-                  >
-                    <div
-                      className="qc-swatch-bg"
-                      style={{ background: `linear-gradient(145deg, ${p.surface} 30%, ${p.primary}55 100%)` }}
-                    />
-                    <div className="qc-swatch-dots">
-                      <span style={{ background: p.primary }} />
-                      <span style={{ background: p.accent }} />
-                      <span style={{ background: p.ink, opacity: 0.7 }} />
-                    </div>
-                    {p.tier !== 'classic' && (
-                      <span className="qc-swatch-tier" style={{ color: TIER_COLORS[p.tier] }}>
-                        {TIER_LABELS[p.tier]}
-                      </span>
-                    )}
-                    <span className="qc-swatch-name">{p.label}</span>
-                    {selectedPalette.id === p.id && <span className="qc-swatch-check">✓</span>}
-                  </button>
-                ))}
+                {PALETTES.map((p) => {
+                  const locked = !allowedPaletteIds.has(p.id)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`qc-palette-swatch${selectedPalette.id === p.id && !locked ? ' active' : ''}${locked ? ' locked' : ''}`}
+                      onClick={() => locked ? navigate('/store') : setSelectedPalette(p)}
+                      title={locked ? `Unlock with ${TIER_LABELS[p.tier]} tier` : p.label}
+                    >
+                      <div
+                        className="qc-swatch-bg"
+                        style={{ background: `linear-gradient(145deg, ${p.surface} 30%, ${p.primary}55 100%)` }}
+                      />
+                      {locked && <div className="qc-swatch-lock">🔒</div>}
+                      <div className="qc-swatch-dots">
+                        <span style={{ background: p.primary }} />
+                        <span style={{ background: p.accent }} />
+                        <span style={{ background: p.ink, opacity: 0.7 }} />
+                      </div>
+                      {p.tier !== 'classic' && (
+                        <span className="qc-swatch-tier" style={{ color: TIER_COLORS[p.tier] }}>
+                          {TIER_LABELS[p.tier]}
+                        </span>
+                      )}
+                      <span className="qc-swatch-name">{p.label}</span>
+                      {selectedPalette.id === p.id && !locked && <span className="qc-swatch-check">✓</span>}
+                    </button>
+                  )
+                })}
               </div>
             </section>
 
@@ -244,44 +349,167 @@ function QuickCreate() {
               </div>
             </section>
 
-            {/* Step 3: Content */}
+            {/* Step 3: Content — varies by card type */}
             <section className="qc-step">
               <div className="qc-step-header">
                 <span className="qc-step-num">3</span>
                 <div>
-                  <h3 className="qc-step-title">Your Message</h3>
-                  <p className="qc-step-sub">What do you want to say?</p>
+                  <h3 className="qc-step-title">{s3.title}</h3>
+                  <p className="qc-step-sub">{s3.sub}</p>
                 </div>
               </div>
-              <div className="qc-fields">
-                <div className="qc-field">
-                  <div className="qc-field-header">
-                    <label>Heading</label>
-                    <span className="qc-char-count">{heading.length}/200</span>
+
+              {cardType === 'personal' && (
+                <div className="qc-fields">
+                  <div className="qc-field">
+                    <div className="qc-field-header">
+                      <label>Heading</label>
+                      <span className="qc-char-count">{heading.length}/200</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="A short, memorable heading…"
+                      value={heading}
+                      onChange={e => setHeading(e.target.value)}
+                      maxLength={200}
+                      style={{ fontFamily: `'${selectedFont}', serif` }}
+                    />
                   </div>
-                  <input
-                    type="text"
-                    placeholder="A short, memorable heading…"
-                    value={heading}
-                    onChange={e => setHeading(e.target.value)}
-                    maxLength={200}
-                    style={{ fontFamily: `'${selectedFont}', serif` }}
-                  />
-                </div>
-                <div className="qc-field">
-                  <div className="qc-field-header">
-                    <label>Message</label>
-                    <span className="qc-char-count">{body.length}/4000</span>
+                  <div className="qc-field">
+                    <div className="qc-field-header">
+                      <label>Message</label>
+                      <span className="qc-char-count">{body.length}/4000</span>
+                    </div>
+                    <textarea
+                      rows={5}
+                      placeholder="Write what you want to say…"
+                      value={body}
+                      onChange={e => setBody(e.target.value)}
+                      maxLength={4000}
+                    />
                   </div>
-                  <textarea
-                    rows={5}
-                    placeholder="Write what you want to say…"
-                    value={body}
-                    onChange={e => setBody(e.target.value)}
-                    maxLength={4000}
-                  />
                 </div>
-              </div>
+              )}
+
+              {cardType === 'poll' && (
+                <div className="qc-fields">
+                  <div className="qc-field">
+                    <div className="qc-field-header">
+                      <label>Question</label>
+                      <span className="qc-char-count">{pollQuestion.length}/500</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="What do you want to ask?"
+                      value={pollQuestion}
+                      onChange={e => setPollQuestion(e.target.value)}
+                      maxLength={500}
+                    />
+                  </div>
+                  <div className="qc-poll-options">
+                    <label className="qc-poll-options-label">Options</label>
+                    {pollOptions.map((opt, i) => (
+                      <div key={i} className="qc-poll-option-row">
+                        <span className="qc-poll-option-letter">{String.fromCharCode(65 + i)}</span>
+                        <input
+                          type="text"
+                          placeholder={`Option ${i + 1}…`}
+                          value={opt}
+                          onChange={e => updatePollOption(i, e.target.value)}
+                          maxLength={300}
+                        />
+                        {pollOptions.length > 2 && (
+                          <button type="button" className="qc-poll-remove" onClick={() => removePollOption(i)}>✕</button>
+                        )}
+                      </div>
+                    ))}
+                    {pollOptions.length < 6 && (
+                      <button type="button" className="qc-poll-add" onClick={addPollOption}>+ Add option</button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {cardType === 'chain' && (
+                <div className="qc-fields">
+                  <div className="qc-field">
+                    <div className="qc-field-header">
+                      <label>Challenge Prompt</label>
+                      <span className="qc-char-count">{chainChallenge.length}/600</span>
+                    </div>
+                    <textarea
+                      rows={4}
+                      placeholder="Write a challenge for your recipient to respond to…"
+                      value={chainChallenge}
+                      onChange={e => setChainChallenge(e.target.value)}
+                      maxLength={600}
+                    />
+                  </div>
+                  <p className="qc-type-hint">Recipients will be invited to create and send a card back to you.</p>
+                </div>
+              )}
+
+              {cardType === 'trivia' && (
+                <div className="qc-fields">
+                  <div className="qc-field">
+                    <div className="qc-field-header">
+                      <label>Question</label>
+                      <span className="qc-char-count">{triviaQuestion.length}/500</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Ask a trivia question…"
+                      value={triviaQuestion}
+                      onChange={e => setTriviaQuestion(e.target.value)}
+                      maxLength={500}
+                    />
+                  </div>
+                  <div className="qc-trivia-options">
+                    <label className="qc-poll-options-label">
+                      Answers <span className="qc-optional">tap ○ to mark correct</span>
+                    </label>
+                    {triviaOptions.map((opt, i) => (
+                      <div key={i} className={`qc-trivia-option-row${triviaCorrect === i ? ' correct' : ''}`}>
+                        <button
+                          type="button"
+                          className="qc-trivia-correct-btn"
+                          onClick={() => setTriviaCorrect(i)}
+                          title="Mark as correct answer"
+                        >
+                          {triviaCorrect === i ? '✓' : '○'}
+                        </button>
+                        <input
+                          type="text"
+                          placeholder={`Answer ${i + 1}…`}
+                          value={opt}
+                          onChange={e => updateTriviaOption(i, e.target.value)}
+                          maxLength={300}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="qc-type-hint">Recipients see their score and correct answers at the end.</p>
+                </div>
+              )}
+
+              {cardType === 'anonymous' && (
+                <div className="qc-fields">
+                  <div className="qc-field">
+                    <div className="qc-field-header">
+                      <label>Your Message</label>
+                      <span className="qc-char-count">{anonMessage.length}/2000</span>
+                    </div>
+                    <textarea
+                      rows={6}
+                      placeholder="Recipients can reply to this card anonymously…"
+                      value={anonMessage}
+                      onChange={e => setAnonMessage(e.target.value)}
+                      maxLength={2000}
+                    />
+                  </div>
+                  <p className="qc-type-hint">Replies are completely anonymous — no names, no tracking.</p>
+                </div>
+              )}
             </section>
 
             {/* Step 4: Photo */}
@@ -370,7 +598,7 @@ function QuickCreate() {
             </div>
           </div>
 
-          {/* ── Preview pane ── */}
+          {/* ── Preview pane (desktop only) ── */}
           <div className="qc-preview-pane">
             <div className="qc-preview-wrap">
               <p className="qc-preview-label">Live Preview</p>
@@ -395,13 +623,13 @@ function QuickCreate() {
                   className="qc-mini-heading"
                   style={{ fontFamily: `'${selectedFont}', serif`, color: selectedPalette.primary }}
                 >
-                  {heading || 'Your heading here'}
+                  {previewHeading || 'Your heading here'}
                 </h3>
                 <p
                   className="qc-mini-body"
                   style={{ fontFamily: `'${selectedFont}', sans-serif`, color: selectedPalette.ink }}
                 >
-                  {body || 'Your message will appear here…'}
+                  {previewBody || 'Your message will appear here…'}
                 </p>
                 <div className="qc-mini-footer" style={{ borderTopColor: `${selectedPalette.primary}22` }}>
                   <span
