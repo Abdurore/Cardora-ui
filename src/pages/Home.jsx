@@ -123,6 +123,16 @@ function Home() {
   } = useOutletContext()
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [signupBonus, setSignupBonus] = useState(null)
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('cardora-theme') || 'dark' } catch { return 'dark' }
+  })
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme === 'light' ? 'light' : ''
+    try { localStorage.setItem('cardora-theme', theme) } catch {}
+  }, [theme])
+
+  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light')
 
   // Surface the "first 200 users get free CC" offer for logged-out visitors
   // so they see it before bouncing off the hero. Logged-in users have already
@@ -192,6 +202,9 @@ function Home() {
             <Link className="ghost" to="/explore">
               Explore Templates
             </Link>
+            <button type="button" className="theme-toggle-btn" onClick={toggleTheme} title="Switch theme" aria-label="Toggle light/dark theme">
+              {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+            </button>
           </div>
           {signupBonus && !currentUser && (
             <Link to="/signup" className="hero-bonus-banner" aria-label="Claim free Cardora Credits">

@@ -221,7 +221,7 @@ function AdminDashboard() {
   // New redeem code form
   const [newCode, setNewCode] = useState({ numberOfCC: 10, maxUses: 200, isActive: true })
   // New ad form
-  const [newAd, setNewAd] = useState({ name: '', type: 'external', enterpriseId: '', enterpriseName: '', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1 })
+  const [newAd, setNewAd] = useState({ name: '', type: 'external', enterpriseId: '', enterpriseName: '', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1, active: true })
   const [assignEnterprise, setAssignEnterprise] = useState({ adId: null, value: '' })
   // Broadcast subject
   const [broadcastSubject, setBroadcastSubject] = useState('')
@@ -643,18 +643,16 @@ function AdminDashboard() {
     try {
       const payload = { ...newAd }
       if (!payload.linkUrl) delete payload.linkUrl
-      if (!payload.enterpriseId) {
-        delete payload.enterpriseId
-        delete payload.enterpriseName
-      } else {
-        payload.enterpriseUserId = payload.enterpriseId
+      if (payload.enterpriseId) {
+        payload.enterpriseAccountId = payload.enterpriseId
       }
+      delete payload.enterpriseId
+      if (!payload.enterpriseAccountId) delete payload.enterpriseAccountId
       if (!payload.maxViews) delete payload.maxViews
       else payload.maxViews = Number(payload.maxViews)
-      if (!payload.enterpriseAccountId) delete payload.enterpriseAccountId
       await createAdminAd(payload)
       showMsg('Ad created!')
-      setNewAd({ name: '', type: 'external', enterpriseId: '', enterpriseName: '', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1 })
+      setNewAd({ name: '', type: 'external', enterpriseId: '', enterpriseName: '', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1, active: true })
       if (adVideoInputRef.current) adVideoInputRef.current.value = ''
       loadTabData('Ads')
     } catch (err) {
@@ -1591,10 +1589,6 @@ function AdminDashboard() {
                 <label className="admin-field">
                   <span>Display Priority (higher = shown first)</span>
                   <input type="number" placeholder="1" value={newAd.priority} onChange={e => setNewAd(p => ({ ...p, priority: Number(e.target.value) }))} />
-                </label>
-                <label className="admin-field">
-                  <span>Enterprise Account ID <small>(optional — links ad to an enterprise user)</small></span>
-                  <input placeholder="e.g. user_id or username" value={newAd.enterpriseAccountId} onChange={e => setNewAd(p => ({ ...p, enterpriseAccountId: e.target.value }))} />
                 </label>
                 <button className="primary" type="button" onClick={handleCreateAd} disabled={adVideoUploading}>
                   {adVideoUploading ? 'Uploading...' : 'Create'}
