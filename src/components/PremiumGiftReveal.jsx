@@ -1,112 +1,103 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { motion } from 'framer-motion'
 
+// Heart silhouette path — used for ALL gift packages so the reveal feels
+// consistent across the catalog. Differentiation comes from colour, intensity,
+// and duration rather than shape.
+const HEART_PATH =
+  'M100 170s-66-45-88-78C-6 60 10 22 44 16c23-4 44 7 56 28 12-21 33-32 56-28 34 6 50 44 32 76-22 33-88 78-88 78z'
+
+const HEART_SHAPE = 'heart'
+
+// Gradient pairs differentiate each package visually. Order roughly follows
+// price tiers — lower tiers use softer pinks, higher tiers move into rich
+// jewel tones.
 const EFFECTS = {
   heart: {
-    gradient: ['#7b0016', '#ff4f98'],
-    path:
-      'M100 170s-66-45-88-78C-6 60 10 22 44 16c23-4 44 7 56 28 12-21 33-32 56-28 34 6 50 44 32 76-22 33-88 78-88 78z',
+    gradient: ['#ff6b9d', '#ff4f98'],
     price: 2,
-    shape: 'heart',
     phases: ['form'],
     duration: 1500,
     intensity: 1,
   },
   diamond: {
     gradient: ['#5de0ff', '#7b82ff'],
-    path: 'M100 10 L170 70 L100 170 L30 70 Z M100 10 L140 70 L100 170 L60 70 Z',
     price: 3,
-    shape: 'diamond',
     phases: ['explode', 'form'],
     duration: 1800,
     intensity: 1.2,
   },
   rose: {
     gradient: ['#7b0016', '#ff4f98'],
-    path:
-      'M100 20 C140 10 170 40 160 80 C150 120 110 150 100 170 C90 150 50 120 40 80 C30 40 60 10 100 20 Z',
     price: 5,
-    shape: 'heart',
     phases: ['explode', 'form'],
     duration: 2200,
     intensity: 1.45,
   },
   star: {
     gradient: ['#ffd56a', '#ff7ad1'],
-    path: 'M100 15 L122 70 L180 70 L132 108 L150 165 L100 132 L50 165 L68 108 L20 70 L78 70 Z',
     price: 7,
-    shape: 'star',
     phases: ['explode', 'form'],
     duration: 2500,
     intensity: 1.7,
   },
   orb: {
     gradient: ['#7ef7ff', '#62ffa2'],
-    path: 'M100 20 A80 80 0 1 0 100 180 A80 80 0 1 0 100 20 Z',
     price: 10,
-    shape: 'ring',
     phases: ['orbit', 'form'],
     duration: 3000,
     intensity: 2,
   },
   ring: {
     gradient: ['#ffe07a', '#ff9bd2'],
-    path:
-      'M100 30 A70 70 0 1 0 100 170 A70 70 0 1 0 100 30 Z M100 55 A45 45 0 1 1 100 145 A45 45 0 1 1 100 55 Z',
     price: 30,
-    shape: 'ring',
     phases: ['orbit', 'form'],
     duration: 3400,
     intensity: 2.4,
   },
   candle: {
     gradient: ['#ffce7a', '#ff7ad1'],
-    path: 'M80 60 Q100 20 120 60 Z M70 60 L130 60 L120 170 L80 170 Z',
     price: 50,
-    shape: 'diamond',
     phases: ['explode', 'orbit', 'form'],
     duration: 3800,
     intensity: 2.8,
   },
   christmas_tree: {
     gradient: ['#3cffb1', '#7ef7ff'],
-    path:
-      'M100 20 L145 80 L120 80 L160 130 L130 130 L170 180 L30 180 L70 130 L40 130 L80 80 L55 80 Z',
     price: 60,
-    shape: 'star',
     phases: ['explode', 'orbit', 'form'],
     duration: 4100,
     intensity: 3.1,
   },
   crescent_moon: {
     gradient: ['#ffe59a', '#ffd1f0'],
-    path: 'M120 20 A70 70 0 1 0 120 180 A50 50 0 1 1 120 20 Z',
     price: 80,
-    shape: 'ring',
     phases: ['orbit', 'form', 'glow'],
     duration: 4400,
     intensity: 3.35,
   },
   meteorite: {
     gradient: ['#ff9bd2', '#7ef7ff'],
-    path: 'M140 40 L180 60 L120 120 L60 100 L80 40 Z',
     price: 99,
-    shape: 'diamond',
     phases: ['explode', 'orbit', 'form', 'glow'],
     duration: 4700,
     intensity: 3.7,
   },
   necklace: {
     gradient: ['#ffd56a', '#7ef7ff'],
-    path:
-      'M40 70 A60 60 0 0 0 160 70 L150 100 A50 50 0 0 1 50 100 Z M90 100 L110 100 L100 130 Z',
     price: 150,
-    shape: 'ring',
     phases: ['explode', 'orbit', 'form', 'glow'],
     duration: 5200,
     intensity: 4,
   },
 }
+
+// All effects render the heart silhouette. Inject the shared shape/path so
+// downstream code (icons, mappers) reads them as before without changes.
+Object.values(EFFECTS).forEach((effect) => {
+  effect.path = HEART_PATH
+  effect.shape = HEART_SHAPE
+})
 
 export const giftConfigs = Object.values(EFFECTS).reduce((acc, effect) => {
   acc[effect.price] = {
@@ -121,7 +112,7 @@ export const giftConfigs = Object.values(EFFECTS).reduce((acc, effect) => {
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
 const easeOutQuad = (t) => 1 - (1 - t) * (1 - t)
 
-export const getGiftEffect = (key) => EFFECTS[key] || EFFECTS.diamond
+export const getGiftEffect = (key) => EFFECTS[key] || EFFECTS.heart
 
 function phaseProgress(elapsed, config) {
   const phases = config.phases
@@ -137,36 +128,23 @@ function phaseProgress(elapsed, config) {
   }
 }
 
-function getTargetPoint(shape, t, centerX, centerY, scale) {
-  if (shape === 'star') {
-    const spikes = 5
-    const outer = scale * 17
-    const inner = scale * 8
-    const angle = t - Math.PI / 2
-    const radius = Math.floor((t / Math.PI) * spikes) % 2 === 0 ? outer : inner
-    return { x: centerX + Math.cos(angle * spikes) * radius, y: centerY + Math.sin(angle * spikes) * radius }
-  }
-
-  if (shape === 'ring') {
-    const radius = scale * 15
-    return { x: centerX + Math.cos(t) * radius, y: centerY + Math.sin(t) * radius }
-  }
-
-  if (shape === 'diamond') {
-    const radius = scale * 15
-    const angle = t % (Math.PI * 2)
-    const x = Math.cos(angle)
-    const y = Math.sin(angle)
-    const factor = radius / (Math.abs(x) + Math.abs(y))
-    return { x: centerX + x * factor, y: centerY + y * factor }
-  }
-
+// Heart parametric curve — i ∈ [0, 2π) returns a point on the canonical heart.
+function heartPoint(t, centerX, centerY, scale) {
   const x = 16 * Math.pow(Math.sin(t), 3)
   const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
   return { x: centerX + x * scale, y: centerY + y * scale }
 }
 
-function PremiumGiftReveal({ effect = 'diamond', onComplete }) {
+// Detect lower-power devices to throttle particle count and effects.
+function isLowPowerDevice() {
+  if (typeof window === 'undefined') return false
+  const cores = navigator.hardwareConcurrency || 4
+  const narrow = window.innerWidth < 768
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  return narrow || cores <= 4 || reduceMotion
+}
+
+function PremiumGiftReveal({ effect = 'heart', onComplete }) {
   const canvasRef = useRef(null)
   const rafRef = useRef(null)
   const startRef = useRef(0)
@@ -179,13 +157,18 @@ function PremiumGiftReveal({ effect = 'diamond', onComplete }) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return undefined
 
+    const lowPower = isLowPowerDevice()
+    // Cap DPR on small screens to avoid drawing 3x retina cost on phones.
+    const maxDpr = lowPower ? 1.5 : 2
+    const dpr = Math.min(window.devicePixelRatio || 1, maxDpr)
+
     const resize = () => {
-      const { innerWidth, innerHeight, devicePixelRatio } = window
-      canvas.width = innerWidth * devicePixelRatio
-      canvas.height = innerHeight * devicePixelRatio
+      const { innerWidth, innerHeight } = window
+      canvas.width = innerWidth * dpr
+      canvas.height = innerHeight * dpr
       canvas.style.width = `${innerWidth}px`
       canvas.style.height = `${innerHeight}px`
-      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
 
     resize()
@@ -194,7 +177,14 @@ function PremiumGiftReveal({ effect = 'diamond', onComplete }) {
     const width = () => window.innerWidth
     const height = () => window.innerHeight
     const center = () => ({ x: width() / 2, y: height() / 2 })
-    const particleCount = Math.min(190, Math.round(118 + config.intensity * 16))
+
+    // Particle count scales with intensity but is capped lower on mobile so
+    // weaker GPUs (mid-range Android, older iPhones) stay above 30fps.
+    const baseCount = lowPower
+      ? Math.min(95, Math.round(60 + config.intensity * 9))
+      : Math.min(190, Math.round(118 + config.intensity * 16))
+    const particleCount = baseCount
+
     const particles = Array.from({ length: particleCount }, (_, index) => {
       const angle = (index / particleCount) * Math.PI * 2
       return {
@@ -215,7 +205,7 @@ function PremiumGiftReveal({ effect = 'diamond', onComplete }) {
       const { x: cx, y: cy } = center()
       const scale = Math.min(width(), height()) / 42
       particles.forEach((p, index) => {
-        const target = getTargetPoint(config.shape, (index / particleCount) * Math.PI * 2, cx, cy, scale)
+        const target = heartPoint((index / particleCount) * Math.PI * 2, cx, cy, scale)
         p.x = cx
         p.y = cy
         p.tx = target.x
@@ -230,17 +220,37 @@ function PremiumGiftReveal({ effect = 'diamond', onComplete }) {
     initParticles()
     startRef.current = performance.now()
 
+    // Throttle to ~50fps on low-power devices to free up the main thread for
+    // the surrounding card stage (Framer Motion + DOM reflow on the heart SVG).
+    const minFrameMs = lowPower ? 20 : 0
+    let lastFrame = 0
+
     const tick = (time) => {
+      if (time - lastFrame < minFrameMs) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
+      lastFrame = time
+
       const elapsed = time - startRef.current
       const { phase, localProgress, totalProgress } = phaseProgress(elapsed, config)
       const { x: cx, y: cy } = center()
       const scale = Math.min(width(), height()) / 42
 
-      ctx.fillStyle = `rgba(2, 2, 5, ${phase === 'glow' ? 0.09 : 0.15})`
+      // Lighter trail-clear on mobile keeps the canvas from accumulating noise
+      // when frames are dropped.
+      ctx.fillStyle = `rgba(2, 2, 5, ${phase === 'glow' ? 0.09 : (lowPower ? 0.22 : 0.15)})`
       ctx.fillRect(0, 0, width(), height())
 
+      // Build the radial gradient once per frame — creating it inside the
+      // particle loop allocated 200+ gradient objects per frame.
+      // We still need per-particle radial centers, so keep colour stops here
+      // and reuse the gradient pair.
+      const gradStart = config.gradient[1]
+      const gradEnd = config.gradient[0]
+
       particles.forEach((p, index) => {
-        const target = getTargetPoint(config.shape, (index / particleCount) * Math.PI * 2, cx, cy, scale)
+        const target = heartPoint((index / particleCount) * Math.PI * 2, cx, cy, scale)
         p.tx = target.x
         p.ty = target.y
 
@@ -278,11 +288,14 @@ function PremiumGiftReveal({ effect = 'diamond', onComplete }) {
 
         ctx.save()
         ctx.globalAlpha = alpha * p.opacity
-        ctx.shadowBlur = p.glow * glowBoost
-        ctx.shadowColor = config.gradient[1]
+        // Heavy shadowBlur is expensive on mobile GPUs — disable on low-power.
+        if (!lowPower) {
+          ctx.shadowBlur = p.glow * glowBoost
+          ctx.shadowColor = gradStart
+        }
         const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 6)
-        gradient.addColorStop(0, config.gradient[1])
-        gradient.addColorStop(1, config.gradient[0])
+        gradient.addColorStop(0, gradStart)
+        gradient.addColorStop(1, gradEnd)
         ctx.fillStyle = gradient
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.size * glowBoost, 0, Math.PI * 2)
@@ -324,7 +337,7 @@ function PremiumGiftReveal({ effect = 'diamond', onComplete }) {
           content: '';
           position: absolute;
           inset: 0;
-          background: radial-gradient(circle at center, rgba(118, 239, 255, 0.12), transparent 60%);
+          background: radial-gradient(circle at center, rgba(255, 107, 157, 0.12), transparent 60%);
           pointer-events: none;
         }
 

@@ -47,6 +47,7 @@ import {
   resetPassword,
   deleteAccount,
   updateCurrency,
+  createFlutterwaveGiftCheckout,
 } from '../lib/api.js'
 import {
   getPrimaryUser,
@@ -300,6 +301,32 @@ function MainLayout() {
       return { ok: true, checkout: false }
     } catch (error) {
       console.error('Checkout start failed', error)
+      return { ok: false, reason: error.message || 'checkout' }
+    }
+  }
+
+  const purchaseGift = async (gift) => {
+    if (!hydratedUser) {
+      navigate('/login')
+      return { ok: false, reason: 'auth' }
+    }
+    if (!gift) return { ok: false, reason: 'no-gift' }
+    try {
+      const response = await createFlutterwaveGiftCheckout({
+        giftKey: gift.effectKey,
+        giftTitle: gift.title,
+        amount: gift.amount,
+        cc: gift.cc,
+      })
+      const checkout = normalizeCheckoutSession(response)
+      if (checkout.checkoutUrl) {
+        window.location.href = checkout.checkoutUrl
+        return { ok: true, checkout: true }
+      }
+      await hydrateSession()
+      return { ok: true, checkout: false }
+    } catch (error) {
+      console.error('Gift checkout failed', error)
       return { ok: false, reason: error.message || 'checkout' }
     }
   }
@@ -795,6 +822,7 @@ function MainLayout() {
           publishTemplate,
           deleteMarketplaceTemplate,
           createCardOnBackend: handleCreateCard,
+          purchaseGift,
           getUserCardsFromBackend: handleGetUserCards,
           deleteCardOnBackend: handleDeleteCard,
           claimDailyCoupon: handleClaimDailyCoupon,

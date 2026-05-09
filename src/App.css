@@ -14476,6 +14476,30 @@ a {
   display: grid;
 }
 
+.store-gifts-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.store-gifts-intro {
+  padding: 18px 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 247, 255, 0.1);
+  background: linear-gradient(160deg, rgba(12, 26, 34, 0.7), rgba(6, 14, 18, 0.85));
+}
+
+.store-gifts-intro h4 { margin: 0 0 6px; font-size: 1.05rem; color: #e2eaf0; }
+.store-gifts-intro p  { margin: 0; font-size: 0.84rem; color: rgba(226,234,240,0.62); line-height: 1.55; }
+
+.store-gift-status {
+  margin: 0; padding: 10px 14px; border-radius: 10px;
+  font-size: 0.84rem;
+  background: rgba(126, 247, 255, 0.07);
+  border: 1px solid rgba(126, 247, 255, 0.18);
+  color: rgba(226,234,240,0.8);
+}
+
 .store-referral-card,
 .store-coming-card {
   padding: 26px;
