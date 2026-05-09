@@ -23625,6 +23625,116 @@ a {
 [data-theme="light"] .cs-step-arrow { color: #7aafbd; }
 [data-theme="light"] .cs-step-label { color: #2c5a6e; }
 [data-theme="light"] .cs-step.active .cs-step-label { color: #0a7a8f; }
+
+/* ── Studio: phone frame & preview ─────────────────── */
+[data-theme="light"] .cs-phone-frame {
+  background: linear-gradient(180deg, rgba(215,240,250,0.98), rgba(200,232,245,0.98)) !important;
+  border-color: rgba(10,122,143,0.16) !important;
+  box-shadow: 0 16px 40px rgba(10,122,143,0.1), inset 0 1px 0 rgba(255,255,255,0.6) !important;
+}
+[data-theme="light"] .cs-phone-notch { background: rgba(10,122,143,0.12) !important; }
+
+/* ── Studio: send modal ─────────────────────────────── */
+[data-theme="light"] .cs-send-modal-overlay { background: rgba(5,18,28,0.45) !important; }
+[data-theme="light"] .cs-send-modal {
+  background: rgba(224,245,252,0.99) !important;
+  border-color: rgba(10,122,143,0.18) !important;
+  color: #091e2a !important;
+}
+[data-theme="light"] .cs-send-modal h3 { color: #091e2a !important; }
+[data-theme="light"] .cs-send-modal-eyebrow { color: #4f8fa0 !important; }
+[data-theme="light"] .cs-send-modal-note,
+[data-theme="light"] .cs-send-modal-tier-note { color: #2c5a6e !important; }
+[data-theme="light"] .cs-send-link-pill {
+  background: rgba(10,122,143,0.06) !important;
+  border-color: rgba(10,122,143,0.18) !important;
+  color: #065d6e !important;
+}
+[data-theme="light"] .cs-send-modal-email-input {
+  background: rgba(210,240,248,0.8) !important;
+  border-color: rgba(10,122,143,0.18) !important;
+  color: #091e2a !important;
+}
+[data-theme="light"] .cs-send-modal-email-input::placeholder { color: #7aafbd !important; }
+[data-theme="light"] .cs-send-modal-close {
+  color: #2c5a6e !important;
+  background: rgba(10,122,143,0.07) !important;
+  border-color: rgba(10,122,143,0.14) !important;
+}
+[data-theme="light"] .cs-send-confirm { background: rgba(224,245,252,0.99) !important; }
+[data-theme="light"] .cs-send-confirm-text { color: #091e2a !important; }
+[data-theme="light"] .cs-send-modal-cc-deducted { background: rgba(10,122,143,0.07) !important; color: #0a7a8f !important; }
+
+/* ── Studio: panel section labels & hints ───────────── */
+[data-theme="light"] .cs-section-head,
+[data-theme="light"] .cs-section-label { color: #0a7a8f !important; }
+[data-theme="light"] .cs-hint-badge {
+  background: rgba(10,122,143,0.07) !important;
+  color: #0a7a8f !important;
+  border-color: rgba(10,122,143,0.18) !important;
+}
+[data-theme="light"] .cs-hint-tooltip {
+  background: rgba(224,245,252,0.99) !important;
+  border-color: rgba(10,122,143,0.18) !important;
+  color: #091e2a !important;
+}
+
+/* ── Studio: toggle fields ──────────────────────────── */
+[data-theme="light"] .cs-toggle-field { color: #091e2a !important; }
+[data-theme="light"] .cs-toggle-field input[type='checkbox']:not(:checked) {
+  background: rgba(10,122,143,0.12) !important;
+  border-color: rgba(10,122,143,0.25) !important;
+}
+
+/* ── Studio: color swatches / palette chips ─────────── */
+[data-theme="light"] .cs-color-chip {
+  border-color: rgba(10,122,143,0.2) !important;
+  box-shadow: 0 2px 8px rgba(10,122,143,0.1) !important;
+}
+[data-theme="light"] .cs-palette-row { border-bottom-color: rgba(10,122,143,0.1) !important; }
+
+/* ── Studio: image strip ────────────────────────────── */
+[data-theme="light"] .cs-img-strip-item {
+  border-color: rgba(10,122,143,0.14) !important;
+  background: rgba(210,240,248,0.6) !important;
+}
+[data-theme="light"] .cs-img-add-btn {
+  border-color: rgba(10,122,143,0.2) !important;
+  background: rgba(10,122,143,0.04) !important;
+  color: #0a7a8f !important;
+}
+
+/* ── Studio: tag chips / option pills ───────────────── */
+[data-theme="light"] .cs-tag-chip {
+  background: rgba(10,122,143,0.07) !important;
+  border-color: rgba(10,122,143,0.18) !important;
+  color: #065d6e !important;
+}
+[data-theme="light"] .cs-option-pill {
+  background: rgba(210,240,248,0.7) !important;
+  border-color: rgba(10,122,143,0.15) !important;
+  color: #091e2a !important;
+}
+[data-theme="light"] .cs-option-pill.active {
+  background: rgba(10,122,143,0.14) !important;
+  border-color: rgba(10,122,143,0.38) !important;
+  color: #065d6e !important;
+}
+
+/* ── Studio: canvas background overlay ─────────────── */
+[data-theme="light"] .cs-canvas-wrap { background: rgba(190,228,242,0.5) !important; }
+
+/* ── Studio: publish modal ──────────────────────────── */
+[data-theme="light"] .cs-publish-modal,
+[data-theme="light"] .cs-publish-overlay > div {
+  background: rgba(224,245,252,0.99) !important;
+  border-color: rgba(10,122,143,0.18) !important;
+  color: #091e2a !important;
+}
+
+/* ── Global: scrollbars in light mode ──────────────── */
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(10,122,143,0.18); }
+[data-theme="light"] ::-webkit-scrollbar-track { background: rgba(10,122,143,0.04); }
 [data-theme="light"] .cs-nav-btn {
   background: rgba(10,122,143,0.1) !important;
   border-color: rgba(10,122,143,0.28) !important;
@@ -23758,10 +23868,13 @@ a {
   width: 100%;
   padding: 0 24px;
 }
+/* On ≤860px: switch to block so the 1fr preview track doesn't steal space */
 @media (max-width: 860px) {
-  .qc-split { grid-template-columns: 1fr; padding: 0 16px; }
-  .qc-preview-pane { display: none; }
+  .qc-split { display: block !important; padding: 0 16px; }
+  .qc-preview-pane { display: none !important; }
 }
+
+/* Compact mobile layout */
 @media (max-width: 540px) {
   .qc-topbar { padding: 10px 14px; gap: 8px; }
   .qc-topbar-center { flex-direction: column; gap: 3px; align-items: flex-start; }
@@ -23769,13 +23882,45 @@ a {
   .qc-badge-type { display: none; }
   .qc-studio-text { display: none; }
   .qc-studio-link-btn { padding: 7px 9px; }
-  .qc-palette-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .qc-form-pane { padding: 24px 0 110px; gap: 30px; }
-  .qc-step-header { gap: 12px; margin-bottom: 16px; }
-  .qc-dropzone { padding: 24px 16px; }
-  .qc-font-chip { min-width: 82px; padding: 12px 10px; }
-  .qc-font-chip-sample { font-size: 1.65rem; }
-  .qc-submit-btn { padding: 15px; font-size: 0.96rem; }
+
+  /* 3-col shorter swatches — half the scroll of 2-col tall ones */
+  .qc-palette-grid { grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .qc-palette-swatch { aspect-ratio: 5/3; border-radius: 10px; }
+  .qc-swatch-name { font-size: 0.6rem; padding: 4px 7px 7px; }
+  .qc-swatch-dots { top: 6px; left: 7px; gap: 4px; }
+  .qc-swatch-dots span { width: 6px; height: 6px; }
+  .qc-swatch-check { width: 16px; height: 16px; font-size: 0.62rem; bottom: 6px; right: 6px; }
+
+  .qc-form-pane { padding: 22px 0 90px; gap: 28px; }
+  .qc-step-header { gap: 10px; margin-bottom: 14px; }
+  .qc-step-title { font-size: 0.88rem; }
+
+  .qc-font-chip { min-width: 82px; padding: 11px 10px; }
+  .qc-font-chip-sample { font-size: 1.55rem; }
+
+  .qc-dropzone { padding: 22px 14px; }
+
+  /* Sticky create button */
+  .qc-submit-area {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: 0 -16px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(7,9,12,0.96);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid rgba(255,255,255,0.07);
+    z-index: 20;
+  }
+  .qc-studio-hint { font-size: 0.71rem; }
+}
+
+@media (max-width: 540px) {
+  [data-theme="light"] .qc-submit-area {
+    background: rgba(220,244,252,0.97);
+    border-top-color: rgba(10,122,143,0.14);
+  }
 }
 
 /* Form pane */
