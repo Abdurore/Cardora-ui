@@ -201,6 +201,10 @@ export async function getCardBySlug(slug, password) {
   return request(`/cards/${slug}${qs}`)
 }
 
+export async function getMyCard(slug) {
+  return request(`/cards/${slug}`, { auth: true })
+}
+
 export async function submitCardResponse(slug, body) {
   return request(`/cards/${slug}/response`, { method: 'POST', auth: true, body })
 }

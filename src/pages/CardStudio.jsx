@@ -1903,18 +1903,24 @@ function CardStudio() {
           <div className="cs-sub-section">
             <p className="cs-sub-label">Lock</p>
             <div className="cs-choice-row">
-              {['none', 'time', 'password'].map(type => (
+              {[
+                { id: 'none',     label: 'None' },
+                { id: 'tap',      label: 'Tap' },
+                { id: 'scratch',  label: 'Scratch' },
+                { id: 'time',     label: 'Timer' },
+                { id: 'password', label: 'Password' },
+              ].map(({ id, label }) => (
                 <button
-                  key={type}
+                  key={id}
                   type="button"
-                  className={`cs-chip ${c.interaction.lock.type === type ? 'active' : ''}`}
-                  onClick={() => update('interaction.lock.type', type)}
+                  className={`cs-chip ${c.interaction.lock.type === id ? 'active' : ''}`}
+                  onClick={() => update('interaction.lock.type', id)}
                 >
-                  {type}
+                  {label}
                 </button>
               ))}
             </div>
-            {c.interaction.lock.type !== 'none' && (
+            {(c.interaction.lock.type === 'time' || c.interaction.lock.type === 'password') && (
               <label className="cs-field">
                 <span>{c.interaction.lock.type === 'time' ? 'Unlock Date/Time' : 'Password'}</span>
                 <input
@@ -1923,6 +1929,12 @@ function CardStudio() {
                   onChange={e => update('interaction.lock.value', e.target.value)}
                 />
               </label>
+            )}
+            {c.interaction.lock.type === 'tap' && (
+              <p className="cs-hint">Recipient taps anywhere on the card to reveal it — creates a sense of anticipation.</p>
+            )}
+            {c.interaction.lock.type === 'scratch' && (
+              <p className="cs-hint">Recipient scratches through an overlay to reveal the card — like a scratch card.</p>
             )}
           </div>
 
@@ -2773,10 +2785,28 @@ function CardStudio() {
         <main className="cs-canvas-wrap">
           <div className="cs-canvas">
             <div className="cs-canvas-head">
-              <p className="cs-canvas-head-label">
-                <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 5, opacity: 0.5 }} />
-                Live Preview — click any element to edit
-              </p>
+              {studioSteps.filter(s => s !== 'preview').length > 1 ? (
+                <div className="cs-step-timeline">
+                  {studioSteps.filter(s => s !== 'preview').map((step, i, arr) => (
+                    <span key={step} className="cs-step-timeline-item">
+                      <button
+                        type="button"
+                        className={`cs-step-node${activeStep === step ? ' active' : ''}`}
+                        onClick={() => goToStep(step)}
+                      >
+                        <span className="cs-step-num">{i + 1}</span>
+                        <span className="cs-step-name">{stepLabels[step]}</span>
+                      </button>
+                      {i < arr.length - 1 && <span className="cs-step-arrow">→</span>}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="cs-canvas-head-label">
+                  <HiOutlineEye style={{ verticalAlign: 'middle', marginRight: 5, opacity: 0.5 }} />
+                  Live Preview
+                </p>
+              )}
               <button type="button" className="cs-preview-toggle" onClick={enterPreview}>
                 Full Preview
               </button>

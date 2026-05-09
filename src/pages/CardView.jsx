@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getCardBySlug, submitPollVote, submitTriviaAnswer, submitChainReply } from '../lib/api.js'
+import { getCardBySlug, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage } from '../lib/api.js'
 import { mapBackendCard } from '../lib/backendMappers.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import ReportModal from '../components/ReportModal.jsx'
@@ -42,6 +42,8 @@ function CardView() {
         const backendCard = candidates.find(isCardLike)
         if (backendCard) {
           const mapped = mapBackendCard(backendCard)
+          // Preserve raw state for chain replies feed
+          mapped._chainState = backendCard.state || res?.state || null
           setCard(mapped)
           if (mapped.locked && mapped.lockType === 'password') setNeedsPassword(true)
           setLoading(false)
@@ -151,6 +153,9 @@ function CardView() {
   const handleChainReply = async (message) => {
     try { await submitChainReply(card.slug || id, { message }) } catch (e) { console.warn('Chain reply failed', e) }
   }
+  const handleAnonSubmit = async (message) => {
+    await sendCardAnonymousMessage(card.slug || id, { message })
+  }
 
   return (
     <>
@@ -159,6 +164,7 @@ function CardView() {
         onClose={() => navigate('/')}
         tier={card.tier || 'classic'}
         studioType={studioType}
+        cardTitle={card.title || ''}
         recipientEmail={card.recipient || card.recipientEmail || ''}
         pollData={pollData}
         triviaData={triviaData}
@@ -166,6 +172,8 @@ function CardView() {
         onPollSubmit={handlePollSubmit}
         onTriviaComplete={handleTriviaComplete}
         onChainReply={handleChainReply}
+        onAnonSubmit={handleAnonSubmit}
+        chainState={card._chainState}
       />
       {showReport && (
         <ReportModal

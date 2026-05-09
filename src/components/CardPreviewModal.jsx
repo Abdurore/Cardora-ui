@@ -5,8 +5,17 @@ import Envelope from './Envelope.jsx'
 import AmbientParticles from './AmbientParticles.jsx'
 import { fireOpenEffect } from '../lib/studioEffects.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
+import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
 
 const LEGACY_EMOJI_AMBIENTS = new Set(['floating', 'reverse'])
+
+const ENTRY_DEFAULTS = {
+  personal:  { label: 'Personal Card',   Icon: PersonalCardIcon, hint: 'Someone sent you a card',            color: '#e2b96e' },
+  poll:      { label: 'Poll Card',        Icon: PollCardIcon,     hint: "You've been asked to vote",          color: '#7eb3ff' },
+  trivia:    { label: 'Trivia Card',      Icon: TriviaCardIcon,   hint: "You've been challenged",             color: '#ffe066' },
+  chain:     { label: 'Chain Card',       Icon: ChainCardIcon,    hint: 'A chain was started for you',        color: '#62ffa2' },
+  anonymous: { label: 'Anonymous Card',   Icon: AnonCardIcon,     hint: 'Open to send an anonymous message',  color: '#c084fc' },
+}
 
 // Typewriter hook
 function useTypewriter(text, speed, active) {
@@ -37,10 +46,13 @@ function CardPreviewModal({
   triviaData = null,
   anonTemplate = null,
   pageMode = false,
+  cardTitle = '',
   onPollSubmit = null,
   onTriviaComplete = null,
   onChainReply = null,
   onQuestionResponse = null,
+  onAnonSubmit = null,
+  chainState = null,
 }) {
   // `allowedTools` gates tool visibility; `tierLimits` caps the content a
   // visible tool is allowed to contribute (e.g. music allowed, images > 1).
@@ -49,7 +61,7 @@ function CardPreviewModal({
   const limit = (key, fallback = true) => (tierLimits ? !!tierLimits[key] : fallback)
   const maxImages = tierLimits ? (tierLimits.maxImages ?? Infinity) : Infinity
   const envelopeEnabled = shouldShowEnvelope(studioType)
-  const [stage, setStage] = useState(envelopeEnabled ? 'closed' : 'open')
+  const [stage, setStage] = useState(pageMode ? 'entry' : (envelopeEnabled ? 'closed' : 'open'))
   const [questionIdx, setQuestionIdx] = useState(0)
   const [fadeBody, setFadeBody] = useState(!envelopeEnabled)
   const [bodyVisible, setBodyVisible] = useState(!envelopeEnabled)
@@ -77,10 +89,16 @@ function CardPreviewModal({
   // matches what the recipient will actually experience.
   const lockSpec = cardObject?.interaction?.lock || { type: 'none', value: '' }
   const revealSpec = cardObject?.interaction?.reveal || { type: 'tap', hint: '' }
-  const [unlocked, setUnlocked] = useState(lockSpec.type === 'none')
+  const [unlocked, setUnlocked] = useState(
+    lockSpec.type === 'none' || (lockSpec.type !== 'password' && lockSpec.type !== 'time' && lockSpec.type !== 'tap' && lockSpec.type !== 'scratch')
+  )
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState('')
   const [now, setNow] = useState(() => Date.now())
+  // Scratch lock state
+  const scratchCanvasRef = useRef(null)
+  const scratchingRef = useRef(false)
+  const [scratchPct, setScratchPct] = useState(0)
   // Tick once per second while the time-lock is active so the countdown updates.
   useEffect(() => {
     if (lockSpec.type !== 'time' || unlocked) return undefined
@@ -92,6 +110,52 @@ function CardPreviewModal({
   useEffect(() => {
     if (lockSpec.type === 'time' && unlockAt && now >= unlockAt) setUnlocked(true)
   }, [lockSpec.type, unlockAt, now])
+
+  // Scratch canvas: fill with overlay color when gate mounts
+  useEffect(() => {
+    if (lockSpec.type !== 'scratch' || unlocked) return
+    const canvas = scratchCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.globalCompositeOperation = 'source-over'
+    const bg = cardObject?.card?.backgroundColor || '#0b0f14'
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    // Decorative overlay text
+    ctx.font = 'bold 15px system-ui'
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'
+    ctx.textAlign = 'center'
+    const rows = ['SCRATCH', 'TO', 'REVEAL']
+    rows.forEach((t, i) => ctx.fillText(t, canvas.width / 2, canvas.height / 2 - 18 + i * 22))
+    setScratchPct(0)
+  }, [lockSpec.type, unlocked, cardObject?.card?.backgroundColor])
+
+  const handleScratch = useCallback((e) => {
+    if (!scratchingRef.current || unlocked) return
+    const canvas = scratchCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const rect = canvas.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const x = (clientX - rect.left) * (canvas.width / rect.width)
+    const y = (clientY - rect.top) * (canvas.height / rect.height)
+    ctx.globalCompositeOperation = 'destination-out'
+    ctx.beginPath()
+    ctx.arc(x, y, 32, 0, Math.PI * 2)
+    ctx.fill()
+    // Sample every 8th pixel for performance
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+    let cleared = 0
+    for (let i = 3; i < data.length; i += 32) {
+      if (data[i] < 128) cleared++
+    }
+    const total = (canvas.width * canvas.height) / 8
+    const pct = Math.round((cleared / total) * 100)
+    setScratchPct(pct)
+    if (pct >= 55) setUnlocked(true)
+  }, [unlocked])
 
   const handlePasswordSubmit = (e) => {
     e?.preventDefault?.()
@@ -127,6 +191,17 @@ function CardPreviewModal({
   // Trivia preview state
   const [previewTriviaIdx, setPreviewTriviaIdx] = useState(0)
   const [previewTriviaAnswers, setPreviewTriviaAnswers] = useState([])
+
+  // Anonymous reply state (pageMode only)
+  const [anonMessage, setAnonMessage] = useState('')
+  const [anonSubmitting, setAnonSubmitting] = useState(false)
+  const [anonSubmitted, setAnonSubmitted] = useState(false)
+
+  // Chain reply state (pageMode only)
+  const [chainMessage, setChainMessage] = useState('')
+  const [chainSubmitting, setChainSubmitting] = useState(false)
+  const [chainSubmitted, setChainSubmitted] = useState(false)
+  const [localChainReplies, setLocalChainReplies] = useState([])
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const c = cardObject
@@ -153,7 +228,7 @@ function CardPreviewModal({
 
     audioRef.current.volume = c.background.music.volume
 
-    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview') {
+    if (stage === 'open' || stage === 'questions' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply' || stage === 'chainReplies') {
       // Honour trim window: jump to start point if we're outside the segment.
       if (musicTrimmed) {
         const t = audioRef.current.currentTime
@@ -194,6 +269,13 @@ function CardPreviewModal({
     fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
   }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits])
 
+  // Seed localChainReplies from chainState prop when it becomes available
+  useEffect(() => {
+    if (chainState?.responses?.length) {
+      setLocalChainReplies(chainState.responses)
+    }
+  }, [chainState])
+
   const schedulePreviewTimer = useCallback((fn, delay) => {
     const id = window.setTimeout(() => {
       previewTimersRef.current = previewTimersRef.current.filter((timer) => timer !== id)
@@ -209,6 +291,16 @@ function CardPreviewModal({
       previewTimersRef.current = []
     }
   }, [])
+
+  const handleEntryOpen = () => {
+    if (envelopeEnabled) {
+      setStage('closed')
+    } else {
+      setFadeBody(true)
+      setBodyVisible(true)
+      setStage('open')
+    }
+  }
 
   const handleOpen = () => {
     previewTimersRef.current.forEach(window.clearTimeout)
@@ -244,7 +336,11 @@ function CardPreviewModal({
       return
     }
     if (studioType === 'anonymous') {
-      setStage('anonPreview')
+      setStage(pageMode ? 'anonReply' : 'anonPreview')
+      return
+    }
+    if (studioType === 'chain' && pageMode) {
+      setStage('chainReplies')
       return
     }
     if (hasQuestions) {
@@ -276,6 +372,12 @@ function CardPreviewModal({
     setPreviewTriviaIdx(0)
     setPreviewTriviaAnswers([])
     setPreviewTriviaSubmitted(false)
+    setAnonMessage('')
+    setAnonSubmitting(false)
+    setAnonSubmitted(false)
+    setChainMessage('')
+    setChainSubmitting(false)
+    setChainSubmitted(false)
   }
 
   const handleEndDone = () => {
@@ -474,7 +576,7 @@ function CardPreviewModal({
         ) : null}
       </div>
 
-      {stage !== 'closed' && (
+      {stage !== 'closed' && stage !== 'entry' && (
         <div className="cp-ambient-overlay" aria-hidden="true">
           {renderBgEffect()}
         </div>
@@ -484,7 +586,7 @@ function CardPreviewModal({
         <audio ref={audioRef} src={c.background.music.url} loop preload="auto" />
       )}
 
-      <div className={`cp-close-btn ${pageMode ? 'cp-back-btn' : ''}`} onClick={onClose}>
+      <div className={`cp-close-btn ${pageMode ? 'cp-back-btn' : ''} ${stage === 'entry' ? 'cp-close-btn-hidden' : ''}`} onClick={onClose}>
         {pageMode ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 5l-7 7 7 7" />
@@ -545,6 +647,118 @@ function CardPreviewModal({
           </div>
         </div>
       )}
+
+      {/* TAP LOCK — tap anywhere to reveal */}
+      {!unlocked && lockSpec.type === 'tap' && stage !== 'entry' && (
+        <div
+          className="cp-tap-gate"
+          style={{
+            '--tap-accent': c.theme.accentColor || '#7ef7ff',
+            '--tap-bg': c.card.backgroundColor || '#0b0f14',
+          }}
+          onClick={() => setUnlocked(true)}
+        >
+          <div className="cp-tap-rings" aria-hidden="true">
+            <div className="cp-tap-ring r1" />
+            <div className="cp-tap-ring r2" />
+            <div className="cp-tap-ring r3" />
+          </div>
+          <div className="cp-tap-center">
+            <div className="cp-tap-icon">👆</div>
+            <p className="cp-tap-label">Tap to reveal</p>
+            {lockSpec.value && <p className="cp-tap-hint">{lockSpec.value}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* SCRATCH LOCK — scratch to reveal */}
+      {!unlocked && lockSpec.type === 'scratch' && stage !== 'entry' && (
+        <div
+          className="cp-scratch-gate"
+          style={{ '--scratch-accent': c.theme.accentColor || '#7ef7ff' }}
+        >
+          <canvas
+            ref={scratchCanvasRef}
+            className="cp-scratch-canvas"
+            width={360}
+            height={640}
+            onPointerDown={() => { scratchingRef.current = true }}
+            onPointerUp={() => { scratchingRef.current = false }}
+            onPointerLeave={() => { scratchingRef.current = false }}
+            onPointerMove={handleScratch}
+            onTouchStart={e => { e.preventDefault(); scratchingRef.current = true }}
+            onTouchEnd={() => { scratchingRef.current = false }}
+            onTouchMove={e => { e.preventDefault(); handleScratch(e) }}
+          />
+          <div className="cp-scratch-bar">
+            <div className="cp-scratch-fill" style={{ width: `${Math.min(scratchPct, 100)}%` }} />
+            <span className="cp-scratch-hint">{scratchPct < 55 ? 'Scratch to reveal the card' : 'Revealing…'}</span>
+          </div>
+        </div>
+      )}
+
+      {/* CINEMATIC ENTRY SCREEN — shown first in pageMode before the card opens */}
+      {stage === 'entry' && (() => {
+        const entryMeta = ENTRY_DEFAULTS[studioType] || ENTRY_DEFAULTS.personal
+        const EntryIcon = entryMeta.Icon
+        const bg = c.card.backgroundColor || '#0b0f14'
+        const accent = c.theme.accentColor || entryMeta.color
+        const g1 = c.theme?.palette?.gradient?.[0] || accent
+        const g2 = c.theme?.palette?.gradient?.[1] || bg
+        return (
+          <div
+            className="cp-entry-screen"
+            style={{ '--entry-bg': bg, '--entry-g1': g1, '--entry-g2': g2, '--entry-accent': accent }}
+          >
+            {/* Atmospheric orbs */}
+            <div className="cp-entry-orb cp-entry-orb-1" />
+            <div className="cp-entry-orb cp-entry-orb-2" />
+            <div className="cp-entry-orb cp-entry-orb-3" />
+
+            {/* Particle layer */}
+            <div className="cp-entry-particles" aria-hidden="true">
+              {renderBgEffect()}
+            </div>
+
+            {/* Center content */}
+            <div className="cp-entry-content">
+              <div className="cp-entry-brand">
+                <img src="/cardora-logo.png?v=4" alt="" className="cp-entry-brand-logo" />
+                <span className="cp-entry-brand-name">Cardora</span>
+              </div>
+
+              <div className="cp-entry-type-chip" style={{ color: accent, borderColor: `${accent}40` }}>
+                <EntryIcon size={14} color={accent} />
+                <span>{entryMeta.label}</span>
+              </div>
+
+              <h1
+                className="cp-entry-title"
+                style={{
+                  color: c.card.headingColor || '#ffffff',
+                  fontFamily: `'${c.theme.fontFamily}', serif`,
+                }}
+              >
+                {cardTitle || entryMeta.hint}
+              </h1>
+
+              <button
+                className="cp-entry-open-btn"
+                style={{ '--btn-color': accent }}
+                onClick={handleEntryOpen}
+              >
+                <span className="cp-entry-open-ring" />
+                <span className="cp-entry-open-ring cp-entry-open-ring-2" />
+                <span className="cp-entry-open-label">
+                  {studioType === 'anonymous' ? 'Open' : 'Open Card'}
+                </span>
+              </button>
+
+              <p className="cp-entry-tap-hint">tap to reveal</p>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ENVELOPE (closed state) — only Personal + Chain cards get the reveal metaphor */}
       {unlocked && stage === 'closed' && envelopeEnabled && (
@@ -715,14 +929,30 @@ function CardPreviewModal({
                       Submit Vote
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      className="cp-continue-btn visible"
-                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                      onClick={() => setStage('end')}
-                    >
-                      Continue
-                    </button>
+                    <div className="cp-poll-voted-confirm">
+                      <div className="cp-poll-voted-icon" style={{ color: c.theme.accentColor }}>✓</div>
+                      <p className="cp-poll-voted-msg" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                        Vote submitted!
+                      </p>
+                      <div className="cp-poll-voted-choices">
+                        {(pollData.options || []).map((opt, i) => (
+                          previewPollVotes.includes(i) ? (
+                            <div key={i} className="cp-poll-voted-choice" style={{ background: `${c.theme.accentColor}20`, borderColor: `${c.theme.accentColor}60`, color: c.card.textColor }}>
+                              <span className="cp-poll-voted-check" style={{ color: c.theme.accentColor }}>✓</span>
+                              <span>{opt || `Option ${i + 1}`}</span>
+                            </div>
+                          ) : null
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        className="cp-continue-btn visible"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        onClick={() => setStage('end')}
+                      >
+                        Continue
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -809,28 +1039,48 @@ function CardPreviewModal({
               style={cardSurfaceStyle(borderStyle)}
             >
               <div className="cp-card-inner cp-card-inner-full">
-                <div className="cp-trivia-results">
-                  <div
-                    className="cp-trivia-score-circle"
-                    style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                  >
-                    {triviaData.questions.filter((q, i) => previewTriviaAnswers[i] === q.correctIndex).length}/{triviaData.questions.length}
+                {(() => {
+                  const correct = triviaData.questions.filter((q, i) => previewTriviaAnswers[i] === q.correctIndex).length
+                  const total = triviaData.questions.length
+                  const pct = total > 0 ? correct / total : 0
+                  const circumference = 2 * Math.PI * 44
+                  const dashOffset = circumference * (1 - pct)
+                  const perfMsg = pct === 1 ? 'Perfect score!' : pct >= 0.75 ? 'Great job!' : pct >= 0.5 ? 'Not bad!' : 'Keep practicing!'
+                  const perfEmoji = pct === 1 ? '🏆' : pct >= 0.75 ? '🎉' : pct >= 0.5 ? '👏' : '💪'
+                  return (
+                  <div className="cp-trivia-results">
+                    <svg className="cp-trivia-score-ring" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="7" />
+                      <circle
+                        cx="50" cy="50" r="44" fill="none"
+                        stroke={c.theme.accentColor}
+                        strokeWidth="7"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={dashOffset}
+                        style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1)', transformOrigin: 'center', transform: 'rotate(-90deg)' }}
+                      />
+                      <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fill={c.card.headingColor} fontSize="20" fontWeight="800" fontFamily="inherit">
+                        {correct}/{total}
+                      </text>
+                    </svg>
+                    <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, margin: 0 }}>
+                      {perfMsg} {perfEmoji}
+                    </h3>
+                    <p className="cp-trivia-score-label" style={{ color: c.card.textColor }}>
+                      {correct} out of {total} correct
+                    </p>
+                    <button
+                      type="button"
+                      className="cp-continue-btn visible"
+                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      onClick={() => setStage('end')}
+                    >
+                      Continue
+                    </button>
                   </div>
-                  <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, margin: 0 }}>
-                    Quiz Complete!
-                  </h3>
-                  <p className="cp-trivia-score-label" style={{ color: c.card.textColor }}>
-                    You got {triviaData.questions.filter((q, i) => previewTriviaAnswers[i] === q.correctIndex).length} out of {triviaData.questions.length} correct
-                  </p>
-                  <button
-                    type="button"
-                    className="cp-continue-btn visible"
-                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                    onClick={() => setStage('end')}
-                  >
-                    Continue
-                  </button>
-                </div>
+                  )
+                })()}
               </div>
             </article>,
             'cp-gradient-border-full'
@@ -874,6 +1124,195 @@ function CardPreviewModal({
                     Done
                   </button>
                 </div>
+              </div>
+            </article>,
+            'cp-gradient-border-full'
+          )}
+        </div>
+      )}
+
+      {/* ANONYMOUS REPLY — shown in pageMode when recipient opens an anonymous card */}
+      {stage === 'anonReply' && (
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article
+              className="cp-card cp-card-full cp-anon-reply-card"
+              style={cardSurfaceStyle(borderStyle)}
+            >
+              {anonSubmitted ? (
+                <div className="cp-anon-reply-sent">
+                  <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>✓</div>
+                  <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                    Sent anonymously
+                  </h3>
+                  <p style={{ color: c.card.textColor, opacity: 0.7, fontSize: '0.9rem' }}>
+                    Your message was delivered. The creator won't know it was you.
+                  </p>
+                  <div className="cp-end-actions">
+                    <button
+                      className="cp-end-btn"
+                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      onClick={handleReset}
+                    >
+                      Replay card
+                    </button>
+                    <a
+                      className="cp-end-btn ghost"
+                      style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      href="/studio"
+                    >
+                      Create yours →
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="cp-anon-reply-form">
+                  <p className="cp-anon-reply-label" style={{ color: c.theme.accentColor }}>
+                    Anonymous Message
+                  </p>
+                  <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, marginBottom: 8 }}>
+                    Send a message anonymously
+                  </h3>
+                  <p style={{ color: c.card.textColor, opacity: 0.7, fontSize: '0.85rem', marginBottom: 20 }}>
+                    The creator will receive your message but won't know who sent it.
+                  </p>
+                  <textarea
+                    className="cp-anon-textarea"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: `1.5px solid ${c.theme.accentColor}40`,
+                      color: c.card.textColor,
+                      fontFamily: `'${c.theme.fontFamily}', sans-serif`,
+                    }}
+                    placeholder="Write your message here… (max 500 characters)"
+                    maxLength={500}
+                    value={anonMessage}
+                    onChange={e => setAnonMessage(e.target.value)}
+                  />
+                  <div className="cp-anon-char-count" style={{ color: c.card.textColor, opacity: 0.45 }}>
+                    {anonMessage.length} / 500
+                  </div>
+                  <button
+                    className="cp-continue-btn visible"
+                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor, opacity: anonSubmitting ? 0.6 : 1 }}
+                    disabled={!anonMessage.trim() || anonSubmitting}
+                    onClick={async () => {
+                      if (!anonMessage.trim()) return
+                      setAnonSubmitting(true)
+                      try {
+                        if (onAnonSubmit) await onAnonSubmit(anonMessage.trim())
+                      } catch (e) { /* swallow */ }
+                      setAnonSubmitting(false)
+                      setAnonSubmitted(true)
+                    }}
+                  >
+                    {anonSubmitting ? 'Sending…' : 'Send Anonymously'}
+                  </button>
+                  <button
+                    type="button"
+                    style={{ background: 'none', border: 'none', color: c.card.textColor, opacity: 0.4, fontSize: '0.8rem', marginTop: 8, cursor: 'pointer' }}
+                    onClick={() => setStage('end')}
+                  >
+                    Skip
+                  </button>
+                </div>
+              )}
+            </article>,
+            'cp-gradient-border-full'
+          )}
+        </div>
+      )}
+
+      {/* CHAIN REPLIES — live public feed + reply form, pageMode only */}
+      {stage === 'chainReplies' && (
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article
+              className="cp-card cp-card-full cp-chain-replies-card"
+              style={cardSurfaceStyle(borderStyle)}
+            >
+              <div className="cp-chain-replies-inner">
+                {/* Header */}
+                <div className="cp-chain-header">
+                  <p className="cp-chain-eyebrow" style={{ color: c.theme.accentColor }}>Chain Card</p>
+                  {c.content.heading && (
+                    <h3 className="cp-chain-challenge" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                      {c.content.heading}
+                    </h3>
+                  )}
+                </div>
+
+                {/* Existing replies feed */}
+                <div className="cp-chain-feed">
+                  {localChainReplies.length === 0 ? (
+                    <p className="cp-chain-empty" style={{ color: c.card.textColor }}>
+                      No replies yet — be the first!
+                    </p>
+                  ) : (
+                    localChainReplies.slice().reverse().map((r, i) => (
+                      <div key={r.userId || r.id || i} className="cp-chain-reply">
+                        <div className="cp-chain-reply-avatar" style={{ background: `${c.theme.accentColor}30`, color: c.theme.accentColor }}>
+                          {(r.name || '?')[0].toUpperCase()}
+                        </div>
+                        <div className="cp-chain-reply-body">
+                          <span className="cp-chain-reply-name" style={{ color: c.theme.accentColor }}>{r.name || 'Someone'}</span>
+                          <p className="cp-chain-reply-text" style={{ color: c.card.textColor }}>{r.response || r.message}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Reply form */}
+                {!chainSubmitted ? (
+                  <div className="cp-chain-reply-form">
+                    <textarea
+                      className="cp-anon-textarea"
+                      style={{ background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${c.theme.accentColor}40`, color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif` }}
+                      placeholder="Add your reply to the chain…"
+                      maxLength={500}
+                      value={chainMessage}
+                      onChange={e => setChainMessage(e.target.value)}
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="cp-continue-btn visible"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor, flex: 1, opacity: chainSubmitting ? 0.6 : 1 }}
+                        disabled={!chainMessage.trim() || chainSubmitting}
+                        onClick={async () => {
+                          if (!chainMessage.trim()) return
+                          setChainSubmitting(true)
+                          try {
+                            if (onChainReply) await onChainReply(chainMessage.trim())
+                            setLocalChainReplies(prev => [...prev, { response: chainMessage.trim(), name: 'You', timestamp: new Date().toISOString() }])
+                          } catch (e) { /* swallow */ }
+                          setChainSubmitting(false)
+                          setChainSubmitted(true)
+                        }}
+                      >
+                        {chainSubmitting ? 'Sending…' : 'Reply to Chain'}
+                      </button>
+                      <button
+                        type="button"
+                        style={{ background: 'none', border: `1.5px solid ${c.theme.accentColor}40`, color: c.theme.accentColor, borderRadius: 999, padding: '0 16px', cursor: 'pointer', fontSize: '0.82rem' }}
+                        onClick={() => setStage('end')}
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="cp-chain-reply-sent">
+                    <p className="cp-chain-sent-msg" style={{ color: c.theme.accentColor }}>✓ Reply added to the chain!</p>
+                    <button
+                      className="cp-continue-btn visible"
+                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      onClick={() => setStage('end')}
+                    >
+                      Continue
+                    </button>
+                  </div>
+                )}
               </div>
             </article>,
             'cp-gradient-border-full'
@@ -943,15 +1382,29 @@ function CardPreviewModal({
             className="cp-card cp-card-full cp-end-card"
             style={cardSurfaceStyle(borderStyle)}
           >
-            <div className="cp-end-icon" style={{ color: c.theme.accentColor }}>✓</div>
             {pageMode ? (
-              <>
-                <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+              <div className="cp-end-outro">
+                {/* Animated sparkle burst */}
+                <div className="cp-end-sparkle-ring" style={{ '--end-accent': c.theme.accentColor }}>
+                  {[0,1,2,3,4,5,6,7].map(i => (
+                    <div key={i} className="cp-end-sparkle" style={{ '--i': i, background: c.theme.accentColor }} />
+                  ))}
+                  <div className="cp-end-outro-check" style={{ color: c.theme.accentColor }}>✓</div>
+                </div>
+
+                <h3 className="cp-end-outro-heading" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
                   That's the whole card
                 </h3>
-                <p style={{ color: c.card.textColor, opacity: 0.65, fontSize: '0.9rem' }}>
-                  Made with Cardora
+                <p className="cp-end-outro-sub" style={{ color: c.card.textColor }}>
+                  Hope it made your day
                 </p>
+
+                {/* Cardora branding */}
+                <div className="cp-end-brand">
+                  <img src="/cardora-logo.png?v=4" alt="" className="cp-end-brand-logo" />
+                  <span style={{ color: c.card.textColor, opacity: 0.5, fontSize: '0.78rem' }}>Made with Cardora</span>
+                </div>
+
                 <div className="cp-end-actions">
                   {hasGift && (
                     <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleEndDone}>
@@ -961,11 +1414,11 @@ function CardPreviewModal({
                   <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleReset}>
                     Replay
                   </button>
-                  <a className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href="/studio">
+                  <a className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: `${c.theme.accentColor}60`, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href="/studio">
                     Create yours →
                   </a>
                 </div>
-              </>
+              </div>
             ) : (
               <>
                 <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>

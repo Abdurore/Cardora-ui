@@ -24,11 +24,11 @@ function CardItem({
   type,
   variant = 'one',
   showOccasion = true,
+  showTypeBadge = true,
   previewImage,
   onClick,
   isFavorite,
   onToggleFavorite,
-  showTypeBadge = true,
 }) {
   const tierInfo = getTierInfo(tier)
   const audienceCount = String(meta || '').replace(/views?/i, '').trim()
