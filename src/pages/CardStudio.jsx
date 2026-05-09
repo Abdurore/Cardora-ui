@@ -125,11 +125,11 @@ const TYPE_ACCENT = {
 const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
 
 const TIER_COST_BY_TYPE = {
-  personal:  { classic: 0, premium: 10, elite: 25 },
-  poll:      { classic: 0, premium: 25, elite: 25 },
-  trivia:    { classic: 0, premium: 25, elite: 25 },
-  chain:     { classic: 0, premium: 25, elite: 25 },
-  anonymous: { classic: 0, premium: 45, elite: 45 },
+  personal:  { classic: 0, premium: 25, elite: 35 },
+  poll:      { classic: 0, premium: null, elite: 35 },
+  trivia:    { classic: 0, premium: null, elite: 50 },
+  chain:     { classic: 0, premium: null, elite: 40 },
+  anonymous: { classic: 0, premium: null, elite: 45 },
 }
 
 const TYPE_LABEL = {

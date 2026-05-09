@@ -198,6 +198,7 @@ function CardPreviewModal({
   const [anonSubmitted, setAnonSubmitted] = useState(false)
 
   // Chain reply state (pageMode only)
+  const [chainName, setChainName] = useState('')
   const [chainMessage, setChainMessage] = useState('')
   const [chainSubmitting, setChainSubmitting] = useState(false)
   const [chainSubmitted, setChainSubmitted] = useState(false)
@@ -703,7 +704,8 @@ function CardPreviewModal({
         const EntryIcon = entryMeta.Icon
         const bg = c.card.backgroundColor || '#0b0f14'
         const accent = c.theme.accentColor || entryMeta.color
-        const g1 = c.theme?.palette?.gradient?.[0] || accent
+        // Always use the type-specific color as the dominant orb hue so each card type has visual identity
+        const g1 = entryMeta.color
         const g2 = c.theme?.palette?.gradient?.[1] || bg
         return (
           <div
@@ -904,7 +906,7 @@ function CardPreviewModal({
                         }}
                       >
                         <span className="cp-poll-radio" />
-                        <span>{opt || `Option ${i + 1}`}</span>
+                        <span>{(typeof opt === 'object' ? opt.text : opt) || `Option ${i + 1}`}</span>
                       </button>
                     ))}
                   </div>
@@ -939,7 +941,7 @@ function CardPreviewModal({
                           previewPollVotes.includes(i) ? (
                             <div key={i} className="cp-poll-voted-choice" style={{ background: `${c.theme.accentColor}20`, borderColor: `${c.theme.accentColor}60`, color: c.card.textColor }}>
                               <span className="cp-poll-voted-check" style={{ color: c.theme.accentColor }}>✓</span>
-                              <span>{opt || `Option ${i + 1}`}</span>
+                              <span>{(typeof opt === 'object' ? opt.text : opt) || `Option ${i + 1}`}</span>
                             </div>
                           ) : null
                         ))}
@@ -1266,6 +1268,15 @@ function CardPreviewModal({
                 {/* Reply form */}
                 {!chainSubmitted ? (
                   <div className="cp-chain-reply-form">
+                    <input
+                      type="text"
+                      className="cp-chain-name-input"
+                      style={{ background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${c.theme.accentColor}40`, color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif` }}
+                      placeholder="Your name or handle…"
+                      maxLength={50}
+                      value={chainName}
+                      onChange={e => setChainName(e.target.value)}
+                    />
                     <textarea
                       className="cp-anon-textarea"
                       style={{ background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${c.theme.accentColor}40`, color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif` }}
@@ -1282,9 +1293,10 @@ function CardPreviewModal({
                         onClick={async () => {
                           if (!chainMessage.trim()) return
                           setChainSubmitting(true)
+                          const displayName = chainName.trim() || 'Anonymous'
                           try {
-                            if (onChainReply) await onChainReply(chainMessage.trim())
-                            setLocalChainReplies(prev => [...prev, { response: chainMessage.trim(), name: 'You', timestamp: new Date().toISOString() }])
+                            if (onChainReply) await onChainReply(chainMessage.trim(), displayName)
+                            setLocalChainReplies(prev => [...prev, { response: chainMessage.trim(), name: displayName, timestamp: new Date().toISOString() }])
                           } catch (e) { /* swallow */ }
                           setChainSubmitting(false)
                           setChainSubmitted(true)
