@@ -250,6 +250,21 @@ export async function createCouponCheckout(payload) {
 }
 
 /* ═══════════════════════════════════════════════
+   GIFTS (Flutterwave-backed)
+   ═══════════════════════════════════════════════ */
+export async function createFlutterwaveGiftCheckout(payload) {
+  return request('/create-flutterwave-gift-checkout', { method: 'POST', auth: true, body: payload })
+}
+
+export async function getUserGiftInventory() {
+  return request('/user-gifts', { auth: true })
+}
+
+export async function claimGift(payload) {
+  return request('/claim-gift', { method: 'POST', auth: true, body: payload })
+}
+
+/* ═══════════════════════════════════════════════
    REWARDED ADS
    ═══════════════════════════════════════════════ */
 export async function getRewardedAd() {

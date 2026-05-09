@@ -21,6 +21,7 @@ import { getMusicPresetsForTier } from '../data/cardDefaults.js'
 import { getTierLimits } from '../lib/tierLimits.js'
 import { PALETTES, getPalettesForTier, applyPalette, getPaletteById } from '../lib/palettes.js'
 import InlineColorPicker from '../components/InlineColorPicker.jsx'
+import { GiftIcon } from '../components/GiftCard.jsx'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 const STUDIO_AUTOSAVE_PREFIX = 'cardora:studioAutoSave:'
@@ -306,7 +307,7 @@ function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const { currentUser, publishTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal } = useOutletContext() || {}
+  const { currentUser, publishTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, inventory = [] } = useOutletContext() || {}
   // Read card type and tier from location state (set by CreateCardPicker)
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
@@ -2143,23 +2144,67 @@ function CardStudio() {
 
     // GIFTS
     if (activeTool === 'gifts') {
+      const selectedKey = c.giftEffect?.effectKey || 'none'
       return (
         <>
           <p className="cs-panel-eyebrow">Gifts</p>
           <h3>End-of-card gift reveal</h3>
           <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.7, lineHeight: 1.55 }}>
-            Gift attachments are coming soon. This section is temporarily disabled while the gift
-            store is being stabilized.
+            Attach a purchased gift to play after the card reveal. Recipients see a heart-particle
+            animation in the gift's signature colours before they receive it.
           </p>
           <div className="cs-sub-section">
-            <p className="cs-sub-label">Status</p>
-            <div className="cs-gift-selected">
-              <div>
-                <strong>Coming Soon</strong>
-                <span className="cs-gift-amount">Gift selection will return in a later update.</span>
+            <p className="cs-sub-label">Select a Gift</p>
+            <button
+              type="button"
+              className={`cs-gift-option ${selectedKey === 'none' ? 'active' : ''}`}
+              onClick={() => {
+                update('giftEffect.enabled', false)
+                update('giftEffect.effectKey', 'none')
+                update('giftEffect.giftTitle', '')
+                update('giftEffect.giftAmount', '')
+              }}
+            >
+              <span className="cs-gift-none-icon">✕</span>
+              <span>No Gift</span>
+            </button>
+            {inventory.length > 0 ? (
+              <div className="cs-gift-grid">
+                {inventory.map((gift, idx) => (
+                  <button
+                    key={gift.id || idx}
+                    type="button"
+                    className={`cs-gift-option ${selectedKey === (gift.effectKey || gift.title) ? 'active' : ''}`}
+                    onClick={() => {
+                      update('giftEffect.enabled', true)
+                      update('giftEffect.effectKey', gift.effectKey || gift.title)
+                      update('giftEffect.giftTitle', gift.title)
+                      update('giftEffect.giftAmount', gift.amount || '')
+                    }}
+                  >
+                    <GiftIcon effectKey={gift.effectKey} size={36} />
+                    <span>{gift.title}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.5 }}>
+                No gifts in your inventory yet. Visit the Store to purchase gifts.
+              </p>
+            )}
+          </div>
+          {c.giftEffect?.enabled && (
+            <div className="cs-sub-section">
+              <p className="cs-sub-label">Selected Gift</p>
+              <div className="cs-gift-selected">
+                <GiftIcon effectKey={c.giftEffect.effectKey} size={44} />
+                <div>
+                  <strong>{c.giftEffect.giftTitle}</strong>
+                  {c.giftEffect.giftAmount && <span className="cs-gift-amount">{c.giftEffect.giftAmount}</span>}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </>
       )
     }

@@ -4,7 +4,9 @@ import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import PackCard from '../components/PackCard.jsx'
 import RewardedAds from '../components/RewardedAds.jsx'
-import { storePacks } from '../data/catalog.js'
+import { storePacks, storeGifts } from '../data/catalog.js'
+import GiftCard from '../components/GiftCard.jsx'
+import GiftPreviewModal from '../components/GiftPreviewModal.jsx'
 
 const REWARD_TABS = ['earn', 'redeem', 'referral']
 
@@ -19,7 +21,12 @@ function Store() {
     redeemCodeAction,
     refreshBalance,
     userCurrency,
+    purchaseGift,
   } = useOutletContext()
+
+  const [activeGift, setActiveGift] = useState(null)
+  const [isPurchasingGift, setIsPurchasingGift] = useState(false)
+  const [giftMessage, setGiftMessage] = useState('')
 
   const [checkoutMessage, setCheckoutMessage] = useState('')
   const [activePack, setActivePack] = useState(null)
@@ -355,15 +362,27 @@ function Store() {
         )}
 
         {activeSection === 'gifts' && (
-          <div className="store-coming-shell">
-            <div className="store-coming-card">
-              <span className="store-coming-icon">Soon</span>
-              <h4>Gift purchases are coming soon.</h4>
+          <div className="store-gifts-shell">
+            <div className="store-gifts-intro">
+              <h4>Send a gift with your card</h4>
               <p>
-                The gifting lane is temporarily paused while we complete the technical work behind
-                it. CC purchases and rewards are still live while we finish this part of the
-                experience.
+                Each gift plays a unique heart-particle animation in its own colour palette before
+                the recipient receives it. Buy once, attach from Studio.
               </p>
+            </div>
+            {giftMessage && <p className="store-gift-status">{giftMessage}</p>}
+            <div className="gift-grid">
+              {storeGifts.map((gift) => (
+                <GiftCard
+                  key={gift.effectKey}
+                  title={gift.title}
+                  amount={gift.amount}
+                  note={gift.note}
+                  effectKey={gift.effectKey}
+                  actionLabel="Preview"
+                  onAction={() => setActiveGift(gift)}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -413,6 +432,40 @@ function Store() {
             </div>
           </div>
         </section>
+      ) : null}
+
+      {activeGift ? (
+        <GiftPreviewModal
+          gift={activeGift}
+          disabled={isPurchasingGift}
+          onClose={() => setActiveGift(null)}
+          onBuy={async () => {
+            if (!currentUser) {
+              openAuthModal()
+              return
+            }
+            setIsPurchasingGift(true)
+            setGiftMessage('')
+            const result = await purchaseGift(activeGift)
+            if (!result?.ok) {
+              setGiftMessage(result?.reason === 'auth'
+                ? 'Please sign in to continue.'
+                : 'Could not start gift checkout. Please try again.')
+              setIsPurchasingGift(false)
+              setTimeout(() => setGiftMessage(''), 2800)
+              return
+            }
+            // On success the user is redirected to Flutterwave; close locally
+            // in case the redirect is delayed or skipped (no checkoutUrl path).
+            if (!result.checkout) {
+              setGiftMessage('Gift added to your inventory!')
+              setActiveGift(null)
+              await refreshBalance?.()
+              setTimeout(() => setGiftMessage(''), 2800)
+            }
+            setIsPurchasingGift(false)
+          }}
+        />
       ) : null}
     </div>
   )

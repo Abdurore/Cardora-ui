@@ -41,11 +41,11 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
           {effectConfig ? (
             <div className="preview-shape-wrap">
               <AnimatedShape
-                shapeType={gift.effectKey}
+                shapeType="heart"
                 hue={PREVIEW_HUE[gift.effectKey] ?? 340}
                 width={160}
                 height={140}
-                particleCount={200}
+                particleCount={140}
                 traceLength={8}
                 className="preview-shape-canvas"
               />
