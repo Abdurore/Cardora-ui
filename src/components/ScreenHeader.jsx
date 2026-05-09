@@ -1,8 +1,20 @@
 import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 
 const BRAND_LOGO = '/cardora-logo.png?v=4'
 
 function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('cardora-theme') || 'dark' } catch { return 'dark' }
+  })
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme === 'light' ? 'light' : ''
+    try { localStorage.setItem('cardora-theme', theme) } catch {}
+  }, [theme])
+
+  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light')
+
   return (
     <header className="screen-header">
       <div className="brand">
@@ -12,6 +24,15 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
         </div>
       </div>
       <div className="header-actions">
+        <button
+          type="button"
+          className="header-theme-btn"
+          onClick={toggleTheme}
+          aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          title={theme === 'light' ? 'Dark mode' : 'Light mode'}
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
         {user ? (
           <Link to="/profile" className="header-user-capsule" aria-label="Profile">
             <span className="header-capsule-avatar">
