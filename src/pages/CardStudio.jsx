@@ -112,6 +112,14 @@ const TYPE_ACCENT = {
   anonymous: '#7ef7ff',
 }
 
+const TYPE_SEND_GRADIENT = {
+  personal:  'linear-gradient(135deg, #fbbf24, #f97316)',
+  poll:      'linear-gradient(135deg, #60a5fa, #818cf8)',
+  trivia:    'linear-gradient(135deg, #c084fc, #a78bfa)',
+  chain:     'linear-gradient(135deg, #34d399, #10b981)',
+  anonymous: 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
+}
+
 const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
 
 const TIER_COST_BY_TYPE = {
@@ -2807,8 +2815,9 @@ function CardStudio() {
               className="cs-nav-btn send"
               disabled={isSending}
               onClick={handleSendClick}
+              style={{ '--send-gradient': TYPE_SEND_GRADIENT[studioType] || TYPE_SEND_GRADIENT.personal }}
             >
-              {isSending ? 'Sending…' : 'Send'}
+              {isSending ? 'Creating…' : 'Create Card'}
             </button>
           )}
         </div>
@@ -3178,9 +3187,10 @@ function CardStudio() {
                 className="cs-m2-send-btn"
                 disabled={isSending}
                 onClick={isArtist ? () => setShowPublish(true) : handleSendClick}
+                style={!isArtist ? { '--type-accent': TYPE_ACCENT[studioType] || TYPE_ACCENT.personal } : undefined}
               >
                 <span className="cs-m2-send-arrow">▷</span>
-                <span>{isArtist ? 'Publish' : tierCost > 0 ? `Send ${tierCost}cc` : 'Send'}</span>
+                <span>{isArtist ? 'Publish' : tierCost > 0 ? `Create (${tierCost}cc)` : 'Create Card'}</span>
               </button>
             </div>
           </>

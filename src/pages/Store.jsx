@@ -33,7 +33,8 @@ function Store() {
   const [isRedeeming, setIsRedeeming] = useState(false)
   const [copiedField, setCopiedField] = useState('')
 
-  const packs = couponPackages?.length ? couponPackages : storePacks
+  const validPacks = (couponPackages || []).filter(p => (p.cc || 0) > 0)
+  const packs = validPacks.length ? validPacks : storePacks
   const referralRewards = (currentUser?.ccIncomeHistory || []).filter(
     (entry) => (entry.type || entry.source) === 'referral_milestone',
   )

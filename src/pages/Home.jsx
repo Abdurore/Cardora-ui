@@ -179,10 +179,10 @@ function Home() {
         </div>
         <div className="hero-copy">
           <p className="eyebrow hero-eyebrow">Cardora Platform</p>
-          <h1>One platform.<br />Every kind of card.</h1>
+          <h1>Create interactive<br />card experiences.</h1>
           <p className="subtext">
-            Greeting reveals, live polls, scored trivia, chain replies, and anonymous inboxes —
-            all designed to make the moment feel real.
+            Cardora turns simple messages into interactive digital card experiences
+            that people can engage with, not just read.
           </p>
           <div className="hero-format-chips" aria-hidden="true">
             {FORMAT_CHIPS.map((chip, i) => (
