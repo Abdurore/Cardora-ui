@@ -60,10 +60,12 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
   const navigate = useNavigate()
   const [selectedType, setSelectedType] = useState(null)
   const [selectedTier, setSelectedTier] = useState(null)
+  const [modeStep, setModeStep] = useState(false)
   const isArtist = currentUser?.role === 'Artist'
 
   // Reset state when modal opens / closes or preselection changes
   useEffect(() => {
+    setModeStep(false)
     if (open && preselectedType) {
       setSelectedType(preselectedType)
       const type = CARD_TYPES.find((t) => t.id === preselectedType)
@@ -81,8 +83,12 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
 
   const handleStart = () => {
     if (!selectedType || !selectedTier) return
-    onClose()
-    navigate(`/studio?type=${selectedType}&tier=${selectedTier}`)
+    if (isArtist) {
+      onClose()
+      navigate(`/studio?type=${selectedType}&tier=${selectedTier}`)
+    } else {
+      setModeStep(true)
+    }
   }
 
   const handleSelectType = (typeId) => {
@@ -93,7 +99,9 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
   }
 
   const handleBack = () => {
-    if (selectedType) {
+    if (modeStep) {
+      setModeStep(false)
+    } else if (selectedType) {
       setSelectedType(null)
       setSelectedTier(null)
     } else {
@@ -108,14 +116,16 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
         {/* Header */}
         <div className="ctm-header">
           <button type="button" className="ctm-back" onClick={handleBack}>
-            {selectedType ? '← Back' : '✕'}
+            {(selectedType || modeStep) ? '← Back' : '✕'}
           </button>
           <div className="ctm-header-text">
             <p className="eyebrow">{isArtist ? 'Artist Studio' : 'Create a Card'}</p>
             <h2>
-              {selectedType
-                ? (isArtist ? 'Pick a tier to design for' : 'Choose your tier')
-                : (isArtist ? 'What signature piece are you designing?' : 'What are you creating?')}
+              {modeStep
+                ? 'How do you want to build?'
+                : selectedType
+                  ? (isArtist ? 'Pick a tier to design for' : 'Choose your tier')
+                  : (isArtist ? 'What signature piece are you designing?' : 'What are you creating?')}
             </h2>
             {isArtist && !selectedType && (
               <p className="ctm-artist-sub">You're building for the marketplace — every tier is open to you, no CC cost. Design something people will save.</p>
@@ -154,7 +164,7 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
         )}
 
         {/* Tier Selection */}
-        {selectedType && activeType && (() => {
+        {selectedType && activeType && !modeStep && (() => {
           const Icon = activeType.icon
           return (
           <div className="ctm-tier-section">
@@ -197,11 +207,39 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
               disabled={!selectedTier}
               onClick={handleStart}
             >
-              {isArtist ? 'Open the Artist Studio →' : 'Start Creating →'}
+              {isArtist ? 'Open the Artist Studio →' : 'Continue →'}
             </button>
           </div>
           )
         })()}
+
+        {/* Mode Selection — non-artist only */}
+        {selectedType && activeType && modeStep && !isArtist && (
+          <div className="ctm-mode-section">
+            <div className="ctm-mode-grid">
+              <button
+                type="button"
+                className="ctm-mode-card ctm-mode-quick"
+                onClick={() => { onClose(); navigate(`/quick?type=${selectedType}&tier=${selectedTier}`) }}
+              >
+                <div className="ctm-mode-icon">⚡</div>
+                <h3>Quick Start</h3>
+                <p>Pick a theme, add your text and a photo — ready in minutes.</p>
+                <span className="ctm-mode-hint">Simple · Fast · Clean</span>
+              </button>
+              <button
+                type="button"
+                className="ctm-mode-card ctm-mode-studio"
+                onClick={() => { onClose(); navigate(`/studio?type=${selectedType}&tier=${selectedTier}`) }}
+              >
+                <div className="ctm-mode-icon">🎨</div>
+                <h3>Full Studio</h3>
+                <p>Complete control — design, effects, music, and more.</p>
+                <span className="ctm-mode-hint">Advanced · Creative · Powerful</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )
