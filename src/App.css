@@ -24009,6 +24009,23 @@ a {
   flex-shrink: 0; white-space: nowrap;
 }
 .qc-studio-link-btn:hover { color: #7ef7ff; border-color: rgba(126,239,255,0.32); background: rgba(126,239,255,0.07); }
+.qc-topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.qc-cc-pill {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.75rem; padding: 4px 10px; border-radius: 20px;
+  background: rgba(126,239,255,0.06); border: 1px solid rgba(126,239,255,0.14);
+  color: rgba(126,239,255,0.75); white-space: nowrap;
+}
+.qc-cc-pill.short { background: rgba(255,100,100,0.08); border-color: rgba(255,100,100,0.22); color: #ffb4b4; }
+.qc-cc-icon { font-size: 0.72rem; }
+.qc-cc-balance { font-weight: 700; }
+.qc-cc-cost { opacity: 0.6; }
+.qc-studio-hint-link {
+  background: none; border: none; cursor: pointer; padding: 0;
+  color: rgba(126,239,255,0.5); font-size: inherit; text-decoration: underline;
+  transition: color 0.15s;
+}
+.qc-studio-hint-link:hover { color: rgba(126,239,255,0.85); }
 
 /* Split layout */
 .qc-split {
@@ -24423,8 +24440,8 @@ a {
 }
 @keyframes qcSpin { to { transform: rotate(360deg); } }
 .qc-studio-hint { text-align: center; font-size: 0.78rem; color: rgba(226,234,240,0.3); margin: 0; }
-.qc-studio-hint a { color: rgba(126,239,255,0.5); text-decoration: none; }
-.qc-studio-hint a:hover { color: rgba(126,239,255,0.85); }
+.qc-studio-hint a, .qc-studio-hint .qc-studio-hint-link { color: rgba(126,239,255,0.5); text-decoration: none; }
+.qc-studio-hint a:hover, .qc-studio-hint .qc-studio-hint-link:hover { color: rgba(126,239,255,0.85); }
 
 /* Preview pane */
 .qc-preview-pane {
