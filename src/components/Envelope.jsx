@@ -154,7 +154,7 @@ function Envelope({
       // Don't setStage here — the consumer typically unmounts on onOpenComplete.
       // Stage is irrelevant after the letter is out.
       onOpenComplete?.()
-    }, 1500 * pacing)
+    }, 3200 * pacing)
   }, [stage, profile.ambientAudio, pacing, onOpenComplete, safeSetStage, scheduleTimer])
 
   const sceneClass = [
