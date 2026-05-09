@@ -454,6 +454,17 @@ export async function getEnterpriseAdStats() {
   return request('/ads/enterprise-stats', { auth: true })
 }
 
+export async function updateEnterpriseAd(adId, payload) {
+  try {
+    return await request(`/ads/enterprise/${adId}`, { method: 'PATCH', auth: true, body: payload })
+  } catch (error) {
+    if (error.status === 404) {
+      return request(`/ads/${adId}`, { method: 'PATCH', auth: true, body: payload })
+    }
+    throw error
+  }
+}
+
 export async function getAdminTemplatesLookup(query = '') {
   return request(`/admin/templates/lookup?${query}`, { auth: true })
 }

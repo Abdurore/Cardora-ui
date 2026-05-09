@@ -221,7 +221,7 @@ function AdminDashboard() {
   // New redeem code form
   const [newCode, setNewCode] = useState({ numberOfCC: 10, maxUses: 200, isActive: true })
   // New ad form
-  const [newAd, setNewAd] = useState({ name: '', type: 'external', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1, enterpriseAccountId: '' })
+  const [newAd, setNewAd] = useState({ name: '', type: 'external', enterpriseId: '', enterpriseName: '', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1 })
   const [assignEnterprise, setAssignEnterprise] = useState({ adId: null, value: '' })
   // Broadcast subject
   const [broadcastSubject, setBroadcastSubject] = useState('')
@@ -276,6 +276,7 @@ function AdminDashboard() {
   const pagedUsers = usersPaging.pagedData
   const pagedReports = reportsPaging.pagedData
   const pagedAds = adsPaging.pagedData
+  const enterpriseUsers = users.filter(user => String(user.role || '').toLowerCase() === 'enterprise')
   const pagedCoupons = couponsPaging.pagedData
   const pagedLogs = logsPaging.pagedData
   const pagedModLogs = modLogsPaging.pagedData
@@ -389,9 +390,10 @@ function AdminDashboard() {
           break
         }
         case 'Ads': {
-          const [adsRes, analyticsRes] = await Promise.allSettled([getAdminAds(), getAdminAdsAnalytics()])
+          const [adsRes, analyticsRes, usersRes] = await Promise.allSettled([getAdminAds(), getAdminAdsAnalytics(), getAdminUsers()])
           if (adsRes.status === 'fulfilled') setAds(adsRes.value?.data?.ads || adsRes.value?.ads || [])
           if (analyticsRes.status === 'fulfilled') setAdsAnalytics(analyticsRes.value?.data || analyticsRes.value || null)
+          if (usersRes.status === 'fulfilled') setUsers(usersRes.value?.data?.users || usersRes.value?.users || [])
           break
         }
         case 'Media': {
@@ -641,12 +643,18 @@ function AdminDashboard() {
     try {
       const payload = { ...newAd }
       if (!payload.linkUrl) delete payload.linkUrl
+      if (!payload.enterpriseId) {
+        delete payload.enterpriseId
+        delete payload.enterpriseName
+      } else {
+        payload.enterpriseUserId = payload.enterpriseId
+      }
       if (!payload.maxViews) delete payload.maxViews
       else payload.maxViews = Number(payload.maxViews)
       if (!payload.enterpriseAccountId) delete payload.enterpriseAccountId
       await createAdminAd(payload)
       showMsg('Ad created!')
-      setNewAd({ name: '', type: 'external', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1, enterpriseAccountId: '' })
+      setNewAd({ name: '', type: 'external', enterpriseId: '', enterpriseName: '', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1 })
       if (adVideoInputRef.current) adVideoInputRef.current.value = ''
       loadTabData('Ads')
     } catch (err) {
@@ -1495,6 +1503,31 @@ function AdminDashboard() {
                     { value: 'internal', label: 'Internal' },
                   ]}
                 />
+                <label className="admin-field">
+                  <span>Enterprise Account <small>(optional)</small></span>
+                  <select
+                    value={newAd.enterpriseId}
+                    onChange={e => {
+                      const enterpriseId = e.target.value
+                      const owner = enterpriseUsers.find(user => String(user._id || user.id) === enterpriseId)
+                      setNewAd(p => ({
+                        ...p,
+                        enterpriseId,
+                        enterpriseName: owner?.username || owner?.name || owner?.email || '',
+                      }))
+                    }}
+                  >
+                    <option value="">No enterprise owner</option>
+                    {enterpriseUsers.map(user => {
+                        const uid = user._id || user.id
+                        return (
+                          <option key={uid} value={uid}>
+                            {user.username || user.name || user.email || uid}
+                          </option>
+                        )
+                      })}
+                  </select>
+                </label>
 
                 {/* Video drag-and-drop upload */}
                 <div
@@ -1590,7 +1623,7 @@ function AdminDashboard() {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Name</th><th>Type</th><th>Reward</th><th>Duration</th><th>Views</th><th>CTA</th><th>Enterprise</th><th>Active</th><th>Actions</th></tr>
+                  <tr><th>Name</th><th>Enterprise</th><th>Type</th><th>Reward</th><th>Duration</th><th>Views</th><th>CTA</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {pagedAds.map(ad => {
@@ -1599,6 +1632,38 @@ function AdminDashboard() {
                     return (
                     <tr key={adId}>
                       <td>{ad.name || '—'}</td>
+                      <td>
+                        <select
+                          value={ad.enterpriseId || ad.enterpriseUserId || ad.enterprise?._id || ad.enterprise?.id || ad.enterpriseOwner?._id || ''}
+                          onChange={async e => {
+                            const enterpriseId = e.target.value
+                            const owner = enterpriseUsers.find(user => String(user._id || user.id) === enterpriseId)
+                            const adId = ad._id || ad.id
+                            if (!adId) return
+                            try {
+                              await updateAdminAd(adId, {
+                                enterpriseId,
+                                enterpriseUserId: enterpriseId,
+                                enterpriseName: owner?.username || owner?.name || owner?.email || '',
+                              })
+                              showMsg('Enterprise owner updated.')
+                              loadTabData('Ads')
+                            } catch (err) {
+                              showMsg(err.message || 'Could not update enterprise owner.', false)
+                            }
+                          }}
+                        >
+                          <option value="">Unassigned</option>
+                          {enterpriseUsers.map(user => {
+                            const uid = user._id || user.id
+                            return (
+                              <option key={uid} value={uid}>
+                                {user.username || user.name || user.email || uid}
+                              </option>
+                            )
+                          })}
+                        </select>
+                      </td>
                       <td>{ad.type}</td>
                       <td>{ad.rewardCC} CC</td>
                       <td>{ad.duration}s</td>

@@ -18148,6 +18148,82 @@ a {
   flex-wrap: wrap;
 }
 
+.cv-recipient-intro {
+  display: grid;
+  gap: 8px;
+}
+
+.cv-recipient-intro .cv-type-eyebrow {
+  margin-bottom: 0;
+}
+
+.cv-recipient-intro p:last-child {
+  margin: 0;
+  color: rgba(220, 242, 247, 0.72);
+  line-height: 1.6;
+}
+
+.card-view-poll .card-open-shell {
+  border-radius: 22px;
+}
+
+.card-view-poll .card-open-content {
+  gap: 14px;
+}
+
+.card-view-trivia .card-open-shell {
+  border-radius: 18px;
+}
+
+.card-view-chain .card-open-shell {
+  border-radius: 28px;
+}
+
+.card-view-anonymous .card-open,
+.card-view-poll .card-open,
+.card-view-trivia .card-open {
+  padding: 20px;
+}
+
+.card-view-anonymous .card-open-shell {
+  min-height: auto;
+  border-radius: 24px;
+}
+
+.cv-anonymous-section {
+  display: grid;
+  gap: 12px;
+  text-align: left;
+  background:
+    radial-gradient(circle at top left, rgba(126, 247, 255, 0.12), transparent 42%),
+    rgba(8, 16, 20, 0.78);
+}
+
+.cv-anonymous-heading {
+  margin: 0;
+  color: #edf8ff;
+  font-size: 1.1rem;
+  line-height: 1.35;
+}
+
+.cv-anonymous-copy {
+  margin: 0;
+  color: rgba(220, 242, 247, 0.72);
+  line-height: 1.65;
+}
+
+.cv-anonymous-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border-radius: 999px;
+  padding: 0 20px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .cv-type-chip {
   display: inline-flex;
   align-items: center;
