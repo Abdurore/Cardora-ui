@@ -23297,47 +23297,48 @@ a {
 }
 [data-theme="light"] .nav-create-label { color: var(--text-dim) !important; }
 
-/* ── Hero ────────────────────────────────────────────── */
+/* ── Hero (decorative — cyan + mint, light tones) ────── */
 [data-theme="light"] .topbar,
 [data-theme="light"] .hero-shell {
-  background: linear-gradient(150deg, #c0e9f2 0%, #d5f0ee 50%, #e0f5f2 100%) !important;
+  background: linear-gradient(150deg, #ecfeff 0%, #f0fdfa 50%, #f4f8fb 100%) !important;
 }
-[data-theme="light"] .hero-particle { opacity: 0.18; filter: hue-rotate(10deg) saturate(1.4); }
+[data-theme="light"] .hero-particle { opacity: 0.22; filter: hue-rotate(0deg) saturate(1.1); }
 [data-theme="light"] .hero-aurora {
-  opacity: 0.62;
+  opacity: 0.55;
   background: conic-gradient(from 180deg,
-    rgba(10,122,143,0.0),
-    rgba(0,160,120,0.55),
-    rgba(10,180,140,0.42),
-    rgba(20,140,100,0.18),
-    rgba(0,200,150,0.60),
-    rgba(10,160,130,0.38),
-    rgba(10,122,143,0.0));
-  filter: blur(20px);
+    rgba(8,145,178,0.0),
+    rgba(8,145,178,0.45),
+    rgba(34,211,170,0.35),
+    rgba(5,150,105,0.18),
+    rgba(8,145,178,0.50),
+    rgba(34,211,170,0.30),
+    rgba(8,145,178,0.0));
+  filter: blur(24px);
   animation-name: auroraShiftLight;
 }
 [data-theme="light"] .hero-card-halo {
-  opacity: 0.5;
-  background: radial-gradient(circle, rgba(0,160,120,0.45), rgba(10,180,130,0.15), transparent 70%);
+  opacity: 0.4;
+  background: radial-gradient(circle, rgba(8,145,178,0.4), rgba(5,150,105,0.12), transparent 70%);
 }
+/* Phone & floating cards stay dark — they ARE card previews. */
 [data-theme="light"] .hero-phone {
-  border-color: rgba(10,122,143,0.35);
+  border-color: var(--accent-strong);
   background: linear-gradient(180deg, rgba(8,22,28,0.96), rgba(4,12,16,0.98));
-  box-shadow: 0 30px 80px var(--accent-strong), inset 0 0 30px rgba(10,200,160,0.06);
+  box-shadow: 0 30px 80px rgba(8,145,178,0.18), inset 0 0 30px rgba(126,247,255,0.06);
 }
 [data-theme="light"] .hero-preview-orbit {
-  border-color: rgba(10,160,130,0.2);
+  border-color: rgba(8,145,178,0.20);
 }
 [data-theme="light"] .hero-floating-card {
-  background: linear-gradient(160deg, rgba(8,26,22,0.96), rgba(4,16,14,0.98));
-  border-color: rgba(0,200,140,0.35);
-  box-shadow: 0 24px 60px rgba(0,0,0,0.3), 0 0 40px rgba(0,200,140,0.12), inset 0 1px 0 rgba(100,255,200,0.1);
+  background: linear-gradient(160deg, rgba(8,22,28,0.96), rgba(4,12,16,0.98));
+  border-color: rgba(126,247,255,0.30);
+  box-shadow: 0 24px 60px rgba(8,145,178,0.18), 0 0 40px rgba(34,211,170,0.10), inset 0 1px 0 rgba(126,247,255,0.10);
 }
-[data-theme="light"] .hero-fc-eyebrow { color: rgba(100,220,180,0.8); }
-[data-theme="light"] .hero-fc-title { color: rgba(200,250,230,0.92); }
+[data-theme="light"] .hero-fc-eyebrow { color: rgba(126,247,255,0.85); }
+[data-theme="light"] .hero-fc-title   { color: rgba(232,255,250,0.95); }
 [data-theme="light"] .hero-dust {
-  background: radial-gradient(circle, rgba(0,200,140,0.9), rgba(10,180,120,0.3));
-  box-shadow: 0 0 10px rgba(0,200,140,0.5);
+  background: radial-gradient(circle, rgba(8,145,178,0.85), rgba(5,150,105,0.3));
+  box-shadow: 0 0 10px rgba(8,145,178,0.45);
 }
 [data-theme="light"] .hero-eyebrow { color: var(--primary); }
 
