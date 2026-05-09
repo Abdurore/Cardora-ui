@@ -76,9 +76,8 @@ const ARTIST = {
 
 export const TIER_LIMITS = { classic: CLASSIC, premium: PREMIUM, elite: ELITE }
 
-// Personal + Chain are the narrative formats — they keep the envelope reveal.
-// Poll, Trivia, Anonymous jump straight to content (no envelope metaphor).
-const ENVELOPE_TYPES = new Set(['personal', 'chain'])
+// Personal cards keep the envelope reveal. Poll, Trivia, Chain, Anonymous skip straight to content.
+const ENVELOPE_TYPES = new Set(['personal'])
 
 export function shouldShowEnvelope(studioType) {
   return ENVELOPE_TYPES.has(studioType)

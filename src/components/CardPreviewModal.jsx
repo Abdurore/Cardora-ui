@@ -306,21 +306,16 @@ function CardPreviewModal({
   const handleOpen = () => {
     previewTimersRef.current.forEach(window.clearTimeout)
     previewTimersRef.current = []
-    setStage('revealing')
-    setBodyVisible(false)
-    setFadeBody(false)
     setRevealStep(0)
-    schedulePreviewTimer(() => {
-      triggerOpenEffect()
-      setStage('open')
-      if (hasFadeIn) {
-        schedulePreviewTimer(() => setFadeBody(true), 260)
-        schedulePreviewTimer(() => setBodyVisible(true), 420)
-      } else {
-        setFadeBody(true)
-        setBodyVisible(true)
-      }
-    }, 1050)
+    triggerOpenEffect()
+    setStage('open')
+    if (hasFadeIn) {
+      schedulePreviewTimer(() => setFadeBody(true), 260)
+      schedulePreviewTimer(() => setBodyVisible(true), 420)
+    } else {
+      setFadeBody(true)
+      setBodyVisible(true)
+    }
   }
 
   const handleContinue = () => {
@@ -780,13 +775,6 @@ function CardPreviewModal({
       )}
 
       {/* OPEN CARD — also gated by lock for non-envelope card types. */}
-      {unlocked && stage === 'revealing' && (
-        <div className="cp-reveal-bridge">
-          <div className="cp-reveal-bridge-orbit" />
-          <p>Opening your card</p>
-        </div>
-      )}
-
       {unlocked && stage === 'open' && (
         <div className="cp-card-wrap cp-card-wrap-full">
           {renderGradientBorder(
