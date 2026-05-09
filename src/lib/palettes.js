@@ -43,8 +43,35 @@ export const PALETTES = [
     ink:     '#2a2a2a',
     accent:  '#b03030',
   },
+  {
+    id: 'navy-slate',
+    label: 'Navy Slate',
+    tier: 'classic',
+    primary: '#93c5fd',
+    surface: '#0f1929',
+    ink:     '#dbeafe',
+    accent:  '#7ee8a2',
+  },
+  {
+    id: 'forest-grove',
+    label: 'Forest Grove',
+    tier: 'classic',
+    primary: '#6ee7b7',
+    surface: '#0d1a14',
+    ink:     '#ecfdf5',
+    accent:  '#fde68a',
+  },
+  {
+    id: 'dusty-rose',
+    label: 'Dusty Rose',
+    tier: 'classic',
+    primary: '#f9a8d4',
+    surface: '#1a0e16',
+    ink:     '#fdf2f8',
+    accent:  '#c4b5fd',
+  },
 
-  // ── Premium (5 additional) ───────────────────────────────
+  // ── Premium (8 additional — 14 total with classic) ───────
   {
     id: 'champagne-rose',
     label: 'Champagne Rose',
@@ -90,8 +117,35 @@ export const PALETTES = [
     ink:     '#f7efdd',
     accent:  '#ff9b5a',
   },
+  {
+    id: 'lavender-haze',
+    label: 'Lavender Haze',
+    tier: 'premium',
+    primary: '#d8b4fe',
+    surface: '#120f1e',
+    ink:     '#f5f3ff',
+    accent:  '#93c5fd',
+  },
+  {
+    id: 'copper-smoke',
+    label: 'Copper Smoke',
+    tier: 'premium',
+    primary: '#fb923c',
+    surface: '#1a0f0a',
+    ink:     '#fff7ed',
+    accent:  '#fbbf24',
+  },
+  {
+    id: 'arctic-storm',
+    label: 'Arctic Storm',
+    tier: 'premium',
+    primary: '#38bdf8',
+    surface: '#0c1624',
+    ink:     '#f0f9ff',
+    accent:  '#7dd3fc',
+  },
 
-  // ── Elite (7 additional — total 15) ──────────────────────
+  // ── Elite (10 additional — 24 total) ─────────────────────
   {
     id: 'royal-velvet',
     label: 'Royal Velvet',
@@ -154,6 +208,33 @@ export const PALETTES = [
     surface: '#f5ecd9',
     ink:     '#2a2a2a',
     accent:  '#b03030',
+  },
+  {
+    id: 'crimson-noir',
+    label: 'Crimson Noir',
+    tier: 'elite',
+    primary: '#f87171',
+    surface: '#0d0305',
+    ink:     '#fff1f2',
+    accent:  '#fca5a5',
+  },
+  {
+    id: 'deep-space',
+    label: 'Deep Space',
+    tier: 'elite',
+    primary: '#818cf8',
+    surface: '#020617',
+    ink:     '#eef2ff',
+    accent:  '#38bdf8',
+  },
+  {
+    id: 'copper-luxe',
+    label: 'Copper Luxe',
+    tier: 'elite',
+    primary: '#e4a84b',
+    surface: '#0f0a06',
+    ink:     '#fef3c7',
+    accent:  '#c084fc',
   },
 ]
 
