@@ -562,17 +562,19 @@ function Profile() {
               </div>
             ) : userCards.length > 0 ? (
               <div className="card-grid compact">
-                {userCards.map((card, index) => (
-                  <div key={card.id} className="profile-card-wrap">
+                {userCards.map((card) => {
+                  const typeVariant = { personal: 'v1', poll: 'v2', trivia: 'v3', chain: 'v4', anonymous: 'v5' }[card.type] || 'v1'
+                  return (
+                  <div key={card.id} className={`profile-card-wrap profile-card-type-${card.type || 'personal'}`}>
                     <CardItem
                       {...card}
-                      variant={`v${(index % 4) + 1}`}
-                      showTypeBadge={false}
+                      variant={typeVariant}
+                      showTypeBadge={true}
                       isFavorite={favorites.includes(card.id)}
                       onToggleFavorite={toggleFavorite}
                       onClick={() => card.slug
                         ? navigate(`/card/${card.slug}/responses`)
-                        : openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })
+                        : openCardDetails({ ...card, variant: typeVariant })
                       }
                     />
                     <div className="profile-card-actions">
@@ -624,7 +626,8 @@ function Profile() {
                       </div>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <p className="empty-state">You haven't created any cards yet. Head to the Studio to make one!</p>

@@ -13125,6 +13125,11 @@ a {
 .profile-card-wrap {
   position: relative;
 }
+.profile-card-type-poll .card { border-top: 3px solid #7eb3ff; }
+.profile-card-type-trivia .card { border-top: 3px solid #ffe066; }
+.profile-card-type-chain .card { border-top: 3px solid #62ffa2; }
+.profile-card-type-anonymous .card { border-top: 3px solid #c084fc; }
+.profile-card-type-personal .card { border-top: 3px solid #e2b96e; }
 
 .profile-card-actions {
   display: flex;
@@ -17890,6 +17895,34 @@ a {
 /* ═══════════════════════════════════════════════════
    CARD STUDIO — CHAIN PREVIEW ELEMENTS
    ═══════════════════════════════════════════════════ */
+.cs-preview-chain {
+  width: 100%;
+  max-width: 340px;
+  padding: 22px 18px;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: csSlideUp 0.5s ease both;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  position: relative;
+}
+.cs-preview-chain h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+.cs-preview-chain .cs-preview-body-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  opacity: 0.82;
+  flex: 1;
+}
+
+/* Legacy mobile chain — keep for mobile layout compat */
 .cs-mobile-chain-preview {
   width: 100%;
   flex: 1;
@@ -19205,6 +19238,7 @@ a {
 .cs-preview-card,
 .cs-preview-poll,
 .cs-preview-trivia,
+.cs-preview-chain,
 .cs-mobile-chain-preview,
 .cs-preview-anon .cs-preview-anon-template {
   display: flex;
@@ -23020,6 +23054,13 @@ a {
 .cp-chain-reply-name { font-size: 0.75rem; font-weight: 700; display: block; margin-bottom: 2px; }
 .cp-chain-reply-text { font-size: 0.85rem; margin: 0; line-height: 1.5; opacity: 0.85; }
 .cp-chain-reply-form { display: flex; flex-direction: column; gap: 10px; }
+.cp-chain-name-input {
+  width: 100%; padding: 10px 14px; border-radius: 10px;
+  font-size: 0.85rem; outline: none; box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.cp-chain-name-input::placeholder { opacity: 0.45; }
+.cp-chain-name-input:focus { border-color: currentColor !important; }
 .cp-chain-reply-sent { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
 .cp-chain-sent-msg { font-size: 0.9rem; font-weight: 700; margin: 0; }
 
