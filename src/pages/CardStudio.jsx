@@ -54,10 +54,10 @@ const ALL_TOOLS = [
   { id: 'animation', icon: HiOutlineSparkles, label: 'Animation', hint: 'Confetti & effects', group: 'Effects' },
   { id: 'gifts', icon: HiOutlineGift, label: 'Gifts', hint: 'End-of-card gift reveal', group: 'Interactive' },
   { id: 'interaction', icon: HiOutlineLockClosed, label: 'Interaction', hint: 'Lock & reveal', group: 'Interactive' },
-  { id: 'poll', icon: HiOutlineChartBarSquare, label: 'Poll', hint: 'Question with selectable choices', group: 'Interactive' },
-  { id: 'trivia', icon: HiOutlineLightBulb, label: 'Trivia', hint: 'Scored quiz with correct answers', group: 'Interactive' },
   { id: 'chain', icon: HiOutlineArrowPathRoundedSquare, label: 'Chain', hint: 'Invite recipient to reply with a card', group: 'Interactive' },
   { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template', group: 'Interactive' },
+  { id: 'poll', icon: HiOutlineChartBarSquare, label: 'Poll', hint: 'Question with selectable choices', group: 'Interactive' },
+  { id: 'trivia', icon: HiOutlineLightBulb, label: 'Trivia', hint: 'Scored quiz with correct answers', group: 'Interactive' },
 ]
 
 const TOOL_GROUP_ORDER = ['Content', 'Style', 'Effects', 'Interactive']
@@ -2295,13 +2295,42 @@ function CardStudio() {
           >
             {pollData.question || 'Ask a question your recipients can answer instantly.'}
           </p>
-          <div className="cs-preview-poll-options" onClick={e => e.stopPropagation()} style={{ cursor: 'default' }}>
-            {(previewPollOptions.length > 0 ? previewPollOptions : ['Option 1', 'Option 2', 'Option 3']).map((opt, i) => (
-              <div key={i} className="cs-preview-poll-option cs-clickable-preview" style={{ color: c.card.textColor }}>
+          <div className="cs-preview-poll-options" onClick={e => e.stopPropagation()}>
+            {(pollData.options.length > 0 ? pollData.options : ['', '']).map((opt, i) => (
+              <div key={i} className="cs-preview-poll-option" style={{ color: c.card.textColor }}>
                 <span className="cs-preview-poll-dot" />
-                <span>{opt}</span>
+                {compact ? (
+                  <span>{opt || `Option ${i + 1}`}</span>
+                ) : (
+                  <span
+                    contentEditable
+                    suppressContentEditableWarning
+                    data-placeholder={`Option ${i + 1}`}
+                    className="cs-editable cs-poll-opt-editable"
+                    style={{ outline: 'none', display: 'inline-block', minWidth: 60, cursor: 'text' }}
+                    onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'pollOption', index: i }) }}
+                    onBlur={e => {
+                      const text = e.currentTarget.textContent.trim()
+                      setPollData(prev => {
+                        const opts = [...prev.options]
+                        while (opts.length <= i) opts.push('')
+                        opts[i] = text
+                        return { ...prev, options: opts }
+                      })
+                      setActiveEditEl(null)
+                    }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+                  >{opt}</span>
+                )}
               </div>
             ))}
+            {!compact && pollData.options.length < 6 && (
+              <button
+                type="button"
+                className="cs-preview-poll-add-opt"
+                onClick={e => { e.stopPropagation(); setPollData(prev => ({ ...prev, options: [...prev.options, ''] })) }}
+              >+ Add option</button>
+            )}
           </div>
           <div className="cs-preview-poll-foot">
             <span>Tap to vote</span>
@@ -2478,14 +2507,25 @@ function CardStudio() {
           >
             {c.content.body}
           </p>
-          <div
-            className="cs-chain-reply-strip cs-clickable-preview"
-            onClick={e => { e.stopPropagation(); setActiveTool('chain'); setActiveStep('card') }}
-            title="Click to edit chain prompt"
-            style={{ cursor: 'pointer', marginTop: 'auto' }}
-          >
+          <div className="cs-chain-reply-strip" style={{ marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
             <span>🔗</span>
-            <span>{chainData.prompt || "Now it's your turn…"}</span>
+            {compact ? (
+              <span>{chainData.prompt || "Now it's your turn…"}</span>
+            ) : (
+              <span
+                contentEditable
+                suppressContentEditableWarning
+                data-placeholder="Now it's your turn…"
+                className="cs-editable"
+                style={{ outline: 'none', flex: 1, cursor: 'text' }}
+                onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'chainPrompt', index: 0 }) }}
+                onBlur={e => {
+                  setChainData(prev => ({ ...prev, prompt: e.currentTarget.textContent.trim() }))
+                  setActiveEditEl(null)
+                }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+              >{chainData.prompt}</span>
+            )}
           </div>
           <button type="button" className="cs-chain-reply-btn" disabled>Reply with a card</button>
           {/* Floating toolbar */}
