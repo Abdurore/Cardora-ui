@@ -49,7 +49,9 @@ function Store() {
     () => ({
       referralsCount: currentUser?.referralsCount ?? 0,
       referralCode: currentUser?.referralCode || '',
-      referralLink: currentUser?.referralLink || '',
+      referralLink: currentUser?.referralCode
+        ? `https://cardora.studio/signup?ref=${currentUser.referralCode}`
+        : (currentUser?.referralLink || ''),
     }),
     [currentUser],
   )
@@ -307,30 +309,45 @@ function Store() {
                   {/* Milestone progress bar */}
                   {(() => {
                     const MILESTONES = [
-                      { count: 1,  reward: 5,   label: '1' },
-                      { count: 5,  reward: 15,  label: '5' },
-                      { count: 10, reward: 30,  label: '10' },
-                      { count: 25, reward: 75,  label: '25' },
-                      { count: 50, reward: 150, label: '50' },
+                      { count: 1,  reward: 5,   label: '1 referral' },
+                      { count: 5,  reward: 15,  label: '5 referrals' },
+                      { count: 10, reward: 30,  label: '10 referrals' },
+                      { count: 25, reward: 75,  label: '25 referrals' },
+                      { count: 50, reward: 150, label: '50 referrals' },
                     ]
                     const count = referralStats.referralsCount
-                    const nextMilestone = MILESTONES.find(m => m.count > count) || MILESTONES[MILESTONES.length - 1]
-                    const prevMilestone = [...MILESTONES].reverse().find(m => m.count <= count)
-                    const rangeStart = prevMilestone ? prevMilestone.count : 0
-                    const rangeEnd = nextMilestone.count
-                    const pct = count >= rangeEnd ? 100 : Math.min(((count - rangeStart) / (rangeEnd - rangeStart)) * 100, 100)
+                    const lastIdx = MILESTONES.length - 1
+                    // Find which segment we're in
+                    const nextIdx = MILESTONES.findIndex(m => m.count > count)
+                    const prevIdx = nextIdx === -1 ? lastIdx : Math.max(0, nextIdx - 1)
+                    const allDone = nextIdx === -1
+                    // Fill = equal-spaced segments. Each segment is 1/lastIdx wide.
+                    let fillPct
+                    if (allDone) {
+                      fillPct = 100
+                    } else if (nextIdx === 0) {
+                      // Before first milestone
+                      fillPct = (count / MILESTONES[0].count) * (100 / lastIdx)
+                    } else {
+                      const segStart = MILESTONES[prevIdx].count
+                      const segEnd = MILESTONES[nextIdx].count
+                      const withinSeg = (count - segStart) / (segEnd - segStart)
+                      fillPct = ((prevIdx + withinSeg) / lastIdx) * 100
+                    }
 
                     return (
                       <div className="store-referral-milestones">
                         <div className="store-referral-milestones-head">
                           <h5>Milestone Progress</h5>
-                          <span className="store-referral-unlocked">{referralRewards.length} unlocked</span>
+                          <span className="store-referral-unlocked">
+                            {MILESTONES.filter(m => count >= m.count).length} / {MILESTONES.length} unlocked
+                          </span>
                         </div>
                         <div className="store-referral-track-wrap">
                           <div className="store-referral-track">
-                            <div className="store-referral-track-fill" style={{ width: `${pct}%` }} />
-                            {MILESTONES.map((m) => {
-                              const pos = (m.count / MILESTONES[MILESTONES.length - 1].count) * 100
+                            <div className="store-referral-track-fill" style={{ width: `${Math.min(100, fillPct)}%` }} />
+                            {MILESTONES.map((m, i) => {
+                              const pos = (i / lastIdx) * 100
                               const unlocked = count >= m.count
                               return (
                                 <div
@@ -340,16 +357,16 @@ function Store() {
                                   title={`${m.count} referrals → +${m.reward} CC`}
                                 >
                                   <div className="store-referral-marker-dot" />
-                                  <span className="store-referral-marker-label">{m.label}</span>
+                                  <span className="store-referral-marker-label">{m.count}</span>
                                   <span className="store-referral-marker-reward">+{m.reward} CC</span>
                                 </div>
                               )
                             })}
                           </div>
                           <div className="store-referral-track-hint">
-                            {count >= MILESTONES[MILESTONES.length - 1].count
+                            {allDone
                               ? 'All milestones unlocked!'
-                              : `${count} / ${nextMilestone.count} referrals — next reward: +${nextMilestone.reward} CC`}
+                              : `${count} / ${MILESTONES[nextIdx].count} referrals — next: +${MILESTONES[nextIdx].reward} CC`}
                           </div>
                         </div>
                       </div>

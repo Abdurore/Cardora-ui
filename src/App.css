@@ -20673,7 +20673,7 @@ a {
   height: 6px;
   background: rgba(148, 163, 184, 0.12);
   border-radius: 999px;
-  margin-bottom: 32px;
+  margin-bottom: 40px;
 }
 .store-referral-track-fill {
   position: absolute;
@@ -20709,21 +20709,25 @@ a {
 }
 .store-referral-marker-label {
   position: absolute;
-  top: 14px;
+  top: 16px;
   font-size: 0.62rem;
   font-weight: 700;
   color: rgba(148, 163, 184, 0.55);
   white-space: nowrap;
+  transform: translateX(-50%);
+  left: 50%;
 }
 .store-referral-marker.unlocked .store-referral-marker-label {
   color: #7ef7ff;
 }
 .store-referral-marker-reward {
   position: absolute;
-  bottom: 14px;
+  bottom: 16px;
   font-size: 0.6rem;
   color: rgba(148, 163, 184, 0.4);
   white-space: nowrap;
+  transform: translateX(-50%);
+  left: 50%;
 }
 .store-referral-marker.unlocked .store-referral-marker-reward {
   color: rgba(126, 247, 255, 0.65);
@@ -24688,3 +24692,394 @@ a {
 [data-theme="light"] .qc-gate-icon { color: rgba(10,122,143,0.55); }
 [data-theme="light"] .qc-gate-inner h2 { color: var(--text); }
 [data-theme="light"] .qc-gate-inner p { color: var(--text-muted); }
+
+/* ═══════════════════════════════════════════════════════
+   LIGHT MODE — MISSED COMPONENTS PASS 2
+   Fixes: Store pack cards, Auth consent/legal, Enterprise benefits
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Store — CC pack cards ───────────────────────────── */
+[data-theme="light"] .pack {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-md);
+}
+[data-theme="light"] .pack:hover {
+  border-color: var(--accent-strong) !important;
+  box-shadow: 0 12px 32px rgba(8,145,178,0.12) !important;
+}
+[data-theme="light"] .pack::before {
+  background: radial-gradient(circle at top, rgba(8,145,178,0.06), transparent 42%);
+}
+[data-theme="light"] .pack-title {
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .pack h3 {
+  color: var(--text) !important;
+}
+[data-theme="light"] .pack-price {
+  color: var(--primary) !important;
+}
+[data-theme="light"] .pack-currency-note {
+  color: var(--text-dim) !important;
+}
+
+/* ── Store — Gift cards ──────────────────────────────── */
+[data-theme="light"] .gift {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm);
+}
+[data-theme="light"] .gift-title {
+  color: var(--text) !important;
+}
+[data-theme="light"] .gift-price {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .gift-note {
+  color: var(--text-dim) !important;
+}
+
+/* Pack detail modal — keep dark (intentional product view) */
+
+/* ── Auth — consent checkboxes + legal note ──────────── */
+[data-theme="light"] .auth-consent {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .auth-consent a { color: var(--primary) !important; }
+[data-theme="light"] .auth-legal-note {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .auth-legal-note a { color: var(--primary) !important; }
+[data-theme="light"] .auth-consent input {
+  accent-color: var(--primary) !important;
+}
+
+/* ── Auth — custom select (country picker etc.) ──────── */
+[data-theme="light"] .auth-select-trigger {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+[data-theme="light"] .auth-select-trigger:focus-visible {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--accent-tint) !important;
+}
+[data-theme="light"] .auth-select-menu {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-lg) !important;
+  backdrop-filter: none !important;
+}
+[data-theme="light"] .auth-select-option {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .auth-select-option:hover {
+  background: var(--hover) !important;
+  border-color: var(--accent-tint) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .auth-select-option.active {
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-mid) !important;
+  color: var(--primary) !important;
+  box-shadow: none !important;
+}
+
+/* ── Enterprise — benefit cards ──────────────────────── */
+[data-theme="light"] .enterprise-benefit-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm);
+}
+[data-theme="light"] .enterprise-benefit-card h4 {
+  color: var(--text) !important;
+}
+[data-theme="light"] .enterprise-benefit-card p {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .enterprise-contact-link {
+  color: var(--primary) !important;
+}
+
+/* ── Store pay modal (detail sheet overlay) ──────────── */
+[data-theme="light"] .store-pay-modal {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  color: var(--text);
+}
+[data-theme="light"] .store-pay-hero h3 { color: var(--text) !important; }
+[data-theme="light"] .store-pay-hero p  { color: var(--text-muted) !important; }
+[data-theme="light"] .store-pay-amount  { color: var(--text) !important; }
+[data-theme="light"] .store-pay-note    { color: var(--text-dim) !important; }
+[data-theme="light"] .store-pay-breakdown { 
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-tint) !important;
+}
+[data-theme="light"] .store-pay-breakdown span { color: var(--text-muted) !important; }
+
+/* ── Admin stat cards (also used by EnterpriseDashboard) */
+[data-theme="light"] .admin-stat-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+[data-theme="light"] .admin-stat-value { color: var(--text) !important; }
+[data-theme="light"] .admin-stat-label { color: var(--text-dim) !important; }
+
+/* ── Tags / filter chips ─────────────────────────────── */
+[data-theme="light"] .tag {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .tag.active, [data-theme="light"] .tag:hover {
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-mid) !important;
+  color: var(--primary) !important;
+}
+
+/* ── Card items (marketplace grid) ──────────────────────*/
+[data-theme="light"] .card-item {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+[data-theme="light"] .card-item-title { color: var(--text) !important; }
+[data-theme="light"] .card-item-meta  { color: var(--text-dim) !important; }
+[data-theme="light"] .card-item-author { color: var(--text-muted) !important; }
+
+/* ── Inventory cards ─────────────────────────────────── */
+[data-theme="light"] .inventory-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .inventory-card h4 { color: var(--text) !important; }
+[data-theme="light"] .inventory-card p  { color: var(--text-muted) !important; }
+
+/* ── WelcomeBackBanner ───────────────────────────────── */
+[data-theme="light"] .welcome-banner {
+  background: var(--surface) !important;
+  border-color: var(--accent-tint) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .welcome-banner-msg  { color: var(--text-muted) !important; }
+[data-theme="light"] .welcome-banner-name { color: var(--text) !important; }
+[data-theme="light"] .welcome-banner-close {
+  background: var(--hover) !important;
+  color: var(--text-muted) !important;
+}
+
+/* ── Global select element — light mode arrow ────────── */
+/* index.css bakes in a cyan arrow that's invisible on white */
+[data-theme="light"] select {
+  color: var(--text) !important;
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  background-image:
+    linear-gradient(180deg, var(--surface), var(--surface)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%230891b2' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+[data-theme="light"] select option,
+[data-theme="light"] select optgroup {
+  background-color: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   LIGHT MODE — PASS 3
+   Fixes: Chat profile modal, Store reward tabs,
+   Gifts intro banner, Watch & Earn (rad-container),
+   gift card preview modal
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Chat profile card (popup when clicking a user) ──── */
+[data-theme="light"] .chat-profile-card {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+[data-theme="light"] .chat-profile-fullname { color: var(--text) !important; }
+[data-theme="light"] .chat-profile-bio      { color: var(--text-muted) !important; }
+[data-theme="light"] .chat-profile-meta {
+  border-top-color: var(--border) !important;
+}
+[data-theme="light"] .chat-profile-meta-item { color: var(--text-dim) !important; }
+[data-theme="light"] .chat-profile-id        { color: var(--text-dim) !important; }
+[data-theme="light"] .chat-profile-empty {
+  background: var(--hover) !important;
+  border-color: var(--border) !important;
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .chat-profile-status-pill {
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--primary) !important;
+}
+/* The backdrop stays dark — it dims the chat behind the modal */
+
+/* ── Store — Reward sub-tabs (Earn CC / Redeem / Referrals bar) */
+[data-theme="light"] .store-reward-tabs {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .store-reward-tab {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .store-reward-tab:hover {
+  color: var(--text) !important;
+  background: var(--hover) !important;
+}
+[data-theme="light"] .store-reward-tab.active {
+  color: var(--primary) !important;
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-mid) !important;
+  box-shadow: none !important;
+}
+
+/* ── Store — Gifts intro banner ──────────────────────── */
+[data-theme="light"] .store-gifts-intro {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .store-gifts-intro h4 { color: var(--text) !important; }
+[data-theme="light"] .store-gifts-intro p  { color: var(--text-muted) !important; }
+[data-theme="light"] .store-gift-status {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--text-muted) !important;
+}
+
+/* ── Store — Watch & Earn (RewardedAds component) ────── */
+[data-theme="light"] .rad-container {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .rad-container::before {
+  background: radial-gradient(circle, var(--accent-soft), transparent 70%) !important;
+}
+[data-theme="light"] .rad-icon {
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-border) !important;
+}
+[data-theme="light"] .rad-title { color: var(--text) !important; }
+[data-theme="light"] .rad-desc  { color: var(--text-muted) !important; }
+[data-theme="light"] .rad-stat  { 
+  background: var(--hover) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .rad-stat strong { color: var(--text) !important; }
+[data-theme="light"] .rad-stat span   { color: var(--text-dim) !important; }
+[data-theme="light"] .rad-cooldown-label { color: var(--text-muted) !important; }
+[data-theme="light"] .rad-cooldown-ring {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Gift card preview modal (particle animation preview) */
+/* Keep canvas/animation area dark — it IS the product.  */
+/* Only fix the info body below the animation.           */
+[data-theme="light"] .preview-card {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .preview-card h3    { color: var(--text) !important; }
+[data-theme="light"] .preview-card p     { color: var(--text-muted) !important; }
+[data-theme="light"] .preview-eyebrow    { color: var(--primary) !important; }
+[data-theme="light"] .preview-body       { 
+  background: var(--surface) !important; 
+  border-top-color: var(--border) !important; 
+}
+[data-theme="light"] .preview-meta       { color: var(--text-dim) !important; }
+[data-theme="light"] .preview-tier-badge { 
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--primary) !important;
+}
+
+/* ── Store coming/referral dark banners ──────────────── */
+[data-theme="light"] .store-coming-card,
+[data-theme="light"] .store-referral-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .store-coming-card::before,
+[data-theme="light"] .store-referral-card::before { opacity: 0 !important; }
+
+/* ── Store gift card (StoreGifts view) action button ─── */
+[data-theme="light"] .gift-action {
+  background: var(--surface) !important;
+  border-color: var(--accent-mid) !important;
+  color: var(--primary) !important;
+}
+[data-theme="light"] .gift-count { color: var(--text-dim) !important; }
+
+/* ── Pass 4: Visibility sweep — WorldChat header + QC dim texts ── */
+
+/* WorldChat header — all text visible in light mode */
+[data-theme="light"] .chat-header-bar {
+  background: var(--elevated) !important;
+  border-color: var(--accent-tint) !important;
+}
+[data-theme="light"] .chat-header-bar::before { opacity: 0 !important; }
+[data-theme="light"] .chat-header-wordmark   { color: var(--text) !important; }
+[data-theme="light"] .chat-title             { color: var(--text) !important; }
+[data-theme="light"] .chat-status            { color: var(--text-muted) !important; }
+[data-theme="light"] .chat-status.online     { color: var(--success) !important; }
+[data-theme="light"] .chat-status-dot        { background: var(--text-dim) !important; }
+[data-theme="light"] .chat-status.online .chat-status-dot {
+  background: var(--success) !important;
+  box-shadow: 0 0 6px rgba(5,150,105,0.5) !important;
+}
+[data-theme="light"] .chat-header-balance    { color: var(--primary) !important; }
+[data-theme="light"] .chat-online-count {
+  color: var(--primary) !important;
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-border) !important;
+}
+[data-theme="light"] .chat-header-bar .eyebrow { color: var(--text-dim) !important; }
+[data-theme="light"] .chat-header-signin     { color: var(--primary) !important; }
+
+/* QC "LIVE PREVIEW" + "Simplified preview…" — boost to readable */
+[data-theme="light"] .qc-preview-label { color: var(--text-dim) !important; }
+[data-theme="light"] .qc-preview-note  { color: var(--text-muted) !important; }
+
+/* QC "Show N more themes" button */
+[data-theme="light"] .qc-show-more-btn {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-mid) !important;
+  color: var(--primary) !important;
+}
+[data-theme="light"] .qc-show-more-btn:hover {
+  background: var(--accent-tint) !important;
+}
+
+/* General: any remaining white-on-white nav & tab labels */
+[data-theme="light"] .tab-label,
+[data-theme="light"] .section-label,
+[data-theme="light"] .filter-label { color: var(--text-muted) !important; }
+
+/* Admin / moderator / enterprise text on light bg */
+[data-theme="light"] .admin-section h3,
+[data-theme="light"] .admin-header h2  { color: var(--text) !important; }
+[data-theme="light"] .admin-table td,
+[data-theme="light"] .admin-table th   { color: var(--text-muted) !important; }
+
+/* Poll option inline edit */
+.cs-poll-opt-editable:empty::before { content: attr(data-placeholder); opacity: 0.35; }
+.cs-preview-poll-add-opt {
+  margin-top: 6px; width: 100%; padding: 6px 10px;
+  border-radius: 8px; border: 1px dashed rgba(126,239,255,0.25);
+  background: rgba(126,239,255,0.04); color: rgba(126,239,255,0.55);
+  font-size: 0.78rem; cursor: pointer; text-align: center;
+}
+.cs-preview-poll-add-opt:hover { background: rgba(126,239,255,0.08); color: rgba(126,239,255,0.8); }
+
+/* Chain prompt inline edit — make the strip flex properly */
+.cs-chain-reply-strip { display: flex; align-items: center; gap: 8px; }

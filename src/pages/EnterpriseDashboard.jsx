@@ -2,7 +2,7 @@ import { useOutletContext, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
-import { getEnterpriseAdStats, updateEnterpriseAd } from '../lib/api.js'
+import { getEnterpriseAdStats, updateAdminAd } from '../lib/api.js'
 
 function EnterpriseDashboard() {
   const { currentUser, balance, openAuthModal } = useOutletContext()
@@ -35,7 +35,7 @@ function EnterpriseDashboard() {
     setUpdatingAdId(adId)
     setError('')
     try {
-      await updateEnterpriseAd(adId, { isActive: nextActive, active: nextActive })
+      await updateAdminAd(adId, { isActive: nextActive, active: nextActive })
       setAds(prev => prev.map(item => {
         const itemId = item._id || item.id || item.adId
         return itemId === adId ? { ...item, isActive: nextActive, active: nextActive } : item

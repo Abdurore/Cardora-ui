@@ -18,28 +18,6 @@ const CARD_TYPES = [
     ],
   },
   {
-    id: 'poll',
-    label: 'Poll',
-    Icon: PollCardIcon,
-    desc: 'Ask your audience a question. See live results when they answer.',
-    accent: '#60a5fa',
-    tiers: [
-      { id: 'classic', label: 'Classic', desc: 'Simple question + options', cost: '0 CC' },
-      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '35 CC' },
-    ],
-  },
-  {
-    id: 'trivia',
-    label: 'Trivia',
-    Icon: TriviaCardIcon,
-    desc: 'Quiz your friends. They see their score and correct answers.',
-    accent: '#a78bfa',
-    tiers: [
-      { id: 'classic', label: 'Classic', desc: 'Standard quiz format', cost: '0 CC' },
-      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '50 CC' },
-    ],
-  },
-  {
     id: 'chain',
     label: 'Chain',
     Icon: ChainCardIcon,
@@ -59,6 +37,28 @@ const CARD_TYPES = [
     tiers: [
       { id: 'classic', label: 'Classic', desc: 'Free to receive, clean template', cost: '0 CC' },
       { id: 'elite', label: 'Elite', desc: 'Premium template with full effects', cost: '45 CC' },
+    ],
+  },
+  {
+    id: 'poll',
+    label: 'Poll',
+    Icon: PollCardIcon,
+    desc: 'Ask your audience a question. See live results when they answer.',
+    accent: '#60a5fa',
+    tiers: [
+      { id: 'classic', label: 'Classic', desc: 'Simple question + options', cost: '0 CC' },
+      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '35 CC' },
+    ],
+  },
+  {
+    id: 'trivia',
+    label: 'Trivia',
+    Icon: TriviaCardIcon,
+    desc: 'Quiz your friends. They see their score and correct answers.',
+    accent: '#a78bfa',
+    tiers: [
+      { id: 'classic', label: 'Classic', desc: 'Standard quiz format', cost: '0 CC' },
+      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '50 CC' },
     ],
   },
 ]
