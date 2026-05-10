@@ -25015,3 +25015,54 @@ a {
   color: var(--primary) !important;
 }
 [data-theme="light"] .gift-count { color: var(--text-dim) !important; }
+
+/* ── Pass 4: Visibility sweep — WorldChat header + QC dim texts ── */
+
+/* WorldChat header — all text visible in light mode */
+[data-theme="light"] .chat-header-bar {
+  background: var(--elevated) !important;
+  border-color: var(--accent-tint) !important;
+}
+[data-theme="light"] .chat-header-bar::before { opacity: 0 !important; }
+[data-theme="light"] .chat-header-wordmark   { color: var(--text) !important; }
+[data-theme="light"] .chat-title             { color: var(--text) !important; }
+[data-theme="light"] .chat-status            { color: var(--text-muted) !important; }
+[data-theme="light"] .chat-status.online     { color: var(--success) !important; }
+[data-theme="light"] .chat-status-dot        { background: var(--text-dim) !important; }
+[data-theme="light"] .chat-status.online .chat-status-dot {
+  background: var(--success) !important;
+  box-shadow: 0 0 6px rgba(5,150,105,0.5) !important;
+}
+[data-theme="light"] .chat-header-balance    { color: var(--primary) !important; }
+[data-theme="light"] .chat-online-count {
+  color: var(--primary) !important;
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-border) !important;
+}
+[data-theme="light"] .chat-header-bar .eyebrow { color: var(--text-dim) !important; }
+[data-theme="light"] .chat-header-signin     { color: var(--primary) !important; }
+
+/* QC "LIVE PREVIEW" + "Simplified preview…" — boost to readable */
+[data-theme="light"] .qc-preview-label { color: var(--text-dim) !important; }
+[data-theme="light"] .qc-preview-note  { color: var(--text-muted) !important; }
+
+/* QC "Show N more themes" button */
+[data-theme="light"] .qc-show-more-btn {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-mid) !important;
+  color: var(--primary) !important;
+}
+[data-theme="light"] .qc-show-more-btn:hover {
+  background: var(--accent-tint) !important;
+}
+
+/* General: any remaining white-on-white nav & tab labels */
+[data-theme="light"] .tab-label,
+[data-theme="light"] .section-label,
+[data-theme="light"] .filter-label { color: var(--text-muted) !important; }
+
+/* Admin / moderator / enterprise text on light bg */
+[data-theme="light"] .admin-section h3,
+[data-theme="light"] .admin-header h2  { color: var(--text) !important; }
+[data-theme="light"] .admin-table td,
+[data-theme="light"] .admin-table th   { color: var(--text-muted) !important; }
