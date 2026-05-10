@@ -24887,3 +24887,131 @@ a {
   background-color: var(--surface) !important;
   color: var(--text) !important;
 }
+
+/* ═══════════════════════════════════════════════════════
+   LIGHT MODE — PASS 3
+   Fixes: Chat profile modal, Store reward tabs,
+   Gifts intro banner, Watch & Earn (rad-container),
+   gift card preview modal
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Chat profile card (popup when clicking a user) ──── */
+[data-theme="light"] .chat-profile-card {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+[data-theme="light"] .chat-profile-fullname { color: var(--text) !important; }
+[data-theme="light"] .chat-profile-bio      { color: var(--text-muted) !important; }
+[data-theme="light"] .chat-profile-meta {
+  border-top-color: var(--border) !important;
+}
+[data-theme="light"] .chat-profile-meta-item { color: var(--text-dim) !important; }
+[data-theme="light"] .chat-profile-id        { color: var(--text-dim) !important; }
+[data-theme="light"] .chat-profile-empty {
+  background: var(--hover) !important;
+  border-color: var(--border) !important;
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .chat-profile-status-pill {
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--primary) !important;
+}
+/* The backdrop stays dark — it dims the chat behind the modal */
+
+/* ── Store — Reward sub-tabs (Earn CC / Redeem / Referrals bar) */
+[data-theme="light"] .store-reward-tabs {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .store-reward-tab {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .store-reward-tab:hover {
+  color: var(--text) !important;
+  background: var(--hover) !important;
+}
+[data-theme="light"] .store-reward-tab.active {
+  color: var(--primary) !important;
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-mid) !important;
+  box-shadow: none !important;
+}
+
+/* ── Store — Gifts intro banner ──────────────────────── */
+[data-theme="light"] .store-gifts-intro {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .store-gifts-intro h4 { color: var(--text) !important; }
+[data-theme="light"] .store-gifts-intro p  { color: var(--text-muted) !important; }
+[data-theme="light"] .store-gift-status {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--text-muted) !important;
+}
+
+/* ── Store — Watch & Earn (RewardedAds component) ────── */
+[data-theme="light"] .rad-container {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .rad-container::before {
+  background: radial-gradient(circle, var(--accent-soft), transparent 70%) !important;
+}
+[data-theme="light"] .rad-icon {
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-border) !important;
+}
+[data-theme="light"] .rad-title { color: var(--text) !important; }
+[data-theme="light"] .rad-desc  { color: var(--text-muted) !important; }
+[data-theme="light"] .rad-stat  { 
+  background: var(--hover) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .rad-stat strong { color: var(--text) !important; }
+[data-theme="light"] .rad-stat span   { color: var(--text-dim) !important; }
+[data-theme="light"] .rad-cooldown-label { color: var(--text-muted) !important; }
+[data-theme="light"] .rad-cooldown-ring {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Gift card preview modal (particle animation preview) */
+/* Keep canvas/animation area dark — it IS the product.  */
+/* Only fix the info body below the animation.           */
+[data-theme="light"] .preview-card {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .preview-card h3    { color: var(--text) !important; }
+[data-theme="light"] .preview-card p     { color: var(--text-muted) !important; }
+[data-theme="light"] .preview-eyebrow    { color: var(--primary) !important; }
+[data-theme="light"] .preview-body       { 
+  background: var(--surface) !important; 
+  border-top-color: var(--border) !important; 
+}
+[data-theme="light"] .preview-meta       { color: var(--text-dim) !important; }
+[data-theme="light"] .preview-tier-badge { 
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--primary) !important;
+}
+
+/* ── Store coming/referral dark banners ──────────────── */
+[data-theme="light"] .store-coming-card,
+[data-theme="light"] .store-referral-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .store-coming-card::before,
+[data-theme="light"] .store-referral-card::before { opacity: 0 !important; }
+
+/* ── Store gift card (StoreGifts view) action button ─── */
+[data-theme="light"] .gift-action {
+  background: var(--surface) !important;
+  border-color: var(--accent-mid) !important;
+  color: var(--primary) !important;
+}
+[data-theme="light"] .gift-count { color: var(--text-dim) !important; }
