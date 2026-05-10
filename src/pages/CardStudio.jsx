@@ -131,6 +131,14 @@ const TIER_COST_BY_TYPE = {
   anonymous: { classic: 0, premium: null, elite: 45 },
 }
 
+// Premium is personal-only (engine throws otherwise). For non-personal
+// types arriving with ?tier=premium, fall back to elite so the URL is
+// honored without surprising the user with a backend rejection.
+function resolveTier(type, tier) {
+  if (type !== 'personal' && tier === 'premium') return 'elite'
+  return tier
+}
+
 const TYPE_LABEL = {
   personal:  'Personal Card',
   poll:      'Poll Card',
@@ -347,9 +355,9 @@ function CardStudio() {
     ? autoSavedRef.current
     : null
 
-  // -- Card type + tier from URL --
+  // -- Card type + tier from URL (with premium-on-non-personal guard) --
   const studioType = searchParams.get('type') || 'personal'
-  const studioTier = searchParams.get('tier') || 'classic'
+  const studioTier = resolveTier(studioType, searchParams.get('tier') || 'classic')
   const typeMeta = STUDIO_TYPE_META[studioType] || STUDIO_TYPE_META.personal
   const tierLabel = TIER_LABELS[studioTier] || 'Classic'
   const tierCost = (TIER_COST_BY_TYPE[studioType] || TIER_COST_BY_TYPE.personal)[studioTier] ?? 0
@@ -505,9 +513,14 @@ function CardStudio() {
   const [chainData, setChainData] = useState(() =>
     initialAutoSaved?.chainData || { enabled: false, prompt: '' }
   )
-  const [anonTemplate, setAnonTemplate] = useState(() =>
-    initialAutoSaved?.anonTemplate || { enabled: false, tier: studioTier || 'classic' }
-  )
+  const [anonTemplate, setAnonTemplate] = useState(() => {
+    const saved = initialAutoSaved?.anonTemplate
+    if (saved) {
+      // anonTemplate.tier must be classic|elite (not premium — anon is non-personal)
+      return { ...saved, tier: saved.tier === 'premium' ? 'elite' : (saved.tier || 'classic') }
+    }
+    return { enabled: false, tier: studioTier === 'elite' ? 'elite' : 'classic' }
+  })
   const [anonPreviewTab, setAnonPreviewTab] = useState('sender') // 'sender' | 'recipient'
 
   // Auto-save: every change persists to localStorage after a short debounce so
@@ -2121,7 +2134,7 @@ function CardStudio() {
               <div className="cs-sub-section">
                 <p className="cs-sub-label">Template Tier</p>
                 <div className="cs-choice-row">
-                  {['classic', 'premium'].map((t) => (
+                  {['classic', 'elite'].map((t) => (
                     <button
                       key={t}
                       type="button"
@@ -2133,7 +2146,7 @@ function CardStudio() {
                   ))}
                 </div>
                 <p className="cs-info-note" style={{ marginTop: 6 }}>
-                  Classic = free for senders. Premium = costs CC for senders.
+                  Classic = free for senders. Elite = 45 CC per send (full effects).
                 </p>
               </div>
             </>
@@ -2583,7 +2596,7 @@ function CardStudio() {
             <div className="cs-preview-anon-recipient" style={{ background: cardBg, borderColor: `${accent}1a`, ...cardBorderCss }}>
               <div className="cs-preview-anon-head">
                 <p className="cs-preview-anon-eyebrow">&#x1F441;&#xFE0F; Anonymous Inbox</p>
-                <span className="cs-preview-pill">{anonTemplate.tier === 'premium' ? 'Premium' : 'Classic'}</span>
+                <span className="cs-preview-pill">{anonTemplate.tier === 'elite' ? 'Elite' : 'Classic'}</span>
               </div>
               <h3
                 contentEditable={!compact}

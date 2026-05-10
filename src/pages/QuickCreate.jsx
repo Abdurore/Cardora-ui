@@ -28,6 +28,13 @@ const TIER_COST_BY_TYPE = {
   anonymous: { classic: 0, premium: null, elite: 45 },
 }
 
+// Premium is personal-only — fall back to elite for non-personal types
+// so a stray `?tier=premium` doesn't read cost as 0 and confuse the user.
+function resolveTier(type, tier) {
+  if (type !== 'personal' && tier === 'premium') return 'elite'
+  return tier
+}
+
 const TYPE_LABEL = {
   personal:  'Personal Card',
   poll:      'Poll Card',
@@ -87,8 +94,8 @@ function QuickCreate() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const cardType = params.get('type') || 'personal'
-  const cardTierRaw = params.get('tier') || 'classic'
-  const cardTier = cardTierRaw.toLowerCase()
+  const cardTierRaw = (params.get('tier') || 'classic').toLowerCase()
+  const cardTier = resolveTier(cardType, cardTierRaw)
 
   const { createCardOnBackend, currentUser, openAuthModal, balance } = useOutletContext()
 
@@ -344,9 +351,7 @@ function QuickCreate() {
           <div className={`qc-cc-pill${isLowBalance ? ' short' : ''}`} title={`Your balance: ${bal} CC`}>
             <span className="qc-cc-icon">◈</span>
             <span className="qc-cc-balance">{bal} CC</span>
-            {tierCost > 0 && (
-              <span className="qc-cc-cost">· {tierCost === 0 ? 'Free' : `${tierCost} to send`}</span>
-            )}
+            <span className="qc-cc-cost">· {tierCost === 0 ? 'Free to send' : `${tierCost} CC to send`}</span>
           </div>
           <button type="button" className="qc-studio-link-btn" onClick={openInStudio}>
             <span className="qc-studio-text">Full Studio</span>
@@ -585,7 +590,7 @@ function QuickCreate() {
                   </div>
                   <div className="qc-trivia-options">
                     <label className="qc-poll-options-label">
-                      Answers <span className="qc-optional">tap ○ to mark correct</span>
+                      Answers <span className="qc-optional">tap the radio to mark the correct answer</span>
                     </label>
                     {triviaOptions.map((opt, i) => (
                       <div key={i} className={`qc-trivia-option-row${triviaCorrect === i ? ' correct' : ''}`}>
