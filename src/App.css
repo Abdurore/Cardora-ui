@@ -25083,3 +25083,138 @@ a {
 
 /* Chain prompt inline edit — make the strip flex properly */
 .cs-chain-reply-strip { display: flex; align-items: center; gap: 8px; }
+
+/* ════════════════════════════════════════════════════════════
+   LIGHT MODE — Mobile Studio (≤640 px)
+   All cs-mobile-* classes use hardcoded dark values inside the
+   @media block above; these overrides bring them into light mode.
+   ════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  [data-theme="light"] .cs-shell {
+    background: var(--bg) !important;
+  }
+
+  [data-theme="light"] .cs-mobile-shell {
+    background: linear-gradient(180deg, #ecfeff 0%, #f0fdfa 50%, #f4f8fb 100%) !important;
+  }
+
+  /* Header bar */
+  [data-theme="light"] .cs-mobile-header {
+    background: rgba(255,255,255,0.97) !important;
+    border-bottom-color: var(--accent-tint) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  [data-theme="light"] .cs-mobile-back,
+  [data-theme="light"] .cs-mobile-save {
+    background: var(--surface) !important;
+    border-color: var(--accent-mid) !important;
+    color: var(--primary) !important;
+  }
+  [data-theme="light"] .cs-mobile-back:hover,
+  [data-theme="light"] .cs-mobile-save:hover {
+    background: var(--accent-soft) !important;
+  }
+  [data-theme="light"] .cs-mobile-title {
+    color: var(--text) !important;
+  }
+
+  /* Preview area */
+  [data-theme="light"] .cs-mobile-preview {
+    background: transparent !important;
+  }
+  [data-theme="light"] .cs-mobile-tap-hint {
+    color: var(--text-dim) !important;
+  }
+  [data-theme="light"] .cs-mobile-card-hint {
+    color: var(--text-muted) !important;
+    background: rgba(255,255,255,0.9) !important;
+    border-color: var(--accent-border) !important;
+  }
+
+  /* Sticky step + tool tab bar */
+  [data-theme="light"] .cs-mobile-sticky-bar {
+    background: rgba(255,255,255,0.97) !important;
+    border-bottom-color: var(--accent-tint) !important;
+  }
+  [data-theme="light"] .cs-mobile-stepnav {
+    border-bottom-color: var(--accent-soft) !important;
+  }
+  [data-theme="light"] .cs-mobile-step {
+    color: var(--text-dim) !important;
+  }
+  [data-theme="light"] .cs-mobile-step.active {
+    color: var(--primary) !important;
+    border-bottom-color: var(--primary) !important;
+  }
+  [data-theme="light"] .cs-mobile-tool-chip {
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text-muted) !important;
+  }
+  [data-theme="light"] .cs-mobile-tool-chip.active {
+    /* accent color stays, only text needs to work on it */
+    color: #041015 !important;
+  }
+
+  /* Panel content */
+  [data-theme="light"] .cs-mobile-panel h3 {
+    color: var(--text) !important;
+  }
+  [data-theme="light"] .cs-mobile-panel {
+    background: var(--bg) !important;
+  }
+
+  /* State nav (Envelope / Card tabs) */
+  [data-theme="light"] .cs-mobile-state-nav {
+    background: rgba(255,255,255,0.97) !important;
+    border-bottom-color: var(--accent-tint) !important;
+  }
+  [data-theme="light"] .cs-mobile-state-btn {
+    color: var(--text-dim) !important;
+  }
+  [data-theme="light"] .cs-mobile-state-btn.active {
+    color: var(--primary) !important;
+    border-bottom-color: var(--primary) !important;
+    background: var(--accent-soft) !important;
+  }
+
+  /* Bottom bar (Tools button) */
+  [data-theme="light"] .cs-mobile-bottom-bar {
+    background: rgba(255,255,255,0.97) !important;
+    border-top-color: var(--accent-tint) !important;
+  }
+  [data-theme="light"] .cs-mobile-tools-btn {
+    color: var(--text-muted) !important;
+  }
+  [data-theme="light"] .cs-mobile-tools-btn:active {
+    color: var(--primary) !important;
+  }
+
+  /* Footer (Preview / Create buttons) */
+  [data-theme="light"] .cs-mobile-footer {
+    background: rgba(255,255,255,0.97) !important;
+    border-top-color: var(--accent-tint) !important;
+  }
+  [data-theme="light"] .cs-mobile-ghost {
+    background: var(--surface) !important;
+    border-color: var(--accent-mid) !important;
+    color: var(--primary) !important;
+  }
+
+  /* Inline element edit bar (slides up when tapping text/image) */
+  [data-theme="light"] .cs-mobile-edit-bar {
+    background: rgba(255,255,255,0.98) !important;
+    border-top-color: var(--accent-border) !important;
+  }
+  [data-theme="light"] .cs-mobile-edit-label {
+    color: var(--primary) !important;
+    border-right-color: var(--border) !important;
+  }
+  [data-theme="light"] .cs-mobile-edit-sep {
+    background: var(--border) !important;
+  }
+  [data-theme="light"] .cs-mobile-edit-color-label {
+    color: var(--text-dim) !important;
+  }
+}
