@@ -647,7 +647,7 @@ export function cardObjectToBackendPayload(cardObject, {
       enhancements.media = Array.isArray(cardObject.media?.images)
         ? cardObject.media.images
             .map(img => (typeof img === 'string' ? img : img?.url))
-            .filter(url => typeof url === 'string' && /^(https?:|data:)/i.test(url.trim()))
+            .filter(url => typeof url === 'string' && /^https?:/i.test(url.trim()))
             .map(url => ({ type: 'image', url: url.trim() }))
         : []
     }
@@ -876,7 +876,7 @@ export function mapBackendCard(card) {
   })()
 
   return {
-    id: card.cardId || card._id || slug,
+    id: card.cardId || card.id || card._id || slug,
     slug,
     title: card.title || content.header || content.question || content.challenge || 'Untitled Card',
     subtitle: content.body || '',

@@ -20673,7 +20673,7 @@ a {
   height: 6px;
   background: rgba(148, 163, 184, 0.12);
   border-radius: 999px;
-  margin-bottom: 32px;
+  margin-bottom: 40px;
 }
 .store-referral-track-fill {
   position: absolute;
@@ -20709,21 +20709,25 @@ a {
 }
 .store-referral-marker-label {
   position: absolute;
-  top: 14px;
+  top: 16px;
   font-size: 0.62rem;
   font-weight: 700;
   color: rgba(148, 163, 184, 0.55);
   white-space: nowrap;
+  transform: translateX(-50%);
+  left: 50%;
 }
 .store-referral-marker.unlocked .store-referral-marker-label {
   color: #7ef7ff;
 }
 .store-referral-marker-reward {
   position: absolute;
-  bottom: 14px;
+  bottom: 16px;
   font-size: 0.6rem;
   color: rgba(148, 163, 184, 0.4);
   white-space: nowrap;
+  transform: translateX(-50%);
+  left: 50%;
 }
 .store-referral-marker.unlocked .store-referral-marker-reward {
   color: rgba(126, 247, 255, 0.65);
@@ -25066,3 +25070,16 @@ a {
 [data-theme="light"] .admin-header h2  { color: var(--text) !important; }
 [data-theme="light"] .admin-table td,
 [data-theme="light"] .admin-table th   { color: var(--text-muted) !important; }
+
+/* Poll option inline edit */
+.cs-poll-opt-editable:empty::before { content: attr(data-placeholder); opacity: 0.35; }
+.cs-preview-poll-add-opt {
+  margin-top: 6px; width: 100%; padding: 6px 10px;
+  border-radius: 8px; border: 1px dashed rgba(126,239,255,0.25);
+  background: rgba(126,239,255,0.04); color: rgba(126,239,255,0.55);
+  font-size: 0.78rem; cursor: pointer; text-align: center;
+}
+.cs-preview-poll-add-opt:hover { background: rgba(126,239,255,0.08); color: rgba(126,239,255,0.8); }
+
+/* Chain prompt inline edit — make the strip flex properly */
+.cs-chain-reply-strip { display: flex; align-items: center; gap: 8px; }

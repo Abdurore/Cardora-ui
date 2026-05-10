@@ -222,7 +222,6 @@ function AdminDashboard() {
   const [newCode, setNewCode] = useState({ numberOfCC: 10, maxUses: 200, isActive: true })
   // New ad form
   const [newAd, setNewAd] = useState({ name: '', type: 'external', enterpriseId: '', enterpriseName: '', videoUrl: '', linkUrl: '', rewardCC: 2, duration: 30, maxViews: '', isActive: true, priority: 1, active: true })
-  const [assignEnterprise, setAssignEnterprise] = useState({ adId: null, value: '' })
   // Broadcast subject
   const [broadcastSubject, setBroadcastSubject] = useState('')
   const [adVideoUploading, setAdVideoUploading] = useState(false)
@@ -660,20 +659,7 @@ function AdminDashboard() {
     }
   }
 
-  const handleAssignEnterprise = async () => {
-    const { adId, value } = assignEnterprise
-    if (!adId) return
-    try {
-      await updateAdminAd(adId, { enterpriseAccountId: value.trim() || null })
-      showMsg('Enterprise account assigned!')
-      setAssignEnterprise({ adId: null, value: '' })
-      loadTabData('Ads')
-    } catch (err) {
-      showMsg(err.message || 'Failed', false)
-    }
-  }
-
-  const handleBroadcast = async () => {
+const handleBroadcast = async () => {
     if (!broadcastMessage.trim()) { showMsg('Message cannot be empty.', false); return }
     if (!broadcastSubject.trim()) { showMsg('Subject line is required.', false); return }
     try {
@@ -1622,7 +1608,6 @@ function AdminDashboard() {
                 <tbody>
                   {pagedAds.map(ad => {
                     const adId = ad._id || ad.id
-                    const isAssigning = assignEnterprise.adId === adId
                     return (
                     <tr key={adId}>
                       <td>{ad.name || '—'}</td>
@@ -1663,33 +1648,6 @@ function AdminDashboard() {
                       <td>{ad.duration}s</td>
                       <td>{ad.currentViews ?? 0}{ad.maxViews ? `/${ad.maxViews}` : ''}</td>
                       <td>{ad.linkUrl ? <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7ef7ff', fontSize: '0.75rem' }}>Link</a> : '—'}</td>
-                      <td>
-                        {isAssigning ? (
-                          <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                            <input
-                              style={{ fontSize: '0.75rem', padding: '2px 6px', width: 120, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, color: '#e2eaf0' }}
-                              placeholder="Account ID"
-                              value={assignEnterprise.value}
-                              onChange={e => setAssignEnterprise(p => ({ ...p, value: e.target.value }))}
-                              onKeyDown={e => { if (e.key === 'Enter') handleAssignEnterprise(); if (e.key === 'Escape') setAssignEnterprise({ adId: null, value: '' }) }}
-                              autoFocus
-                            />
-                            <button type="button" className="admin-action-btn approve" style={{ padding: '2px 8px' }} onClick={handleAssignEnterprise}>Save</button>
-                            <button type="button" className="admin-action-btn" style={{ padding: '2px 8px' }} onClick={() => setAssignEnterprise({ adId: null, value: '' })}>✕</button>
-                          </span>
-                        ) : (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            style={{ cursor: 'pointer', fontSize: '0.78rem', color: ad.enterpriseAccountId ? '#7ef7ff' : 'rgba(255,255,255,0.3)' }}
-                            title="Click to assign enterprise account"
-                            onClick={() => setAssignEnterprise({ adId, value: ad.enterpriseAccountId || '' })}
-                            onKeyDown={e => e.key === 'Enter' && setAssignEnterprise({ adId, value: ad.enterpriseAccountId || '' })}
-                          >
-                            {ad.enterpriseAccountId || '+ Assign'}
-                          </span>
-                        )}
-                      </td>
                       <td>{ad.isActive ? 'Yes' : 'No'}</td>
                       <td style={{ display: 'flex', gap: 4 }}>
                         <button type="button" className="admin-action-btn approve" onClick={() => handleToggleAd(ad)}>

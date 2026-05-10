@@ -2258,7 +2258,6 @@ function CardStudio() {
 
   const renderStudioContentPreview = (compact = false) => {
     const previewQuestion = triviaData.questions[0] || { text: '', options: ['', '', '', ''], correctIndex: 0 }
-    const previewPollOptions = pollData.options.filter(Boolean)
     if (studioType === 'poll') {
       const headingSize = c.theme.headingSize ?? 28
       return (
