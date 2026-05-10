@@ -24688,3 +24688,202 @@ a {
 [data-theme="light"] .qc-gate-icon { color: rgba(10,122,143,0.55); }
 [data-theme="light"] .qc-gate-inner h2 { color: var(--text); }
 [data-theme="light"] .qc-gate-inner p { color: var(--text-muted); }
+
+/* ═══════════════════════════════════════════════════════
+   LIGHT MODE — MISSED COMPONENTS PASS 2
+   Fixes: Store pack cards, Auth consent/legal, Enterprise benefits
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Store — CC pack cards ───────────────────────────── */
+[data-theme="light"] .pack {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-md);
+}
+[data-theme="light"] .pack:hover {
+  border-color: var(--accent-strong) !important;
+  box-shadow: 0 12px 32px rgba(8,145,178,0.12) !important;
+}
+[data-theme="light"] .pack::before {
+  background: radial-gradient(circle at top, rgba(8,145,178,0.06), transparent 42%);
+}
+[data-theme="light"] .pack-title {
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .pack h3 {
+  color: var(--text) !important;
+}
+[data-theme="light"] .pack-price {
+  color: var(--primary) !important;
+}
+[data-theme="light"] .pack-currency-note {
+  color: var(--text-dim) !important;
+}
+
+/* ── Store — Gift cards ──────────────────────────────── */
+[data-theme="light"] .gift {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm);
+}
+[data-theme="light"] .gift-title {
+  color: var(--text) !important;
+}
+[data-theme="light"] .gift-price {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .gift-note {
+  color: var(--text-dim) !important;
+}
+
+/* Pack detail modal — keep dark (intentional product view) */
+
+/* ── Auth — consent checkboxes + legal note ──────────── */
+[data-theme="light"] .auth-consent {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .auth-consent a { color: var(--primary) !important; }
+[data-theme="light"] .auth-legal-note {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .auth-legal-note a { color: var(--primary) !important; }
+[data-theme="light"] .auth-consent input {
+  accent-color: var(--primary) !important;
+}
+
+/* ── Auth — custom select (country picker etc.) ──────── */
+[data-theme="light"] .auth-select-trigger {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+[data-theme="light"] .auth-select-trigger:focus-visible {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--accent-tint) !important;
+}
+[data-theme="light"] .auth-select-menu {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-lg) !important;
+  backdrop-filter: none !important;
+}
+[data-theme="light"] .auth-select-option {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .auth-select-option:hover {
+  background: var(--hover) !important;
+  border-color: var(--accent-tint) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .auth-select-option.active {
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-mid) !important;
+  color: var(--primary) !important;
+  box-shadow: none !important;
+}
+
+/* ── Enterprise — benefit cards ──────────────────────── */
+[data-theme="light"] .enterprise-benefit-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm);
+}
+[data-theme="light"] .enterprise-benefit-card h4 {
+  color: var(--text) !important;
+}
+[data-theme="light"] .enterprise-benefit-card p {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .enterprise-contact-link {
+  color: var(--primary) !important;
+}
+
+/* ── Store pay modal (detail sheet overlay) ──────────── */
+[data-theme="light"] .store-pay-modal {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  color: var(--text);
+}
+[data-theme="light"] .store-pay-hero h3 { color: var(--text) !important; }
+[data-theme="light"] .store-pay-hero p  { color: var(--text-muted) !important; }
+[data-theme="light"] .store-pay-amount  { color: var(--text) !important; }
+[data-theme="light"] .store-pay-note    { color: var(--text-dim) !important; }
+[data-theme="light"] .store-pay-breakdown { 
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-tint) !important;
+}
+[data-theme="light"] .store-pay-breakdown span { color: var(--text-muted) !important; }
+
+/* ── Admin stat cards (also used by EnterpriseDashboard) */
+[data-theme="light"] .admin-stat-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+[data-theme="light"] .admin-stat-value { color: var(--text) !important; }
+[data-theme="light"] .admin-stat-label { color: var(--text-dim) !important; }
+
+/* ── Tags / filter chips ─────────────────────────────── */
+[data-theme="light"] .tag {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .tag.active, [data-theme="light"] .tag:hover {
+  background: var(--accent-tint) !important;
+  border-color: var(--accent-mid) !important;
+  color: var(--primary) !important;
+}
+
+/* ── Card items (marketplace grid) ──────────────────────*/
+[data-theme="light"] .card-item {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+[data-theme="light"] .card-item-title { color: var(--text) !important; }
+[data-theme="light"] .card-item-meta  { color: var(--text-dim) !important; }
+[data-theme="light"] .card-item-author { color: var(--text-muted) !important; }
+
+/* ── Inventory cards ─────────────────────────────────── */
+[data-theme="light"] .inventory-card {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .inventory-card h4 { color: var(--text) !important; }
+[data-theme="light"] .inventory-card p  { color: var(--text-muted) !important; }
+
+/* ── WelcomeBackBanner ───────────────────────────────── */
+[data-theme="light"] .welcome-banner {
+  background: var(--surface) !important;
+  border-color: var(--accent-tint) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .welcome-banner-msg  { color: var(--text-muted) !important; }
+[data-theme="light"] .welcome-banner-name { color: var(--text) !important; }
+[data-theme="light"] .welcome-banner-close {
+  background: var(--hover) !important;
+  color: var(--text-muted) !important;
+}
+
+/* ── Global select element — light mode arrow ────────── */
+/* index.css bakes in a cyan arrow that's invisible on white */
+[data-theme="light"] select {
+  color: var(--text) !important;
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  background-image:
+    linear-gradient(180deg, var(--surface), var(--surface)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%230891b2' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+[data-theme="light"] select option,
+[data-theme="light"] select optgroup {
+  background-color: var(--surface) !important;
+  color: var(--text) !important;
+}
