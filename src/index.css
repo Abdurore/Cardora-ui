@@ -1,9 +1,138 @@
+/* ═══════════════════════════════════════════════════════════
+   THEME TOKENS — single source of truth for the whole app
+   Override only the values inside [data-theme="light"] for light mode.
+   Component CSS (App.css) consumes these via var(...).
+   ═══════════════════════════════════════════════════════════ */
 
 :root {
   color-scheme: dark;
   font-family: 'Manrope', sans-serif;
-  background-color: #0b0f12;
-  color: #e8f1f4;
+
+  /* ── Brand & accents ── */
+  --primary:        #7ef7ff;      /* cyan — main brand */
+  --primary-strong: #62ffa2;      /* mint — emphasis / hover */
+  --primary-soft:   #ace7ff;      /* light cyan — text on accent bg */
+  --secondary:      #c4a8ff;      /* violet — secondary actions */
+  --tertiary:       #ffd47a;      /* amber — warnings / featured */
+
+  /* ── Surfaces ── */
+  --bg:        #0b0f12;                    /* page bg */
+  --surface:   rgba(14, 24, 30, 0.92);     /* cards, panels */
+  --elevated:  rgba(20, 32, 40, 0.96);     /* modals, popovers */
+  --hover:     rgba(255, 255, 255, 0.04);  /* hover wash */
+  --inset:     rgba(0, 0, 0, 0.18);        /* inset wells, inputs */
+
+  /* ── Text ── */
+  --text:         #e8f1f4;
+  --text-muted:   rgba(232, 241, 244, 0.72);
+  --text-dim:     rgba(232, 241, 244, 0.5);
+  --text-inverse: #0b0f12;                 /* text on accent buttons */
+  --placeholder:  rgba(232, 241, 244, 0.4);
+
+  /* ── Borders ── */
+  --border:        rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --hairline:      rgba(255, 255, 255, 0.06);
+
+  /* ── State colors ── */
+  --danger:  #ff6b6b;
+  --warning: #ffbf6b;
+  --success: #62ffa2;
+  --info:    #7ef7ff;
+
+  /* ── Accent tints (10–25%) ── */
+  --accent-soft:    rgba(126, 247, 255, 0.06);
+  --accent-tint:    rgba(126, 247, 255, 0.10);
+  --accent-mid:     rgba(126, 247, 255, 0.16);
+  --accent-strong:  rgba(126, 247, 255, 0.25);
+  --accent-border:  rgba(126, 247, 255, 0.22);
+
+  /* ── Buttons ── */
+  --btn-bg:           rgba(126, 247, 255, 0.12);
+  --btn-bg-hover:     rgba(126, 247, 255, 0.20);
+  --btn-text:         #7ef7ff;
+  --btn-primary-bg:   linear-gradient(135deg, #7ef7ff, #62ffa2);
+  --btn-primary-text: #0b0f12;
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 24px rgba(126, 247, 255, 0.18);
+
+  /* ── Backgrounds (decorative) ── */
+  --bg-gradient: radial-gradient(circle at top, rgba(36, 91, 105, 0.45), transparent 55%),
+                 radial-gradient(circle at 20% 80%, rgba(12, 40, 52, 0.9), transparent 60%),
+                 #081013;
+
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT THEME — clean, readable, professional
+   Background: warm soft white. Surfaces: pure white. Accent: dark teal.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Brand & accents — direct light counterparts of dark cyan + mint
+     Dark #7ef7ff (cyan)  → Light #0891b2 (cyan-600)
+     Dark #62ffa2 (mint)  → Light #059669 (emerald-600)
+     Dark #c4a8ff (violet)→ Light #7c3aed (violet-600) */
+  --primary:        #0891b2;   /* bright cyan-teal — pops on white */
+  --primary-strong: #0e7490;   /* deeper cyan for hover / emphasis */
+  --primary-soft:   #ecfeff;   /* very light cyan tint */
+  --secondary:      #059669;   /* emerald — mint counterpart */
+  --tertiary:       #d97706;   /* amber for warm highlights */
+
+  /* Surfaces — white cards on warm-neutral page bg */
+  --bg:       #f4f8fb;
+  --surface:  #ffffff;
+  --elevated: #ffffff;
+  --hover:    rgba(10, 122, 143, 0.05);
+  --inset:    rgba(10, 122, 143, 0.04);
+
+  /* Text — dark ink on white, plenty of contrast */
+  --text:         #0c1929;
+  --text-muted:   #4b6577;
+  --text-dim:     #748b9b;
+  --text-inverse: #ffffff;
+  --placeholder:  #94adb9;
+
+  /* Borders — soft cool grey */
+  --border:        #e2eaf0;
+  --border-strong: #cbd6df;
+  --hairline:      rgba(10, 122, 143, 0.10);
+
+  /* State colors */
+  --danger:  #dc2626;
+  --warning: #d97706;
+  --success: #059669;
+  --info:    #0a7a8f;
+
+  /* Accent tints (cyan-teal — derived from #0891b2) */
+  --accent-soft:   rgba(8, 145, 178, 0.05);
+  --accent-tint:   rgba(8, 145, 178, 0.10);
+  --accent-mid:    rgba(8, 145, 178, 0.15);
+  --accent-strong: rgba(8, 145, 178, 0.22);
+  --accent-border: rgba(8, 145, 178, 0.20);
+
+  /* Buttons — gradient mirrors dark mode (cyan → mint) */
+  --btn-bg:           rgba(8, 145, 178, 0.08);
+  --btn-bg-hover:     rgba(8, 145, 178, 0.14);
+  --btn-text:         #0891b2;
+  --btn-primary-bg:   linear-gradient(135deg, #0891b2, #059669);
+  --btn-primary-text: #ffffff;
+
+  /* Shadows — soft, no glow */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.10);
+  --shadow-glow: 0 0 0 0 transparent;
+
+  /* Decorative bg */
+  --bg-gradient: linear-gradient(180deg, #f4f8fb 0%, #eef4f8 100%);
 }
 
 * {
@@ -13,9 +142,9 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at top, rgba(36, 91, 105, 0.45), transparent 55%),
-    radial-gradient(circle at 20% 80%, rgba(12, 40, 52, 0.9), transparent 60%),
-    #081013;
+  background: var(--bg-gradient);
+  color: var(--text);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #root {
@@ -35,14 +164,14 @@ select {
   -moz-appearance: none;
   font-family: inherit;
   font-size: 0.92rem;
-  color: #eafcff;
-  background-color: rgba(8, 16, 20, 0.92);
-  background-image: linear-gradient(180deg, rgba(14, 24, 30, 0.95), rgba(6, 12, 16, 0.98)),
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' fill='none' stroke='%237ef7ff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  color: var(--text);
+  background-color: var(--surface);
+  background-image: linear-gradient(180deg, var(--surface), var(--surface)),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
   background-repeat: no-repeat, no-repeat;
   background-position: center, right 14px center;
   background-size: auto, 12px 8px;
-  border: 1px solid rgba(126, 247, 255, 0.18);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px 38px 10px 14px;
   line-height: 1.2;
@@ -51,14 +180,14 @@ select {
 }
 
 select:hover {
-  border-color: rgba(126, 247, 255, 0.32);
+  border-color: var(--border-strong);
 }
 
 select:focus,
 select:focus-visible {
   outline: none;
-  border-color: rgba(126, 247, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(126, 247, 255, 0.12);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 select:disabled {
@@ -68,8 +197,8 @@ select:disabled {
 
 select option,
 select optgroup {
-  background-color: #0b161c;
-  color: #eafcff;
+  background-color: var(--surface);
+  color: var(--text);
 }
 
 button {

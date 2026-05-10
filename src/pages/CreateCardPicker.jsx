@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 
+// Tier matrix mirrors backend CARD_COSTS (CLAUDE.md: single source of truth).
+// Premium is personal-only; non-personal types only support classic + elite.
 const CARD_TYPES = [
   {
     id: 'personal',
@@ -11,8 +13,8 @@ const CARD_TYPES = [
     accent: '#f0c060',
     tiers: [
       { id: 'classic', label: 'Classic', desc: 'Clean design, no effects', cost: '0 CC' },
-      { id: 'premium', label: 'Premium', desc: 'Music, animations, full effects', cost: '5 CC' },
-      { id: 'elite', label: 'Elite', desc: 'Everything + exclusive envelope styles', cost: '10 CC' },
+      { id: 'premium', label: 'Premium', desc: 'Music, animations, full effects', cost: '25 CC' },
+      { id: 'elite', label: 'Elite', desc: 'Everything + exclusive envelope styles', cost: '35 CC' },
     ],
   },
   {
@@ -23,7 +25,7 @@ const CARD_TYPES = [
     accent: '#60a5fa',
     tiers: [
       { id: 'classic', label: 'Classic', desc: 'Simple question + options', cost: '0 CC' },
-      { id: 'premium', label: 'Premium', desc: 'Styled card with effects', cost: '5 CC' },
+      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '35 CC' },
     ],
   },
   {
@@ -34,7 +36,7 @@ const CARD_TYPES = [
     accent: '#a78bfa',
     tiers: [
       { id: 'classic', label: 'Classic', desc: 'Standard quiz format', cost: '0 CC' },
-      { id: 'premium', label: 'Premium', desc: 'Styled card with animations', cost: '5 CC' },
+      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '50 CC' },
     ],
   },
   {
@@ -45,7 +47,7 @@ const CARD_TYPES = [
     accent: '#f97316',
     tiers: [
       { id: 'classic', label: 'Classic', desc: 'Simple card with chain prompt', cost: '0 CC' },
-      { id: 'premium', label: 'Premium', desc: 'Styled card with animations', cost: '5 CC' },
+      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '40 CC' },
     ],
   },
   {
@@ -56,7 +58,7 @@ const CARD_TYPES = [
     accent: '#7ef7ff',
     tiers: [
       { id: 'classic', label: 'Classic', desc: 'Free to receive, clean template', cost: '0 CC' },
-      { id: 'premium', label: 'Premium', desc: 'Premium template with effects', cost: '5 CC' },
+      { id: 'elite', label: 'Elite', desc: 'Premium template with full effects', cost: '45 CC' },
     ],
   },
 ]
