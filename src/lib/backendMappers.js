@@ -102,6 +102,8 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     referralsCount: user.referralsCount || 0,
     ccIncomeHistory: user.ccIncomeHistory || [],
     isVerified: user.isVerified ?? true,
+    isPremiumActive: !!(couponPayload?.isPremiumActive || user.isPremiumActive),
+    premiumUntil: couponPayload?.premiumUntil || user.premiumUntil || null,
     createdAt: user.createdAt || '',
     avatarColor: extras.avatarColor || 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
     avatarUrl: user.profilePictureUrl || extras.avatarUrl || '',

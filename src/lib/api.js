@@ -180,6 +180,30 @@ export async function getUserCards(query = 'page=1&limit=20') {
   return request(`/usercards?${query}`, { auth: true })
 }
 
+export async function completeFirstTimeUser() {
+  return request('/users/first-time/complete', { method: 'PATCH', auth: true })
+}
+
+export async function equipProfileBackground(backgroundId, blur = false) {
+  return request('/users/equip-profile-background', { method: 'PATCH', auth: true, body: { backgroundId, blur } })
+}
+
+export async function equipChatFrame(frameId) {
+  return request('/users/equip-chat-frame', { method: 'PATCH', auth: true, body: { frameId } })
+}
+
+export async function buyChatFrame(frameId) {
+  return request('/users/buy-chat-frame', { method: 'POST', auth: true, body: { frameId } })
+}
+
+export async function getProfileBackgrounds() {
+  return request('/admin/profile-backgrounds', { auth: true })
+}
+
+export async function getChatFrames() {
+  return request('/admin/chat-frames', { auth: true })
+}
+
 /* ═══════════════════════════════════════════════
    CARDS
    ═══════════════════════════════════════════════ */
@@ -195,6 +219,10 @@ export async function updateCard(payload) {
 export async function deleteCard(payload) {
   const cardId = payload?.cardId || payload?.id
   return request('/delete-card', { method: 'DELETE', auth: true, body: { cardId, id: cardId } })
+}
+
+export async function getCardPrices() {
+  return request('/cards/prices')
 }
 
 export async function getCardBySlug(slug, password) {
@@ -247,6 +275,14 @@ export async function createPaystackCheckout(payload) {
 
 export async function createCouponCheckout(payload) {
   return request('/create-coupon-checkout', { method: 'POST', auth: true, body: payload })
+}
+
+export async function createPremiumCheckout() {
+  return request('/create-premium-checkout', { method: 'POST', auth: true })
+}
+
+export async function giftPremium(username) {
+  return request('/gift-premium', { method: 'POST', auth: true, body: { username } })
 }
 
 /* ═══════════════════════════════════════════════

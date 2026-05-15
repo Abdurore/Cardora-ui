@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -7,8 +7,19 @@ import RewardedAds from '../components/RewardedAds.jsx'
 import { storePacks, storeGifts } from '../data/catalog.js'
 import GiftCard from '../components/GiftCard.jsx'
 import GiftPreviewModal from '../components/GiftPreviewModal.jsx'
+import { buyChatFrame, equipChatFrame, getUserCoupons, getChatFrames } from '../lib/api.js'
 
 const REWARD_TABS = ['earn', 'redeem', 'referral']
+
+// Fallback chat frames if API returns nothing
+const FALLBACK_FRAMES = [
+  { id: 'frame_neon', name: 'Neon Glow', price: 5, preview: '🟣', desc: 'Vibrant neon border for your chat messages' },
+  { id: 'frame_gold', name: 'Royal Gold', price: 8, preview: '🟡', desc: 'Elegant gold frame with shimmer effect' },
+  { id: 'frame_galaxy', name: 'Galaxy', price: 10, preview: '🔮', desc: 'Cosmic gradient with star particles' },
+  { id: 'frame_fire', name: 'Flame', price: 7, preview: '🔥', desc: 'Animated fire border for bold messages' },
+  { id: 'frame_ice', name: 'Arctic Ice', price: 6, preview: '❄️', desc: 'Frosted crystal frame with cool tones' },
+  { id: 'frame_rose', name: 'Rose Garden', price: 5, preview: '🌹', desc: 'Soft pink gradient with petal accents' },
+]
 
 function Store() {
   const {
@@ -39,6 +50,33 @@ function Store() {
   const [isClaiming, setIsClaiming] = useState(false)
   const [isRedeeming, setIsRedeeming] = useState(false)
   const [copiedField, setCopiedField] = useState('')
+  const [cosmeticMsg, setCosmeticMsg] = useState({ text: '', ok: false })
+  const [buyingFrame, setBuyingFrame] = useState(null)
+  const [equippingFrame, setEquippingFrame] = useState(null)
+  const [streakInfo, setStreakInfo] = useState(null)
+  const [chatFrames, setChatFrames] = useState(FALLBACK_FRAMES)
+
+  // Load chat frames from API
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await getChatFrames()
+        const frames = res?.chatFrames || res?.data?.chatFrames || res?.data || (Array.isArray(res) ? res : [])
+        if (!cancelled && Array.isArray(frames) && frames.length > 0) {
+          setChatFrames(frames.map(f => ({
+            id: f.id || f._id,
+            name: f.name || 'Chat Frame',
+            price: f.price || 0,
+            preview: f.url ? '' : '✨',
+            url: f.url || '',
+            desc: f.description || '',
+          })))
+        }
+      } catch { /* use fallback */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const validPacks = (couponPackages || []).filter(p => (p.cc || 0) > 0)
   const packs = validPacks.length ? validPacks : storePacks
@@ -88,6 +126,42 @@ function Store() {
     const result = await claimDailyCoupon()
     setClaimMsg({ text: result.message, ok: result.ok })
     setIsClaiming(false)
+    // Refresh streak info after claim
+    try {
+      const couponData = await getUserCoupons()
+      setStreakInfo({
+        streak: couponData?.dailyClaimStreak ?? 0,
+        reward: couponData?.dailyFreeRewardAmount ?? 1,
+        isPremium: couponData?.isPremiumActive ?? false,
+        premiumUntil: couponData?.premiumUntil ?? null,
+      })
+    } catch { /* silent */ }
+  }
+
+  const handleBuyFrame = async (frameId) => {
+    if (!currentUser) { openAuthModal(); return }
+    setBuyingFrame(frameId)
+    setCosmeticMsg({ text: '', ok: false })
+    try {
+      const res = await buyChatFrame(frameId)
+      setCosmeticMsg({ text: res?.message || 'Frame purchased!', ok: true })
+    } catch (err) {
+      setCosmeticMsg({ text: err?.message || 'Could not buy frame.', ok: false })
+    }
+    setBuyingFrame(null)
+  }
+
+  const handleEquipFrame = async (frameId) => {
+    if (!currentUser) { openAuthModal(); return }
+    setEquippingFrame(frameId)
+    setCosmeticMsg({ text: '', ok: false })
+    try {
+      const res = await equipChatFrame(frameId)
+      setCosmeticMsg({ text: res?.message || 'Frame equipped!', ok: true })
+    } catch (err) {
+      setCosmeticMsg({ text: err?.message || 'Could not equip frame.', ok: false })
+    }
+    setEquippingFrame(null)
   }
 
   const handleRedeem = async () => {
@@ -143,6 +217,13 @@ function Store() {
           </button>
           <button
             type="button"
+            className={`tab ${activeSection === 'cosmetics' ? 'active' : ''}`}
+            onClick={() => setActiveSection('cosmetics')}
+          >
+            ✨ Cosmetics
+          </button>
+          <button
+            type="button"
             className={`tab ${activeSection === 'rewards' ? 'active' : ''}`}
             onClick={() => setActiveSection('rewards')}
           >
@@ -171,6 +252,52 @@ function Store() {
                 onSelect={() => handleSelect(pack)}
               />
             ))}
+          </div>
+        )}
+
+        {activeSection === 'cosmetics' && (
+          <div className="store-cosmetics-section">
+            <div className="store-cosmetics-intro">
+              <h4>Chat Frames</h4>
+              <p>Personalize your chat messages with unique animated frames. Buy with CC and equip from your inventory.</p>
+            </div>
+            {cosmeticMsg.text && (
+              <p className={`store-earn-msg ${cosmeticMsg.ok ? 'success' : 'error'}`}>{cosmeticMsg.text}</p>
+            )}
+            <div className="store-cosmetics-grid">
+              {chatFrames.map(frame => (
+                <div key={frame.id} className="store-frame-card">
+                  <div className="store-frame-preview">
+                    {frame.url
+                      ? <img src={frame.url} alt={frame.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+                      : frame.preview}
+                  </div>
+                  <div className="store-frame-info">
+                    <strong>{frame.name}</strong>
+                    <p>{frame.desc}</p>
+                    <span className="store-frame-price">{frame.price} CC</span>
+                  </div>
+                  <div className="store-frame-actions">
+                    <button
+                      type="button"
+                      className="primary store-frame-buy"
+                      onClick={() => handleBuyFrame(frame.id)}
+                      disabled={buyingFrame === frame.id}
+                    >
+                      {buyingFrame === frame.id ? '...' : 'Buy'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost store-frame-equip"
+                      onClick={() => handleEquipFrame(frame.id)}
+                      disabled={equippingFrame === frame.id}
+                    >
+                      {equippingFrame === frame.id ? '...' : 'Equip'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -211,7 +338,13 @@ function Store() {
                   </div>
                   <div className="store-earn-info">
                     <h4>Daily Free Coupon</h4>
-                    <p>Claim one free coupon every day just for being active.</p>
+                    <p>Claim {streakInfo?.isPremium ? '2 CC' : '1 CC'} every day. {streakInfo?.isPremium ? '(Premium bonus!)' : 'Premium users earn 2×!'}</p>
+                    {streakInfo && streakInfo.streak > 0 && (
+                      <div className="store-streak-badge">
+                        <span className="store-streak-fire">🔥</span>
+                        <span>{streakInfo.streak}-day streak</span>
+                      </div>
+                    )}
                     {claimMsg.text && (
                       <p className={`store-earn-msg ${claimMsg.ok ? 'success' : 'error'}`}>{claimMsg.text}</p>
                     )}

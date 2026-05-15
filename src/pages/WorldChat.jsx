@@ -441,16 +441,32 @@ function WorldChat() {
               const followers = num(p.followersCount ?? p.followers)
               const following = num(p.followingCount ?? p.following)
               const isVerified = !!(p.isVerified || p.verified)
+              const isPremium = !!(p.isPremiumActive || p.premium || p.isPremium)
               const status = p.status || p.customStatus || null
               const fullName = p.fullName || p.displayName || p.name || null
               const location = p.location || p.country || p.city || null
               const userIdShort = String(p.id || p._id || profileCard.userId || '').slice(-8)
+              const profileBgUrl = p.profileBackground?.url || p.equippedBackground?.url || p.profileBackgroundUrl || p.backgroundUrl || p.background?.url || null
+              const profileBgBlur = p.profileBackground?.blur || p.equippedBackground?.blur || false
               const hasAnyDetail = !!(bio || joined || cardsSent !== null || followers !== null || following !== null || referrals !== null || location || fullName)
 
               return (
                 <>
+                  {/* Profile Background Banner */}
+                  {profileBgUrl && (
+                    <div className="chat-profile-bg-banner">
+                      <img
+                        src={profileBgUrl}
+                        alt=""
+                        className="chat-profile-bg-img"
+                        style={profileBgBlur ? { filter: 'blur(6px)', transform: 'scale(1.1)' } : undefined}
+                      />
+                      <div className="chat-profile-bg-fade" />
+                    </div>
+                  )}
+
                   {/* Avatar + identity */}
-                  <div className="chat-profile-header">
+                  <div className={`chat-profile-header${profileBgUrl ? ' chat-profile-header--with-bg' : ''}`}>
                     <div className="chat-profile-avatar-wrap">
                       {displayAvatarUrl
                         ? <img src={displayAvatarUrl} alt="" className="chat-profile-avatar" />
@@ -464,6 +480,11 @@ function WorldChat() {
                         <span className={`profile-role-badge ${roleBadgeClass(role)}`}>
                           {roleIcon(role)} {role}
                         </span>
+                        {(isPremium) && (
+                          <span className="profile-role-badge profile-premium-badge">
+                            ⭐ Premium
+                          </span>
+                        )}
                         {status && <span className="chat-profile-status-pill">{status}</span>}
                       </div>
                     </div>

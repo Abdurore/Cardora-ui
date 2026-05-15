@@ -12,7 +12,7 @@ import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
-import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics, getMyTemplates } from '../lib/api.js'
+import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
@@ -77,6 +77,16 @@ function Profile() {
   const [loadingCardAnalytics, setLoadingCardAnalytics] = useState({}) // keyed by slug
   const [shareTarget, setShareTarget] = useState(null) // { url, title } | null
   const [myTemplates, setMyTemplates] = useState(null) // null = not loaded yet
+
+  // Premium state
+  const [premiumLoading, setPremiumLoading] = useState(false)
+  const [premiumMsg, setPremiumMsg] = useState({ text: '', ok: false })
+  const [giftUsername, setGiftUsername] = useState('')
+  const [giftLoading, setGiftLoading] = useState(false)
+  const [giftMsg, setGiftMsg] = useState({ text: '', ok: false })
+  const [profileBgs, setProfileBgs] = useState([]) // admin-uploaded backgrounds
+  const [equippingBg, setEquippingBg] = useState(null)
+  const [bgMsg, setBgMsg] = useState({ text: '', ok: false })
 
   const fetchCardAnalytics = async (slug) => {
     if (!slug || cardAnalytics[slug] !== undefined) return
@@ -157,6 +167,32 @@ function Profile() {
     })()
     return () => { cancelled = true }
   }, [currentUser])
+
+  // Load profile backgrounds for premium users
+  useEffect(() => {
+    if (!currentUser?.isPremiumActive) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await getProfileBackgrounds()
+        const bgs = res?.backgrounds || res?.data?.backgrounds || res?.data || (Array.isArray(res) ? res : [])
+        if (!cancelled && Array.isArray(bgs)) setProfileBgs(bgs)
+      } catch { /* silent */ }
+    })()
+    return () => { cancelled = true }
+  }, [currentUser?.isPremiumActive])
+
+  const handleEquipBackground = async (bgId) => {
+    setEquippingBg(bgId)
+    setBgMsg({ text: '', ok: false })
+    try {
+      const res = await equipProfileBackground(bgId)
+      setBgMsg({ text: res?.message || 'Background equipped!', ok: true })
+    } catch (err) {
+      setBgMsg({ text: err?.message || 'Could not equip background.', ok: false })
+    }
+    setEquippingBg(null)
+  }
 
   const handleSaveProfile = async () => {
     if (!editForm.name.trim()) {
@@ -245,6 +281,38 @@ function Profile() {
     if (result.ok) setShowArtistForm(false)
   }
 
+  const handlePremiumCheckout = async () => {
+    if (!currentUser) { openAuthModal(); return }
+    setPremiumLoading(true)
+    setPremiumMsg({ text: '', ok: false })
+    try {
+      const res = await createPremiumCheckout()
+      if (res?.authorization_url || res?.data?.authorization_url) {
+        window.location.href = res.authorization_url || res.data.authorization_url
+      } else {
+        setPremiumMsg({ text: res?.message || 'Premium activated!', ok: true })
+      }
+    } catch (err) {
+      setPremiumMsg({ text: err?.message || 'Could not start premium checkout.', ok: false })
+    }
+    setPremiumLoading(false)
+  }
+
+  const handleGiftPremium = async () => {
+    if (!currentUser) { openAuthModal(); return }
+    if (!giftUsername.trim()) { setGiftMsg({ text: 'Enter a username.', ok: false }); return }
+    setGiftLoading(true)
+    setGiftMsg({ text: '', ok: false })
+    try {
+      const res = await giftPremium(giftUsername.trim())
+      setGiftMsg({ text: res?.message || 'Premium gifted successfully!', ok: true })
+      setGiftUsername('')
+    } catch (err) {
+      setGiftMsg({ text: err?.message || 'Could not gift premium.', ok: false })
+    }
+    setGiftLoading(false)
+  }
+
   return (
     <div className="page-body">
       <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
@@ -292,6 +360,12 @@ function Profile() {
             <span className="role-icon">{roleInfo.icon}</span>
             <span className="role-name">{roleName}</span>
           </div>
+          {currentUser?.isPremiumActive && (
+            <div className="profile-role-badge profile-premium-badge">
+              <span className="role-icon">⭐</span>
+              <span className="role-name">Premium</span>
+            </div>
+          )}
           <p className="profile-role-desc">{roleInfo.desc}</p>
 
           {/* Bio */}
@@ -418,6 +492,94 @@ function Profile() {
         {!currentUser ? (
           <p className="empty-state">Sign in to personalize your profile.</p>
         ) : null}
+
+        {/* ═══ Premium Membership ═══ */}
+        {currentUser && (
+          <div className="profile-premium-section">
+            <div className="profile-premium-card">
+              <div className="profile-premium-header">
+                <span className="profile-premium-star">⭐</span>
+                <div>
+                  <h4 className="profile-premium-title">Cardora Premium</h4>
+                  <p className="profile-premium-sub">₦500 / 30 days — double daily CC, exclusive profile backgrounds, streak tracking, and more.</p>
+                </div>
+              </div>
+
+              <div className="profile-premium-perks-row">
+                <span className="profile-premium-perk-chip">💎 2× Daily CC</span>
+                <span className="profile-premium-perk-chip">🖼 Backgrounds</span>
+                <span className="profile-premium-perk-chip">🔥 Streaks</span>
+                <span className="profile-premium-perk-chip">🎁 Gift Premium</span>
+              </div>
+
+              {premiumMsg.text && (
+                <p className={`store-earn-msg ${premiumMsg.ok ? 'success' : 'error'}`}>{premiumMsg.text}</p>
+              )}
+
+              <button
+                type="button"
+                className="primary profile-premium-btn"
+                onClick={handlePremiumCheckout}
+                disabled={premiumLoading}
+              >
+                {premiumLoading ? 'Processing...' : 'Subscribe Now'}
+              </button>
+            </div>
+
+            {/* Gift Premium */}
+            <div className="profile-premium-gift">
+              <p className="profile-premium-gift-label">🎁 Gift 7 days of Premium to a friend</p>
+              <div className="profile-premium-gift-row">
+                <input
+                  type="text"
+                  value={giftUsername}
+                  onChange={e => setGiftUsername(e.target.value)}
+                  placeholder="Friend's username"
+                  onKeyDown={e => { if (e.key === 'Enter') handleGiftPremium() }}
+                />
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={handleGiftPremium}
+                  disabled={giftLoading}
+                >
+                  {giftLoading ? '...' : 'Send'}
+                </button>
+              </div>
+              {giftMsg.text && (
+                <p className={`store-earn-msg ${giftMsg.ok ? 'success' : 'error'}`}>{giftMsg.text}</p>
+              )}
+            </div>
+
+            {/* Profile Backgrounds — premium only */}
+            {currentUser?.isPremiumActive && profileBgs.length > 0 && (
+              <div className="profile-premium-backgrounds">
+                <h4>Profile Backgrounds</h4>
+                <p className="profile-premium-bg-hint">Choose a background for your profile. Premium exclusive.</p>
+                {bgMsg.text && (
+                  <p className={`store-earn-msg ${bgMsg.ok ? 'success' : 'error'}`}>{bgMsg.text}</p>
+                )}
+                <div className="profile-bg-grid">
+                  {profileBgs.map(bg => (
+                    <button
+                      key={bg.id || bg._id}
+                      type="button"
+                      className="profile-bg-card"
+                      onClick={() => handleEquipBackground(bg.id || bg._id)}
+                      disabled={equippingBg === (bg.id || bg._id)}
+                      title={bg.name || 'Background'}
+                    >
+                      <img src={bg.url} alt={bg.name || ''} className="profile-bg-img" />
+                      <span className="profile-bg-name">
+                        {equippingBg === (bg.id || bg._id) ? 'Equipping...' : (bg.name || 'Unnamed')}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Currency preference */}
         {currentUser && (

@@ -1,8 +1,16 @@
 Cardora Backend API Handbook (Frontend + AI Integration)
 =========================================================
 
-Latest Updates (May 4, 2026)
+Latest Updates (May 6, 2026)
 ----------------------------
+- Card read reliability improved:
+  - `GET /cards/:slug` now performs a safer slug match (decoded + trim + case-insensitive fallback)
+  - view increments now target card `id` to avoid slug mismatch edge cases
+- New card pricing endpoint:
+  - `GET /cards/prices` returns all card types with tier pricing from backend source-of-truth
+- New first-time-user flow:
+  - users now include `isFirstTimeUser` (default `true` on signup)
+  - `PATCH /users/first-time/complete` sets `isFirstTimeUser` to `false` (auth required)
 - Validation behavior updated:
   - unknown request fields are now stripped globally (`stripUnknown: true`)
   - card `layoutdata` is now optional and accepts any object shape
@@ -20,6 +28,28 @@ Latest Updates (May 4, 2026)
   - rewarded CC from ads is tracked in aggregate + daily metrics
   - `/admin/ads/global-stats` now includes daily totals and per-ad performance
   - `/admin/ads/analytics` now returns aggregate + daily rows
+
+Latest Updates (May 10, 2026)
+-----------------------------
+- Premium membership and rewards:
+  - `POST /create-premium-checkout` added (Paystack checkout for premium)
+  - premium price is `500 NGN`, duration is `30 days`
+  - premium activation/extension handled in webhook using `purchaseType: premium_subscription`
+- Daily free claim improvements:
+  - premium users now get `2 CC` daily (non-premium remains `1 CC`)
+  - streak system added via `dailyClaimStreak` (consecutive daily claims)
+- Premium gifting:
+  - `POST /gift-premium` lets premium users gift one friend `7 days` premium
+  - gifting is one-time per sender
+- Profile backgrounds:
+  - admin endpoints to add/delete profile backgrounds
+  - premium users can equip exactly one profile background
+  - equip endpoint supports `blur` boolean
+- Chat frames:
+  - admin endpoints to add/delete chat frames (`name`, `id`, `url`, `price`)
+  - moderators can request new chat frames
+  - admin must approve moderator chat frame requests
+  - users can buy chat frames with CC and equip one owned frame at a time
 
 Purpose
 -------
@@ -206,6 +236,7 @@ Returns bonus availability snapshot.
 GET /current-user (auth)
 ------------------------
 Core profile + balance + analytics-friendly fields.
+Includes `isFirstTimeUser` (defaults to `true` if missing in legacy records).
 
 PUT /update-profile (auth)
 --------------------------
@@ -231,6 +262,45 @@ Query: `page`, `limit`
 GET /users/:identifier/profile (auth)
 -------------------------------------
 Minimal profile for other users by `id` or `username`.
+
+PATCH /users/first-time/complete (auth)
+---------------------------------------
+Marks onboarding completion for the current user:
+- sets `isFirstTimeUser` to `false`
+
+PATCH /users/equip-profile-background (auth)
+--------------------------------------------
+Premium-only endpoint to equip one profile background.
+
+Body:
+```json
+{
+  "backgroundId": "bg_gold_01",
+  "blur": true
+}
+```
+
+PATCH /users/equip-chat-frame (auth)
+------------------------------------
+Equip one owned chat frame.
+
+Body:
+```json
+{
+  "frameId": "frame_fire_01"
+}
+```
+
+POST /users/buy-chat-frame (auth)
+---------------------------------
+Buy a chat frame using CC.
+
+Body:
+```json
+{
+  "frameId": "frame_fire_01"
+}
+```
 
 
 ================================================================
@@ -959,9 +1029,20 @@ Forced type+tier routes:
 
 Read/Update/Delete
 ------------------
+- `GET /cards/prices`
 - `GET /cards/:slug`
 - `PUT /update-card` (auth)
 - `DELETE /delete-card` (auth)
+
+Card Pricing Endpoint
+---------------------
+`GET /cards/prices` returns backend pricing by card type and tier.
+Current values:
+- personal: classic `0`, premium `25`, elite `35`
+- poll: classic `0`, elite `35`
+- chain: classic `0`, elite `40`
+- trivia: classic `0`, elite `50`
+- anonymous: classic `0`, elite `45`
 
 Update-card supports partial patching of:
 - `config`
@@ -1149,6 +1230,44 @@ User Coupon Endpoints
 - `GET /user/coupons` (auth)
 - `POST /redeem-code` (auth)
 - `POST /create-paystack-checkout` (auth)
+- `POST /create-premium-checkout` (auth)
+- `POST /gift-premium` (auth)
+
+Premium Checkout
+----------------
+`POST /create-premium-checkout`
+- Initializes Paystack checkout for premium purchase.
+- Price: `500 NGN`
+- Duration: `30 days`
+
+Premium Gift
+------------
+`POST /gift-premium`
+
+Body:
+```json
+{
+  "username": "friend_username"
+}
+```
+
+Rules:
+- Sender must have active premium.
+- Sender can gift only once.
+- Recipient receives `7 days` premium (extends existing premium if active).
+
+Daily Free Claim Notes
+----------------------
+- `POST /claim-daily-free-coupon` now awards:
+  - `2 CC` for premium users
+  - `1 CC` for non-premium users
+- Streak tracking is now included:
+  - `dailyClaimStreak` increments for consecutive daily claims
+- `GET /user/coupons` now includes premium/streak fields:
+  - `dailyClaimStreak`
+  - `dailyFreeRewardAmount`
+  - `premiumUntil`
+  - `isPremiumActive`
 
 Admin Redeem Code Endpoints
 ---------------------------
@@ -1224,10 +1343,16 @@ Admin-only
 - `GET /admin/moderator-action-logs`
 - broadcaster direct send endpoint
 - broadcast request approval endpoint
+- `POST /admin/profile-backgrounds`
+- `DELETE /admin/profile-backgrounds/:backgroundId`
+- `POST /admin/chat-frames`
+- `DELETE /admin/chat-frames/:frameId`
+- `POST /admin/chat-frame-requests/:requestId/approve`
 
 Moderator-only
 --------------
 - `POST /admin/broadcast-requests` (request email broadcast for admin approval)
+- `POST /admin/chat-frame-requests` (request chat frame creation; admin approval required)
 
 
 ================================================================
@@ -1251,6 +1376,47 @@ Moderator -> Admin Approval Broadcast
    - `POST /admin/broadcast-requests`
 2) Admin approves and sends:
    - `POST /admin/broadcast-requests/:requestId/approve`
+
+Profile Background Management
+-----------------------------
+Create profile background (admin):
+`POST /admin/profile-backgrounds`
+
+Body:
+```json
+{
+  "id": "bg_gold_01",
+  "name": "Golden Aura",
+  "url": "https://cdn.example.com/backgrounds/golden-aura.png"
+}
+```
+
+Delete profile background (admin):
+`DELETE /admin/profile-backgrounds/:backgroundId`
+
+Chat Frame Management + Request Flow
+------------------------------------
+Create chat frame (admin):
+`POST /admin/chat-frames`
+
+Body:
+```json
+{
+  "id": "frame_fire_01",
+  "name": "Fire Edge",
+  "url": "https://cdn.example.com/frames/fire-edge.png",
+  "price": 50
+}
+```
+
+Delete chat frame (admin):
+`DELETE /admin/chat-frames/:frameId`
+
+Moderator/admin request chat frame:
+`POST /admin/chat-frame-requests`
+
+Approve request (admin):
+`POST /admin/chat-frame-requests/:requestId/approve`
 
 
 ================================================================
@@ -1378,8 +1544,11 @@ Optional:
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_SECURE`
+- `EMAIL_FROM` (recommended, e.g. `Cardora <noreply@cardora.studio>`)
+- `EMAIL_REPLY_TO` (recommended, e.g. `support@cardora.studio`)
 - `PAYSTACK_SECRET_KEY`
 - `PAYSTACK_CALLBACK_URL`
+- `PAYSTACK_PREMIUM_PLAN_CODE` (required for premium subscription checkout)
 
 
 ================================================================

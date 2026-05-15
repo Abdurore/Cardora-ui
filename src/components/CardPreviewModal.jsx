@@ -61,10 +61,17 @@ function CardPreviewModal({
   const limit = (key, fallback = true) => (tierLimits ? !!tierLimits[key] : fallback)
   const maxImages = tierLimits ? (tierLimits.maxImages ?? Infinity) : Infinity
   const envelopeEnabled = shouldShowEnvelope(studioType)
-  const [stage, setStage] = useState(pageMode ? 'entry' : (envelopeEnabled ? 'closed' : 'open'))
+  // Non-personal cards skip the entry screen entirely in pageMode.
+  // Recipients of poll/chain/trivia/anonymous cards see content immediately.
+  const isPersonalType = studioType === 'personal'
+  const [stage, setStage] = useState(
+    pageMode
+      ? (isPersonalType ? 'entry' : 'open')
+      : (envelopeEnabled ? 'closed' : 'open')
+  )
   const [questionIdx, setQuestionIdx] = useState(0)
-  const [fadeBody, setFadeBody] = useState(!envelopeEnabled)
-  const [bodyVisible, setBodyVisible] = useState(!envelopeEnabled)
+  const [fadeBody, setFadeBody] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
+  const [bodyVisible, setBodyVisible] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
   const [revealStep, setRevealStep] = useState(0)
   const audioRef = useRef(null)
   const containerRef = useRef(null)
@@ -687,8 +694,8 @@ function CardPreviewModal({
         </div>
       )}
 
-      {/* CINEMATIC ENTRY SCREEN — shown first in pageMode before the card opens */}
-      {stage === 'entry' && (() => {
+      {/* CINEMATIC ENTRY SCREEN — shown first in pageMode for PERSONAL cards only */}
+      {stage === 'entry' && isPersonalType && (() => {
         const entryMeta = ENTRY_DEFAULTS[studioType] || ENTRY_DEFAULTS.personal
         const EntryIcon = entryMeta.Icon
         const bg = c.card.backgroundColor || '#0b0f14'
