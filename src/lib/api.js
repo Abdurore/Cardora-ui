@@ -200,6 +200,14 @@ export async function getProfileBackgrounds() {
   return request('/admin/profile-backgrounds', { auth: true })
 }
 
+export async function createProfileBackground(payload) {
+  return request('/admin/profile-backgrounds', { method: 'POST', auth: true, body: payload })
+}
+
+export async function deleteProfileBackground(backgroundId) {
+  return request(`/admin/profile-backgrounds/${encodeURIComponent(backgroundId)}`, { method: 'DELETE', auth: true })
+}
+
 export async function getChatFrames() {
   return request('/admin/chat-frames', { auth: true })
 }

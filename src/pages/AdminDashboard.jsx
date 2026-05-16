@@ -46,6 +46,9 @@ import {
   uploadMediaMusic,
   updateMediaMusic,
   deleteMediaMusic,
+  getProfileBackgrounds,
+  createProfileBackground,
+  deleteProfileBackground,
   getAdminTemplates,
   getTemplates,
   approveTemplate,
@@ -213,6 +216,7 @@ function AdminDashboard() {
   const [referralStats, setReferralStats] = useState(null)
   const [mediaVideos, setMediaVideos] = useState([])
   const [mediaMusic, setMediaMusic] = useState([])
+  const [profileBackgrounds, setProfileBackgrounds] = useState([])
   const [allTemplates, setAllTemplates] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -230,14 +234,17 @@ function AdminDashboard() {
   // Media library forms
   const [newVideo, setNewVideo] = useState({ name: '', url: '' })
   const [newTrack, setNewTrack] = useState({ name: '', url: '' })
+  const [newProfileBg, setNewProfileBg] = useState({ name: '', url: '' })
   const [mediaVideoUploading, setMediaVideoUploading] = useState(false)
   const [mediaMusicUploading, setMediaMusicUploading] = useState(false)
+  const [profileBgUploading, setProfileBgUploading] = useState(false)
   // Just-uploaded music clip awaiting trim + save. Holds the Cloudinary URL
   // and a default name; backend POST happens once when the admin clicks Save
   // in the trim editor — no two-step "upload then save" dance.
   const [musicDraft, setMusicDraft] = useState(null) // { url, name } | null
   const mediaVideoInputRef = useRef(null)
   const mediaMusicInputRef = useRef(null)
+  const profileBgInputRef = useRef(null)
   // Ban form
   const [banForm, setBanForm] = useState({ identifier: '', durationDays: 7, reason: '' })
   const [banConfirm, setBanConfirm] = useState(null) // { user, payload } | null
@@ -396,7 +403,7 @@ function AdminDashboard() {
           break
         }
         case 'Media': {
-          const [videosRes, musicRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic()])
+          const [videosRes, musicRes, profileBgRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic(), getProfileBackgrounds()])
           if (videosRes.status === 'fulfilled') {
             setMediaVideos(pickList(videosRes.value, 'videos', 'items', 'media') || [])
           } else {
@@ -409,6 +416,12 @@ function AdminDashboard() {
           } else {
             console.warn('[Admin] /media/music failed', musicRes.reason)
             setMediaMusic([])
+          }
+          if (profileBgRes.status === 'fulfilled') {
+            setProfileBackgrounds(pickList(profileBgRes.value, 'backgrounds', 'items', 'media') || [])
+          } else {
+            console.warn('[Admin] /admin/profile-backgrounds failed', profileBgRes.reason)
+            setProfileBackgrounds([])
           }
           break
         }
@@ -710,7 +723,7 @@ const handleBroadcast = async () => {
 
   const refreshMediaSilent = async () => {
     try {
-      const [videosRes, musicRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic()])
+      const [videosRes, musicRes, profileBgRes] = await Promise.allSettled([getMediaVideos(), getMediaMusic(), getProfileBackgrounds()])
       if (videosRes.status === 'fulfilled') {
         const list = pickList(videosRes.value, 'videos', 'items', 'media')
         if (list !== null) setMediaVideos(list)
@@ -722,6 +735,12 @@ const handleBroadcast = async () => {
         if (list !== null) setMediaMusic(mergeTrimData(list))
       } else {
         console.warn('[Admin] getMediaMusic failed', musicRes.reason)
+      }
+      if (profileBgRes.status === 'fulfilled') {
+        const list = pickList(profileBgRes.value, 'backgrounds', 'items', 'media')
+        if (list !== null) setProfileBackgrounds(list)
+      } else {
+        console.warn('[Admin] getProfileBackgrounds failed', profileBgRes.reason)
       }
     } catch (err) {
       console.error('[Admin] refreshMediaSilent failed', err)
@@ -750,6 +769,66 @@ const handleBroadcast = async () => {
       await deleteMediaVideo(nameKey)
       setMediaVideos(prev => prev.filter(v => (v._id || v.id) !== (video._id || video.id)))
       showMsg('Video deleted.')
+      refreshMediaSilent()
+    } catch (err) {
+      showMsg(err.message || 'Delete failed.', false)
+    }
+  }
+
+  const handleProfileBgFile = async (file) => {
+    if (!file) { showMsg('No file selected.', false); return }
+    if (!file.type.startsWith('image/')) {
+      showMsg(`Please select an image file. Got "${file.type || 'unknown'}".`, false)
+      return
+    }
+    setProfileBgUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'image')
+      const fallbackName = file.name.replace(/\.[^.]+$/, '').slice(0, 80)
+      const finalName = (newProfileBg.name || '').trim() || fallbackName
+      const id = `bg_${Date.now()}_${finalName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'profile'}`
+      try {
+        await createProfileBackground({ id, name: finalName, url })
+        showMsg('Profile background added!')
+        setNewProfileBg({ name: '', url: '' })
+        if (profileBgInputRef.current) profileBgInputRef.current.value = ''
+        await refreshMediaSilent()
+      } catch (postErr) {
+        console.error('[Admin] createProfileBackground POST failed', postErr)
+        setNewProfileBg({ name: finalName, url })
+        showMsg(`Save failed (image uploaded): ${postErr.message || 'unknown error'}`, false)
+      }
+    } catch (err) {
+      console.error('[Admin] Cloudinary profile background upload failed', err)
+      showMsg(`Upload failed: ${err.message || 'unknown error'}`, false)
+    } finally {
+      setProfileBgUploading(false)
+    }
+  }
+
+  const handleAddProfileBg = async () => {
+    if (!newProfileBg.name || !newProfileBg.url) { showMsg('Name and image required.', false); return }
+    try {
+      const id = `bg_${Date.now()}_${newProfileBg.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'profile'}`
+      await createProfileBackground({ id, name: newProfileBg.name, url: newProfileBg.url })
+      showMsg('Profile background added!')
+      setNewProfileBg({ name: '', url: '' })
+      if (profileBgInputRef.current) profileBgInputRef.current.value = ''
+      refreshMediaSilent()
+    } catch (err) {
+      console.error('[Admin] createProfileBackground failed', err)
+      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
+    }
+  }
+
+  const handleDeleteProfileBg = async (bg) => {
+    const bgId = bg.id || bg._id
+    if (!bgId) return
+    if (!await appConfirm('Delete Profile Background', 'Delete this premium background? This cannot be undone.', { variant: 'danger', confirmLabel: 'Delete' })) return
+    try {
+      await deleteProfileBackground(bgId)
+      setProfileBackgrounds(prev => prev.filter(item => (item.id || item._id) !== bgId))
+      showMsg('Profile background deleted.')
       refreshMediaSilent()
     } catch (err) {
       showMsg(err.message || 'Delete failed.', false)
@@ -1673,6 +1752,89 @@ const handleBroadcast = async () => {
           <div className="admin-section">
             <h3 className="admin-section-title">Media Library</h3>
             <p className="admin-section-note">Upload videos and music that users can pick inside Card Studio backgrounds.</p>
+
+            {/* Profile Backgrounds */}
+            <div className="admin-media-block">
+              <div className="admin-media-block-header">
+                <span className="admin-media-block-icon">🖼</span>
+                <div>
+                  <h4 className="admin-media-block-title">Premium Profile Backgrounds</h4>
+                  <p className="admin-media-block-desc">Images premium users can apply to their profile and WorldChat profile modal.</p>
+                </div>
+              </div>
+
+              <div className="admin-media-add-form">
+                <input
+                  ref={profileBgInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={e => handleProfileBgFile(e.target.files?.[0])}
+                />
+                <div className="admin-media-add-row">
+                  <label className="admin-field admin-media-title-field">
+                    <span>Background Name <small>(optional — defaults to filename)</small></span>
+                    <input
+                      placeholder="e.g. Neon Bloom"
+                      value={newProfileBg.name}
+                      onChange={e => setNewProfileBg(p => ({ ...p, name: e.target.value }))}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={`admin-media-file-btn${newProfileBg.url ? ' ready' : ''}${profileBgUploading ? ' uploading' : ''}`}
+                    onClick={() => !profileBgUploading && profileBgInputRef.current?.click()}
+                    disabled={profileBgUploading}
+                  >
+                    {profileBgUploading ? (
+                      <><span className="admin-media-file-spinner" />Uploading…</>
+                    ) : newProfileBg.url ? (
+                      <><span>✓</span> Replace image</>
+                    ) : (
+                      <><span className="admin-media-file-icon">↑</span> Upload &amp; save</>
+                    )}
+                  </button>
+                  {newProfileBg.url && (
+                    <button
+                      className="primary admin-media-add-btn"
+                      type="button"
+                      onClick={handleAddProfileBg}
+                      disabled={profileBgUploading || !newProfileBg.name.trim()}
+                      title="Retry saving the previous upload"
+                    >
+                      Retry save
+                    </button>
+                  )}
+                </div>
+                <p className="admin-media-hint">Images save to the premium background library automatically once uploaded.</p>
+              </div>
+
+              {profileBackgrounds.length > 0 ? (
+                <div className="admin-profile-bg-grid">
+                  {profileBackgrounds.map(bg => (
+                    <div key={bg._id || bg.id || bg.url} className="admin-profile-bg-card">
+                      <img src={bg.url} alt={bg.name || ''} className="admin-profile-bg-thumb" />
+                      <div className="admin-media-video-footer">
+                        <span className="admin-media-video-title">{bg.name || bg.title || 'Untitled'}</span>
+                        <button
+                          type="button"
+                          className="admin-media-delete-btn"
+                          onClick={() => handleDeleteProfileBg(bg)}
+                          aria-label="Delete"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="admin-media-empty">
+                  <span>🖼</span>
+                  <p>No profile backgrounds yet. Add the first one above.</p>
+                </div>
+              )}
+            </div>
 
             {/* ── Background Videos ── */}
             <div className="admin-media-block">

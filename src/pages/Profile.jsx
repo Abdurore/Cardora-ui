@@ -89,6 +89,9 @@ function Profile() {
   const [profileBgs, setProfileBgs] = useState([]) // admin-uploaded backgrounds
   const [equippingBg, setEquippingBg] = useState(null)
   const [bgMsg, setBgMsg] = useState({ text: '', ok: false })
+  const profileBgUrl = currentUser?.profileBackground?.url || currentUser?.equippedBackground?.url || currentUser?.profileBackgroundUrl || currentUser?.backgroundUrl || ''
+  const profileBgBlur = currentUser?.profileBackground?.blur || currentUser?.equippedBackground?.blur || false
+  const equippedBgId = currentUser?.profileBackground?.id || currentUser?.profileBackground?._id || currentUser?.equippedBackground?.id || currentUser?.equippedBackground?._id || ''
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -220,6 +223,7 @@ function Profile() {
     try {
       const res = await equipProfileBackground(bgId)
       setBgMsg({ text: res?.message || 'Background equipped!', ok: true })
+      await refreshBalance?.()
     } catch (err) {
       setBgMsg({ text: err?.message || 'Could not equip background.', ok: false })
     }
@@ -356,7 +360,18 @@ function Profile() {
       <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
       <div className="screen-body">
         {/* Profile Card */}
-        <div className="profile profile-enhanced">
+        <div className={`profile profile-enhanced${profileBgUrl ? ' profile-enhanced--with-bg' : ''}`}>
+          {profileBgUrl && (
+            <>
+              <img
+                className="profile-enhanced-bg"
+                src={profileBgUrl}
+                alt=""
+                style={profileBgBlur ? { filter: 'blur(6px)', transform: 'scale(1.06)' } : undefined}
+              />
+              <div className="profile-enhanced-bg-fade" />
+            </>
+          )}
           <button
             className={`avatar upload-avatar${isUploadingAvatar ? ' uploading' : ''}`}
             type="button"
@@ -554,17 +569,29 @@ function Profile() {
                 <p className={`store-earn-msg ${premiumMsg.ok ? 'success' : 'error'}`}>{premiumMsg.text}</p>
               )}
 
-              <button
-                type="button"
-                className="primary profile-premium-btn"
-                onClick={handlePremiumCheckout}
-                disabled={premiumLoading}
-              >
-                {premiumLoading ? 'Processing...' : 'Subscribe Now'}
-              </button>
+              {currentUser?.isPremiumActive ? (
+                <div className="profile-premium-active-panel">
+                  <span className="profile-premium-active-pill">Premium active</span>
+                  <p>
+                    {currentUser?.premiumUntil
+                      ? `Renews or expires on ${new Date(currentUser.premiumUntil).toLocaleDateString()}.`
+                      : 'Your premium perks are enabled.'}
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="primary profile-premium-btn"
+                  onClick={handlePremiumCheckout}
+                  disabled={premiumLoading}
+                >
+                  {premiumLoading ? 'Processing...' : 'Subscribe Now'}
+                </button>
+              )}
             </div>
 
             {/* Gift Premium */}
+            {currentUser?.isPremiumActive && (
             <div className="profile-premium-gift">
               <p className="profile-premium-gift-label">🎁 Gift 7 days of Premium to a friend</p>
               <div className="profile-premium-gift-row">
@@ -588,32 +615,43 @@ function Profile() {
                 <p className={`store-earn-msg ${giftMsg.ok ? 'success' : 'error'}`}>{giftMsg.text}</p>
               )}
             </div>
+            )}
 
             {/* Profile Backgrounds — premium only */}
-            {currentUser?.isPremiumActive && profileBgs.length > 0 && (
+            {currentUser?.isPremiumActive && (
               <div className="profile-premium-backgrounds">
                 <h4>Profile Backgrounds</h4>
-                <p className="profile-premium-bg-hint">Choose a background for your profile. Premium exclusive.</p>
+                <p className="profile-premium-bg-hint">
+                  Choose a background for your profile and WorldChat profile modal.
+                </p>
                 {bgMsg.text && (
                   <p className={`store-earn-msg ${bgMsg.ok ? 'success' : 'error'}`}>{bgMsg.text}</p>
                 )}
-                <div className="profile-bg-grid">
-                  {profileBgs.map(bg => (
-                    <button
-                      key={bg.id || bg._id}
-                      type="button"
-                      className="profile-bg-card"
-                      onClick={() => handleEquipBackground(bg.id || bg._id)}
-                      disabled={equippingBg === (bg.id || bg._id)}
-                      title={bg.name || 'Background'}
-                    >
-                      <img src={bg.url} alt={bg.name || ''} className="profile-bg-img" />
-                      <span className="profile-bg-name">
-                        {equippingBg === (bg.id || bg._id) ? 'Equipping...' : (bg.name || 'Unnamed')}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                {profileBgs.length > 0 ? (
+                  <div className="profile-bg-grid">
+                    {profileBgs.map(bg => {
+                      const bgId = bg.id || bg._id
+                      const isActive = bgId && String(bgId) === String(equippedBgId)
+                      return (
+                        <button
+                          key={bgId || bg.url}
+                          type="button"
+                          className={`profile-bg-card${isActive ? ' active' : ''}`}
+                          onClick={() => handleEquipBackground(bgId)}
+                          disabled={equippingBg === bgId}
+                          title={bg.name || 'Background'}
+                        >
+                          <img src={bg.url} alt={bg.name || ''} className="profile-bg-img" />
+                          <span className="profile-bg-name">
+                            {equippingBg === bgId ? 'Equipping...' : isActive ? 'Selected' : (bg.name || 'Unnamed')}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="profile-premium-bg-empty">No premium backgrounds have been added yet.</p>
+                )}
               </div>
             )}
           </div>
