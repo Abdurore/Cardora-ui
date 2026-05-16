@@ -1,4 +1,4 @@
-import { useOutletContext, Link, useNavigate } from 'react-router-dom'
+import { useOutletContext, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -13,7 +13,7 @@ import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
 import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground } from '../lib/api.js'
-import { mapTemplateToCard } from '../lib/backendMappers.js'
+import { mapTemplateToCard, normalizeCheckoutSession } from '../lib/backendMappers.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
@@ -45,8 +45,10 @@ function Profile() {
     marketplaceTemplates,
     deleteMarketplaceTemplate,
     onCurrencyChange,
+    refreshBalance,
   } = useOutletContext()
   const navigate = useNavigate()
+  const location = useLocation()
   const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
   const [statusModal, setStatusModal] = useState(null)
   const avatarInputRef = useRef(null)
@@ -87,6 +89,36 @@ function Profile() {
   const [profileBgs, setProfileBgs] = useState([]) // admin-uploaded backgrounds
   const [equippingBg, setEquippingBg] = useState(null)
   const [bgMsg, setBgMsg] = useState({ text: '', ok: false })
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const paystackReference = params.get('reference') || params.get('trxref')
+    const isPremiumReturn = params.get('premium') === 'callback' || params.get('type') === 'premium'
+    if (!paystackReference && !isPremiumReturn) return
+
+    let cancelled = false
+    const refreshPremiumState = async () => {
+      setPremiumLoading(true)
+      setPremiumMsg({ text: 'Confirming premium payment...', ok: true })
+      try {
+        // The webhook may complete a moment after Paystack redirects back.
+        await new Promise(resolve => setTimeout(resolve, 1200))
+        await refreshBalance?.()
+        if (!cancelled) {
+          setPremiumMsg({ text: 'Payment received. Refreshing your premium status...', ok: true })
+          navigate('/profile', { replace: true })
+        }
+      } catch {
+        if (!cancelled) {
+          setPremiumMsg({ text: 'Payment returned successfully, but we could not refresh your profile yet. Please reload in a moment.', ok: false })
+        }
+      } finally {
+        if (!cancelled) setPremiumLoading(false)
+      }
+    }
+    refreshPremiumState()
+    return () => { cancelled = true }
+  }, [location.search, navigate, refreshBalance])
 
   const fetchCardAnalytics = async (slug) => {
     if (!slug || cardAnalytics[slug] !== undefined) return
@@ -286,11 +318,17 @@ function Profile() {
     setPremiumLoading(true)
     setPremiumMsg({ text: '', ok: false })
     try {
-      const res = await createPremiumCheckout()
-      if (res?.authorization_url || res?.data?.authorization_url) {
-        window.location.href = res.authorization_url || res.data.authorization_url
+      const callbackUrl = `${window.location.origin}/profile?premium=callback`
+      const res = await createPremiumCheckout({
+        callbackUrl,
+        callback_url: callbackUrl,
+        redirectUrl: callbackUrl,
+      })
+      const checkout = normalizeCheckoutSession(res)
+      if (checkout.checkoutUrl) {
+        window.location.href = checkout.checkoutUrl
       } else {
-        setPremiumMsg({ text: res?.message || 'Premium activated!', ok: true })
+        setPremiumMsg({ text: checkout.message || 'Premium checkout started, but no checkout URL was returned.', ok: false })
       }
     } catch (err) {
       setPremiumMsg({ text: err?.message || 'Could not start premium checkout.', ok: false })

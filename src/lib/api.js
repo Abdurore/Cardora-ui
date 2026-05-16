@@ -277,8 +277,8 @@ export async function createCouponCheckout(payload) {
   return request('/create-coupon-checkout', { method: 'POST', auth: true, body: payload })
 }
 
-export async function createPremiumCheckout() {
-  return request('/create-premium-checkout', { method: 'POST', auth: true })
+export async function createPremiumCheckout(payload = {}) {
+  return request('/create-premium-checkout', { method: 'POST', auth: true, body: payload })
 }
 
 export async function giftPremium(username) {

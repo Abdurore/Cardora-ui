@@ -327,6 +327,12 @@ function CardStudio() {
     ? `${STUDIO_AUTOSAVE_PREFIX}${currentUser.id}`
     : `${STUDIO_AUTOSAVE_PREFIX}guest`
 
+  // -- Card type + tier from URL (with premium-on-non-personal guard) --
+  // These must be initialized before autosave restore runs because restore
+  // compares the saved draft against the current studio context.
+  const restoreStudioType = searchParams.get('type') || 'personal'
+  const restoreStudioTier = resolveTier(restoreStudioType, searchParams.get('tier') || 'classic')
+
   // Read the most recent autosave for this user/context. Used on mount to
   // restore unsaved work — survives reloads, browser closes, accidental
   // navigation away. Scoped by studioType+studioTier so we don't restore a
@@ -339,7 +345,7 @@ function CardStudio() {
       if (!saved || typeof saved !== 'object') return null
       // Only restore when the user is opening the same type+tier — otherwise
       // a poll/elite draft would clobber a fresh personal/classic session.
-      if (saved.studioType !== studioType || saved.studioTier !== studioTier) return null
+      if (saved.studioType !== restoreStudioType || saved.studioTier !== restoreStudioTier) return null
       return saved
     } catch {
       return null
@@ -613,6 +619,13 @@ function CardStudio() {
     else if (studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clear inline edit state when preview closes to prevent blank page bug
+  useEffect(() => {
+    if (!showPreview) {
+      setActiveEditEl(null)
+    }
+  }, [showPreview])
+
   // Snap font to a tier-allowed family when the current pick isn't available at this tier.
   useEffect(() => {
     const fallback = availableFonts[0] || 'Cinzel'
@@ -744,6 +757,21 @@ function CardStudio() {
       current[keys[keys.length - 1]] = value
       return result
     })
+  }
+
+  const editableText = (node, { trim = false } = {}) => {
+    const text = node?.textContent ?? ''
+    return trim ? text.trim() : text
+  }
+
+  const finishInlineEdit = () => {
+    const active = document.activeElement
+    if (active?.isContentEditable) {
+      active.blur()
+      window.setTimeout(() => setActiveEditEl(null), 0)
+      return
+    }
+    setActiveEditEl(null)
   }
 
   const applyPaletteWithHistory = (palette) => {
@@ -2277,7 +2305,7 @@ function CardStudio() {
             className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
             style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
             onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
-            onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+            onBlur={e => { if (!compact) update('content.heading', editableText(e.currentTarget)) }}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
           >
             {c.content.heading}
@@ -2289,7 +2317,7 @@ function CardStudio() {
             className={`cs-editable cs-preview-poll-question${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
             style={{ color: c.card.textColor, outline: 'none' }}
             onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
-            onBlur={e => { if (!compact) setPollData(prev => ({ ...prev, question: e.currentTarget.textContent })) }}
+            onBlur={e => { if (!compact) setPollData(prev => ({ ...prev, question: editableText(e.currentTarget) })) }}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
           >
             {pollData.question || 'Ask a question your recipients can answer instantly.'}
@@ -2309,7 +2337,7 @@ function CardStudio() {
                     style={{ outline: 'none', display: 'inline-block', minWidth: 60, cursor: 'text' }}
                     onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'pollOption', index: i }) }}
                     onBlur={e => {
-                      const text = e.currentTarget.textContent.trim()
+                      const text = editableText(e.currentTarget, { trim: true })
                       setPollData(prev => {
                         const opts = [...prev.options]
                         while (opts.length <= i) opts.push('')
@@ -2319,7 +2347,9 @@ function CardStudio() {
                       setActiveEditEl(null)
                     }}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
-                  >{opt}</span>
+                  >
+                    {opt}
+                  </span>
                 )}
               </div>
             ))}
@@ -2357,9 +2387,9 @@ function CardStudio() {
           )}
           <div className="cs-preview-watermark">
             <span>Made with </span>
-            <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+            <span className="cs-preview-watermark-cta">Cardora</span>
             <span className="cs-preview-watermark-sep">·</span>
-            <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+            <span className="cs-preview-watermark-cta">Create yours →</span>
           </div>
         </div>
       )
@@ -2385,7 +2415,7 @@ function CardStudio() {
             className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
             style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
             onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
-            onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+            onBlur={e => { if (!compact) update('content.heading', editableText(e.currentTarget)) }}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
           >
             {c.content.heading}
@@ -2406,9 +2436,11 @@ function CardStudio() {
               className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
               style={{ outline: 'none' }}
               onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
-              onBlur={e => { if (!compact) setTriviaData(prev => { const qs = [...prev.questions]; qs[0] = { ...qs[0], text: e.currentTarget.textContent }; return { ...prev, questions: qs } }) }}
+              onBlur={e => { if (!compact) setTriviaData(prev => { const qs = [...(prev.questions || [])]; qs[0] = { ...(qs[0] || { options: ['', '', '', ''], correctIndex: 0 }), text: editableText(e.currentTarget) }; return { ...prev, questions: qs } }) }}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
-            >{previewQuestion.text || 'Place your first quiz question here.'}</p>
+            >
+              {previewQuestion.text || 'Place your first quiz question here.'}
+            </p>
           </div>
           <div className="cs-preview-trivia-opts" onClick={e => e.stopPropagation()}>
             {(previewQuestion.options?.length ? previewQuestion.options : ['', '', '', '']).map((opt, oi) => (
@@ -2425,7 +2457,7 @@ function CardStudio() {
                   style={{ outline: 'none', flex: 1, display: 'block', cursor: !compact ? 'text' : 'default' }}
                   onBlur={e => {
                     if (compact) return
-                    const text = e.currentTarget.textContent.trim()
+                    const text = editableText(e.currentTarget, { trim: true })
                     setTriviaData(prev => {
                       const qs = [...prev.questions]
                       const opts = [...(qs[0]?.options || [])]
@@ -2436,7 +2468,9 @@ function CardStudio() {
                     })
                   }}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
-                >{opt || ''}</span>
+                >
+                  {opt || ''}
+                </span>
               </div>
             ))}
           </div>
@@ -2465,9 +2499,9 @@ function CardStudio() {
           )}
           <div className="cs-preview-watermark">
             <span>Made with </span>
-            <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+            <span className="cs-preview-watermark-cta">Cardora</span>
             <span className="cs-preview-watermark-sep">·</span>
-            <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+            <span className="cs-preview-watermark-cta">Create yours →</span>
           </div>
         </div>
       )
@@ -2489,7 +2523,7 @@ function CardStudio() {
             className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
             style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
             onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
-            onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+            onBlur={e => { if (!compact) update('content.heading', editableText(e.currentTarget)) }}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
           >
             {c.content.heading}
@@ -2501,7 +2535,7 @@ function CardStudio() {
             className={`cs-editable cs-preview-body-text${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
             style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
             onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
-            onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
+            onBlur={e => { if (!compact) update('content.body', editableText(e.currentTarget)) }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
           >
             {c.content.body}
@@ -2519,11 +2553,13 @@ function CardStudio() {
                 style={{ outline: 'none', flex: 1, cursor: 'text' }}
                 onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'chainPrompt', index: 0 }) }}
                 onBlur={e => {
-                  setChainData(prev => ({ ...prev, prompt: e.currentTarget.textContent.trim() }))
+                  setChainData(prev => ({ ...prev, prompt: editableText(e.currentTarget, { trim: true }) }))
                   setActiveEditEl(null)
                 }}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
-              >{chainData.prompt}</span>
+              >
+                {chainData.prompt}
+              </span>
             )}
           </div>
           <button type="button" className="cs-chain-reply-btn" disabled>Reply with a card</button>
@@ -2551,9 +2587,9 @@ function CardStudio() {
           )}
           <div className="cs-preview-watermark">
             <span>Made with </span>
-            <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+            <span className="cs-preview-watermark-cta">Cardora</span>
             <span className="cs-preview-watermark-sep">·</span>
-            <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+            <span className="cs-preview-watermark-cta">Create yours →</span>
           </div>
         </div>
       )
@@ -2603,9 +2639,11 @@ function CardStudio() {
                   className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
                   style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
                   onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
-                  onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+                  onBlur={e => { if (!compact) update('content.heading', editableText(e.currentTarget)) }}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
-                >{c.content.heading || ''}</h4>
+                >
+                  {c.content.heading || ''}
+                </h4>
                 <p
                   contentEditable={!compact}
                   suppressContentEditableWarning
@@ -2613,9 +2651,11 @@ function CardStudio() {
                   className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
                   style={{ color: c.card.textColor, outline: 'none' }}
                   onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
-                  onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
+                  onBlur={e => { if (!compact) update('content.body', editableText(e.currentTarget)) }}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
-                >{c.content.body || ''}</p>
+                >
+                  {c.content.body || ''}
+                </p>
               </div>
               <div className="cs-preview-anon-textarea-mock" style={{ borderColor: `${accent}28`, color: `${c.card.textColor}88` }}>
                 Write something honest, kind, or surprising…
@@ -2644,9 +2684,11 @@ function CardStudio() {
                 className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
                 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, outline: 'none' }}
                 onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
-                onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+                onBlur={e => { if (!compact) update('content.heading', editableText(e.currentTarget)) }}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
-              >{c.content.heading || 'Your inbox card'}</h3>
+              >
+                {c.content.heading || 'Your inbox card'}
+              </h3>
               <p
                 contentEditable={!compact}
                 suppressContentEditableWarning
@@ -2654,9 +2696,11 @@ function CardStudio() {
                 className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
                 style={{ color: c.card.textColor, fontSize: '0.8rem', marginBottom: 10, outline: 'none' }}
                 onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
-                onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
+                onBlur={e => { if (!compact) update('content.body', editableText(e.currentTarget)) }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
-              >{c.content.body || ''}</p>
+              >
+                {c.content.body || ''}
+              </p>
               <div className="cs-preview-anon-messages">
                 {[
                   '"You make people feel seen. Keep going."',
@@ -2694,9 +2738,9 @@ function CardStudio() {
           )}
           <div className="cs-preview-watermark">
             <span>Made with </span>
-            <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+            <span className="cs-preview-watermark-cta">Cardora</span>
             <span className="cs-preview-watermark-sep">·</span>
-            <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+            <span className="cs-preview-watermark-cta">Create yours →</span>
           </div>
         </div>
       )
@@ -2779,7 +2823,7 @@ function CardStudio() {
         className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
         style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
         onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
-        onBlur={e => { if (!compact) update('content.heading', e.currentTarget.textContent) }}
+        onBlur={e => { if (!compact) update('content.heading', editableText(e.currentTarget)) }}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
       >
         {c.content.heading}
@@ -2797,7 +2841,7 @@ function CardStudio() {
           className={`cs-editable cs-preview-body-text${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
           style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
           onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
-          onBlur={e => { if (!compact) update('content.body', e.currentTarget.textContent) }}
+          onBlur={e => { if (!compact) update('content.body', editableText(e.currentTarget)) }}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
         >
           {c.content.body}
@@ -2809,7 +2853,7 @@ function CardStudio() {
             className={`cs-extended cs-editable${!compact && activeEditEl?.type === 'extendedBody' ? ' cs-edit-active' : ''}`}
             style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif`, fontSize: `${bodySize}px`, outline: 'none' }}
             onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'extendedBody', index: 0 }) } }}
-            onBlur={e => { if (!compact) update('content.extendedBody', e.currentTarget.textContent) }}
+            onBlur={e => { if (!compact) update('content.extendedBody', editableText(e.currentTarget)) }}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
           >
             {c.content.extendedBody}
@@ -2863,9 +2907,9 @@ function CardStudio() {
 
         <div className="cs-preview-watermark">
           <span>Made with </span>
-          <a href="/" className="cs-preview-watermark-cta">Cardora</a>
+          <span className="cs-preview-watermark-cta">Cardora</span>
           <span className="cs-preview-watermark-sep">·</span>
-          <a href="/" className="cs-preview-watermark-cta">Create yours →</a>
+          <span className="cs-preview-watermark-cta">Create yours →</span>
         </div>
       </div>
     )
@@ -3050,7 +3094,7 @@ function CardStudio() {
                       className={`cs-editable${activeEditEl?.type === 'closedHeading' ? ' cs-edit-active' : ''}`}
                       style={{ color: c.closedState.headingColor, fontFamily: `'${c.closedState.headingFont}', serif`, outline: 'none' }}
                       onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'closedHeading', index: 0 }) }}
-                      onBlur={e => { update('closedState.headingText', e.currentTarget.textContent); setActiveEditEl(null) }}
+                      onBlur={e => { update('closedState.headingText', editableText(e.currentTarget)); setActiveEditEl(null) }}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
                     >
                       {c.closedState.headingText}
@@ -3061,7 +3105,7 @@ function CardStudio() {
                       className={`cs-editable${activeEditEl?.type === 'closedBody' ? ' cs-edit-active' : ''}`}
                       style={{ color: c.closedState.textColor, outline: 'none' }}
                       onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'closedBody', index: 0 }) }}
-                      onBlur={e => { update('closedState.bodyText', e.currentTarget.textContent); setActiveEditEl(null) }}
+                      onBlur={e => { update('closedState.bodyText', editableText(e.currentTarget)); setActiveEditEl(null) }}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
                     >
                       {c.closedState.bodyText}
@@ -3176,7 +3220,7 @@ function CardStudio() {
                 className={`cs-editable${activeEditEl?.type === 'closedHeading' ? ' cs-edit-active' : ''}`}
                 style={{ color: c.closedState.headingColor, fontFamily: `'${c.closedState.headingFont}', serif`, outline: 'none' }}
                 onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'closedHeading', index: 0 }) }}
-                onBlur={e => { update('closedState.headingText', e.currentTarget.textContent); setActiveEditEl(null) }}
+                onBlur={e => { update('closedState.headingText', editableText(e.currentTarget)); setActiveEditEl(null) }}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
               >
                 {c.closedState.headingText}
@@ -3187,7 +3231,7 @@ function CardStudio() {
                 className={`cs-editable${activeEditEl?.type === 'closedBody' ? ' cs-edit-active' : ''}`}
                 style={{ color: c.closedState.textColor, outline: 'none' }}
                 onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'closedBody', index: 0 }) }}
-                onBlur={e => { update('closedState.bodyText', e.currentTarget.textContent); setActiveEditEl(null) }}
+                onBlur={e => { update('closedState.bodyText', editableText(e.currentTarget)); setActiveEditEl(null) }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
               >
                 {c.closedState.bodyText}
@@ -3224,7 +3268,7 @@ function CardStudio() {
                   {(activeEditEl.type === 'heading' ? c.content.heading : c.closedState.headingText || '').length > 24 ? '…' : ''}"
                 </span>
               )}
-              <button type="button" className="cs-m2-edit-done-btn" onClick={() => setActiveEditEl(null)}>Done</button>
+              <button type="button" className="cs-m2-edit-done-btn" onClick={finishInlineEdit}>Done</button>
             </div>
             {/* Row 2: controls for the selected element */}
             <div className="cs-m2-edit-controls">
@@ -3601,6 +3645,7 @@ function CardStudio() {
           anonTemplate={anonTemplate}
           onClose={() => {
             setShowPreview(false)
+            setActiveEditEl(null)
             if (activeStep === 'preview') setActiveStep('card')
           }}
         />
@@ -3992,6 +4037,8 @@ function CardStudio() {
 }
 
 export default CardStudio
+
+
 
 
 

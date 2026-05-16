@@ -85,7 +85,7 @@ export function createApp() {
 
   // 404 landing page for invalid requests.
   app.use((req, res) => {
-    const appHome = CORS_ORIGIN || "https://cardoraa.netlify.app";
+    const appHome = CORS_ORIGIN || "https://cardora.studio";
     res.status(404).type("html").send(`<!doctype html>
 <html lang="en">
   <head>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import PremiumGiftReveal from './PremiumGiftReveal.jsx'
 import Envelope from './Envelope.jsx'
 import AmbientParticles from './AmbientParticles.jsx'
@@ -54,6 +55,7 @@ function CardPreviewModal({
   onAnonSubmit = null,
   chainState = null,
 }) {
+  const navigate = useNavigate()
   // `allowedTools` gates tool visibility; `tierLimits` caps the content a
   // visible tool is allowed to contribute (e.g. music allowed, images > 1).
   // Both null = public viewer, render everything the card has.
@@ -1147,13 +1149,14 @@ function CardPreviewModal({
                     >
                       Replay card
                     </button>
-                    <a
+                    <button
+                      type="button"
                       className="cp-end-btn ghost"
-                      style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                      href="/studio"
+                      style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                      onClick={() => navigate('/studio')}
                     >
                       Create yours →
-                    </a>
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -1360,9 +1363,14 @@ function CardPreviewModal({
                   <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleReset}>
                     Replay
                   </button>
-                  <a className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: `${c.theme.accentColor}60`, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href="/studio">
+                  <button
+                    type="button"
+                    className="cp-end-btn ghost"
+                    style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                    onClick={() => navigate('/studio')}
+                  >
                     Create yours →
-                  </a>
+                  </button>
                 </div>
               </div>
             ) : (
@@ -1453,9 +1461,14 @@ function CardPreviewModal({
                 Replay
               </button>
               {pageMode ? (
-                <a className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} href="/studio">
+                <button
+                  type="button"
+                  className="cp-end-btn ghost"
+                  style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                  onClick={() => navigate('/studio')}
+                >
                   Create yours →
-                </a>
+                </button>
               ) : (
                 <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={onClose}>
                   Back to Editor
