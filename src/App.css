@@ -4046,6 +4046,41 @@
   gap: 12px;
 }
 
+.cv-logo-loader,
+.cp-asset-loader-mark {
+  width: 76px;
+  height: 76px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 25%, rgba(126,247,255,0.2), rgba(255,255,255,0.035));
+  border: 1px solid rgba(126,247,255,0.18);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.45), 0 0 42px rgba(126,247,255,0.12);
+  animation: cvLogoPulse 1.35s ease-in-out infinite;
+}
+
+.cv-logo-loader img,
+.cp-asset-loader-mark img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.cv-page-loading p,
+.cp-asset-loader p {
+  margin: 0;
+  color: rgba(224,247,252,0.62);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@keyframes cvLogoPulse {
+  0%, 100% { transform: scale(1); opacity: 0.72; }
+  50% { transform: scale(1.055); opacity: 1; }
+}
+
 .card-view-tier {
   position: static;
 }
@@ -10054,6 +10089,20 @@ a {
   isolation: isolate;
 }
 
+.cp-card-full::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255,255,255,0.075), transparent 42%),
+    repeating-radial-gradient(circle at 20% 30%, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px);
+  mix-blend-mode: screen;
+  opacity: 0.55;
+}
+
 /* Coloured surface layer. Drives `card.backgroundColor` and
    `card.backgroundOpacity` independently of content opacity, so when the user
    adds transparency the page background bleeds through but text and images
@@ -10093,6 +10142,42 @@ a {
   scroll-behavior: smooth;
   grid-template-rows: auto;
   overscroll-behavior: contain;
+}
+
+.cp-card-text-only .cp-card-inner-full {
+  align-content: center;
+  grid-template-rows: auto auto auto;
+  min-height: min(820px, 86vh);
+  padding-top: 52px;
+  padding-bottom: 52px;
+}
+
+.cp-card-text-only .cp-heading {
+  max-width: 16ch;
+}
+
+.cp-signoff {
+  justify-self: end;
+  width: min(56ch, 100%);
+  margin: 6px auto 0;
+  text-align: right;
+  font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+  font-size: clamp(1rem, 2vw, 1.22rem);
+  font-style: italic;
+  opacity: 0.72;
+}
+
+.cp-asset-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--loader-accent, #7ef7ff) 16%, transparent), transparent 32%),
+    #070d12;
 }
 
 .cp-card-inner::-webkit-scrollbar {
@@ -17358,16 +17443,40 @@ a {
   overflow: hidden;
 }
 
+.cp-cascade-in {
+  opacity: 0;
+  animation: cpCascadeIn 0.46s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@keyframes cpCascadeIn {
+  from { opacity: 0; transform: translateY(18px); filter: blur(10px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
 .cp-poll-option:hover {
   border-color: rgba(96, 165, 250, 0.45);
   background: rgba(96, 165, 250, 0.1);
   transform: translateY(-1px);
 }
 
+.cp-poll-option:active {
+  transform: translateY(1px) scale(0.985);
+}
+
 .cp-poll-option.selected {
   border-color: rgba(96, 165, 250, 0.6);
   background: rgba(96, 165, 250, 0.14);
   box-shadow: 0 4px 16px rgba(96, 165, 250, 0.12);
+}
+
+.cp-poll-option.submitted:not(.selected) {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.cp-poll-option.submitted.selected {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12), 0 0 28px rgba(96, 165, 250, 0.16);
 }
 
 .cp-poll-radio {
@@ -17481,9 +17590,36 @@ a {
   background: rgba(167, 139, 250, 0.06);
 }
 
+.cp-trivia-option:active {
+  transform: translateY(1px) scale(0.985);
+}
+
 .cp-trivia-option.selected {
   border-color: rgba(167, 139, 250, 0.55);
   background: rgba(167, 139, 250, 0.12);
+}
+
+.cp-trivia-option.correct {
+  border-color: rgba(98, 255, 162, 0.58);
+  background: rgba(98, 255, 162, 0.12);
+}
+
+.cp-trivia-option.wrong {
+  border-color: rgba(248, 113, 113, 0.62);
+  background: rgba(248, 113, 113, 0.12);
+  animation: cpWrongShake 0.34s ease both;
+}
+
+.cp-trivia-next:disabled {
+  opacity: 0.38;
+  pointer-events: none;
+}
+
+@keyframes cpWrongShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-3px); }
 }
 
 .cp-trivia-option-letter {
@@ -17553,6 +17689,82 @@ a {
   font-size: 0.85rem;
   margin: 0;
   opacity: 0.7;
+}
+
+.cp-type-entry-screen .cp-entry-content {
+  gap: 18px;
+}
+
+.cp-type-entry-copy {
+  width: min(34ch, 82vw);
+  margin: -6px auto 4px;
+  text-align: center;
+  line-height: 1.6;
+  opacity: 0.68;
+}
+
+.cp-identity-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 12;
+  width: min(420px, calc(100vw - 28px));
+  transform: translateX(-50%);
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(126,247,255,0.18);
+  background: linear-gradient(180deg, rgba(12,22,29,0.96), rgba(4,9,14,0.98));
+  box-shadow: 0 28px 80px rgba(0,0,0,0.62);
+  display: grid;
+  gap: 10px;
+  animation: cpSheetUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.cp-identity-handle {
+  justify-self: center;
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(226,242,247,0.22);
+}
+
+.cp-identity-label {
+  margin: 0;
+  color: rgba(234,252,255,0.72);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cp-identity-sheet input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(126,247,255,0.18);
+  background: rgba(255,255,255,0.055);
+  color: #ecfbff;
+  padding: 13px 14px;
+  outline: none;
+}
+
+.cp-identity-sheet button {
+  border: none;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: #7ef7ff;
+  color: #061015;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cp-identity-sheet button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+@keyframes cpSheetUp {
+  from { opacity: 0; transform: translate(-50%, 24px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 /* Poll vote confirmation */
@@ -23575,9 +23787,10 @@ a {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 240px;
+  max-height: 320px;
   overflow-y: auto;
   padding-right: 4px;
+  scroll-behavior: smooth;
 }
 .cp-chain-empty {
   text-align: center;
@@ -23600,6 +23813,14 @@ a {
 .cp-chain-reply-name { font-size: 0.75rem; font-weight: 700; display: block; margin-bottom: 2px; }
 .cp-chain-reply-text { font-size: 0.85rem; margin: 0; line-height: 1.5; opacity: 0.85; }
 .cp-chain-reply-form { display: flex; flex-direction: column; gap: 10px; }
+.cp-chain-reply-form::before {
+  content: 'Add your link';
+  color: rgba(226,242,247,0.46);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .cp-chain-name-input {
   width: 100%; padding: 10px 14px; border-radius: 10px;
   font-size: 0.85rem; outline: none; box-sizing: border-box;
@@ -27039,6 +27260,68 @@ a {
 [data-theme="light"] .profile-premium-active-pill { color: #0f766e; }
 [data-theme="light"] .profile-premium-active-panel p,
 [data-theme="light"] .profile-premium-bg-empty { color: var(--text-muted); }
+
+.notfound-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(126,247,255,0.1), transparent 34%),
+    radial-gradient(circle at 80% 80%, rgba(98,255,162,0.07), transparent 28%),
+    #04080d;
+  color: #ecfbff;
+}
+
+.notfound-card {
+  width: min(520px, 100%);
+  text-align: center;
+  padding: 42px 30px;
+  border-radius: 24px;
+  border: 1px solid rgba(126,247,255,0.15);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018)),
+    rgba(7,13,18,0.86);
+  box-shadow: 0 30px 90px rgba(0,0,0,0.58);
+}
+
+.notfound-logo {
+  width: 68px;
+  height: 68px;
+  object-fit: contain;
+  margin-bottom: 22px;
+  filter: drop-shadow(0 0 28px rgba(126,247,255,0.2));
+}
+
+.notfound-kicker {
+  margin: 0 0 8px;
+  color: #7ef7ff;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.notfound-card h1 {
+  margin: 0;
+  font-family: 'Cinzel', serif;
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  line-height: 1.05;
+}
+
+.notfound-card > p:not(.notfound-kicker) {
+  margin: 16px auto 28px;
+  max-width: 38ch;
+  color: rgba(236,251,255,0.62);
+  line-height: 1.65;
+}
+
+.notfound-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 
 /* ════════════════════════════════════════════════════════════
    COSMETICS RESTYLE — better sizing and card layout

@@ -73,6 +73,36 @@ function CardView() {
     return () => { cancelled = true }
   }, [id])
 
+  useEffect(() => {
+    const title = card?.title ? `${card.title} | Cardora` : 'You have a surprise... | Cardora'
+    const description = card ? 'Someone sent you something made to be opened, not just viewed.' : 'You have a surprise waiting on Cardora.'
+    const image = `${window.location.origin}/cardora-logo.png?v=4`
+    const meta = [
+      ['property', 'og:title', title],
+      ['property', 'og:description', description],
+      ['property', 'og:image', image],
+      ['property', 'og:type', 'website'],
+      ['property', 'og:url', window.location.href],
+      ['name', 'twitter:card', 'summary_large_image'],
+      ['name', 'twitter:title', title],
+      ['name', 'twitter:description', description],
+      ['name', 'twitter:image', image],
+    ]
+    document.title = title
+    meta.forEach(([attr, key, content]) => {
+      let tag = document.head.querySelector(`meta[${attr}="${key}"]`)
+      if (!tag) {
+        tag = document.createElement('meta')
+        tag.setAttribute(attr, key)
+        document.head.appendChild(tag)
+      }
+      tag.setAttribute('content', content)
+    })
+    return () => {
+      document.title = 'Cardora Studio'
+    }
+  }, [card])
+
   const handlePasswordSubmit = async () => {
     setPasswordError('')
     try {
@@ -91,7 +121,10 @@ function CardView() {
   if (loading) {
     return (
       <div className="cv-page-loading">
-        <div className="chat-loading-spinner" />
+        <div className="cv-logo-loader">
+          <img src="/cardora-logo.png?v=4" alt="" />
+        </div>
+        <p>Preparing your surprise</p>
       </div>
     )
   }
@@ -147,11 +180,11 @@ function CardView() {
   const handlePollSubmit = async (optionId) => {
     try { await submitPollVote(card.slug || id, { optionId }) } catch (e) { console.warn('Poll submit failed', e) }
   }
-  const handleTriviaComplete = async (answers) => {
-    try { await submitTriviaAnswer(card.slug || id, { answers }) } catch (e) { console.warn('Trivia submit failed', e) }
+  const handleTriviaComplete = async (answers, name) => {
+    try { await submitTriviaAnswer(card.slug || id, { answers, name }) } catch (e) { console.warn('Trivia submit failed', e) }
   }
-  const handleChainReply = async (message) => {
-    try { await submitChainReply(card.slug || id, { message }) } catch (e) { console.warn('Chain reply failed', e) }
+  const handleChainReply = async (message, name) => {
+    try { await submitChainReply(card.slug || id, { message, name }) } catch (e) { console.warn('Chain reply failed', e) }
   }
   const handleAnonSubmit = async (message) => {
     await sendCardAnonymousMessage(card.slug || id, { message })
@@ -174,6 +207,8 @@ function CardView() {
         onChainReply={handleChainReply}
         onAnonSubmit={handleAnonSubmit}
         chainState={card._chainState}
+        cardId={card.slug || card.id || id}
+        senderName={card.senderName || card.sender || card.creatorName || ''}
       />
       {showReport && (
         <ReportModal

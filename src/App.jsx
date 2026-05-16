@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout.jsx'
 import Home from './pages/Home.jsx'
 import Explore from './pages/Explore.jsx'
@@ -18,6 +18,7 @@ import AnonInbox from './pages/AnonInbox.jsx'
 import CreateCardPicker from './pages/CreateCardPicker.jsx'
 import CardResponses from './pages/CardResponses.jsx'
 import QuickCreate from './pages/QuickCreate.jsx'
+import NotFound from './pages/NotFound.jsx'
 
 function App() {
   return (
@@ -41,7 +42,7 @@ function App() {
         <Route path="/signup" element={<AuthPage mode="signup" />} />
         <Route path="/legal/:doc" element={<LegalPage />} />
         <Route path="/inbox" element={<AnonInbox />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Route>
       {/* Public anonymous send page — outside MainLayout so no auth context required */}
       <Route path="/ask/:username" element={<AnonSend />} />

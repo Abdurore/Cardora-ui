@@ -54,6 +54,8 @@ function CardPreviewModal({
   onQuestionResponse = null,
   onAnonSubmit = null,
   chainState = null,
+  cardId = '',
+  senderName = '',
 }) {
   const navigate = useNavigate()
   // `allowedTools` gates tool visibility; `tierLimits` caps the content a
@@ -63,12 +65,11 @@ function CardPreviewModal({
   const limit = (key, fallback = true) => (tierLimits ? !!tierLimits[key] : fallback)
   const maxImages = tierLimits ? (tierLimits.maxImages ?? Infinity) : Infinity
   const envelopeEnabled = shouldShowEnvelope(studioType)
-  // Non-personal cards skip the entry screen entirely in pageMode.
-  // Recipients of poll/chain/trivia/anonymous cards see content immediately.
   const isPersonalType = studioType === 'personal'
+  const needsTitleBuffer = pageMode && (studioType === 'trivia' || studioType === 'chain')
   const [stage, setStage] = useState(
     pageMode
-      ? (isPersonalType ? 'entry' : 'open')
+      ? 'assetLoading'
       : (envelopeEnabled ? 'closed' : 'open')
   )
   const [questionIdx, setQuestionIdx] = useState(0)
@@ -79,6 +80,10 @@ function CardPreviewModal({
   const containerRef = useRef(null)
   const openCardInnerRef = useRef(null)
   const previewTimersRef = useRef([])
+  const receiverStorageKey = useMemo(() => {
+    const path = typeof window !== 'undefined' ? window.location.pathname : cardId
+    return `cardora:receiver:${studioType}:${cardId || path}`
+  }, [cardId, studioType])
 
   // Device-frame preview. Fullscreen by default; lets the sender see how the
   // card scales on phone / tablet / desktop without leaving the modal.
@@ -200,6 +205,7 @@ function CardPreviewModal({
   // Trivia preview state
   const [previewTriviaIdx, setPreviewTriviaIdx] = useState(0)
   const [previewTriviaAnswers, setPreviewTriviaAnswers] = useState([])
+  const [triviaLocked, setTriviaLocked] = useState(false)
 
   // Anonymous reply state (pageMode only)
   const [anonMessage, setAnonMessage] = useState('')
@@ -208,6 +214,8 @@ function CardPreviewModal({
 
   // Chain reply state (pageMode only)
   const [chainName, setChainName] = useState('')
+  const [participantName, setParticipantName] = useState('')
+  const [showIdentitySheet, setShowIdentitySheet] = useState(false)
   const [chainMessage, setChainMessage] = useState('')
   const [chainSubmitting, setChainSubmitting] = useState(false)
   const [chainSubmitted, setChainSubmitted] = useState(false)
@@ -222,6 +230,7 @@ function CardPreviewModal({
   const fadeSpeed = hasFadeIn ? parseFloat(c.card.textBodyAnimation.fadeInDuration) || 2 : 0
   const mediaAllowed = toolAllowed('media') && maxImages > 0
   const primaryImage = mediaAllowed ? (c.media.images[0] || null) : null
+  const isTextOnlyCard = !primaryImage && !c.media.images.length
 
   const typedBody = useTypewriter(c.content.body, typeSpeed, stage === 'open' && hasTypewriter)
   const typedExtended = useTypewriter(c.content.extendedBody, typeSpeed, stage === 'open' && hasTypewriter && typedBody === c.content.body)
@@ -231,6 +240,54 @@ function CardPreviewModal({
   const musicStartSec = Number(c.background.music.startSec) || 0
   const musicEndSec = Number(c.background.music.endSec) || 0
   const musicTrimmed = musicEndSec > 0 && musicEndSec > musicStartSec
+
+  useEffect(() => {
+    if (!pageMode) return undefined
+    let cancelled = false
+    const imageUrls = [
+      '/cardora-logo.png?v=4',
+      ...(mediaAllowed ? c.media.images.map(img => img.url).filter(Boolean) : []),
+    ]
+    const imageLoads = imageUrls.map(src => new Promise(resolve => {
+      const img = new Image()
+      img.onload = resolve
+      img.onerror = resolve
+      img.src = src
+    }))
+    const fontsReady = document.fonts?.ready?.catch(() => {}) || Promise.resolve()
+    const minimum = new Promise(resolve => window.setTimeout(resolve, 720))
+    Promise.all([fontsReady, minimum, ...imageLoads]).then(() => {
+      if (cancelled) return
+      if (needsTitleBuffer) setStage('typeEntry')
+      else if (isPersonalType) setStage('entry')
+      else setStage('open')
+    })
+    return () => { cancelled = true }
+  }, [pageMode, needsTitleBuffer, isPersonalType, mediaAllowed, c.media.images, c.background.music.url])
+
+  useEffect(() => {
+    if (!pageMode) return
+    try {
+      const pollSaved = JSON.parse(localStorage.getItem(`${receiverStorageKey}:poll`) || 'null')
+      if (pollSaved?.submitted) {
+        setPreviewPollVotes(Array.isArray(pollSaved.votes) ? pollSaved.votes : [])
+        setPreviewPollSubmitted(true)
+      }
+      const triviaSaved = JSON.parse(localStorage.getItem(`${receiverStorageKey}:trivia`) || 'null')
+      if (triviaSaved?.submitted) {
+        setPreviewTriviaAnswers(Array.isArray(triviaSaved.answers) ? triviaSaved.answers : [])
+        setPreviewTriviaSubmitted(true)
+        setTriviaLocked(true)
+      }
+      const nameSaved = localStorage.getItem(`${receiverStorageKey}:name`)
+      if (nameSaved) {
+        setParticipantName(nameSaved)
+        setChainName(nameSaved)
+      }
+    } catch {
+      /* localStorage may be unavailable in private contexts */
+    }
+  }, [pageMode, receiverStorageKey])
 
   useEffect(() => {
     if (!audioRef.current || !musicAllowed) return undefined
@@ -311,6 +368,31 @@ function CardPreviewModal({
     }
   }
 
+  const handleBufferedStart = () => {
+    if ((studioType === 'trivia' || studioType === 'chain') && !participantName.trim()) {
+      setShowIdentitySheet(true)
+      return
+    }
+    setFadeBody(true)
+    setBodyVisible(true)
+    setStage('open')
+  }
+
+  const saveParticipantName = () => {
+    const cleanName = participantName.trim()
+    if (!cleanName) return
+    try {
+      localStorage.setItem(`${receiverStorageKey}:name`, cleanName)
+    } catch {
+      /* ignore localStorage failures */
+    }
+    setChainName(cleanName)
+    setShowIdentitySheet(false)
+    setFadeBody(true)
+    setBodyVisible(true)
+    setStage('open')
+  }
+
   const handleOpen = () => {
     previewTimersRef.current.forEach(window.clearTimeout)
     previewTimersRef.current = []
@@ -333,9 +415,14 @@ function CardPreviewModal({
       return
     }
     if (studioType === 'trivia' && triviaData) {
+      if (previewTriviaSubmitted) {
+        setStage('triviaResults')
+        return
+      }
       setPreviewTriviaIdx(0)
       setPreviewTriviaAnswers([])
       setPreviewTriviaSubmitted(false)
+      setTriviaLocked(false)
       setStage('triviaQ')
       return
     }
@@ -361,6 +448,14 @@ function CardPreviewModal({
   const handleReset = () => {
     previewTimersRef.current.forEach(window.clearTimeout)
     previewTimersRef.current = []
+    if (pageMode && studioType === 'poll' && previewPollSubmitted) {
+      setStage('pollVote')
+      return
+    }
+    if (pageMode && studioType === 'trivia' && previewTriviaSubmitted) {
+      setStage('triviaResults')
+      return
+    }
     setStage(envelopeEnabled ? 'closed' : 'open')
     setQuestionIdx(0)
     setFadeBody(!envelopeEnabled)
@@ -371,6 +466,7 @@ function CardPreviewModal({
     setPreviewTriviaIdx(0)
     setPreviewTriviaAnswers([])
     setPreviewTriviaSubmitted(false)
+    setTriviaLocked(false)
     setAnonMessage('')
     setAnonSubmitting(false)
     setAnonSubmitted(false)
@@ -543,7 +639,8 @@ function CardPreviewModal({
   // Continue label for the open card
   const continueLabel = studioType === 'poll' ? 'Vote Now'
     : studioType === 'trivia' ? 'Start Quiz'
-    : studioType === 'anonymous' ? 'Preview Inbox'
+    : studioType === 'chain' ? 'Read Chain'
+    : studioType === 'anonymous' ? (pageMode ? 'Send Message' : 'Preview Inbox')
     : 'Done'
 
   const inner = (
@@ -575,7 +672,7 @@ function CardPreviewModal({
         ) : null}
       </div>
 
-      {stage !== 'closed' && stage !== 'entry' && (
+      {stage !== 'closed' && stage !== 'entry' && stage !== 'assetLoading' && (
         <div className="cp-ambient-overlay" aria-hidden="true">
           {renderBgEffect()}
         </div>
@@ -585,7 +682,7 @@ function CardPreviewModal({
         <audio ref={audioRef} src={c.background.music.url} loop preload="auto" />
       )}
 
-      <div className={`cp-close-btn ${pageMode ? 'cp-back-btn' : ''} ${stage === 'entry' ? 'cp-close-btn-hidden' : ''}`} onClick={onClose}>
+      <div className={`cp-close-btn ${pageMode ? 'cp-back-btn' : ''} ${stage === 'entry' || stage === 'assetLoading' ? 'cp-close-btn-hidden' : ''}`} onClick={onClose}>
         {pageMode ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 5l-7 7 7 7" />
@@ -602,6 +699,15 @@ function CardPreviewModal({
         <button className="cp-reset-btn" onClick={handleReset}>
           Reset
         </button>
+      )}
+
+      {stage === 'assetLoading' && (
+        <div className="cp-asset-loader" style={{ '--loader-accent': c.theme.accentColor || '#7ef7ff' }}>
+          <div className="cp-asset-loader-mark">
+            <img src="/cardora-logo.png?v=4" alt="" />
+          </div>
+          <p>Preparing your surprise</p>
+        </div>
       )}
 
       {/* LOCK GATE — runs before the envelope. Honours interaction.lock so the
@@ -760,6 +866,63 @@ function CardPreviewModal({
         )
       })()}
 
+      {stage === 'typeEntry' && needsTitleBuffer && (() => {
+        const entryMeta = ENTRY_DEFAULTS[studioType] || ENTRY_DEFAULTS.trivia
+        const EntryIcon = entryMeta.Icon
+        const title = studioType === 'chain' ? 'Join the Chain' : 'Ready to Play?'
+        const prompt = studioType === 'chain' ? 'Sign your addition' : 'Who is playing?'
+        return (
+          <div
+            className="cp-entry-screen cp-type-entry-screen"
+            style={{
+              '--entry-bg': c.card.backgroundColor || '#0b0f14',
+              '--entry-g1': entryMeta.color,
+              '--entry-g2': c.background.colors?.[1] || '#111827',
+              '--entry-accent': c.theme.accentColor || entryMeta.color,
+            }}
+          >
+            <div className="cp-entry-content">
+              <div className="cp-entry-brand">
+                <img src="/cardora-logo.png?v=4" alt="" className="cp-entry-brand-logo" />
+                <span className="cp-entry-brand-name">Cardora</span>
+              </div>
+              <div className="cp-entry-type-chip">
+                <EntryIcon size={14} color="currentColor" />
+                <span>{entryMeta.label}</span>
+              </div>
+              <h1 className="cp-entry-title" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                {title}
+              </h1>
+              <p className="cp-type-entry-copy" style={{ color: c.card.textColor }}>
+                {cardTitle || c.content.heading || entryMeta.hint}
+              </p>
+              <button className="cp-entry-open-btn" style={{ '--btn-color': c.theme.accentColor }} onClick={handleBufferedStart}>
+                <span className="cp-entry-open-ring" />
+                <span className="cp-entry-open-label">Start</span>
+              </button>
+            </div>
+            {showIdentitySheet && (
+              <div className="cp-identity-sheet" role="dialog" aria-modal="true" aria-label={prompt}>
+                <div className="cp-identity-handle" />
+                <p className="cp-identity-label">{prompt}</p>
+                <input
+                  type="text"
+                  value={participantName}
+                  maxLength={50}
+                  autoFocus
+                  placeholder="Name or nickname"
+                  onChange={e => setParticipantName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveParticipantName() }}
+                />
+                <button type="button" disabled={!participantName.trim()} onClick={saveParticipantName}>
+                  Continue
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* ENVELOPE (closed state) — only Personal + Chain cards get the reveal metaphor */}
       {unlocked && stage === 'closed' && envelopeEnabled && (
         <>
@@ -782,7 +945,7 @@ function CardPreviewModal({
         <div className="cp-card-wrap cp-card-wrap-full">
           {renderGradientBorder(
             <article
-              className="cp-card cp-card-full"
+              className={`cp-card cp-card-full ${isTextOnlyCard ? 'cp-card-text-only' : ''}`}
               style={cardSurfaceStyle({ ...borderStyle, '--scrollbar-color': c.card.scrollbarColor })}
             >
               <div ref={openCardInnerRef} className="cp-card-inner cp-card-inner-full" style={{ '--scrollbar-color': c.card.scrollbarColor }}>
@@ -845,6 +1008,12 @@ function CardPreviewModal({
                   return null
                 })}
 
+                {senderName && (
+                  <p className={`cp-signoff cp-reveal-element ${revealStep >= 4 ? 'visible' : ''}`} style={{ color: c.card.textColor }}>
+                    &mdash; Sent by {senderName}
+                  </p>
+                )}
+
                 {/* Continue */}
                 <button
                   className={`cp-continue-btn cp-reveal-element ${revealStep >= 4 ? 'visible' : ''}`}
@@ -885,8 +1054,8 @@ function CardPreviewModal({
                       <button
                         key={i}
                         type="button"
-                        className={`cp-poll-option ${previewPollVotes.includes(i) ? 'selected' : ''}`}
-                        style={{ color: c.card.textColor }}
+                        className={`cp-poll-option cp-cascade-in ${previewPollVotes.includes(i) ? 'selected' : ''} ${previewPollSubmitted ? 'submitted' : ''}`}
+                        style={{ color: c.card.textColor, '--i': i }}
                         onClick={() => {
                           if (previewPollSubmitted) return
                           if (pollData.allowMultiple) {
@@ -909,6 +1078,11 @@ function CardPreviewModal({
                       disabled={previewPollVotes.length === 0}
                       onClick={() => {
                         setPreviewPollSubmitted(true)
+                        try {
+                          localStorage.setItem(`${receiverStorageKey}:poll`, JSON.stringify({ submitted: true, votes: previewPollVotes }))
+                        } catch {
+                          /* ignore localStorage failures */
+                        }
                         if (onPollSubmit) {
                           const opts = pollData?.options || []
                           const optId = previewPollVotes.map(i => {
@@ -925,7 +1099,7 @@ function CardPreviewModal({
                     <div className="cp-poll-voted-confirm">
                       <div className="cp-poll-voted-icon" style={{ color: c.theme.accentColor }}>✓</div>
                       <p className="cp-poll-voted-msg" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
-                        Vote submitted!
+                        Vote Sealed
                       </p>
                       <div className="cp-poll-voted-choices">
                         {(pollData.options || []).map((opt, i) => (
@@ -980,19 +1154,26 @@ function CardPreviewModal({
                     className="cp-trivia-question-text"
                     style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}
                   >
-                    {triviaData.questions[previewTriviaIdx]?.text || 'Question'}
+                    {triviaData.questions[previewTriviaIdx]?.text || triviaData.questions[previewTriviaIdx]?.question || 'Question'}
                   </h3>
                   <div className="cp-trivia-options">
                     {(triviaData.questions[previewTriviaIdx]?.options || []).map((opt, oi) => (
                       <button
                         key={oi}
                         type="button"
-                        className={`cp-trivia-option ${previewTriviaAnswers[previewTriviaIdx] === oi ? 'selected' : ''}`}
-                        style={{ color: c.card.textColor }}
+                        disabled={triviaLocked}
+                        className={`cp-trivia-option cp-cascade-in ${previewTriviaAnswers[previewTriviaIdx] === oi ? 'selected' : ''} ${
+                          triviaLocked && previewTriviaAnswers[previewTriviaIdx] === oi
+                            ? (oi === (triviaData.questions[previewTriviaIdx]?.correctIndex ?? 0) ? 'correct' : 'wrong')
+                            : ''
+                        }`}
+                        style={{ color: c.card.textColor, '--i': oi }}
                         onClick={() => {
+                          if (triviaLocked) return
                           const next = [...previewTriviaAnswers]
                           next[previewTriviaIdx] = oi
                           setPreviewTriviaAnswers(next)
+                          setTriviaLocked(true)
                         }}
                       >
                         <span className="cp-trivia-option-letter">{String.fromCharCode(65 + oi)}</span>
@@ -1004,12 +1185,24 @@ function CardPreviewModal({
                     type="button"
                     className="cp-trivia-next"
                     style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                    disabled={previewTriviaAnswers[previewTriviaIdx] == null}
                     onClick={() => {
                       if (previewTriviaIdx < triviaData.questions.length - 1) {
                         setPreviewTriviaIdx(i => i + 1)
+                        setTriviaLocked(false)
                       } else {
+                        setPreviewTriviaSubmitted(true)
+                        try {
+                          localStorage.setItem(`${receiverStorageKey}:trivia`, JSON.stringify({
+                            submitted: true,
+                            answers: previewTriviaAnswers,
+                            name: participantName.trim(),
+                          }))
+                        } catch {
+                          /* ignore localStorage failures */
+                        }
                         setStage('triviaResults')
-                        if (onTriviaComplete) onTriviaComplete(previewTriviaAnswers)
+                        if (onTriviaComplete) onTriviaComplete(previewTriviaAnswers, participantName.trim())
                       }
                     }}
                   >
@@ -1067,9 +1260,9 @@ function CardPreviewModal({
                       type="button"
                       className="cp-continue-btn visible"
                       style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                      onClick={() => setStage('end')}
+                      onClick={() => navigate('/chat')}
                     >
-                      Continue
+                      Talk to the sender
                     </button>
                   </div>
                   )
@@ -1195,7 +1388,7 @@ function CardPreviewModal({
                       setAnonSubmitting(true)
                       try {
                         if (onAnonSubmit) await onAnonSubmit(anonMessage.trim())
-                      } catch (e) { /* swallow */ }
+                      } catch { /* swallow */ }
                       setAnonSubmitting(false)
                       setAnonSubmitted(true)
                     }}
@@ -1243,7 +1436,7 @@ function CardPreviewModal({
                       No replies yet — be the first!
                     </p>
                   ) : (
-                    localChainReplies.slice().reverse().map((r, i) => (
+                    localChainReplies.map((r, i) => (
                       <div key={r.userId || r.id || i} className="cp-chain-reply">
                         <div className="cp-chain-reply-avatar" style={{ background: `${c.theme.accentColor}30`, color: c.theme.accentColor }}>
                           {(r.name || '?')[0].toUpperCase()}
@@ -1289,7 +1482,7 @@ function CardPreviewModal({
                           try {
                             if (onChainReply) await onChainReply(chainMessage.trim(), displayName)
                             setLocalChainReplies(prev => [...prev, { response: chainMessage.trim(), name: displayName, timestamp: new Date().toISOString() }])
-                          } catch (e) { /* swallow */ }
+                          } catch { /* swallow */ }
                           setChainSubmitting(false)
                           setChainSubmitted(true)
                         }}

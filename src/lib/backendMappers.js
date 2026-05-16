@@ -890,6 +890,7 @@ export function mapBackendCard(card) {
     templateId: card.templateId || '',
     tier,
     createdAt: card.createdAt || '',
+    senderName: card.senderName || card.creatorName || card.createdBy?.username || card.createdBy?.name || card.user?.username || '',
     // Use card.type as primary signal — content field heuristics as fallback.
     poll: type === 'poll'
       ? { question: content.question || '', options: content.options || [], allowMultiple: !!content.allowMultiple }
