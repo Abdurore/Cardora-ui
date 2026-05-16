@@ -220,7 +220,7 @@ function Store() {
             className={`tab ${activeSection === 'cosmetics' ? 'active' : ''}`}
             onClick={() => setActiveSection('cosmetics')}
           >
-            ✨ Cosmetics
+            Cosmetics
           </button>
           <button
             type="button"
@@ -234,7 +234,7 @@ function Store() {
             className={`tab ${activeSection === 'gifts' ? 'active' : ''}`}
             onClick={() => setActiveSection('gifts')}
           >
-            Gifts Coming Soon
+            Gifts
           </button>
         </div>
 
