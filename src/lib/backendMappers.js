@@ -869,11 +869,31 @@ export function layoutDataToCardObject(layoutdata) {
 export function mapBackendCard(card) {
   const slug = card.slug || card._id || card.cardId || ''
   const config = card.config || {}
-  const content = config.content || {}
+  const layout = card.layoutdata || card.layoutData || card.layoutConfig || {}
+  const content = config.content || card.content || layout.content || {}
   const enhancements = card.enhancements || {}
 
   const type = normaliseType(card.type)
   const tier = normaliseTier(card.tier || card.layoutdata?.tier)
+  const pollContent = content.poll || config.poll || card.poll || layout.poll || content
+  const chainContent = content.chain || config.chain || card.chain || layout.chain || content
+  const triviaContent = content.trivia || config.trivia || card.trivia || layout.trivia || content
+  const pollOptions = Array.isArray(pollContent.options)
+    ? pollContent.options.map((opt, i) => (
+        typeof opt === 'object'
+          ? { id: opt.id || `opt_${i}`, text: opt.text || opt.label || opt.value || '' }
+          : { id: `opt_${i}`, text: String(opt || '') }
+      )).filter(opt => opt.text)
+    : []
+  const triviaQuestions = Array.isArray(triviaContent.questions)
+    ? triviaContent.questions.map(q => ({
+        ...q,
+        text: q.text || q.question || '',
+        question: q.question || q.text || '',
+        options: Array.isArray(q.options) ? q.options : [],
+        correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : 0,
+      }))
+    : []
 
   const lockType = (() => {
     const lt = enhancements.lock?.type || 'none'
@@ -893,14 +913,14 @@ export function mapBackendCard(card) {
     senderName: card.senderName || card.creatorName || card.createdBy?.username || card.createdBy?.name || card.user?.username || '',
     // Use card.type as primary signal — content field heuristics as fallback.
     poll: type === 'poll'
-      ? { question: content.question || '', options: content.options || [], allowMultiple: !!content.allowMultiple }
-      : (content.question && !content.header ? { question: content.question, options: content.options || [] } : null),
+      ? { question: pollContent.question || '', options: pollOptions, allowMultiple: !!pollContent.allowMultiple }
+      : (pollContent.question && !content.header ? { question: pollContent.question, options: pollOptions } : null),
     chain: type === 'chain'
-      ? { challenge: content.challenge || '', rules: content.rules || [] }
-      : (content.challenge ? { challenge: content.challenge, rules: content.rules || [] } : null),
+      ? { challenge: chainContent.challenge || chainContent.prompt || '', prompt: chainContent.prompt || chainContent.challenge || '', rules: chainContent.rules || [] }
+      : (chainContent.challenge || chainContent.prompt ? { challenge: chainContent.challenge || chainContent.prompt, rules: chainContent.rules || [] } : null),
     trivia: type === 'trivia'
-      ? { questions: content.questions || [] }
-      : (content.questions ? { questions: content.questions } : null),
+      ? { questions: triviaQuestions }
+      : (triviaQuestions.length ? { questions: triviaQuestions } : null),
     anonymous: type === 'anonymous'
       ? { message: content.message || '' }
       : null,

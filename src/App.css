@@ -25135,12 +25135,41 @@ a {
 
 /* Compact mobile layout */
 @media (max-width: 540px) {
-  .qc-topbar { padding: 10px 14px; gap: 8px; }
-  .qc-topbar-center { flex-direction: column; gap: 3px; align-items: flex-start; }
+  .qc-topbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .qc-topbar-center {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+    min-width: 0;
+    overflow: hidden;
+  }
   .qc-topbar-title { font-size: 0.88rem; }
+  .qc-topbar-badges { max-width: 100%; overflow: hidden; }
+  .qc-badge-tier {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .qc-topbar-right {
+    display: grid;
+    justify-items: end;
+    gap: 6px;
+  }
+  .qc-cc-pill {
+    max-width: 116px;
+    justify-content: center;
+    padding: 4px 8px;
+  }
+  .qc-cc-cost { display: none; }
   .qc-badge-type { display: none; }
   .qc-studio-text { display: none; }
-  .qc-studio-link-btn { padding: 7px 9px; }
+  .qc-studio-link-btn { padding: 7px 9px; min-width: 34px; justify-content: center; }
 
   /* 3-col shorter swatches — half the scroll of 2-col tall ones */
   .qc-palette-grid { grid-template-columns: repeat(3, 1fr); gap: 7px; }
@@ -25404,17 +25433,19 @@ a {
 .qc-field label { font-size: 0.73rem; font-weight: 600; color: rgba(226,234,240,0.48); letter-spacing: 0.03em; }
 .qc-char-count { font-size: 0.67rem; color: rgba(226,234,240,0.25); }
 .qc-field input, .qc-field textarea {
-  background: rgba(255,255,255,0.04);
-  border: 1.5px solid rgba(255,255,255,0.08);
-  border-radius: 12px; color: var(--border);
+  background: rgba(255,255,255,0.055);
+  border: 1.5px solid rgba(255,255,255,0.12);
+  border-radius: 12px; color: #e8f1f4;
   padding: 12px 16px; font-size: 0.92rem;
   font-family: inherit; resize: none;
   transition: border-color 0.15s, background 0.15s;
   outline: none; width: 100%; box-sizing: border-box;
+  caret-color: #7ef7ff;
 }
+.qc-field input::placeholder, .qc-field textarea::placeholder { color: rgba(232,241,244,0.42); }
 .qc-field input:focus, .qc-field textarea:focus {
   border-color: rgba(126,239,255,0.32);
-  background: rgba(126,239,255,0.025);
+  background: rgba(126,239,255,0.045);
 }
 
 /* Dropzone */

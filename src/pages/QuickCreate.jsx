@@ -259,6 +259,7 @@ function QuickCreate() {
       const triviaData = cardType === 'trivia'
         ? {
             questions: [{
+              question: triviaQuestion.trim(),
               text: triviaQuestion.trim(),
               options: triviaOptions.filter(o => o.trim()),
               correctIndex: triviaCorrect,

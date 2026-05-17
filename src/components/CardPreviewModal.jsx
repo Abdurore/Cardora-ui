@@ -226,6 +226,7 @@ function CardPreviewModal({
   const [chainMessage, setChainMessage] = useState('')
   const [chainSubmitting, setChainSubmitting] = useState(false)
   const [chainSubmitted, setChainSubmitted] = useState(false)
+  const [chainSubmitError, setChainSubmitError] = useState('')
   const [localChainReplies, setLocalChainReplies] = useState([])
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
@@ -482,6 +483,7 @@ function CardPreviewModal({
     setChainMessage('')
     setChainSubmitting(false)
     setChainSubmitted(false)
+    setChainSubmitError('')
   }
 
   const handleEndDone = () => {
@@ -1579,13 +1581,17 @@ function CardPreviewModal({
                         onClick={async () => {
                           if (!chainMessage.trim()) return
                           setChainSubmitting(true)
+                          setChainSubmitError('')
                           const displayName = chainName.trim() || 'Anonymous'
                           try {
                             if (onChainReply) await onChainReply(chainMessage.trim(), displayName)
                             setLocalChainReplies(prev => [...prev, { response: chainMessage.trim(), name: displayName, timestamp: new Date().toISOString() }])
-                          } catch { /* swallow */ }
-                          setChainSubmitting(false)
-                          setChainSubmitted(true)
+                            setChainSubmitted(true)
+                          } catch (err) {
+                            setChainSubmitError(err?.message || 'Could not add your reply. Please try again.')
+                          } finally {
+                            setChainSubmitting(false)
+                          }
                         }}
                       >
                         {chainSubmitting ? 'Sending…' : 'Reply to Chain'}
@@ -1598,6 +1604,9 @@ function CardPreviewModal({
                         Skip
                       </button>
                     </div>
+                    {chainSubmitError && (
+                      <p className="cp-submit-error" style={{ color: c.card.textColor }}>{chainSubmitError}</p>
+                    )}
                   </div>
                 ) : (
                   <div className="cp-chain-reply-sent">

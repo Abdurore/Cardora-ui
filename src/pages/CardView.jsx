@@ -178,27 +178,35 @@ function CardView() {
 
   // Backend submission callbacks
   const handlePollSubmit = async (optionId) => {
+    const options = pollData?.options || []
+    const optionIndex = options.findIndex(opt => (typeof opt === 'object' ? opt.id : opt) === optionId)
+    const optionText = optionIndex >= 0
+      ? (typeof options[optionIndex] === 'object' ? options[optionIndex].text : options[optionIndex])
+      : ''
+    const payload = { type: 'poll', optionId, optionIndex, option: optionId, choice: optionId, optionText }
     try {
-      await submitPollVote(card.slug || id, { optionId })
+      await submitPollVote(card.slug || id, payload)
     } catch (e) {
       console.warn('Poll submit failed, trying generic response endpoint', e)
-      await submitCardResponse(card.slug || id, { type: 'poll', optionId })
+      await submitCardResponse(card.slug || id, payload)
     }
   }
   const handleTriviaComplete = async (answers, name) => {
+    const payload = { type: 'trivia', answers, selectedAnswers: answers, name, playerName: name || 'Anonymous' }
     try {
-      await submitTriviaAnswer(card.slug || id, { answers, name })
+      await submitTriviaAnswer(card.slug || id, payload)
     } catch (e) {
       console.warn('Trivia submit failed, trying generic response endpoint', e)
-      await submitCardResponse(card.slug || id, { type: 'trivia', answers, name })
+      await submitCardResponse(card.slug || id, payload)
     }
   }
   const handleChainReply = async (message, name) => {
+    const payload = { type: 'chain', message, response: message, reply: message, name, participantName: name || 'Anonymous' }
     try {
-      await submitChainReply(card.slug || id, { message, name })
+      await submitChainReply(card.slug || id, payload)
     } catch (e) {
       console.warn('Chain reply failed, trying generic response endpoint', e)
-      await submitCardResponse(card.slug || id, { type: 'chain', message, response: message, name })
+      await submitCardResponse(card.slug || id, payload)
     }
   }
   const handleAnonSubmit = async (message) => {

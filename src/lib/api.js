@@ -126,6 +126,19 @@ async function request(path, { method = 'GET', body, auth = false, headers = {},
   return payload
 }
 
+async function requestFirstSuccess(paths, options = {}) {
+  let lastError = null
+  for (const path of paths) {
+    try {
+      return await request(path, options)
+    } catch (error) {
+      lastError = error
+      if (!error.status) throw error
+    }
+  }
+  throw lastError || new Error('Request failed.')
+}
+
 /* ═══════════════════════════════════════════════
    AUTH
    ═══════════════════════════════════════════════ */
@@ -243,19 +256,51 @@ export async function getMyCard(slug) {
 }
 
 export async function submitCardResponse(slug, body) {
-  return request(`/cards/${slug}/response`, { method: 'POST', body })
+  return requestFirstSuccess([
+    `/cards/${slug}/response`,
+    `/cards/${slug}/responses`,
+    `/public/cards/${slug}/response`,
+    `/public/cards/${slug}/responses`,
+  ], { method: 'POST', body })
 }
 
 export async function submitPollVote(slug, body) {
-  return request(`/cards/${slug}/poll-vote`, { method: 'POST', body })
+  return requestFirstSuccess([
+    `/cards/${slug}/poll-vote`,
+    `/cards/${slug}/poll/vote`,
+    `/cards/${slug}/vote`,
+    `/cards/${slug}/response`,
+    `/public/cards/${slug}/poll-vote`,
+    `/public/cards/${slug}/poll/vote`,
+    `/public/cards/${slug}/vote`,
+    `/public/cards/${slug}/response`,
+  ], { method: 'POST', body })
 }
 
 export async function submitChainReply(slug, body) {
-  return request(`/cards/${slug}/chain-reply`, { method: 'POST', body })
+  return requestFirstSuccess([
+    `/cards/${slug}/chain-reply`,
+    `/cards/${slug}/chain/reply`,
+    `/cards/${slug}/reply`,
+    `/cards/${slug}/response`,
+    `/public/cards/${slug}/chain-reply`,
+    `/public/cards/${slug}/chain/reply`,
+    `/public/cards/${slug}/reply`,
+    `/public/cards/${slug}/response`,
+  ], { method: 'POST', body })
 }
 
 export async function submitTriviaAnswer(slug, body) {
-  return request(`/cards/${slug}/trivia-submit`, { method: 'POST', body })
+  return requestFirstSuccess([
+    `/cards/${slug}/trivia-submit`,
+    `/cards/${slug}/trivia/submit`,
+    `/cards/${slug}/trivia-answer`,
+    `/cards/${slug}/response`,
+    `/public/cards/${slug}/trivia-submit`,
+    `/public/cards/${slug}/trivia/submit`,
+    `/public/cards/${slug}/trivia-answer`,
+    `/public/cards/${slug}/response`,
+  ], { method: 'POST', body })
 }
 
 /* ═══════════════════════════════════════════════
