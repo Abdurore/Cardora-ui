@@ -213,6 +213,8 @@ function CardPreviewModal({
   const [previewTriviaIdx, setPreviewTriviaIdx] = useState(0)
   const [previewTriviaAnswers, setPreviewTriviaAnswers] = useState([])
   const [triviaLocked, setTriviaLocked] = useState(false)
+  const [previewTriviaSubmitting, setPreviewTriviaSubmitting] = useState(false)
+  const [previewTriviaError, setPreviewTriviaError] = useState('')
 
   // Anonymous reply state (pageMode only)
   const [anonMessage, setAnonMessage] = useState('')
@@ -477,6 +479,8 @@ function CardPreviewModal({
     setPreviewTriviaAnswers([])
     setPreviewTriviaSubmitted(false)
     setTriviaLocked(false)
+    setPreviewTriviaSubmitting(false)
+    setPreviewTriviaError('')
     setAnonMessage('')
     setAnonSubmitting(false)
     setAnonSubmitted(false)
@@ -506,7 +510,7 @@ function CardPreviewModal({
   // Build background style
   const bgStyle = {}
   if (c.background.type === 'color') {
-    bgStyle.background = c.background.colors[0] || '#000000'
+    bgStyle.background = c.background.colors[0] || c.card?.backgroundColor || '#0b0f14'
   } else if (c.background.type === 'gradient' || c.background.type === 'animated') {
     bgStyle.background = `linear-gradient(135deg, ${c.background.colors.join(', ')})`
     if (c.background.type === 'animated') bgStyle.backgroundSize = '400% 400%'
@@ -1288,29 +1292,42 @@ function CardPreviewModal({
                     type="button"
                     className="cp-trivia-next"
                     style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                    disabled={previewTriviaAnswers[previewTriviaIdx] == null}
-                    onClick={() => {
+                    disabled={previewTriviaAnswers[previewTriviaIdx] == null || previewTriviaSubmitting}
+                    onClick={async () => {
+                      setPreviewTriviaError('')
                       if (previewTriviaIdx < triviaData.questions.length - 1) {
                         setPreviewTriviaIdx(i => i + 1)
                         setTriviaLocked(false)
                       } else {
-                        setPreviewTriviaSubmitted(true)
+                        setPreviewTriviaSubmitting(true)
                         try {
-                          localStorage.setItem(`${receiverStorageKey}:trivia`, JSON.stringify({
-                            submitted: true,
-                            answers: previewTriviaAnswers,
-                            name: participantName.trim(),
-                          }))
-                        } catch {
-                          /* ignore localStorage failures */
+                          if (onTriviaComplete) await onTriviaComplete(previewTriviaAnswers, participantName.trim())
+                          setPreviewTriviaSubmitted(true)
+                          try {
+                            localStorage.setItem(`${receiverStorageKey}:trivia`, JSON.stringify({
+                              submitted: true,
+                              answers: previewTriviaAnswers,
+                              name: participantName.trim(),
+                            }))
+                          } catch {
+                            /* ignore localStorage failures */
+                          }
+                          setStage('triviaResults')
+                        } catch (err) {
+                          setPreviewTriviaError(err?.message || 'Could not submit your trivia answers. Please try again.')
+                        } finally {
+                          setPreviewTriviaSubmitting(false)
                         }
-                        setStage('triviaResults')
-                        if (onTriviaComplete) onTriviaComplete(previewTriviaAnswers, participantName.trim())
                       }
                     }}
                   >
-                    {previewTriviaIdx < triviaData.questions.length - 1 ? 'Next Question' : 'See Results'}
+                    {previewTriviaSubmitting
+                      ? 'Submitting...'
+                      : previewTriviaIdx < triviaData.questions.length - 1 ? 'Next Question' : 'See Results'}
                   </button>
+                  {previewTriviaError && (
+                    <p className="cp-submit-error" style={{ color: c.card.textColor }}>{previewTriviaError}</p>
+                  )}
                 </div>
               </div>
             </article>,

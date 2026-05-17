@@ -729,7 +729,7 @@ function CardStudio() {
       }
 
       setShowPublish(false)
-      setSavedState('Template submitted for review')
+      setSavedState('Template published to marketplace')
       setPublishSuccess({ name: publishForm.name.trim(), previewImage })
       setPublishScreenshot(null)
       try { localStorage.removeItem(autoSaveKey) } catch { /* ignore */ }
@@ -3677,7 +3677,7 @@ function CardStudio() {
               </button>
             </div>
             <p className="cs-publish-modal-desc">
-              Your card will be submitted for review and added to the Cardora marketplace once approved by our team.
+              Your template will go live in the Cardora marketplace as soon as you publish it.
             </p>
             <div className="cs-publish-fields">
               <label className="cs-field cs-publish-field">
@@ -3771,7 +3771,7 @@ function CardStudio() {
                 onClick={handlePublish}
                 disabled={isPublishing || screenshotUploading || !publishScreenshot?.cloudUrl}
               >
-                {isPublishing ? 'Submitting…' : 'Submit for Review →'}
+                {isPublishing ? 'Publishing...' : 'Publish to Marketplace ->'}
               </button>
               <button
                 type="button"
@@ -3799,10 +3799,9 @@ function CardStudio() {
             <div className="cs-publish-success-icon-wrap">
               <div className="cs-publish-success-icon">{"✓"}</div>
             </div>
-            <h3 className="cs-publish-success-title">Template submitted!</h3>
+            <h3 className="cs-publish-success-title">Template published!</h3>
             <p className="cs-publish-success-desc">
-              <strong>"{publishSuccess.name}"</strong> has been sent to the Cardora team for review.
-              You'll see it appear in the marketplace once it's approved.
+              <strong>"{publishSuccess.name}"</strong> is now live in the Cardora marketplace.
             </p>
             {publishSuccess.previewImage && (
               <img
@@ -3812,9 +3811,9 @@ function CardStudio() {
               />
             )}
             <ul className="cs-publish-success-list">
-              <li>Track review status under <strong>Profile → Published Templates</strong></li>
-              <li>You can delete or edit it there at any time</li>
-              <li>Approved templates earn CC every time someone uses them</li>
+              <li>Track views, likes, and users under <strong>Profile / Published Templates</strong></li>
+              <li>People can discover and use it immediately</li>
+              <li>Live templates earn CC every time someone uses them</li>
             </ul>
             <div className="cs-publish-actions">
               <button

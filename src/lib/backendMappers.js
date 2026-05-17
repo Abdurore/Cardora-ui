@@ -174,15 +174,20 @@ export function mapTemplateToCard(template, index = 0) {
     template.stats?.likes ??
     template.popularityScore ??
     0
-  const userCount =
+  const viewCount =
     template.viewCount ??
     template.views ??
     template.views_count ??
     template.analytics?.views ??
     template.stats?.views ??
-    template.uses ??
+    0
+  const usageCount =
     template.usageCount ??
     template.usage_count ??
+    template.uses ??
+    template.useCount ??
+    template.analytics?.uses ??
+    template.stats?.uses ??
     0
 
   const createdBy = template.createdBy || template.artist || template.author || template.owner || template.userId || null
@@ -196,10 +201,12 @@ export function mapTemplateToCard(template, index = 0) {
     subtitle: template.description || message,
     message,
     occasion: capitalize(template.category || 'General'),
-    meta: `${userCount} Views`,
+    meta: `${usageCount} Users`,
     likes: String(likeCount),
     likeCount,
-    userCount,
+    userCount: usageCount,
+    usageCount,
+    viewCount,
     category: (template.category || 'scratch').toLowerCase(),
     type: normaliseType(template.type || layout.type),
     tier: normaliseTier(findTier(template)),

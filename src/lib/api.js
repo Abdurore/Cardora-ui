@@ -134,6 +134,10 @@ async function requestFirstSuccess(paths, options = {}) {
     } catch (error) {
       lastError = error
       if (!error.status) throw error
+      // Only try the next candidate when the route itself appears absent.
+      // Validation/auth/card-type errors are real backend responses and should
+      // not be hidden by later fallback 404 HTML pages.
+      if (![404, 405].includes(error.status)) throw error
     }
   }
   throw lastError || new Error('Request failed.')
@@ -261,7 +265,7 @@ export async function submitCardResponse(slug, body) {
     `/cards/${slug}/responses`,
     `/public/cards/${slug}/response`,
     `/public/cards/${slug}/responses`,
-  ], { method: 'POST', body })
+  ], { method: 'POST', auth: true, body })
 }
 
 export async function submitPollVote(slug, body) {
@@ -274,7 +278,7 @@ export async function submitPollVote(slug, body) {
     `/public/cards/${slug}/poll/vote`,
     `/public/cards/${slug}/vote`,
     `/public/cards/${slug}/response`,
-  ], { method: 'POST', body })
+  ], { method: 'POST', auth: true, body })
 }
 
 export async function submitChainReply(slug, body) {
@@ -287,7 +291,7 @@ export async function submitChainReply(slug, body) {
     `/public/cards/${slug}/chain/reply`,
     `/public/cards/${slug}/reply`,
     `/public/cards/${slug}/response`,
-  ], { method: 'POST', body })
+  ], { method: 'POST', auth: true, body })
 }
 
 export async function submitTriviaAnswer(slug, body) {
@@ -300,7 +304,7 @@ export async function submitTriviaAnswer(slug, body) {
     `/public/cards/${slug}/trivia/submit`,
     `/public/cards/${slug}/trivia-answer`,
     `/public/cards/${slug}/response`,
-  ], { method: 'POST', body })
+  ], { method: 'POST', auth: true, body })
 }
 
 /* ═══════════════════════════════════════════════
@@ -402,6 +406,22 @@ export async function unlikeTemplate(templateId) {
   return request(`/templates/${templateId}/unlike`, { method: 'POST', auth: true })
 }
 
+export async function trackTemplateView(templateId) {
+  return requestFirstSuccess([
+    `/templates/${templateId}/view`,
+    `/templates/${templateId}/views`,
+    `/templates/${templateId}/track-view`,
+  ], { method: 'POST', auth: true })
+}
+
+export async function trackTemplateUse(templateId) {
+  return requestFirstSuccess([
+    `/templates/${templateId}/use`,
+    `/templates/${templateId}/uses`,
+    `/templates/${templateId}/track-use`,
+  ], { method: 'POST', auth: true })
+}
+
 export async function createTemplate(payload) {
   return request('/create-template', { method: 'POST', auth: true, body: payload })
 }
@@ -411,7 +431,25 @@ export async function updateTemplate(payload) {
 }
 
 export async function deleteTemplate(payload) {
-  return request('/delete-template', { method: 'DELETE', auth: true, body: payload })
+  const templateId = payload?.templateId || payload?.id || payload?._id
+  const candidates = [
+    payload,
+    { templateId },
+    { id: templateId },
+    { _id: templateId },
+    { templateId, id: templateId, _id: templateId },
+  ].filter(Boolean)
+
+  let lastError = null
+  for (const body of candidates) {
+    try {
+      return await request('/delete-template', { method: 'DELETE', auth: true, body })
+    } catch (error) {
+      lastError = error
+      if (![404, 400].includes(error.status)) throw error
+    }
+  }
+  throw lastError || new Error('Could not delete template.')
 }
 
 // Admin-only template delete. Backend enforces role === 'admin' here so the

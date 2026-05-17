@@ -758,10 +758,13 @@ function Profile() {
                         {card.tag || 'Live'}
                       </span>
                       <span className="profile-template-stat">
-                        <strong>{card.userCount ?? 0}</strong> views
+                        <strong>{card.viewCount ?? 0}</strong> views
                       </span>
                       <span className="profile-template-stat">
                         <strong>{card.likeCount ?? 0}</strong> likes
+                      </span>
+                      <span className="profile-template-stat">
+                        <strong>{card.usageCount ?? card.userCount ?? 0}</strong> users
                       </span>
                     </div>
                     <div className="profile-card-actions">

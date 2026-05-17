@@ -20,6 +20,10 @@ function CardItem({
   occasion,
   meta,
   likes,
+  likeCount,
+  userCount,
+  usageCount,
+  viewCount,
   tier = 'classic',
   type,
   variant = 'one',
@@ -31,7 +35,9 @@ function CardItem({
   onToggleFavorite,
 }) {
   const tierInfo = getTierInfo(tier)
-  const audienceCount = String(meta || '').replace(/views?/i, '').trim()
+  const displayLikes = Number(likeCount ?? likes ?? 0) || 0
+  const displayUsers = Number(usageCount ?? userCount ?? String(meta || '').replace(/users?|views?/i, '').trim() ?? 0) || 0
+  const displayViews = Number(viewCount ?? 0) || 0
   const [showReport, setShowReport] = useState(false)
 
   return (
@@ -46,9 +52,12 @@ function CardItem({
         type="button"
         className={`card-favorite ${isFavorite ? 'active' : ''}`}
         aria-pressed={isFavorite}
+        title={isFavorite ? 'Unlike template' : 'Like template'}
+        aria-label={isFavorite ? 'Unlike template' : 'Like template'}
         onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(id) }}
       >
-        {'❤'}
+        <span aria-hidden="true">{isFavorite ? '♥' : '♡'}</span>
+        <strong>{displayLikes}</strong>
       </button>
       <button
         type="button"
@@ -78,8 +87,9 @@ function CardItem({
         {subtitle ? <p className="card-subtitle">{subtitle}</p> : null}
         <div className="card-stats">
           <span className="card-stat"><strong>{tierInfo.cost}</strong> CC</span>
-          <span className="card-stat"><strong>{likes}</strong> Likes</span>
-          <span className="card-stat"><strong>{audienceCount || '0'}</strong> Users</span>
+          <span className="card-stat"><strong>{displayLikes}</strong> Likes</span>
+          <span className="card-stat"><strong>{displayUsers}</strong> Users</span>
+          <span className="card-stat"><strong>{displayViews}</strong> Views</span>
           <span className={`card-stat tier-stat ${tierInfo.badgeClass}`}><strong>{tierInfo.label}</strong></span>
         </div>
       </div>

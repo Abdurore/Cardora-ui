@@ -49,6 +49,9 @@ function CardDetailModal({
   onRequireAuth,
   onDeductCC,
   openCardTypeModal,
+  isLiked = false,
+  onToggleLike,
+  onTemplateUse,
 }) {
   const [view, setView] = useState('main') // 'main' | 'share'
   const [showReport, setShowReport] = useState(false)
@@ -127,9 +130,18 @@ function CardDetailModal({
       } catch { /* fall through with what we have */ }
     }
 
+    onTemplateUse?.(card)
     onClose()
     navigate(`/studio?type=${type}&tier=${tier}`, { state: { cardData: fullCard } })
   }
+
+  const content = card.layoutConfig?.content || card.backendTemplate?.layoutConfig?.content || {}
+  const modalTitle = card.title || content.heading || content.question || 'Template'
+  const modalSubtitle = card.subtitle || content.body || content.message || ''
+  const modalMessage = card.message || content.extendedBody || content.body || content.message || ''
+  const likeCount = Number(card.likeCount ?? card.likes ?? 0)
+  const usageCount = Number(card.usageCount ?? card.userCount ?? 0)
+  const viewCount = Number(card.viewCount ?? 0)
 
   return createPortal(
     <section className="detail-modal" role="dialog" aria-modal="true">
@@ -145,7 +157,7 @@ function CardDetailModal({
         {/* Preview thumb */}
         <div className={`detail-thumb ${card.variant || ''}`}>
           {card.previewImage
-            ? <img src={card.previewImage} alt={card.title || ''} className="detail-thumb-image" />
+            ? <img src={card.previewImage} alt={modalTitle || ''} className="detail-thumb-image" />
             : null}
           <div className="detail-thumb-overlay">
             <div className="detail-thumb-top">
@@ -153,8 +165,8 @@ function CardDetailModal({
               <span className={`tier-badge ${tierInfo.badgeClass}`}>{tierInfo.label}</span>
             </div>
             <div className="detail-thumb-copy">
-              <h3>{card.title}</h3>
-              <p>{card.subtitle}</p>
+              <h3>{modalTitle}</h3>
+              <p>{modalSubtitle}</p>
             </div>
           </div>
           {isPremium ? <span className="detail-upgrade">Unlock full experience</span> : null}
@@ -171,15 +183,19 @@ function CardDetailModal({
               </svg>
               {tierInfo.cost === 0 ? 'Free' : `${tierInfo.cost} CC`}
             </div>
-            {card.likes ? (
-              <div className="cdm-meta-pill">
+            <button
+              type="button"
+              className={`cdm-meta-pill cdm-like-pill ${isLiked ? 'liked' : ''}`}
+              aria-pressed={isLiked}
+              onClick={() => onToggleLike?.(card.id)}
+            >
                 <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" opacity=".7">
                   <path d="M8 1.314C12.438-3.248 23.534 4.735 8 15-7.534 4.736 3.562-3.248 8 1.314z" />
                 </svg>
-                {card.likes}
-              </div>
-            ) : null}
-            {card.meta ? <div className="cdm-meta-pill">{card.meta}</div> : null}
+              {isLiked ? 'Liked' : 'Like'} · {likeCount}
+            </button>
+            <div className="cdm-meta-pill">{usageCount} users</div>
+            <div className="cdm-meta-pill">{viewCount} views</div>
           </div>
 
           {tierInfo.features ? (
@@ -190,7 +206,7 @@ function CardDetailModal({
             </ul>
           ) : null}
 
-          {card.message ? <p className="detail-message">{card.message}</p> : null}
+          {modalMessage ? <p className="detail-message">{modalMessage}</p> : null}
 
           {/* ── Main view ── */}
           {view === 'main' && (

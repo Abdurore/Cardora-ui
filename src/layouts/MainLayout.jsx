@@ -19,6 +19,8 @@ import {
   getUserCoupons,
   likeTemplate,
   unlikeTemplate,
+  trackTemplateUse,
+  trackTemplateView,
   login,
   logout,
   requestOtp,
@@ -249,11 +251,22 @@ function MainLayout() {
       return
     }
 
-    setFavorites((prev) => {
-      const nextFavorites = prev.includes(cardId)
+    const wasLiked = favorites.includes(cardId)
+
+    setFavorites((prev) => (
+      prev.includes(cardId)
         ? prev.filter((id) => id !== cardId)
         : [...prev, cardId]
-      return nextFavorites
+    ))
+    setMarketplaceTemplates((prev) => prev.map((item) => {
+      if (item.id !== cardId) return item
+      const nextLikeCount = Math.max(0, Number(item.likeCount ?? item.likes ?? 0) + (wasLiked ? -1 : 1))
+      return { ...item, likeCount: nextLikeCount, likes: String(nextLikeCount) }
+    }))
+    setSelectedCard((prev) => {
+      if (!prev || prev.id !== cardId) return prev
+      const nextLikeCount = Math.max(0, Number(prev.likeCount ?? prev.likes ?? 0) + (wasLiked ? -1 : 1))
+      return { ...prev, likeCount: nextLikeCount, likes: String(nextLikeCount) }
     })
 
     // Only call the backend for marketplace templates that have a real backend ID
@@ -261,7 +274,6 @@ function MainLayout() {
     if (!backendTemplate) return
     const templateId = backendTemplate.templateId || backendTemplate._id
     if (!templateId) return
-    const wasLiked = favorites.includes(cardId)
     try {
       if (wasLiked) {
         await unlikeTemplate(templateId)
@@ -270,6 +282,47 @@ function MainLayout() {
       }
     } catch (error) {
       console.error('Like sync failed', error)
+    }
+  }
+
+  const openCardDetails = async (card) => {
+    if (!card) {
+      setSelectedCard(null)
+      return
+    }
+    setSelectedCard(card)
+    const templateId = card.templateId || card.backendTemplate?.templateId || card.backendTemplate?._id || card.id
+    const nextViewCount = Number(card.viewCount || 0) + 1
+    setSelectedCard((prev) => prev && prev.id === card.id ? { ...prev, viewCount: nextViewCount } : prev)
+    setMarketplaceTemplates((prev) => prev.map((item) => (
+      item.id === card.id ? { ...item, viewCount: Number(item.viewCount || 0) + 1 } : item
+    )))
+    if (!templateId) return
+    try {
+      await trackTemplateView(templateId)
+    } catch (error) {
+      if (error?.status !== 404) console.warn('Template view tracking failed', error)
+    }
+  }
+
+  const recordTemplateUse = async (card) => {
+    if (!card) return
+    const templateId = card.templateId || card.backendTemplate?.templateId || card.backendTemplate?._id || card.id
+    setMarketplaceTemplates((prev) => prev.map((item) => {
+      if (item.id !== card.id) return item
+      const nextUsageCount = Number(item.usageCount ?? item.userCount ?? 0) + 1
+      return { ...item, usageCount: nextUsageCount, userCount: nextUsageCount, meta: `${nextUsageCount} Users` }
+    }))
+    setSelectedCard((prev) => {
+      if (!prev || prev.id !== card.id) return prev
+      const nextUsageCount = Number(prev.usageCount ?? prev.userCount ?? 0) + 1
+      return { ...prev, usageCount: nextUsageCount, userCount: nextUsageCount, meta: `${nextUsageCount} Users` }
+    })
+    if (!templateId) return
+    try {
+      await trackTemplateUse(templateId)
+    } catch (error) {
+      if (error?.status !== 404) console.warn('Template use tracking failed', error)
     }
   }
 
@@ -519,7 +572,7 @@ function MainLayout() {
         const ownerId = currentUser?.id || null
         const optimisticTemplate = {
           ...created,
-          status: created.status || 'pending',
+          status: created.status || 'live',
           createdBy: created.createdBy || ownerId,
           name: created.name || name,
           type: created.type || type || 'personal',
@@ -535,7 +588,7 @@ function MainLayout() {
       }
 
       await loadPublicData()
-      return { ok: true, message: getResponseMessage(response, 'Template submitted successfully.') }
+      return { ok: true, message: getResponseMessage(response, 'Template published successfully.') }
     } catch (error) {
       console.error('Template publish failed', error)
       return { ok: false, message: error.message || 'Could not publish template.' }
@@ -548,12 +601,20 @@ function MainLayout() {
       // Admins and artists use different endpoints — the artist path checks
       // ownership, which rejects admin callers even though they should be able
       // to moderate the marketplace.
+      const template = marketplaceTemplates.find((t) => (
+        [t.templateId, t.id, t.backendTemplate?._id, t.backendTemplate?.templateId]
+          .some((id) => id && String(id) === String(templateId))
+      ))
+      const backendId = template?.backendTemplate?._id || template?.backendTemplate?.templateId || template?.templateId || template?.id || templateId
       if (currentUser?.role === 'Admin') {
-        await adminDeleteTemplate(templateId)
+        await adminDeleteTemplate(backendId)
       } else {
-        await deleteTemplate({ templateId })
+        await deleteTemplate({ templateId: backendId, id: backendId, _id: backendId })
       }
-      setMarketplaceTemplates((prev) => prev.filter((t) => (t.templateId || t.id) !== templateId))
+      setMarketplaceTemplates((prev) => prev.filter((t) => (
+        ![t.templateId, t.id, t.backendTemplate?._id, t.backendTemplate?.templateId]
+          .some((id) => id && String(id) === String(templateId))
+      )))
       await loadPublicData()
       return { ok: true }
     } catch (error) {
@@ -792,7 +853,7 @@ function MainLayout() {
     <div className={`page ${location.pathname === '/studio' ? 'page-studio' : ''}`}>
       <Outlet
         context={{
-          openCardDetails: setSelectedCard,
+          openCardDetails,
           favorites,
           toggleFavorite,
           balance,
@@ -861,6 +922,9 @@ function MainLayout() {
           setCardTypePreselect(preselect || null)
           setShowCardTypeModal(true)
         }}
+        isLiked={selectedCard ? favorites.includes(selectedCard.id) : false}
+        onToggleLike={toggleFavorite}
+        onTemplateUse={recordTemplateUse}
       />
       <AuthModal
         open={showAuth}

@@ -180,32 +180,34 @@ function CardView() {
   const handlePollSubmit = async (optionId) => {
     const options = pollData?.options || []
     const optionIndex = options.findIndex(opt => (typeof opt === 'object' ? opt.id : opt) === optionId)
-    const optionText = optionIndex >= 0
-      ? (typeof options[optionIndex] === 'object' ? options[optionIndex].text : options[optionIndex])
-      : ''
-    const payload = { type: 'poll', optionId, optionIndex, option: optionId, choice: optionId, optionText }
+    const payload = optionId
+      ? { optionId }
+      : { optionIndex }
     try {
       await submitPollVote(card.slug || id, payload)
     } catch (e) {
-      console.warn('Poll submit failed, trying generic response endpoint', e)
+      if (![404, 405].includes(e?.status)) throw e
+      console.warn('Poll submit route missing, trying generic response endpoint', e)
       await submitCardResponse(card.slug || id, payload)
     }
   }
-  const handleTriviaComplete = async (answers, name) => {
-    const payload = { type: 'trivia', answers, selectedAnswers: answers, name, playerName: name || 'Anonymous' }
+  const handleTriviaComplete = async (answers) => {
+    const payload = { answers }
     try {
       await submitTriviaAnswer(card.slug || id, payload)
     } catch (e) {
-      console.warn('Trivia submit failed, trying generic response endpoint', e)
+      if (![404, 405].includes(e?.status)) throw e
+      console.warn('Trivia submit route missing, trying generic response endpoint', e)
       await submitCardResponse(card.slug || id, payload)
     }
   }
-  const handleChainReply = async (message, name) => {
-    const payload = { type: 'chain', message, response: message, reply: message, name, participantName: name || 'Anonymous' }
+  const handleChainReply = async (message) => {
+    const payload = { response: message }
     try {
       await submitChainReply(card.slug || id, payload)
     } catch (e) {
-      console.warn('Chain reply failed, trying generic response endpoint', e)
+      if (![404, 405].includes(e?.status)) throw e
+      console.warn('Chain reply route missing, trying generic response endpoint', e)
       await submitCardResponse(card.slug || id, payload)
     }
   }
