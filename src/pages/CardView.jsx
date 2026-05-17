@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getCardBySlug, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage } from '../lib/api.js'
+import { getCardBySlug, submitCardResponse, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage } from '../lib/api.js'
 import { mapBackendCard } from '../lib/backendMappers.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import ReportModal from '../components/ReportModal.jsx'
@@ -178,13 +178,28 @@ function CardView() {
 
   // Backend submission callbacks
   const handlePollSubmit = async (optionId) => {
-    try { await submitPollVote(card.slug || id, { optionId }) } catch (e) { console.warn('Poll submit failed', e) }
+    try {
+      await submitPollVote(card.slug || id, { optionId })
+    } catch (e) {
+      console.warn('Poll submit failed, trying generic response endpoint', e)
+      await submitCardResponse(card.slug || id, { type: 'poll', optionId })
+    }
   }
   const handleTriviaComplete = async (answers, name) => {
-    try { await submitTriviaAnswer(card.slug || id, { answers, name }) } catch (e) { console.warn('Trivia submit failed', e) }
+    try {
+      await submitTriviaAnswer(card.slug || id, { answers, name })
+    } catch (e) {
+      console.warn('Trivia submit failed, trying generic response endpoint', e)
+      await submitCardResponse(card.slug || id, { type: 'trivia', answers, name })
+    }
   }
   const handleChainReply = async (message, name) => {
-    try { await submitChainReply(card.slug || id, { message, name }) } catch (e) { console.warn('Chain reply failed', e) }
+    try {
+      await submitChainReply(card.slug || id, { message, name })
+    } catch (e) {
+      console.warn('Chain reply failed, trying generic response endpoint', e)
+      await submitCardResponse(card.slug || id, { type: 'chain', message, response: message, name })
+    }
   }
   const handleAnonSubmit = async (message) => {
     await sendCardAnonymousMessage(card.slug || id, { message })

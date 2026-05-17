@@ -243,19 +243,19 @@ export async function getMyCard(slug) {
 }
 
 export async function submitCardResponse(slug, body) {
-  return request(`/cards/${slug}/response`, { method: 'POST', auth: true, body })
+  return request(`/cards/${slug}/response`, { method: 'POST', body })
 }
 
 export async function submitPollVote(slug, body) {
-  return request(`/cards/${slug}/poll-vote`, { method: 'POST', auth: true, body })
+  return request(`/cards/${slug}/poll-vote`, { method: 'POST', body })
 }
 
 export async function submitChainReply(slug, body) {
-  return request(`/cards/${slug}/chain-reply`, { method: 'POST', auth: true, body })
+  return request(`/cards/${slug}/chain-reply`, { method: 'POST', body })
 }
 
 export async function submitTriviaAnswer(slug, body) {
-  return request(`/cards/${slug}/trivia-submit`, { method: 'POST', auth: true, body })
+  return request(`/cards/${slug}/trivia-submit`, { method: 'POST', body })
 }
 
 /* ═══════════════════════════════════════════════

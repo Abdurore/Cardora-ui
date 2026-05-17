@@ -34,6 +34,50 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function arrayFrom(...values) {
+  return values.find(Array.isArray) || []
+}
+
+function objectFrom(...values) {
+  return values.find(value => value && typeof value === 'object' && !Array.isArray(value)) || {}
+}
+
+function normalizeResponsesState(rawCard, type) {
+  const state = rawCard?.state || {}
+  const stats = rawCard?.stats || rawCard?.analytics || {}
+
+  if (type === 'poll') {
+    return {
+      ...state,
+      votes: arrayFrom(state.votes, state.pollVotes, rawCard.pollVotes, rawCard.votes, stats.votes),
+      counts: objectFrom(state.counts, state.voteCounts, state.pollCounts, rawCard.voteCounts, rawCard.pollCounts, stats.counts),
+    }
+  }
+
+  if (type === 'trivia') {
+    return {
+      ...state,
+      players: arrayFrom(state.players, state.leaderboard, state.submissions, state.responses, rawCard.triviaSubmissions, rawCard.leaderboard),
+    }
+  }
+
+  if (type === 'chain') {
+    return {
+      ...state,
+      responses: arrayFrom(state.responses, state.replies, state.chainReplies, rawCard.chainReplies, rawCard.responses, rawCard.replies),
+    }
+  }
+
+  if (type === 'anonymous' || type === 'anon') {
+    return {
+      ...state,
+      responses: arrayFrom(state.responses, state.messages, rawCard.messages, rawCard.responses),
+    }
+  }
+
+  return state
+}
+
 // ── Empty state ───────────────────────────────────────────────────────
 function EmptyState({ icon, message }) {
   return (
@@ -85,7 +129,9 @@ function PollResultsView({ state, content }) {
   const sorted = [...options].map((opt, i) => {
     const optId = typeof opt === 'object' ? opt.id : `opt_${i}`
     const optText = typeof opt === 'object' ? opt.text : opt
-    const count = Number(counts[optId] || 0) || votes.filter(v => v.optionId === optId).length
+    const countKeys = [optId, String(i), i, optText].filter(key => key !== undefined && key !== null && key !== '')
+    const count = countKeys.reduce((sum, key) => sum + (Number(counts[key]) || 0), 0)
+      || votes.filter(v => countKeys.includes(v.optionId) || countKeys.includes(v.option) || countKeys.includes(v.choice)).length
     return { optId, optText, count }
   }).sort((a, b) => b.count - a.count)
 
@@ -176,10 +222,10 @@ function ChainRepliesView({ state, content }) {
 
   return (
     <div className="cr-section">
-      {content?.challenge && (
+      {(content?.challenge || content?.prompt || content?.heading) && (
         <div className="cr-chain-challenge">
           <p className="cr-chain-challenge-label">Challenge</p>
-          <p className="cr-chain-challenge-text">{content.challenge}</p>
+          <p className="cr-chain-challenge-text">{content.challenge || content.prompt || content.heading}</p>
         </div>
       )}
       <div className="cr-section-header">
@@ -344,7 +390,7 @@ function CardResponses() {
     .replace('standard', 'personal').replace('moment', 'personal')
   const meta = TYPE_META[type] || TYPE_META.personal
   const Icon = meta.Icon
-  const state = rawCard.state || {}
+  const state = normalizeResponsesState(rawCard, type)
   const config = rawCard.config || {}
   const content = config.content || rawCard.content || {}
   const title = rawCard.title || content.header || content.message || content.question || 'Card'

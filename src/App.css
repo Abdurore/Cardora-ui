@@ -10134,14 +10134,18 @@ a {
 .cp-card-inner-full {
   min-height: min(820px, 86vh);
   max-height: min(820px, 86vh);
-  padding: 74px 24px 24px;
+  padding: 58px 24px 24px;
   align-content: start;
   justify-items: center;
-  gap: 24px;
-  overflow-y: auto;
+  gap: 18px;
+  overflow: hidden;
   scroll-behavior: smooth;
   grid-template-rows: auto;
   overscroll-behavior: contain;
+}
+
+.cp-card-with-media .cp-card-inner-full {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
 }
 
 .cp-card-text-only .cp-card-inner-full {
@@ -10159,12 +10163,78 @@ a {
 .cp-signoff {
   justify-self: end;
   width: min(56ch, 100%);
-  margin: 6px auto 0;
+  margin: 24px auto 0;
   text-align: right;
   font-family: 'Cormorant Garamond', 'Playfair Display', serif;
   font-size: clamp(1rem, 2vw, 1.22rem);
   font-style: italic;
   opacity: 0.72;
+}
+
+.cp-personal-signature {
+  justify-self: end;
+  align-self: end;
+  width: min(190px, 58%);
+  margin: 12px 4px 4px auto;
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+  opacity: 1;
+}
+
+.cp-personal-signature-yours {
+  font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+  font-size: clamp(1rem, 2.4vw, 1.35rem);
+  font-style: italic;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  transform: translateY(12px);
+  animation: cpSignatureYours 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+}
+
+.cp-personal-signature-cardora {
+  position: relative;
+  font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.35rem, 3.2vw, 1.95rem);
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  color: var(--sig-accent, currentColor);
+  opacity: 0;
+  transform: translateY(16px) rotate(-2deg);
+  animation: cpSignatureName 1s cubic-bezier(0.16, 1, 0.3, 1) 0.95s both;
+}
+
+.cp-personal-signature-cardora::after {
+  content: '';
+  position: absolute;
+  left: -6%;
+  top: 58%;
+  width: 112%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, currentColor 18%, currentColor 84%, transparent);
+  transform: scaleX(0) rotate(-7deg);
+  transform-origin: left center;
+  opacity: 0.88;
+  animation: cpSignatureSlash 0.74s cubic-bezier(0.65, 0, 0.35, 1) 1.72s both;
+}
+
+@keyframes cpSignatureYours {
+  from { opacity: 0; transform: translateY(12px); filter: blur(10px); }
+  to { opacity: 0.72; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes cpSignatureName {
+  from { opacity: 0; transform: translateY(16px) rotate(-2deg); filter: blur(10px); }
+  to { opacity: 0.9; transform: translateY(0) rotate(-2deg); filter: blur(0); }
+}
+
+@keyframes cpSignatureSlash {
+  from { opacity: 0; transform: scaleX(0) rotate(-7deg); }
+  22% { opacity: 1; }
+  to { opacity: 0.88; transform: scaleX(1) rotate(-7deg); }
 }
 
 .cp-asset-loader {
@@ -10181,12 +10251,18 @@ a {
 }
 
 .cp-card-inner::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 
 .cp-card-inner::-webkit-scrollbar-thumb {
   background: var(--scrollbar-color, #888);
   border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.cp-card-inner::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .cp-media-section {
@@ -10202,13 +10278,25 @@ a {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   gap: 12px;
-  padding: 0 4px 8px;
+  padding: 0 4px 4px;
   width: 100%;
+  max-width: min(100%, 430px);
   scrollbar-width: thin;
   opacity: 0;
   transition: opacity 0.6s ease, transform 0.75s cubic-bezier(0.22, 1, 0.36, 1), filter 0.75s ease;
   transform: translateY(26px) scale(0.94);
   filter: blur(16px);
+  overscroll-behavior-x: contain;
+  -ms-overflow-style: none;
+}
+
+.cp-media-section-full::-webkit-scrollbar {
+  display: none;
+}
+
+.cp-media-section-full.cp-media-auto-pan {
+  scrollbar-width: none;
+  scroll-snap-type: none;
 }
 
 .cp-media-section-full.visible {
@@ -10218,7 +10306,7 @@ a {
 }
 
 .cp-media-section-full.settled {
-  transform: translateY(0) scale(0.985);
+  transform: translateY(0) scale(1);
 }
 
 .cp-media-item {
@@ -10228,14 +10316,18 @@ a {
 
 .cp-media-item-full {
   flex-shrink: 0;
-  width: min(80%, 280px);
-  min-height: clamp(180px, 31vh, 300px);
-  max-height: clamp(180px, 31vh, 300px);
+  width: min(76%, 300px);
+  min-height: clamp(148px, 23vh, 245px);
+  max-height: clamp(148px, 23vh, 245px);
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
   scroll-snap-align: center;
+}
+
+.cp-media-section-full.cp-media-grid--1 .cp-media-item-full {
+  width: min(92%, 360px);
 }
 
 .cp-media-item img {
@@ -10248,6 +10340,7 @@ a {
 .cp-media-item-full img {
   width: 100%;
   height: 100%;
+  max-height: inherit;
   min-height: inherit;
   aspect-ratio: auto;
 }
@@ -10285,6 +10378,37 @@ a {
   transition: opacity ease;
 }
 
+.cp-body-scroll {
+  width: min(100%, 58ch);
+  min-height: 0;
+  max-height: clamp(220px, 36vh, 390px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 8px 0 4px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--scrollbar-color, #888) 76%, transparent) transparent;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+}
+
+.cp-body-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.cp-body-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cp-body-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: var(--scrollbar-color, rgba(255, 255, 255, 0.5));
+  background-clip: content-box;
+}
+
+.cp-card-with-media .cp-body-scroll {
+  max-height: clamp(240px, 34vh, 380px);
+}
+
 .cp-body.visible {
   opacity: 1;
 }
@@ -10308,6 +10432,15 @@ a {
   font-size: 0.85rem;
 }
 
+.cp-card-action-row {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  align-self: end;
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
 .cp-continue-btn {
   padding: 12px 24px;
   border-radius: 999px;
@@ -10316,13 +10449,45 @@ a {
   font-size: 0.85rem;
   cursor: pointer;
   justify-self: center;
-  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+
+.cp-card-action-row .cp-continue-btn {
+  border: 1px solid color-mix(in srgb, var(--action-accent, currentColor) 42%, transparent);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--action-accent, currentColor) 16%, transparent), transparent),
+    rgba(255, 255, 255, 0.045);
+}
+
+.cp-submit-error {
+  margin: -4px 0 0;
+  max-width: 34ch;
+  text-align: center;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  opacity: 0.72;
 }
 
 .cp-card-full .cp-continue-btn {
-  justify-self: start;
+  justify-self: end;
   align-self: end;
   margin-top: 0;
+}
+
+.cp-continue-mark {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--action-accent, currentColor);
+  color: #071012;
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .cp-reveal-element {
@@ -10830,9 +10995,17 @@ a {
     min-height: 80dvh;
     max-height: 84dvh;
     padding: 56px 18px 24px;
-    gap: 20px;
+    gap: 16px;
     grid-template-rows: auto;
-    overflow-y: auto;
+    overflow: hidden;
+  }
+
+  .cp-card-with-media .cp-card-inner-full {
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  }
+
+  .cp-card-with-media .cp-body-scroll {
+    max-height: clamp(220px, 36dvh, 360px);
   }
 
   .cp-gradient-border.cp-gradient-border-full {
@@ -11357,8 +11530,8 @@ a {
   }
 
   .cp-media-item-full {
-    min-height: clamp(180px, 28vh, 240px);
-    max-height: clamp(180px, 28vh, 240px);
+    min-height: clamp(142px, 23vh, 220px);
+    max-height: clamp(142px, 23vh, 220px);
     border-radius: 18px;
     width: min(85%, 260px);
   }

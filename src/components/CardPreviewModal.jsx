@@ -79,6 +79,11 @@ function CardPreviewModal({
   const audioRef = useRef(null)
   const containerRef = useRef(null)
   const openCardInnerRef = useRef(null)
+  const openCardBodyRef = useRef(null)
+  const openCardMediaRef = useRef(null)
+  const bodyAutoScrollPausedRef = useRef(false)
+  const bodyAutoScrollResumeTimerRef = useRef(null)
+  const bodyAutoScrollLastTopRef = useRef(0)
   const previewTimersRef = useRef([])
   const receiverStorageKey = useMemo(() => {
     const path = typeof window !== 'undefined' ? window.location.pathname : cardId
@@ -201,6 +206,8 @@ function CardPreviewModal({
   // Poll preview state
   const [previewPollVotes, setPreviewPollVotes] = useState([])
   const [previewPollSubmitted, setPreviewPollSubmitted] = useState(false)
+  const [previewPollSubmitting, setPreviewPollSubmitting] = useState(false)
+  const [previewPollError, setPreviewPollError] = useState('')
 
   // Trivia preview state
   const [previewTriviaIdx, setPreviewTriviaIdx] = useState(0)
@@ -463,6 +470,8 @@ function CardPreviewModal({
     setRevealStep(0)
     setPreviewPollVotes([])
     setPreviewPollSubmitted(false)
+    setPreviewPollSubmitting(false)
+    setPreviewPollError('')
     setPreviewTriviaIdx(0)
     setPreviewTriviaAnswers([])
     setPreviewTriviaSubmitted(false)
@@ -600,31 +609,69 @@ function CardPreviewModal({
 
   useEffect(() => {
     if (stage !== 'open' || revealStep < 4) return undefined
-    const el = openCardInnerRef.current
+    const el = openCardBodyRef.current
     if (!el) return undefined
 
     el.scrollTop = 0
     const maxScroll = el.scrollHeight - el.clientHeight
     if (maxScroll < 24) return undefined
 
+    bodyAutoScrollPausedRef.current = false
+    bodyAutoScrollLastTopRef.current = 0
     let frame = 0
     let startTime = 0
+    let lastTime = 0
+    let direction = 1
+    const pixelsPerSecond = 15
+    const pauseAutoScroll = (delay = 1600) => {
+      bodyAutoScrollPausedRef.current = true
+      window.clearTimeout(bodyAutoScrollResumeTimerRef.current)
+      bodyAutoScrollResumeTimerRef.current = window.setTimeout(() => {
+        bodyAutoScrollLastTopRef.current = el.scrollTop
+        bodyAutoScrollPausedRef.current = false
+      }, delay)
+    }
+    const handlePointerDown = () => pauseAutoScroll(2200)
+    const handleWheel = () => pauseAutoScroll(1800)
+    const handleTouchMove = () => pauseAutoScroll(1800)
+    const handleScroll = () => {
+      if (!bodyAutoScrollPausedRef.current) return
+      bodyAutoScrollLastTopRef.current = el.scrollTop
+    }
     const delay = window.setTimeout(() => {
-      const duration = Math.min(11000, Math.max(4200, maxScroll * 34))
       const animate = (time) => {
         if (!startTime) startTime = time
-        const progress = Math.min(1, (time - startTime) / duration)
-        const eased = progress < 0.5
-          ? 2 * progress * progress
-          : 1 - Math.pow(-2 * progress + 2, 2) / 2
-        el.scrollTop = maxScroll * eased
-        if (progress < 1) frame = window.requestAnimationFrame(animate)
+        if (!lastTime) lastTime = time
+        const delta = Math.min(80, time - lastTime) / 1000
+        lastTime = time
+        if (!bodyAutoScrollPausedRef.current) {
+          let nextTop = bodyAutoScrollLastTopRef.current + direction * pixelsPerSecond * delta
+          if (nextTop >= maxScroll) {
+            nextTop = maxScroll
+            direction = -1
+          } else if (nextTop <= 0) {
+            nextTop = 0
+            direction = 1
+          }
+          bodyAutoScrollLastTopRef.current = nextTop
+          el.scrollTop = nextTop
+        }
+        frame = window.requestAnimationFrame(animate)
       }
       frame = window.requestAnimationFrame(animate)
-    }, 900)
+    }, 1100)
+    el.addEventListener('pointerdown', handlePointerDown, { passive: true })
+    el.addEventListener('wheel', handleWheel, { passive: true })
+    el.addEventListener('touchmove', handleTouchMove, { passive: true })
+    el.addEventListener('scroll', handleScroll, { passive: true })
 
     return () => {
       window.clearTimeout(delay)
+      window.clearTimeout(bodyAutoScrollResumeTimerRef.current)
+      el.removeEventListener('pointerdown', handlePointerDown)
+      el.removeEventListener('wheel', handleWheel)
+      el.removeEventListener('touchmove', handleTouchMove)
+      el.removeEventListener('scroll', handleScroll)
       if (frame) window.cancelAnimationFrame(frame)
     }
   }, [
@@ -635,6 +682,36 @@ function CardPreviewModal({
     c.content.extendedBody,
     c.media.images.length,
   ])
+
+  useEffect(() => {
+    if (stage !== 'open' || revealStep < 4 || c.media.images.length < 2) return undefined
+    const el = openCardMediaRef.current
+    if (!el) return undefined
+
+    el.scrollLeft = 0
+    const maxScroll = el.scrollWidth - el.clientWidth
+    if (maxScroll < 24) return undefined
+
+    let frame = 0
+    let startTime = 0
+    const delay = window.setTimeout(() => {
+      const duration = Math.min(22000, Math.max(12000, maxScroll * 36))
+      const animate = (time) => {
+        if (!startTime) startTime = time
+        const cycle = ((time - startTime) % duration) / duration
+        const progress = cycle < 0.5 ? cycle * 2 : 2 - cycle * 2
+        const eased = 0.5 - Math.cos(progress * Math.PI) / 2
+        el.scrollLeft = maxScroll * eased
+        frame = window.requestAnimationFrame(animate)
+      }
+      frame = window.requestAnimationFrame(animate)
+    }, 900)
+
+    return () => {
+      window.clearTimeout(delay)
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [stage, revealStep, c.media.images.length])
 
   // Continue label for the open card
   const continueLabel = studioType === 'poll' ? 'Vote Now'
@@ -945,7 +1022,7 @@ function CardPreviewModal({
         <div className="cp-card-wrap cp-card-wrap-full">
           {renderGradientBorder(
             <article
-              className={`cp-card cp-card-full ${isTextOnlyCard ? 'cp-card-text-only' : ''}`}
+              className={`cp-card cp-card-full ${isTextOnlyCard ? 'cp-card-text-only' : 'cp-card-with-media'}`}
               style={cardSurfaceStyle({ ...borderStyle, '--scrollbar-color': c.card.scrollbarColor })}
             >
               <div ref={openCardInnerRef} className="cp-card-inner cp-card-inner-full" style={{ '--scrollbar-color': c.card.scrollbarColor }}>
@@ -966,8 +1043,9 @@ function CardPreviewModal({
                   )
                   if (key === 'media') return mediaAllowed && c.media.images.length > 0 ? (
                     <div
+                      ref={openCardMediaRef}
                       key="media"
-                      className={`cp-media-section cp-media-section-full cp-media-grid--${Math.min(c.media.images.length, 3)} cp-reveal-element ${revealStep >= 2 ? 'visible' : ''} ${revealStep >= 4 ? 'settled' : ''}`}
+                      className={`cp-media-section cp-media-section-full cp-media-grid--${Math.min(c.media.images.length, 3)} ${c.media.images.length > 1 ? 'cp-media-auto-pan' : ''} cp-reveal-element ${revealStep >= 2 ? 'visible' : ''} ${revealStep >= 4 ? 'settled' : ''}`}
                       style={{ transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s' }}
                     >
                       {c.media.images.map((img, i) => (
@@ -988,8 +1066,9 @@ function CardPreviewModal({
                   ) : null
                   if (key === 'body') return (
                     <div
+                      ref={openCardBodyRef}
                       key="body"
-                      className={`cp-body cp-reveal-element ${fadeBody && revealStep >= 3 ? 'visible' : ''}`}
+                      className={`cp-body cp-body-scroll cp-reveal-element ${fadeBody && revealStep >= 3 ? 'visible' : ''}`}
                       style={{
                         color: c.card.textColor,
                         fontFamily: `'${c.theme.fontFamily}', sans-serif`,
@@ -1003,28 +1082,36 @@ function CardPreviewModal({
                           {hasTypewriter ? typedExtended : c.content.extendedBody}
                         </p>
                       )}
+                      {senderName && (
+                        <p className="cp-signoff" style={{ color: c.card.textColor }}>
+                          &mdash; Sent by {senderName}
+                        </p>
+                      )}
+                      {isPersonalType && (
+                        <div className="cp-personal-signature" style={{ '--sig-accent': c.theme.accentColor, color: c.card.textColor }}>
+                          <span className="cp-personal-signature-yours">yours truly,</span>
+                          <span className="cp-personal-signature-cardora">Cardora</span>
+                        </div>
+                      )}
                     </div>
                   )
                   return null
                 })}
 
-                {senderName && (
-                  <p className={`cp-signoff cp-reveal-element ${revealStep >= 4 ? 'visible' : ''}`} style={{ color: c.card.textColor }}>
-                    &mdash; Sent by {senderName}
-                  </p>
-                )}
-
                 {/* Continue */}
-                <button
-                  className={`cp-continue-btn cp-reveal-element ${revealStep >= 4 ? 'visible' : ''}`}
-                  style={{
-                    backgroundColor: c.theme.accentColor,
-                    color: c.card.backgroundColor,
-                  }}
-                  onClick={handleContinue}
-                >
-                  {continueLabel}
-                </button>
+                <div className={`cp-card-action-row cp-reveal-element ${revealStep >= 4 ? 'visible' : ''}`}>
+                  <button
+                    className="cp-continue-btn"
+                    style={{
+                      '--action-accent': c.theme.accentColor,
+                      color: c.theme.accentColor,
+                    }}
+                    onClick={handleContinue}
+                  >
+                    <span>{continueLabel}</span>
+                    <span aria-hidden="true" className="cp-continue-mark">+</span>
+                  </button>
+                </div>
               </div>
             </article>,
             'cp-gradient-border-full'
@@ -1071,30 +1158,44 @@ function CardPreviewModal({
                     ))}
                   </div>
                   {!previewPollSubmitted ? (
-                    <button
-                      type="button"
-                      className="cp-poll-submit"
-                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                      disabled={previewPollVotes.length === 0}
-                      onClick={() => {
-                        setPreviewPollSubmitted(true)
-                        try {
-                          localStorage.setItem(`${receiverStorageKey}:poll`, JSON.stringify({ submitted: true, votes: previewPollVotes }))
-                        } catch {
-                          /* ignore localStorage failures */
-                        }
-                        if (onPollSubmit) {
-                          const opts = pollData?.options || []
-                          const optId = previewPollVotes.map(i => {
-                            const o = opts[i]
-                            return typeof o === 'object' ? o.id : `opt_${i}`
-                          })[0]
-                          onPollSubmit(optId)
-                        }
-                      }}
-                    >
-                      Submit Vote
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="cp-poll-submit"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        disabled={previewPollVotes.length === 0 || previewPollSubmitting}
+                        onClick={async () => {
+                          if (previewPollSubmitting) return
+                          setPreviewPollSubmitting(true)
+                          setPreviewPollError('')
+                          try {
+                            if (onPollSubmit) {
+                              const opts = pollData?.options || []
+                              const optId = previewPollVotes.map(i => {
+                                const o = opts[i]
+                                return typeof o === 'object' ? o.id : `opt_${i}`
+                              })[0]
+                              await onPollSubmit(optId)
+                            }
+                            setPreviewPollSubmitted(true)
+                            try {
+                              localStorage.setItem(`${receiverStorageKey}:poll`, JSON.stringify({ submitted: true, votes: previewPollVotes }))
+                            } catch {
+                              /* ignore localStorage failures */
+                            }
+                          } catch (err) {
+                            setPreviewPollError(err?.message || 'Could not submit your vote. Please try again.')
+                          } finally {
+                            setPreviewPollSubmitting(false)
+                          }
+                        }}
+                      >
+                        {previewPollSubmitting ? 'Submitting...' : 'Submit Vote'}
+                      </button>
+                      {previewPollError && (
+                        <p className="cp-submit-error" style={{ color: c.card.textColor }}>{previewPollError}</p>
+                      )}
+                    </>
                   ) : (
                     <div className="cp-poll-voted-confirm">
                       <div className="cp-poll-voted-icon" style={{ color: c.theme.accentColor }}>✓</div>

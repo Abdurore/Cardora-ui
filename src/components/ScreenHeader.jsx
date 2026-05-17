@@ -3,15 +3,39 @@ import { useState, useEffect } from 'react'
 
 const BRAND_LOGO = '/cardora-logo.png?v=4'
 
+function getDeviceTheme() {
+  try {
+    return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  } catch {
+    return 'dark'
+  }
+}
+
 function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
   const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem('cardora-theme') || 'dark' } catch { return 'dark' }
+    try {
+      const stored = localStorage.getItem('cardora-theme')
+      return stored === 'light' || stored === 'dark' ? stored : getDeviceTheme()
+    } catch {
+      return getDeviceTheme()
+    }
   })
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme === 'light' ? 'light' : ''
     try { localStorage.setItem('cardora-theme', theme) } catch {}
   }, [theme])
+
+  useEffect(() => {
+    let stored = null
+    try { stored = localStorage.getItem('cardora-theme') } catch {}
+    if (stored === 'light' || stored === 'dark') return undefined
+    const media = window.matchMedia?.('(prefers-color-scheme: light)')
+    if (!media) return undefined
+    const handleChange = () => setTheme(media.matches ? 'light' : 'dark')
+    media.addEventListener?.('change', handleChange)
+    return () => media.removeEventListener?.('change', handleChange)
+  }, [])
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light')
 
