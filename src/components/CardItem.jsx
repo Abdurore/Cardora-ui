@@ -31,8 +31,8 @@ function CardItem({
   showTypeBadge = true,
   previewImage,
   onClick,
-  isFavorite,
-  onToggleFavorite,
+  isLiked,
+  onToggleLike,
 }) {
   const tierInfo = getTierInfo(tier)
   const displayLikes = Number(likeCount ?? likes ?? 0) || 0
@@ -48,16 +48,19 @@ function CardItem({
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter') onClick?.() }}
     >
+      {/* Like button — reflects backend likes */}
       <button
         type="button"
-        className={`card-favorite ${isFavorite ? 'active' : ''}`}
-        aria-pressed={isFavorite}
-        title={isFavorite ? 'Unlike template' : 'Like template'}
-        aria-label={isFavorite ? 'Unlike template' : 'Like template'}
-        onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(id) }}
+        className={`card-like-btn ${isLiked ? 'liked' : ''}`}
+        aria-pressed={isLiked}
+        title={isLiked ? 'Unlike template' : 'Like template'}
+        aria-label={isLiked ? 'Unlike template' : 'Like template'}
+        onClick={(e) => { e.stopPropagation(); onToggleLike?.(id) }}
       >
-        <span aria-hidden="true">{isFavorite ? '♥' : '♡'}</span>
-        <strong>{displayLikes}</strong>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+        </svg>
+        <span>{displayLikes}</span>
       </button>
       <button
         type="button"

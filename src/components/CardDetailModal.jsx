@@ -49,6 +49,8 @@ function CardDetailModal({
   onRequireAuth,
   onDeductCC,
   openCardTypeModal,
+  isFavorited = false,
+  onToggleFavorite,
   isLiked = false,
   onToggleLike,
   onTemplateUse,
@@ -137,8 +139,6 @@ function CardDetailModal({
 
   const content = card.layoutConfig?.content || card.backendTemplate?.layoutConfig?.content || {}
   const modalTitle = card.title || content.heading || content.question || 'Template'
-  const modalSubtitle = card.subtitle || content.body || content.message || ''
-  const modalMessage = card.message || content.extendedBody || content.body || content.message || ''
   const likeCount = Number(card.likeCount ?? card.likes ?? 0)
   const usageCount = Number(card.usageCount ?? card.userCount ?? 0)
   const viewCount = Number(card.viewCount ?? 0)
@@ -154,7 +154,7 @@ function CardDetailModal({
         {/* Drag handle */}
         <div className="cdm-drag-handle" aria-hidden="true" />
 
-        {/* Preview thumb */}
+        {/* Preview thumb — clean image, no content overlay */}
         <div className={`detail-thumb ${card.variant || ''}`}>
           {card.previewImage
             ? <img src={card.previewImage} alt={modalTitle || ''} className="detail-thumb-image" />
@@ -164,16 +164,29 @@ function CardDetailModal({
               <p className="detail-eyebrow">{card.occasion}</p>
               <span className={`tier-badge ${tierInfo.badgeClass}`}>{tierInfo.label}</span>
             </div>
-            <div className="detail-thumb-copy">
-              <h3>{modalTitle}</h3>
-              <p>{modalSubtitle}</p>
-            </div>
           </div>
           {isPremium ? <span className="detail-upgrade">Unlock full experience</span> : null}
         </div>
 
         {/* Body */}
         <div className="detail-body">
+          {/* Title row with bookmark */}
+          <div className="cdm-title-row">
+            <h3 className="cdm-template-title">{modalTitle}</h3>
+            <button
+              type="button"
+              className={`cdm-bookmark-btn ${isFavorited ? 'saved' : ''}`}
+              aria-pressed={isFavorited}
+              title={isFavorited ? 'Remove from saved' : 'Save template'}
+              onClick={() => onToggleFavorite?.(card.id)}
+            >
+              {/* Bookmark / ribbon icon */}
+              <svg viewBox="0 0 24 24" width="20" height="20" fill={isFavorited ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+              </svg>
+            </button>
+          </div>
+
           {/* Meta row */}
           <div className="cdm-meta-row">
             <div className="cdm-meta-pill">
@@ -189,9 +202,9 @@ function CardDetailModal({
               aria-pressed={isLiked}
               onClick={() => onToggleLike?.(card.id)}
             >
-                <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" opacity=".7">
-                  <path d="M8 1.314C12.438-3.248 23.534 4.735 8 15-7.534 4.736 3.562-3.248 8 1.314z" />
-                </svg>
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" opacity=".7">
+                <path d="M8 1.314C12.438-3.248 23.534 4.735 8 15-7.534 4.736 3.562-3.248 8 1.314z" />
+              </svg>
               {isLiked ? 'Liked' : 'Like'} · {likeCount}
             </button>
             <div className="cdm-meta-pill">{usageCount} users</div>
@@ -205,8 +218,6 @@ function CardDetailModal({
               ))}
             </ul>
           ) : null}
-
-          {modalMessage ? <p className="detail-message">{modalMessage}</p> : null}
 
           {/* ── Main view ── */}
           {view === 'main' && (

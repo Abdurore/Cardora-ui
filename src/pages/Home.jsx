@@ -115,6 +115,8 @@ function Home() {
     openCardDetails,
     favorites,
     toggleFavorite,
+    likedTemplates,
+    toggleLike,
     currentUser,
     openAuthModal,
     balance,
@@ -327,8 +329,8 @@ function Home() {
                   {...card}
                   showOccasion={false}
                   variant={`v${(index % 4) + 1}`}
-                  isFavorite={favorites.includes(card.id)}
-                  onToggleFavorite={toggleFavorite}
+                  isLiked={likedTemplates.includes(card.id)}
+                  onToggleLike={toggleLike}
                   onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
                 />
               ))}

@@ -7,79 +7,112 @@ const HEART_PATH =
 const HEART_SHAPE = 'heart'
 
 const EFFECTS = {
-  spark: {
-    gradient: ['#ff6b9d', '#ff4f98'],
-    price: 2,
+  tiny: {
+    gradient: ['#9ca3af', '#6b7280'],
+    label: 'Tiny Heart',
+    color: 'Gray',
+    meaning: 'Small appreciation',
+    price: 500,
+    currency: '₦',
     phases: ['form'],
     duration: 1500,
     intensity: 1,
   },
-  ember: {
-    gradient: ['#5de0ff', '#7b82ff'],
-    price: 3,
+  sweet: {
+    gradient: ['#f9a8d4', '#ec4899'],
+    label: 'Sweet Heart',
+    color: 'Pink',
+    meaning: 'Sweet gesture',
+    price: 1000,
+    currency: '₦',
     phases: ['explode', 'form'],
     duration: 1800,
     intensity: 1.2,
   },
-  bloom: {
-    gradient: ['#7b0016', '#ff4f98'],
-    price: 5,
+  purple: {
+    gradient: ['#c084fc', '#7c3aed'],
+    label: 'Purple Love',
+    color: 'Purple',
+    meaning: 'Admiration',
+    price: 2000,
+    currency: '₦',
     phases: ['explode', 'form'],
     duration: 2200,
     intensity: 1.45,
   },
-  glow: {
-    gradient: ['#ffd56a', '#ff7ad1'],
-    price: 7,
+  ocean: {
+    gradient: ['#60a5fa', '#2563eb'],
+    label: 'Ocean Heart',
+    color: 'Blue',
+    meaning: 'Thoughtful gift',
+    price: 3000,
+    currency: '₦',
     phases: ['explode', 'form'],
     duration: 2500,
     intensity: 1.7,
   },
-  radiance: {
-    gradient: ['#7ef7ff', '#62ffa2'],
-    price: 10,
+  emerald: {
+    gradient: ['#34d399', '#059669'],
+    label: 'Emerald Heart',
+    color: 'Green',
+    meaning: 'Special gift',
+    price: 5000,
+    currency: '₦',
     phases: ['orbit', 'form'],
     duration: 3000,
     intensity: 2,
   },
-  bliss: {
-    gradient: ['#ffe07a', '#ff9bd2'],
-    price: 30,
+  passion: {
+    gradient: ['#f87171', '#dc2626'],
+    label: 'Passion Heart',
+    color: 'Red',
+    meaning: 'Romantic gift',
+    price: 10000,
+    currency: '₦',
     phases: ['orbit', 'form'],
     duration: 3400,
     intensity: 2.4,
   },
-  euphoria: {
-    gradient: ['#ffce7a', '#ff7ad1'],
-    price: 50,
+  golden: {
+    gradient: ['#fbbf24', '#d97706'],
+    label: 'Golden Heart',
+    color: 'Gold',
+    meaning: 'Premium gift',
+    price: 20000,
+    currency: '₦',
     phases: ['explode', 'orbit', 'form'],
     duration: 3800,
     intensity: 2.8,
   },
-  cosmos: {
-    gradient: ['#3cffb1', '#7ef7ff'],
-    price: 60,
+  crystal: {
+    gradient: ['#22d3ee', '#06b6d4'],
+    label: 'Crystal Heart',
+    color: 'Cyan',
+    meaning: 'Luxury gift',
+    price: 50000,
+    currency: '₦',
     phases: ['explode', 'orbit', 'form'],
     duration: 4100,
     intensity: 3.1,
   },
-  eternal: {
-    gradient: ['#ffe59a', '#ffd1f0'],
-    price: 80,
+  diamond: {
+    gradient: ['#e2e8f0', '#94a3b8'],
+    label: 'Diamond Heart',
+    color: 'Silver',
+    meaning: 'Elite gift',
+    price: 100000,
+    currency: '₦',
     phases: ['orbit', 'form', 'glow'],
     duration: 4400,
     intensity: 3.35,
   },
-  legend: {
-    gradient: ['#ff9bd2', '#7ef7ff'],
-    price: 99,
-    phases: ['explode', 'orbit', 'form', 'glow'],
-    duration: 4700,
-    intensity: 3.7,
-  },
-  divine: {
-    gradient: ['#ffd56a', '#7ef7ff'],
-    price: 150,
+  legendary: {
+    gradient: ['#f472b6', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'],
+    label: 'Legendary Heart',
+    color: 'Rainbow',
+    meaning: 'Legendary gift',
+    price: 200000,
+    currency: '₦',
     phases: ['explode', 'orbit', 'form', 'glow'],
     duration: 5200,
     intensity: 4,
@@ -104,7 +137,7 @@ export const giftConfigs = Object.values(EFFECTS).reduce((acc, effect) => {
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
 const easeOutQuad = (t) => 1 - (1 - t) * (1 - t)
 
-export const getGiftEffect = (key) => EFFECTS[key] || EFFECTS.spark
+export const getGiftEffect = (key) => EFFECTS[key] || EFFECTS.tiny
 
 function phaseProgress(elapsed, config) {
   const phases = config.phases
@@ -225,8 +258,13 @@ function PremiumGiftReveal({ effect = 'spark', onComplete }) {
       ctx.fillStyle = `rgba(2, 2, 5, ${phase === 'glow' ? 0.09 : lowPower ? 0.22 : 0.15})`
       ctx.fillRect(0, 0, width(), height())
 
-      const gradStart = config.gradient[1]
-      const gradEnd = config.gradient[0]
+      // For rainbow (multi-stop) gradients, each particle picks its own color segment
+      const isRainbow = config.gradient.length > 2
+      const getParticleColors = (idx) => {
+        if (!isRainbow) return { start: config.gradient[1], end: config.gradient[0] }
+        const colorIdx = idx % (config.gradient.length - 1)
+        return { start: config.gradient[colorIdx + 1], end: config.gradient[colorIdx] }
+      }
 
       particles.forEach((p, index) => {
         const target = heartPoint((index / particleCount) * Math.PI * 2, cx, cy, scale)
@@ -264,6 +302,8 @@ function PremiumGiftReveal({ effect = 'spark', onComplete }) {
         const alpha = phase === 'glow'
           ? Math.max(0.18, (1 - totalProgress) * 1.2)
           : Math.max(0.22, 0.35 + localProgress * 0.4)
+
+        const { start: gradStart, end: gradEnd } = getParticleColors(index)
 
         ctx.save()
         ctx.globalAlpha = alpha * p.opacity

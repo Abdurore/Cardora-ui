@@ -260,15 +260,17 @@ export async function getMyCard(slug) {
 }
 
 export async function submitCardResponse(slug, body) {
+  const hasAuth = !!getStoredToken()
   return requestFirstSuccess([
     `/cards/${slug}/response`,
     `/cards/${slug}/responses`,
     `/public/cards/${slug}/response`,
     `/public/cards/${slug}/responses`,
-  ], { method: 'POST', auth: true, body })
+  ], { method: 'POST', auth: hasAuth, body })
 }
 
 export async function submitPollVote(slug, body) {
+  const hasAuth = !!getStoredToken()
   return requestFirstSuccess([
     `/cards/${slug}/poll-vote`,
     `/cards/${slug}/poll/vote`,
@@ -278,10 +280,11 @@ export async function submitPollVote(slug, body) {
     `/public/cards/${slug}/poll/vote`,
     `/public/cards/${slug}/vote`,
     `/public/cards/${slug}/response`,
-  ], { method: 'POST', auth: true, body })
+  ], { method: 'POST', auth: hasAuth, body })
 }
 
 export async function submitChainReply(slug, body) {
+  const hasAuth = !!getStoredToken()
   return requestFirstSuccess([
     `/cards/${slug}/chain-reply`,
     `/cards/${slug}/chain/reply`,
@@ -291,10 +294,11 @@ export async function submitChainReply(slug, body) {
     `/public/cards/${slug}/chain/reply`,
     `/public/cards/${slug}/reply`,
     `/public/cards/${slug}/response`,
-  ], { method: 'POST', auth: true, body })
+  ], { method: 'POST', auth: hasAuth, body })
 }
 
 export async function submitTriviaAnswer(slug, body) {
+  const hasAuth = !!getStoredToken()
   return requestFirstSuccess([
     `/cards/${slug}/trivia-submit`,
     `/cards/${slug}/trivia/submit`,
@@ -304,7 +308,7 @@ export async function submitTriviaAnswer(slug, body) {
     `/public/cards/${slug}/trivia/submit`,
     `/public/cards/${slug}/trivia-answer`,
     `/public/cards/${slug}/response`,
-  ], { method: 'POST', auth: true, body })
+  ], { method: 'POST', auth: hasAuth, body })
 }
 
 /* ═══════════════════════════════════════════════

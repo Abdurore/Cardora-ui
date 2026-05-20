@@ -33,6 +33,8 @@ function Profile() {
     openCardDetails,
     favorites,
     toggleFavorite,
+    likedTemplates,
+    toggleLike,
     balance,
     currentUser,
     openAuthModal,
@@ -749,8 +751,8 @@ function Profile() {
                     <CardItem
                       {...card}
                       variant={`v${(index % 4) + 1}`}
-                      isFavorite={favorites.includes(card.id)}
-                      onToggleFavorite={toggleFavorite}
+                      isLiked={likedTemplates.includes(card.id)}
+                      onToggleLike={toggleLike}
                       onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
                     />
                     <div className="profile-template-analytics">
@@ -819,8 +821,8 @@ function Profile() {
                       {...card}
                       variant={typeVariant}
                       showTypeBadge={true}
-                      isFavorite={favorites.includes(card.id)}
-                      onToggleFavorite={toggleFavorite}
+                      isLiked={likedTemplates.includes(card.id)}
+                      onToggleLike={toggleLike}
                       onClick={() => card.slug
                         ? navigate(`/card/${card.slug}/responses`)
                         : openCardDetails({ ...card, variant: typeVariant })
@@ -894,8 +896,8 @@ function Profile() {
                   key={`${card.title}-${index}`}
                   {...card}
                   variant={`v${(index % 4) + 1}`}
-                  isFavorite={favorites.includes(card.id)}
-                  onToggleFavorite={toggleFavorite}
+                  isLiked={likedTemplates.includes(card.id)}
+                  onToggleLike={toggleLike}
                   onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
                 />
               ))}

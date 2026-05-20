@@ -12,6 +12,8 @@ function Explore() {
     openCardDetails,
     favorites,
     toggleFavorite,
+    likedTemplates,
+    toggleLike,
     currentUser,
     openAuthModal,
     balance,
@@ -127,8 +129,8 @@ function Explore() {
                   key={`trending-${card.id}-${index}`}
                   {...card}
                   variant={`v${(index % 4) + 1}`}
-                  isFavorite={favorites.includes(card.id)}
-                  onToggleFavorite={toggleFavorite}
+                  isLiked={likedTemplates.includes(card.id)}
+                  onToggleLike={toggleLike}
                   onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
                 />
               ))}
@@ -194,8 +196,8 @@ function Explore() {
                   key={`${card.title}-${index}`}
                   {...card}
                   variant={`v${(index % 4) + 1}`}
-                  isFavorite={favorites.includes(card.id)}
-                  onToggleFavorite={toggleFavorite}
+                  isLiked={likedTemplates.includes(card.id)}
+                  onToggleLike={toggleLike}
                   onClick={() => openCardDetails({ ...card, variant: `v${(index % 4) + 1}` })}
                 />
               ))}

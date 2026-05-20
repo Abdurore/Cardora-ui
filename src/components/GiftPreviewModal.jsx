@@ -36,9 +36,9 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
           <h3>{gift.title}</h3>
           <p className="detail-subtitle">{gift.note}</p>
           <div className="detail-meta">
-            <span>{gift.amount}</span>
+            <span>{effectConfig?.label || gift.title}</span>
             <span className="dot" />
-            <span>{effectConfig?.price ? `$${effectConfig.price} tier` : 'Effect preview'}</span>
+            <span>{effectConfig?.meaning || 'Effect preview'}</span>
           </div>
           <div className="detail-actions">
             <button className="ghost" type="button" onClick={() => setShowEffect(true)}>

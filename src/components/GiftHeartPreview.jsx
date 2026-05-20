@@ -24,7 +24,7 @@ const CYCLE_MS = 3400
 // Looping preview that mirrors the full-screen PremiumGiftReveal canvas.
 // Particles burst outward then converge to form a glowing heart silhouette.
 // Rotation and bob keep the settled heart alive between cycles.
-function GiftHeartPreview({ effectKey = 'spark' }) {
+function GiftHeartPreview({ effectKey = 'tiny' }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
   const rafRef = useRef(null)
@@ -98,8 +98,12 @@ function GiftHeartPreview({ effectKey = 'spark' }) {
     const minFrameMs = lowPower ? 20 : 0
     const startTime = performance.now()
 
-    const gradA = config.gradient[0]
-    const gradB = config.gradient[1]
+    const isRainbow = config.gradient.length > 2
+    const getColors = (idx) => {
+      if (!isRainbow) return { a: config.gradient[0], b: config.gradient[1] }
+      const ci = idx % (config.gradient.length - 1)
+      return { a: config.gradient[ci], b: config.gradient[ci + 1] }
+    }
 
     const tick = (time) => {
       if (time - lastFrame < minFrameMs) {
@@ -186,6 +190,7 @@ function GiftHeartPreview({ effectKey = 'spark' }) {
 
         ctx.save()
         ctx.globalAlpha = Math.max(0.04, alpha * p.opacity)
+        const { a: gradA, b: gradB } = getColors(i)
         if (!lowPower) {
           ctx.shadowBlur = p.glow * glowPulse
           ctx.shadowColor = gradA

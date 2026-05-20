@@ -83,6 +83,7 @@ function readUserMeta(userId) {
 function MainLayout() {
   const [selectedCard, setSelectedCard] = useState(null)
   const [favorites, setFavorites] = useState([])
+  const [likedTemplates, setLikedTemplates] = useState([])
   const [balance, setBalance] = useState(0)
   const [cart, setCart] = useState([])
   const [inventory, setInventory] = useState([])
@@ -119,6 +120,7 @@ function MainLayout() {
     setCurrentUser(null)
     setBalance(0)
     setFavorites([])
+    setLikedTemplates([])
     setInventory([])
     setAvatarUrl('')
     setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
@@ -157,6 +159,7 @@ function MainLayout() {
       setCurrentUser(normalized)
       setBalance(normalized.balance)
       setFavorites(meta.favorites || [])
+      setLikedTemplates(meta.likedTemplates || [])
       setInventory(meta.inventory || [])
       setAvatarUrl(normalized.avatarUrl || '')
       setAvatarColor(meta.avatarColor || normalized.avatarColor)
@@ -222,6 +225,7 @@ function MainLayout() {
     const storageKey = `${USER_META_PREFIX}${hydratedUser.id}`
     const payload = {
       favorites,
+      likedTemplates,
       inventory,
       avatarColor,
     }
@@ -235,6 +239,7 @@ function MainLayout() {
           storageKey,
           JSON.stringify({
             favorites,
+            likedTemplates,
             inventory,
             avatarColor,
           }),
@@ -243,17 +248,18 @@ function MainLayout() {
         console.warn('Failed to persist fallback user meta.', fallbackError)
       }
     }
-  }, [avatarColor, avatarUrl, favorites, hydratedUser?.id, inventory])
+  }, [avatarColor, avatarUrl, favorites, likedTemplates, hydratedUser?.id, inventory])
 
-  const toggleFavorite = async (cardId) => {
+  // toggleLike = backend-synced likes (shown on card grid items)
+  const toggleLike = async (cardId) => {
     if (!hydratedUser) {
       navigate('/login')
       return
     }
 
-    const wasLiked = favorites.includes(cardId)
+    const wasLiked = likedTemplates.includes(cardId)
 
-    setFavorites((prev) => (
+    setLikedTemplates((prev) => (
       prev.includes(cardId)
         ? prev.filter((id) => id !== cardId)
         : [...prev, cardId]
@@ -283,6 +289,15 @@ function MainLayout() {
     } catch (error) {
       console.error('Like sync failed', error)
     }
+  }
+
+  // toggleFavorite = local bookmarks only (shown as bookmark in modal)
+  const toggleFavorite = (cardId) => {
+    setFavorites((prev) => (
+      prev.includes(cardId)
+        ? prev.filter((id) => id !== cardId)
+        : [...prev, cardId]
+    ))
   }
 
   const openCardDetails = async (card) => {
@@ -524,6 +539,7 @@ function MainLayout() {
       setCurrentUser(null)
       setBalance(0)
       setFavorites([])
+      setLikedTemplates([])
       setInventory([])
       setAvatarUrl('')
       setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
@@ -856,6 +872,8 @@ function MainLayout() {
           openCardDetails,
           favorites,
           toggleFavorite,
+          likedTemplates,
+          toggleLike,
           balance,
           cart,
           addToCart,
@@ -922,8 +940,10 @@ function MainLayout() {
           setCardTypePreselect(preselect || null)
           setShowCardTypeModal(true)
         }}
-        isLiked={selectedCard ? favorites.includes(selectedCard.id) : false}
-        onToggleLike={toggleFavorite}
+        isFavorited={selectedCard ? favorites.includes(selectedCard.id) : false}
+        onToggleFavorite={toggleFavorite}
+        isLiked={selectedCard ? likedTemplates.includes(selectedCard.id) : false}
+        onToggleLike={toggleLike}
         onTemplateUse={recordTemplateUse}
       />
       <AuthModal
