@@ -95,6 +95,17 @@ function Profile() {
   const profileBgBlur = currentUser?.profileBackground?.blur || currentUser?.equippedBackground?.blur || false
   const equippedBgId = currentUser?.profileBackground?.id || currentUser?.profileBackground?._id || currentUser?.equippedBackground?.id || currentUser?.equippedBackground?._id || ''
 
+  const handleLogoutClick = async () => {
+    const confirmed = await appConfirm('Log Out', 'Are you sure you want to log out?', {
+      confirmLabel: 'Log Out',
+      cancelLabel: 'Cancel',
+      variant: 'warning',
+    })
+    if (confirmed) {
+      onLogout()
+    }
+  }
+
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const paystackReference = params.get('reference') || params.get('trxref')
@@ -943,7 +954,7 @@ function Profile() {
         {currentUser && (
           <div className="profile-danger-zone">
             <h4 className="section-title">Account</h4>
-            <button className="ghost" type="button" onClick={onLogout}>
+            <button className="ghost" type="button" onClick={handleLogoutClick}>
               Log Out
             </button>
             <button
@@ -957,6 +968,9 @@ function Profile() {
         )}
       </div>
       <ScreenNav />
+
+      {/* Logout Confirmation Modal */}
+      {ConfirmModal}
 
       <AvatarCropModal
         open={Boolean(cropSrc)}

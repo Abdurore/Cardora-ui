@@ -2,6 +2,14 @@ import { useState } from 'react'
 import { getTierInfo } from '../utils/tier.js'
 import ReportModal from './ReportModal.jsx'
 
+// Truncate text to a specified word limit
+const truncateText = (text, wordLimit = 10) => {
+  if (!text) return text
+  const words = text.split(/\s+/)
+  if (words.length <= wordLimit) return text
+  return words.slice(0, wordLimit).join(' ') + '...'
+}
+
 const TYPE_BADGE = {
   personal:  { label: 'Personal',  cls: 'type-badge-personal' },
   poll:      { label: 'Poll',      cls: 'type-badge-poll' },
@@ -87,7 +95,7 @@ function CardItem({
       <div className="card-info">
         {showOccasion && occasion ? <p className="card-eyebrow">{occasion}</p> : null}
         <h4>{title}</h4>
-        {subtitle ? <p className="card-subtitle">{subtitle}</p> : null}
+        {subtitle ? <p className="card-subtitle">{truncateText(subtitle, 10)}</p> : null}
         <div className="card-stats">
           <span className="card-stat"><strong>{tierInfo.cost}</strong> CC</span>
           <span className="card-stat"><strong>{displayLikes}</strong> Likes</span>

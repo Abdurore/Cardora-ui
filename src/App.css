@@ -25198,6 +25198,306 @@ a {
   color: var(--text);
 }
 [data-theme="light"] .admin-field span { color: var(--text-muted); }
+[data-theme="light"] .admin-header h2 { color: var(--text) !important; }
+[data-theme="light"] .admin-tab {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--text-muted);
+}
+[data-theme="light"] .admin-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--bg);
+}
+
+/* ── Confirm Modal ───────────────────────────────────── */
+[data-theme="light"] .app-confirm-modal {
+  background: linear-gradient(160deg, #f0f9fb 0%, #e8f4f8 100%);
+  border-color: var(--accent-border);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--accent-tint);
+}
+[data-theme="light"] .app-confirm-title { color: var(--text) !important; }
+[data-theme="light"] .app-confirm-message { color: var(--text-muted) !important; }
+[data-theme="light"] .app-confirm-icon-wrap--danger {
+  background: rgba(255, 60, 80, 0.08);
+  border-color: rgba(255, 60, 80, 0.22);
+  color: #d32f2f;
+}
+[data-theme="light"] .app-confirm-icon-wrap--warning {
+  background: rgba(255, 185, 40, 0.08);
+  border-color: rgba(255, 185, 40, 0.22);
+  color: #f57c00;
+}
+[data-theme="light"] .app-confirm-icon-wrap--default {
+  background: rgba(25, 140, 161, 0.08);
+  border-color: rgba(25, 140, 161, 0.22);
+  color: #00897b;
+}
+[data-theme="light"] .app-confirm-ok {
+  color: #fff;
+}
+[data-theme="light"] .app-confirm-ok--danger {
+  background: linear-gradient(135deg, #ff6b7a 0%, #d32f2f 100%);
+}
+[data-theme="light"] .app-confirm-ok--warning {
+  background: linear-gradient(135deg, #ffcc55 0%, #f57c00 100%);
+  color: #fff;
+}
+[data-theme="light"] .app-confirm-ok--default {
+  background: linear-gradient(135deg, #4db8c4 0%, #00897b 100%);
+}
+
+/* ── Admin Dashboard — Comprehensive Light Mode ────────────────── */
+[data-theme="light"] .admin-restricted { background: var(--bg); }
+[data-theme="light"] .admin-restricted h2 { color: var(--text) !important; }
+[data-theme="light"] .admin-restricted p { color: var(--text-muted) !important; }
+[data-theme="light"] .admin-notice {
+  background: rgba(190, 232, 245, 0.1);
+  border-color: var(--accent-border);
+  color: var(--text-muted);
+}
+[data-theme="light"] .admin-notice strong { color: var(--text) !important; }
+[data-theme="light"] .admin-table-wrap { border-color: var(--accent-border); }
+[data-theme="light"] .admin-table th {
+  background: rgba(190, 232, 245, 0.15) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--accent-border) !important;
+}
+[data-theme="light"] .admin-table td {
+  color: var(--text) !important;
+  border-color: var(--accent-soft) !important;
+}
+[data-theme="light"] .admin-pagination-info { color: var(--text-muted); }
+[data-theme="light"] .admin-pagination-btn {
+  border-color: var(--accent-border);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+[data-theme="light"] .admin-pagination-btn:hover:not(:disabled) {
+  border-color: var(--accent-mid);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+[data-theme="light"] .admin-pagination-page {
+  background: rgba(190, 232, 245, 0.2);
+  border-color: var(--accent-border);
+  color: var(--text) !important;
+}
+[data-theme="light"] .admin-role-chip {
+  background: rgba(190, 232, 245, 0.2);
+  color: #0277bd;
+}
+[data-theme="light"] .admin-role-chip.artist {
+  background: rgba(66, 165, 245, 0.15);
+  color: #1565c0;
+}
+[data-theme="light"] .admin-role-chip.user {
+  background: rgba(158, 158, 158, 0.15);
+  color: #424242;
+}
+[data-theme="light"] .admin-role-chip.admin {
+  background: rgba(255, 193, 7, 0.15);
+  color: #f57f17;
+}
+[data-theme="light"] .admin-role-chip.card {
+  background: rgba(66, 165, 245, 0.15);
+  color: #0277bd;
+}
+[data-theme="light"] .admin-role-chip.template {
+  background: rgba(102, 187, 106, 0.15);
+  color: #2e7d32;
+}
+[data-theme="light"] .admin-status-dot.active {
+  background: #4caf50;
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.4);
+}
+[data-theme="light"] .admin-action-btn {
+  background: var(--accent-soft);
+  color: var(--text-muted);
+  border-color: var(--accent-border);
+}
+[data-theme="light"] .admin-action-btn.approve {
+  background: rgba(76, 175, 80, 0.15);
+  color: #2e7d32;
+  border-color: rgba(76, 175, 80, 0.3);
+}
+[data-theme="light"] .admin-action-btn.reject {
+  background: rgba(244, 67, 54, 0.15);
+  color: #c62828;
+  border-color: rgba(244, 67, 54, 0.3);
+}
+[data-theme="light"] .admin-template-status {
+  background: var(--accent-soft);
+  color: var(--text-muted);
+}
+[data-theme="light"] .admin-template-status.pending {
+  background: rgba(255, 193, 7, 0.15);
+  color: #f57f17;
+}
+[data-theme="light"] .admin-template-status.approved {
+  background: rgba(76, 175, 80, 0.15);
+  color: #2e7d32;
+}
+[data-theme="light"] .admin-template-status.rejected {
+  background: rgba(244, 67, 54, 0.15);
+  color: #c62828;
+}
+[data-theme="light"] .admin-empty { color: var(--text-dim) !important; }
+[data-theme="light"] .admin-empty-icon { color: var(--text-muted); }
+[data-theme="light"] .admin-empty p { color: var(--text-muted) !important; }
+[data-theme="light"] .admin-empty-sub { color: var(--text-dim) !important; }
+[data-theme="light"] .admin-inline-form input,
+[data-theme="light"] .admin-inline-form select {
+  background: var(--surface);
+  border-color: var(--accent-border);
+  color: var(--text);
+}
+[data-theme="light"] .admin-form-grid input,
+[data-theme="light"] .admin-form-grid select {
+  background: var(--surface);
+  border-color: var(--accent-border);
+  color: var(--text);
+}
+[data-theme="light"] .admin-field > span { color: var(--text-muted) !important; }
+[data-theme="light"] .admin-check { color: var(--text-muted) !important; }
+[data-theme="light"] .admin-check input { accent-color: var(--primary); }
+
+/* ── Admin Video Drop Zone & Media Elements ─────────────────── */
+[data-theme="light"] .admin-video-drop {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+}
+[data-theme="light"] .admin-video-drop-check { color: #4caf50; }
+[data-theme="light"] .admin-video-drop-label { color: var(--text) !important; }
+[data-theme="light"] .admin-video-drop-hint { color: var(--text-muted) !important; }
+[data-theme="light"] .admin-video-preview-url { color: var(--primary); opacity: 0.8; }
+[data-theme="light"] .admin-media-add-form {
+  background: var(--surface);
+  border-color: var(--accent-border);
+}
+[data-theme="light"] .admin-media-block-title { color: var(--text) !important; }
+[data-theme="light"] .admin-media-title-field > span { color: var(--text-muted) !important; }
+[data-theme="light"] .admin-media-title-field > span small { color: var(--text-dim) !important; }
+[data-theme="light"] .admin-media-title-field > input {
+  background: var(--surface);
+  border-color: var(--accent-border);
+  color: var(--text);
+}
+
+/* ── Admin Action Button Neutral Variant ───────────────────── */
+[data-theme="light"] .admin-action-btn.neutral {
+  background: rgba(158, 158, 158, 0.15);
+  color: #424242;
+  border-color: rgba(158, 158, 158, 0.3);
+}
+
+/* ── Admin Media Elements Light Mode ───────────────────────── */
+[data-theme="light"] .admin-media-draft-discard {
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #c62828;
+}
+[data-theme="light"] .admin-media-draft-discard:hover {
+  background: rgba(244, 67, 54, 0.1);
+}
+[data-theme="light"] .admin-media-file-btn {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--text-muted);
+}
+[data-theme="light"] .admin-media-file-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(25, 140, 161, 0.1);
+}
+[data-theme="light"] .admin-media-file-btn.ready {
+  border-color: rgba(76, 175, 80, 0.3);
+  color: #2e7d32;
+  background: rgba(76, 175, 80, 0.1);
+}
+[data-theme="light"] .admin-media-video-card {
+  background: var(--surface);
+  border-color: var(--accent-border);
+}
+[data-theme="light"] .admin-media-video-card:hover {
+  border-color: var(--primary);
+}
+[data-theme="light"] .admin-media-video-thumb-wrap { background: var(--bg); }
+[data-theme="light"] .admin-media-video-play-icon { color: var(--primary); }
+[data-theme="light"] .admin-media-video-delete-btn {
+  background: rgba(244, 67, 54, 0.1);
+  color: #c62828;
+}
+[data-theme="light"] .admin-media-video-delete-btn:hover {
+  background: rgba(244, 67, 54, 0.2);
+}
+
+/* ── Admin Broadcast Form Light Mode ───────────────────────── */
+[data-theme="light"] .admin-broadcast-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-theme="light"] .admin-broadcast-subject {
+  background: var(--surface);
+  border-color: var(--accent-border);
+  color: var(--text);
+}
+[data-theme="light"] .admin-broadcast-subject:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(25, 140, 161, 0.1);
+}
+[data-theme="light"] .admin-broadcast-textarea {
+  background: var(--surface);
+  border-color: var(--accent-border);
+  color: var(--text);
+}
+[data-theme="light"] .admin-broadcast-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(25, 140, 161, 0.1);
+}
+[data-theme="light"] .admin-broadcast-count { color: var(--text-muted) !important; }
+
+/* ── Admin Sub-Sections Light Mode ─────────────────────────── */
+[data-theme="light"] .admin-sub-section {
+  background: var(--surface);
+  border-color: var(--accent-border);
+}
+[data-theme="light"] .admin-sub-section h4 { color: var(--text) !important; }
+
+/* ── Admin Profile Background Grid ─────────────────────────── */
+[data-theme="light"] .admin-profile-bg-card {
+  background: var(--surface);
+  border-color: var(--accent-border);
+}
+[data-theme="light"] .admin-profile-bg-thumb { background: var(--bg); }
+
+/* ── Admin Media Music & Block Icons ────────────────────────── */
+[data-theme="light"] .admin-media-music-icon {
+  background: rgba(25, 140, 161, 0.1);
+  border-color: var(--accent-border);
+  color: var(--primary);
+}
+[data-theme="light"] .admin-media-block-icon { color: var(--text-muted); }
+[data-theme="light"] .admin-media-block-title { color: var(--text) !important; }
+
+/* ── Admin Media Music Items ────────────────────────────────── */
+[data-theme="light"] .admin-media-music-item {
+  background: var(--surface);
+  border-color: var(--accent-border);
+}
+[data-theme="light"] .admin-media-music-item:hover {
+  border-color: var(--primary);
+  background: rgba(25, 140, 161, 0.08);
+}
+[data-theme="light"] .admin-media-delete-btn {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #c62828;
+}
+[data-theme="light"] .admin-media-delete-btn:hover {
+  background: rgba(244, 67, 54, 0.2);
+  color: #b71c1c;
+}
 
 /* ── Welcome Back Banner (Earn CC) ──────────────────── */
 [data-theme="light"] .wb-banner-inner {
