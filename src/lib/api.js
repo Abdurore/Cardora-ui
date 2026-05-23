@@ -1,6 +1,43 @@
 const DEFAULT_API_BASE = 'https://cardora-uss3.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, '')
 const TOKEN_KEY = 'cardora:authToken'
+const CHAT_FRAME_CACHE_KEY = 'cardora:adminChatFrames'
+
+function readStorageJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+export function getCachedChatFrames() {
+  const frames = readStorageJson(CHAT_FRAME_CACHE_KEY, [])
+  return Array.isArray(frames) ? frames : []
+}
+
+export function rememberChatFrame(frame) {
+  if (!frame || typeof frame !== 'object') return
+  const id = frame.id || frame.frameId || frame.chatFrameId || frame._id
+  const url = frame.url || frame.imageUrl || frame.frameUrl || frame.chatFrameUrl || frame.cloudinaryUrl || frame.mediaUrl
+  if (!id || !url) return
+  const nextFrame = {
+    ...frame,
+    id,
+    url,
+    imageUrl: frame.imageUrl || url,
+    price: frame.price ?? frame.priceCC ?? frame.cost ?? 0,
+  }
+  const frames = getCachedChatFrames()
+  const existingIndex = frames.findIndex(item => (item.id || item.frameId || item._id) === id)
+  const next = existingIndex >= 0
+    ? frames.map((item, index) => (index === existingIndex ? { ...item, ...nextFrame } : item))
+    : [nextFrame, ...frames]
+  try {
+    localStorage.setItem(CHAT_FRAME_CACHE_KEY, JSON.stringify(next))
+  } catch { /* storage can be unavailable in private contexts */ }
+}
 
 function buildUrl(path) {
   if (/^https?:\/\//i.test(path)) return path
@@ -143,6 +180,71 @@ async function requestFirstSuccess(paths, options = {}) {
   throw lastError || new Error('Request failed.')
 }
 
+function pickChatFrameList(payload) {
+  if (Array.isArray(payload)) return payload
+  const root = payload?.data && typeof payload.data === 'object' ? payload.data : payload
+  if (Array.isArray(root)) return root
+  if (Array.isArray(root?.chatFrames)) return root.chatFrames
+  if (Array.isArray(root?.frames)) return root.frames
+  if (Array.isArray(root?.items)) return root.items
+  if (Array.isArray(root?.data)) return root.data
+  if (Array.isArray(root?.chatFrames?.docs)) return root.chatFrames.docs
+  if (Array.isArray(root?.chatFrames?.items)) return root.chatFrames.items
+  if (Array.isArray(root?.frames?.docs)) return root.frames.docs
+  if (Array.isArray(root?.frames?.items)) return root.frames.items
+  if (Array.isArray(root?.result?.chatFrames)) return root.result.chatFrames
+  if (Array.isArray(root?.result?.frames)) return root.result.frames
+  if (Array.isArray(root?.results)) return root.results
+  if (root && typeof root === 'object') {
+    for (const value of Object.values(root)) {
+      if (!value || typeof value !== 'object') continue
+      const nested = pickChatFrameList(value)
+      if (nested.length) return nested
+    }
+  }
+  return []
+}
+
+function chatFrameHasAsset(frame) {
+  const image = frame?.image && typeof frame.image === 'object'
+    ? frame.image.url || frame.image.secure_url || frame.image.secureUrl
+    : frame?.image
+  return Boolean(
+    frame?.url ||
+    frame?.imageUrl ||
+    image ||
+    frame?.assetUrl ||
+    frame?.asset?.url ||
+    frame?.asset?.secure_url ||
+    frame?.cloudinaryUrl ||
+    frame?.secure_url ||
+    frame?.secureUrl ||
+    frame?.mediaUrl ||
+    frame?.fileUrl ||
+    frame?.previewUrl ||
+    frame?.frameUrl ||
+    frame?.chatFrameUrl
+  )
+}
+
+async function requestFirstChatFrames(paths, options = {}) {
+  let lastError = null
+  let firstSuccess = null
+  for (const path of paths) {
+    try {
+      const payload = await request(path, options)
+      if (!firstSuccess) firstSuccess = payload
+      if (pickChatFrameList(payload).some(chatFrameHasAsset)) return payload
+    } catch (error) {
+      lastError = error
+      if (!error.status) throw error
+      if (![401, 403, 404, 405].includes(error.status)) throw error
+    }
+  }
+  if (firstSuccess) return firstSuccess
+  throw lastError || new Error('Request failed.')
+}
+
 /* ═══════════════════════════════════════════════
    AUTH
    ═══════════════════════════════════════════════ */
@@ -214,7 +316,11 @@ export async function buyChatFrame(frameId) {
 }
 
 export async function getProfileBackgrounds() {
-  return request('/admin/profile-backgrounds', { auth: true })
+  return requestFirstSuccess([
+    '/profile-backgrounds',
+    '/users/profile-backgrounds',
+    '/admin/profile-backgrounds',
+  ], { auth: true })
 }
 
 export async function createProfileBackground(payload) {
@@ -226,7 +332,11 @@ export async function deleteProfileBackground(backgroundId) {
 }
 
 export async function getChatFrames() {
-  return request('/admin/chat-frames', { auth: true })
+  return requestFirstChatFrames([
+    '/admin/chat-frames',
+    '/chat-frames',
+    '/users/chat-frames',
+  ], { auth: true })
 }
 
 /* ═══════════════════════════════════════════════
@@ -349,16 +459,25 @@ export async function giftPremium(username) {
 /* ═══════════════════════════════════════════════
    GIFTS (Flutterwave-backed)
    ═══════════════════════════════════════════════ */
+export async function getGiftCatalog() {
+  return request('/gifts/catalog')
+}
+
 export async function createFlutterwaveGiftCheckout(payload) {
-  return request('/create-flutterwave-gift-checkout', { method: 'POST', auth: true, body: payload })
+  return requestFirstSuccess([
+    '/gifts/flutterwave/checkout',
+    '/gifts/checkout',
+    '/create-gift-checkout',
+    '/create-flutterwave-gift-checkout',
+  ], { method: 'POST', auth: true, body: payload })
 }
 
-export async function getUserGiftInventory() {
-  return request('/user-gifts', { auth: true })
+export async function attachGiftToCard(payload) {
+  return request('/cards/attach-gift', { method: 'POST', auth: true, body: payload })
 }
 
-export async function claimGift(payload) {
-  return request('/claim-gift', { method: 'POST', auth: true, body: payload })
+export async function claimGiftFromCard(slug) {
+  return request(`/cards/${slug}/claim-gift`, { method: 'POST', auth: true })
 }
 
 /* ═══════════════════════════════════════════════
@@ -803,6 +922,59 @@ export async function deleteMediaMusic(nameKey) {
 // the FE audio player honours them when present.
 export async function updateMediaMusic(id, payload) {
   return request(`/media/music/${id}`, { method: 'PATCH', auth: true, body: payload })
+}
+
+/* ═══════════════════════════════════════════════
+   ADMIN: SIGNUP BONUS
+   ═══════════════════════════════════════════════ */
+export async function getSignupBonusStatus() {
+  return request('/admin/signup-bonus-status', { auth: true })
+}
+
+export async function resetSignupBonus() {
+  return request('/admin/reset-signup-bonus', { method: 'POST', auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   ADMIN: CHAT FRAMES
+   ═══════════════════════════════════════════════ */
+export async function createChatFrame(payload) {
+  return request('/admin/chat-frames', { method: 'POST', auth: true, body: payload })
+}
+
+export async function deleteChatFrame(frameId) {
+  return request(`/admin/chat-frames/${encodeURIComponent(frameId)}`, { method: 'DELETE', auth: true })
+}
+
+export async function requestChatFrame(payload) {
+  return request('/admin/chat-frame-requests', { method: 'POST', auth: true, body: payload })
+}
+
+export async function approveChatFrameRequest(requestId) {
+  return request(`/admin/chat-frame-requests/${requestId}/approve`, { method: 'POST', auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   ADMIN: GIFT MANAGEMENT
+   ═══════════════════════════════════════════════ */
+export async function createAdminGift(payload) {
+  return request('/admin/gifts', { method: 'POST', auth: true, body: payload })
+}
+
+export async function getAdminGifts() {
+  return request('/admin/gifts', { auth: true })
+}
+
+export async function deleteAdminGift(giftId) {
+  return request(`/admin/gifts/${encodeURIComponent(giftId)}`, { method: 'DELETE', auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   ADMIN: BROADCAST DELIVERY LOGS
+   ═══════════════════════════════════════════════ */
+export async function getBroadcastDeliveryLogs({ broadcastId, page = 1, limit = 100 } = {}) {
+  const qs = new URLSearchParams({ broadcastId, page, limit }).toString()
+  return request(`/admin/broadcast-delivery-logs?${qs}`, { auth: true })
 }
 
 export { API_BASE }

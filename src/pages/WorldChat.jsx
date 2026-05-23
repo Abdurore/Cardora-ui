@@ -47,8 +47,8 @@ function WorldChat() {
   // Load message history
   useEffect(() => {
     if (!currentUser) return
-    let cancelled = false
-    ;(async () => {
+    let cancelled = false;
+    (async () => {
       try {
         const res = await getWorldChat('page=1&limit=50')
         const raw = res?.data?.messages || res?.messages || []
@@ -327,18 +327,34 @@ function WorldChat() {
                 <div key={msg.id} className={`chat-msg ${isMe ? 'me' : ''}`}>
                   {!isMe && (
                     <div className="chat-msg-head">
-                      <button
-                        type="button"
-                        className="chat-msg-avatar chat-msg-avatar-btn"
-                        onClick={openProfile}
-                        title={`View ${msg.username}'s profile`}
-                      >
-                        {msg.profilePictureUrl ? (
-                          <img src={msg.profilePictureUrl} alt="" />
-                        ) : (
-                          <span>{msg.username?.charAt(0)?.toUpperCase() || '?'}</span>
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <button
+                          type="button"
+                          className="chat-msg-avatar chat-msg-avatar-btn"
+                          onClick={openProfile}
+                          title={`View ${msg.username}'s profile`}
+                        >
+                          {msg.profilePictureUrl ? (
+                            <img src={msg.profilePictureUrl} alt="" />
+                          ) : (
+                            <span>{msg.username?.charAt(0)?.toUpperCase() || '?'}</span>
+                          )}
+                        </button>
+                        {(msg.chatFrameUrl || msg.chatFrameId) && (
+                          <img
+                            src={msg.chatFrameUrl || ''}
+                            alt=""
+                            style={{
+                              position: 'absolute', top: -4, left: -4,
+                              width: 'calc(100% + 8px)', height: 'calc(100% + 8px)',
+                              borderRadius: '50%', pointerEvents: 'none',
+                              objectFit: 'cover', zIndex: 1,
+                              filter: 'drop-shadow(0 0 4px rgba(139, 92, 246, 0.4))',
+                            }}
+                            onError={e => { e.target.style.display = 'none' }}
+                          />
                         )}
-                      </button>
+                      </div>
                       <button
                         type="button"
                         className="chat-msg-name chat-msg-name-btn"

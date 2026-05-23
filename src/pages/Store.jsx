@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useCallback, useMemo, useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -7,19 +7,69 @@ import RewardedAds from '../components/RewardedAds.jsx'
 import { storePacks, storeGifts } from '../data/catalog.js'
 import GiftCard from '../components/GiftCard.jsx'
 import GiftPreviewModal from '../components/GiftPreviewModal.jsx'
-import { buyChatFrame, equipChatFrame, getUserCoupons, getChatFrames } from '../lib/api.js'
+import { buyChatFrame, equipChatFrame, getUserCoupons, getChatFrames, getCachedChatFrames } from '../lib/api.js'
 
 const REWARD_TABS = ['earn', 'redeem', 'referral']
 
-// Fallback chat frames if API returns nothing
-const FALLBACK_FRAMES = [
-  { id: 'frame_neon', name: 'Neon Glow', price: 5, preview: '🟣', desc: 'Vibrant neon border for your chat messages' },
-  { id: 'frame_gold', name: 'Royal Gold', price: 8, preview: '🟡', desc: 'Elegant gold frame with shimmer effect' },
-  { id: 'frame_galaxy', name: 'Galaxy', price: 10, preview: '🔮', desc: 'Cosmic gradient with star particles' },
-  { id: 'frame_fire', name: 'Flame', price: 7, preview: '🔥', desc: 'Animated fire border for bold messages' },
-  { id: 'frame_ice', name: 'Arctic Ice', price: 6, preview: '❄️', desc: 'Frosted crystal frame with cool tones' },
-  { id: 'frame_rose', name: 'Rose Garden', price: 5, preview: '🌹', desc: 'Soft pink gradient with petal accents' },
-]
+function pickList(res, ...keys) {
+  for (const key of keys) {
+    if (Array.isArray(res?.[key])) return res[key]
+    if (Array.isArray(res?.data?.[key])) return res.data[key]
+    if (Array.isArray(res?.data?.[key]?.docs)) return res.data[key].docs
+    if (Array.isArray(res?.data?.[key]?.items)) return res.data[key].items
+    if (Array.isArray(res?.result?.[key])) return res.result[key]
+  }
+  if (Array.isArray(res?.data)) return res.data
+  if (Array.isArray(res?.results)) return res.results
+  if (Array.isArray(res)) return res
+  if (res && typeof res === 'object') {
+    for (const value of Object.values(res)) {
+      if (!value || typeof value !== 'object') continue
+      const nested = pickList(value, ...keys)
+      if (nested.length) return nested
+    }
+  }
+  return []
+}
+
+function normalizeFrame(frame) {
+  const image = frame.image && typeof frame.image === 'object'
+    ? frame.image.url || frame.image.secure_url || frame.image.secureUrl
+    : frame.image
+  const url =
+    frame.url ||
+    frame.imageUrl ||
+    image ||
+    frame.assetUrl ||
+    frame.asset?.url ||
+    frame.asset?.secure_url ||
+    frame.cloudinaryUrl ||
+    frame.secure_url ||
+    frame.secureUrl ||
+    frame.mediaUrl ||
+    frame.fileUrl ||
+    frame.previewUrl ||
+    frame.frameUrl ||
+    frame.chatFrameUrl ||
+    ''
+  return {
+    id: frame.id || frame.frameId || frame.chatFrameId || frame._id || frame.slug,
+    name: frame.name || 'Chat Frame',
+    price: frame.price ?? frame.priceCC ?? frame.cost ?? 0,
+    url,
+    desc: frame.description || frame.desc || '',
+  }
+}
+
+function mergeFrameSources(...sources) {
+  const map = new Map()
+  sources.flat().forEach(frame => {
+    const normalized = normalizeFrame(frame)
+    if (!normalized.id || !normalized.url) return
+    map.set(normalized.id, { ...map.get(normalized.id), ...normalized })
+  })
+  return Array.from(map.values())
+}
 
 function Store() {
   const {
@@ -36,6 +86,7 @@ function Store() {
   } = useOutletContext()
 
   const [activeGift, setActiveGift] = useState(null)
+  const [confirmGift, setConfirmGift] = useState(null)
   const [isPurchasingGift, setIsPurchasingGift] = useState(false)
   const [giftMessage, setGiftMessage] = useState('')
 
@@ -54,29 +105,46 @@ function Store() {
   const [buyingFrame, setBuyingFrame] = useState(null)
   const [equippingFrame, setEquippingFrame] = useState(null)
   const [streakInfo, setStreakInfo] = useState(null)
-  const [chatFrames, setChatFrames] = useState(FALLBACK_FRAMES)
+  const [chatFrames, setChatFrames] = useState([])
+  const [chatFramesLoading, setChatFramesLoading] = useState(true)
 
-  // Load chat frames from API
+  const loadChatFrames = useCallback(async () => {
+    setChatFramesLoading(true)
+    const cachedFrames = getCachedChatFrames()
+    try {
+      const res = await getChatFrames()
+      const frames = pickList(res, 'chatFrames', 'frames', 'items')
+      setChatFrames(mergeFrameSources(frames, cachedFrames))
+    } catch {
+      setChatFrames(mergeFrameSources(cachedFrames))
+    } finally {
+      setChatFramesLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
+      setChatFramesLoading(true)
+      const cachedFrames = getCachedChatFrames()
       try {
         const res = await getChatFrames()
-        const frames = res?.chatFrames || res?.data?.chatFrames || res?.data || (Array.isArray(res) ? res : [])
-        if (!cancelled && Array.isArray(frames) && frames.length > 0) {
-          setChatFrames(frames.map(f => ({
-            id: f.id || f._id,
-            name: f.name || 'Chat Frame',
-            price: f.price || 0,
-            preview: f.url ? '' : '✨',
-            url: f.url || '',
-            desc: f.description || '',
-          })))
+        const frames = pickList(res, 'chatFrames', 'frames', 'items')
+        if (!cancelled) {
+          setChatFrames(mergeFrameSources(frames, cachedFrames))
         }
-      } catch { /* use fallback */ }
+      } catch {
+        if (!cancelled) setChatFrames(mergeFrameSources(cachedFrames))
+      } finally {
+        if (!cancelled) setChatFramesLoading(false)
+      }
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [currentUser])
+
+  useEffect(() => {
+    if (activeSection === 'cosmetics') loadChatFrames()
+  }, [activeSection, loadChatFrames])
 
   const validPacks = (couponPackages || []).filter(p => (p.cc || 0) > 0)
   const packs = validPacks.length ? validPacks : storePacks
@@ -258,46 +326,63 @@ function Store() {
         {activeSection === 'cosmetics' && (
           <div className="store-cosmetics-section">
             <div className="store-cosmetics-intro">
-              <h4>Chat Frames</h4>
-              <p>Personalize your chat messages with unique animated frames. Buy with CC and equip from your inventory.</p>
+              <p className="eyebrow">Chat cosmetics</p>
+              <h4>Frames curated by admins</h4>
+              <p>Buy a frame, equip it, and it becomes the visual treatment around your WorldChat messages.</p>
             </div>
             {cosmeticMsg.text && (
               <p className={`store-earn-msg ${cosmeticMsg.ok ? 'success' : 'error'}`}>{cosmeticMsg.text}</p>
             )}
-            <div className="store-cosmetics-grid">
-              {chatFrames.map(frame => (
-                <div key={frame.id} className="store-frame-card">
-                  <div className="store-frame-preview">
-                    {frame.url
-                      ? <img src={frame.url} alt={frame.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
-                      : frame.preview}
+            {chatFramesLoading ? (
+              <div className="store-frame-empty">Loading uploaded frames...</div>
+            ) : chatFrames.length === 0 ? (
+              <div className="store-frame-empty">No uploaded chat frames are available yet.</div>
+            ) : (
+              <div className="store-cosmetics-grid">
+                {chatFrames.map(frame => (
+                  <div key={frame.id} className="store-frame-card">
+                    <div className="store-frame-preview" aria-label={`${frame.name} WorldChat preview`}>
+                      <div className="store-frame-chat-row">
+                        <div className="store-frame-avatar-wrap">
+                          <span className="store-frame-avatar">C</span>
+                          <img className="store-frame-avatar-frame" src={frame.url} alt="" />
+                        </div>
+                        <div className="store-frame-chat-copy">
+                          <div className="store-frame-chat-meta">
+                            <strong>cardora</strong>
+                            <span>now</span>
+                          </div>
+                          <div className="store-frame-chat-bubble">This is how your frame appears in World Chat.</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="store-frame-info">
+                      <strong>{frame.name}</strong>
+                      {frame.desc ? <p>{frame.desc}</p> : <p>Uploaded by the admin team for WorldChat profiles.</p>}
+                      <span className="store-frame-price">{frame.price} CC</span>
+                    </div>
+                    <div className="store-frame-actions">
+                      <button
+                        type="button"
+                        className="primary store-frame-buy"
+                        onClick={() => handleBuyFrame(frame.id)}
+                        disabled={buyingFrame === frame.id}
+                      >
+                        {buyingFrame === frame.id ? '...' : 'Buy'}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost store-frame-equip"
+                        onClick={() => handleEquipFrame(frame.id)}
+                        disabled={equippingFrame === frame.id}
+                      >
+                        {equippingFrame === frame.id ? '...' : 'Equip'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="store-frame-info">
-                    <strong>{frame.name}</strong>
-                    <p>{frame.desc}</p>
-                    <span className="store-frame-price">{frame.price} CC</span>
-                  </div>
-                  <div className="store-frame-actions">
-                    <button
-                      type="button"
-                      className="primary store-frame-buy"
-                      onClick={() => handleBuyFrame(frame.id)}
-                      disabled={buyingFrame === frame.id}
-                    >
-                      {buyingFrame === frame.id ? '...' : 'Buy'}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost store-frame-equip"
-                      onClick={() => handleEquipFrame(frame.id)}
-                      disabled={equippingFrame === frame.id}
-                    >
-                      {equippingFrame === frame.id ? '...' : 'Equip'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -589,33 +674,74 @@ function Store() {
           gift={activeGift}
           disabled={isPurchasingGift}
           onClose={() => setActiveGift(null)}
-          onBuy={async () => {
+          onBuy={() => {
             if (!currentUser) {
               openAuthModal()
               return
             }
-            setIsPurchasingGift(true)
-            setGiftMessage('')
-            const result = await purchaseGift(activeGift)
-            if (!result?.ok) {
-              setGiftMessage(result?.reason === 'auth'
-                ? 'Please sign in to continue.'
-                : 'Could not start gift checkout. Please try again.')
-              setIsPurchasingGift(false)
-              setTimeout(() => setGiftMessage(''), 2800)
-              return
-            }
-            // On success the user is redirected to Flutterwave; close locally
-            // in case the redirect is delayed or skipped (no checkoutUrl path).
-            if (!result.checkout) {
-              setGiftMessage('Gift added to your inventory!')
-              setActiveGift(null)
-              await refreshBalance?.()
-              setTimeout(() => setGiftMessage(''), 2800)
-            }
-            setIsPurchasingGift(false)
+            setConfirmGift(activeGift)
+            setActiveGift(null)
           }}
         />
+      ) : null}
+
+      {confirmGift ? (
+        <section className="detail-modal" role="dialog" aria-modal="true">
+          <div className="detail-backdrop" onClick={() => !isPurchasingGift && setConfirmGift(null)} />
+          <div className="detail-card store-pay-modal">
+            <div className="store-pay-hero">
+              <p className="eyebrow">Gift checkout</p>
+              <h3>Confirm gift purchase</h3>
+              <p className="detail-subtitle">
+                You will be redirected to Flutterwave to pay securely. The reveal animation appears after payment is completed.
+              </p>
+            </div>
+            <div className="store-pay-summary">
+              <div className="store-pay-row">
+                <span>Gift</span>
+                <strong>{confirmGift.title}</strong>
+              </div>
+              <div className="store-pay-row">
+                <span>Value</span>
+                <strong>{confirmGift.amount}</strong>
+              </div>
+            </div>
+            <div className="detail-actions">
+              <button
+                className="primary"
+                type="button"
+                onClick={async () => {
+                  setIsPurchasingGift(true)
+                  setGiftMessage('')
+                  const result = await purchaseGift(confirmGift)
+                  if (!result?.ok) {
+                    setGiftMessage(result?.reason === 'auth'
+                      ? 'Please sign in to continue.'
+                      : result?.reason || 'Could not start gift checkout. Please try again.')
+                    setIsPurchasingGift(false)
+                    setConfirmGift(null)
+                    setTimeout(() => setGiftMessage(''), 2800)
+                    return
+                  }
+                  if (!result.checkout) {
+                    setGiftMessage('Gift added to your inventory!')
+                    setActiveGift(null)
+                    setConfirmGift(null)
+                    await refreshBalance?.()
+                    setTimeout(() => setGiftMessage(''), 2800)
+                  }
+                  setIsPurchasingGift(false)
+                }}
+                disabled={isPurchasingGift}
+              >
+                {isPurchasingGift ? 'Redirecting...' : 'Continue to Flutterwave'}
+              </button>
+              <button className="ghost" type="button" onClick={() => setConfirmGift(null)} disabled={isPurchasingGift}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </section>
       ) : null}
     </div>
   )

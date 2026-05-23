@@ -12,9 +12,10 @@ import {
   getTemplates,
   getModeratorActionLogs,
   submitBroadcastRequest,
+  requestChatFrame,
 } from '../lib/api.js'
 
-const TABS = ['Reports', 'Users', 'Templates', 'Logs', 'Broadcast']
+const TABS = ['Reports', 'Users', 'Templates', 'Logs', 'Broadcast', 'Chat Frames']
 
 function ModeratorDashboard() {
   const { currentUser, balance, openAuthModal } = useOutletContext()
@@ -43,6 +44,10 @@ function ModeratorDashboard() {
   // Broadcast request
   const [broadcastForm, setBroadcastForm] = useState({ subject: '', message: '' })
   const [broadcastSubmitting, setBroadcastSubmitting] = useState(false)
+
+  // Chat frame request
+  const [chatFrameForm, setChatFrameForm] = useState({ name: '', url: '', reason: '' })
+  const [chatFrameSubmitting, setChatFrameSubmitting] = useState(false)
 
   const isModerator = currentUser?.role === 'Moderator'
 
@@ -146,6 +151,26 @@ function ModeratorDashboard() {
       showMsg(err.message || 'Submission failed.', false)
     } finally {
       setBroadcastSubmitting(false)
+    }
+  }
+
+  const handleChatFrameRequest = async () => {
+    if (!chatFrameForm.name.trim() || !chatFrameForm.url.trim()) {
+      showMsg('Frame name and URL are required.', false); return
+    }
+    setChatFrameSubmitting(true)
+    try {
+      await requestChatFrame({
+        name: chatFrameForm.name.trim(),
+        url: chatFrameForm.url.trim(),
+        reason: chatFrameForm.reason.trim() || undefined,
+      })
+      showMsg('Chat frame request submitted to admin for approval.')
+      setChatFrameForm({ name: '', url: '', reason: '' })
+    } catch (err) {
+      showMsg(err.message || 'Chat frame request failed.', false)
+    } finally {
+      setChatFrameSubmitting(false)
     }
   }
 
@@ -397,6 +422,72 @@ function ModeratorDashboard() {
                   disabled={broadcastSubmitting || !broadcastForm.subject.trim() || !broadcastForm.message.trim()}
                 >
                   {broadcastSubmitting ? 'Submitting…' : 'Submit for Approval'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CHAT FRAME REQUEST */}
+        {activeTab === 'Chat Frames' && (
+          <div className="admin-section">
+            <h3 className="admin-section-title">Request Chat Frame</h3>
+            <p className="admin-section-note">
+              Suggest a new chat frame for the store. The admin will review and approve your request.
+            </p>
+            <div style={{ maxWidth: 480 }}>
+              <div className="admin-inline-form" style={{ flexDirection: 'column', gap: 12 }}>
+                <label className="admin-field" style={{ width: '100%' }}>
+                  <span>Frame Name</span>
+                  <input
+                    placeholder="e.g. Aurora Glow"
+                    value={chatFrameForm.name}
+                    onChange={e => setChatFrameForm(p => ({ ...p, name: e.target.value }))}
+                    maxLength={50}
+                  />
+                </label>
+                <label className="admin-field" style={{ width: '100%' }}>
+                  <span>Frame Image URL</span>
+                  <input
+                    placeholder="https://res.cloudinary.com/..."
+                    value={chatFrameForm.url}
+                    onChange={e => setChatFrameForm(p => ({ ...p, url: e.target.value }))}
+                  />
+                </label>
+                <label className="admin-field" style={{ width: '100%' }}>
+                  <span>Reason / Notes (optional)</span>
+                  <textarea
+                    placeholder="Why should this frame be added to the store?"
+                    value={chatFrameForm.reason}
+                    onChange={e => setChatFrameForm(p => ({ ...p, reason: e.target.value }))}
+                    rows={3}
+                    maxLength={300}
+                    style={{ width: '100%', resize: 'vertical' }}
+                  />
+                </label>
+                {chatFrameForm.url && (
+                  <div style={{
+                    background: 'rgba(255,255,255,0.04)', borderRadius: 12,
+                    padding: 16, display: 'flex', alignItems: 'center', gap: 14,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                    <img
+                      src={chatFrameForm.url}
+                      alt="Preview"
+                      style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(139, 92, 246, 0.4)' }}
+                      onError={e => { e.target.style.display = 'none' }}
+                    />
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Frame preview</span>
+                  </div>
+                )}
+                <button
+                  className="primary"
+                  type="button"
+                  onClick={handleChatFrameRequest}
+                  disabled={chatFrameSubmitting || !chatFrameForm.name.trim() || !chatFrameForm.url.trim()}
+                  style={{ width: '100%' }}
+                >
+                  {chatFrameSubmitting ? 'Submitting…' : 'Submit Frame Request'}
                 </button>
               </div>
             </div>

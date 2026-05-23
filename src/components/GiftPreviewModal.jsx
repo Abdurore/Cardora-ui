@@ -6,7 +6,6 @@ import GiftHeartPreview from './GiftHeartPreview.jsx'
 
 function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false }) {
   const [showEffect, setShowEffect] = useState(autoPreview)
-  const [justPurchased, setJustPurchased] = useState(false)
   const effectConfig = useMemo(
     () => (gift?.effectKey ? getGiftEffect(gift.effectKey) : null),
     [gift],
@@ -14,7 +13,6 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
 
   useEffect(() => {
     setShowEffect(autoPreview)
-    setJustPurchased(false)
   }, [autoPreview, gift])
 
   if (!gift) return null
@@ -47,13 +45,7 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
             <button
               className="primary"
               type="button"
-              onClick={() => {
-                onBuy?.()
-                if (!disabled) {
-                  setJustPurchased(true)
-                  setShowEffect(true)
-                }
-              }}
+              onClick={() => onBuy?.()}
               disabled={disabled}
             >
               Buy Gift
@@ -69,10 +61,6 @@ function GiftPreviewModal({ gift, onClose, onBuy, disabled, autoPreview = false 
           effect={gift.effectKey}
           onComplete={() => {
             setShowEffect(false)
-            if (justPurchased) {
-              setJustPurchased(false)
-              onClose?.()
-            }
           }}
         />
       ) : null}

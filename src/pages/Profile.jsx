@@ -1,4 +1,4 @@
-import { useOutletContext, Link, useLocation, useNavigate } from 'react-router-dom'
+﻿import { useOutletContext, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -24,6 +24,26 @@ const ROLE_CONFIG = {
   Moderator: { badge: 'role-moderator', icon: '🛡', desc: 'Help keep Cardora safe and welcoming' },
   Enterprise: { badge: 'role-enterprise', icon: '🏢', desc: 'Business account with analytics and ad management' },
   Visitor: { badge: 'role-visitor', icon: '👤', desc: 'Sign in to start creating' },
+}
+
+function pickList(res, ...keys) {
+  for (const key of keys) {
+    if (Array.isArray(res?.[key])) return res[key]
+    if (Array.isArray(res?.data?.[key])) return res.data[key]
+  }
+  if (Array.isArray(res?.data)) return res.data
+  if (Array.isArray(res)) return res
+  return []
+}
+
+function normalizeProfileBackground(bg) {
+  const url = bg.url || bg.imageUrl || bg.image || bg.assetUrl || bg.cloudinaryUrl || ''
+  return {
+    ...bg,
+    id: bg.id || bg.backgroundId || bg._id,
+    name: bg.name || bg.title || 'Profile Background',
+    url,
+  }
 }
 
 
@@ -89,6 +109,7 @@ function Profile() {
   const [giftLoading, setGiftLoading] = useState(false)
   const [giftMsg, setGiftMsg] = useState({ text: '', ok: false })
   const [profileBgs, setProfileBgs] = useState([]) // admin-uploaded backgrounds
+  const [showProfileBgOptions, setShowProfileBgOptions] = useState(false)
   const [equippingBg, setEquippingBg] = useState(null)
   const [bgMsg, setBgMsg] = useState({ text: '', ok: false })
   const profileBgUrl = currentUser?.profileBackground?.url || currentUser?.equippedBackground?.url || currentUser?.profileBackgroundUrl || currentUser?.backgroundUrl || ''
@@ -152,7 +173,8 @@ function Profile() {
   // Favorites resolve against whatever the user has favorited from the live
   // marketplace — no demo-data fallback.
   const favoriteCards = (marketplaceTemplates || []).filter((card) => favorites.includes(card.id))
-  const giftInventory = currentUser?.inventory || []
+  const giftInventory = currentUser?.giftsInventory || []
+  const giftWalletNgn = currentUser?.giftWalletNgn || 0
   const roleName = currentUser?.role || 'Visitor'
   const totalCardCount = userCards.length + savedDrafts.length
   const roleInfo = ROLE_CONFIG[roleName] || ROLE_CONFIG.Visitor
@@ -223,8 +245,8 @@ function Profile() {
     ;(async () => {
       try {
         const res = await getProfileBackgrounds()
-        const bgs = res?.backgrounds || res?.data?.backgrounds || res?.data || (Array.isArray(res) ? res : [])
-        if (!cancelled && Array.isArray(bgs)) setProfileBgs(bgs)
+        const bgs = pickList(res, 'backgrounds', 'profileBackgrounds', 'items', 'media')
+        if (!cancelled && Array.isArray(bgs)) setProfileBgs(bgs.map(normalizeProfileBackground).filter(bg => bg.id && bg.url))
       } catch { /* silent */ }
     })()
     return () => { cancelled = true }
@@ -490,6 +512,10 @@ function Profile() {
                   <strong>{giftInventory.length}</strong>
                   <span>Gifts</span>
                 </div>
+                <div className="profile-stat">
+                  <strong>NGN {Number(giftWalletNgn || 0).toLocaleString()}</strong>
+                  <span>Gift Wallet</span>
+                </div>
                 {currentUser?.referralsCount > 0 && (
                   <div className="profile-stat">
                     <strong>{currentUser.referralsCount}</strong>
@@ -572,10 +598,10 @@ function Profile() {
               </div>
 
               <div className="profile-premium-perks-row">
-                <span className="profile-premium-perk-chip">💎 2× Daily CC</span>
-                <span className="profile-premium-perk-chip">🖼 Backgrounds</span>
-                <span className="profile-premium-perk-chip">🔥 Streaks</span>
-                <span className="profile-premium-perk-chip">🎁 Gift Premium</span>
+                <span className="profile-premium-perk-chip">2x Daily CC</span>
+                <span className="profile-premium-perk-chip">Backgrounds</span>
+                <span className="profile-premium-perk-chip">Streaks</span>
+                <span className="profile-premium-perk-chip">Gift Premium</span>
               </div>
 
               {premiumMsg.text && (
@@ -633,14 +659,25 @@ function Profile() {
             {/* Profile Backgrounds — premium only */}
             {currentUser?.isPremiumActive && (
               <div className="profile-premium-backgrounds">
-                <h4>Profile Backgrounds</h4>
-                <p className="profile-premium-bg-hint">
-                  Choose a background for your profile and WorldChat profile modal.
-                </p>
+                <div className="profile-premium-bg-head">
+                  <div>
+                    <h4>Profile Backgrounds</h4>
+                    <p className="profile-premium-bg-hint">
+                      Choose a background for your profile and WorldChat profile modal.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost profile-premium-bg-toggle"
+                    onClick={() => setShowProfileBgOptions(prev => !prev)}
+                  >
+                    {showProfileBgOptions ? 'Hide options' : 'Choose background'}
+                  </button>
+                </div>
                 {bgMsg.text && (
                   <p className={`store-earn-msg ${bgMsg.ok ? 'success' : 'error'}`}>{bgMsg.text}</p>
                 )}
-                {profileBgs.length > 0 ? (
+                {showProfileBgOptions && profileBgs.length > 0 ? (
                   <div className="profile-bg-grid">
                     {profileBgs.map(bg => {
                       const bgId = bg.id || bg._id
@@ -662,9 +699,9 @@ function Profile() {
                       )
                     })}
                   </div>
-                ) : (
+                ) : showProfileBgOptions ? (
                   <p className="profile-premium-bg-empty">No premium backgrounds have been added yet.</p>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -923,14 +960,14 @@ function Profile() {
             <div className="inventory inventory-clean">
               {giftInventory.map((gift, index) => (
                 <InventoryCard
-                  key={`${gift.title}-${index}`}
+                  key={gift.inventoryId || gift._id || gift.id || `${gift.giftName || gift.name || 'gift'}-${index}`}
                   {...gift}
                   variant={`v${(index % 4) + 1}`}
                 />
               ))}
             </div>
           ) : (
-            <p className="empty-state">Gift inventory is coming soon.</p>
+            <p className="empty-state">No gifts in your inventory yet.</p>
           )}
         </div>
 

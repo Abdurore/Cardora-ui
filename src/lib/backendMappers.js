@@ -87,6 +87,12 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
   const user = getPrimaryUser(userPayload) || {}
   const roleValue = String(user.role || user.accountType || 'user').toLowerCase()
   const userId = user._id || user.id || user.userId || user.email || `u-${Date.now()}`
+  const giftsInventory =
+    user.giftsInventory ||
+    user.giftInventory ||
+    user.gifts ||
+    user.inventory?.gifts ||
+    []
 
   return {
     id: userId,
@@ -104,6 +110,8 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     isVerified: user.isVerified ?? true,
     isPremiumActive: !!(couponPayload?.isPremiumActive || user.isPremiumActive),
     premiumUntil: couponPayload?.premiumUntil || user.premiumUntil || null,
+    giftsInventory: Array.isArray(giftsInventory) ? giftsInventory : [],
+    giftWalletNgn: user.giftWalletNgn ?? user.giftWallet ?? user.giftBalanceNgn ?? 0,
     profileBackground: user.profileBackground || user.equippedBackground || user.selectedProfileBackground || user.background || null,
     equippedBackground: user.equippedBackground || user.profileBackground || user.selectedProfileBackground || null,
     profileBackgroundUrl: user.profileBackgroundUrl || user.backgroundUrl || user.selectedProfileBackgroundUrl || user.profileBackground?.url || user.equippedBackground?.url || user.selectedProfileBackground?.url || '',
@@ -253,6 +261,9 @@ export function extractCheckoutUrl(payload) {
     root?.authorizationUrl ||
     root?.checkoutUrl ||
     root?.url ||
+    root?.link ||
+    root?.paymentLink ||
+    root?.payment_link ||
     root?.sessionUrl ||
     payload?.authorization_url ||
     payload?.authorizationUrl ||
@@ -260,8 +271,14 @@ export function extractCheckoutUrl(payload) {
     payload?.data?.authorizationUrl ||
     payload?.checkoutUrl ||
     payload?.url ||
+    payload?.link ||
+    payload?.paymentLink ||
+    payload?.payment_link ||
     payload?.sessionUrl ||
     payload?.data?.url ||
+    payload?.data?.link ||
+    payload?.data?.paymentLink ||
+    payload?.data?.payment_link ||
     null
   )
 }

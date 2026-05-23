@@ -1,4 +1,4 @@
-import { useOutletContext, useNavigate } from 'react-router-dom'
+﻿import { useOutletContext, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { trimAudioFile, getAudioDuration } from '../lib/audioTrim.js'
@@ -53,11 +53,22 @@ import {
   getTemplates,
   approveTemplate,
   rejectTemplate,
+  getSignupBonusStatus,
+  resetSignupBonus,
+  createChatFrame,
+  deleteChatFrame,
+  approveChatFrameRequest,
+  rememberChatFrame,
+  createAdminGift,
+  getAdminGifts,
+  deleteAdminGift,
+  getBroadcastDeliveryLogs,
+  getChatFrames,
 } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
 import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
-const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Packages', 'Codes', 'Ads', 'Media', 'Coupons', 'Logs']
+const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Packages', 'Codes', 'Ads', 'Media', 'Gifts', 'Coupons', 'Logs']
 
 // Persist trim points locally (backend doesn't store startSec/endSec yet).
 // Keyed by track _id OR cloudinary URL so drafts survive before an ID is assigned.
@@ -219,6 +230,14 @@ function AdminDashboard() {
   const [profileBackgrounds, setProfileBackgrounds] = useState([])
   const [allTemplates, setAllTemplates] = useState([])
   const [loading, setLoading] = useState(false)
+  const [signupBonus, setSignupBonus] = useState(null)
+  const [adminChatFrames, setAdminChatFrames] = useState([])
+  const [newChatFrame, setNewChatFrame] = useState({ id: '', name: '', url: '', price: 5 })
+  const [chatFrameUploading, setChatFrameUploading] = useState(false)
+  const [adminGifts, setAdminGifts] = useState([])
+  const [newGift, setNewGift] = useState({ name: '', priceNgn: 500 })
+  const [deliveryLogs, setDeliveryLogs] = useState([])
+  const [deliveryBroadcastId, setDeliveryBroadcastId] = useState('')
 
   // New package form
   const [newPkg, setNewPkg] = useState({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false })
@@ -245,6 +264,7 @@ function AdminDashboard() {
   const mediaVideoInputRef = useRef(null)
   const mediaMusicInputRef = useRef(null)
   const profileBgInputRef = useRef(null)
+  const chatFrameInputRef = useRef(null)
   // Ban form
   const [banForm, setBanForm] = useState({ identifier: '', durationDays: 7, reason: '' })
   const [banConfirm, setBanConfirm] = useState(null) // { user, payload } | null
@@ -332,6 +352,10 @@ function AdminDashboard() {
           if (referralRes.status === 'fulfilled') {
             setReferralStats(referralRes.value?.data || referralRes.value || null)
           }
+          try {
+            const bonusRes = await getSignupBonusStatus()
+            setSignupBonus(bonusRes?.data || bonusRes || null)
+          } catch { setSignupBonus(null) }
           break
         }
         case 'Coupons': {
@@ -418,7 +442,7 @@ function AdminDashboard() {
             setMediaMusic([])
           }
           if (profileBgRes.status === 'fulfilled') {
-            setProfileBackgrounds(pickList(profileBgRes.value, 'backgrounds', 'items', 'media') || [])
+            setProfileBackgrounds(pickList(profileBgRes.value, 'backgrounds', 'profileBackgrounds', 'items', 'media') || [])
           } else {
             console.warn('[Admin] /admin/profile-backgrounds failed', profileBgRes.reason)
             setProfileBackgrounds([])
@@ -440,6 +464,18 @@ function AdminDashboard() {
             setLogs(adminLogsRes.value?.data?.logs || adminLogsRes.value?.logs || [])
           if (modLogsRes.status === 'fulfilled')
             setModLogs(modLogsRes.value?.data?.logs || modLogsRes.value?.logs || [])
+          break
+        }
+        case 'Gifts': {
+          const [giftsRes, framesRes] = await Promise.allSettled([getAdminGifts(), getChatFrames()])
+          if (giftsRes.status === 'fulfilled') {
+            const list = giftsRes.value?.data?.gifts || giftsRes.value?.gifts || giftsRes.value?.data || []
+            setAdminGifts(Array.isArray(list) ? list : [])
+          }
+          if (framesRes.status === 'fulfilled') {
+            const list = framesRes.value?.chatFrames || framesRes.value?.data?.chatFrames || framesRes.value?.data || []
+            setAdminChatFrames(Array.isArray(list) ? list : [])
+          }
           break
         }
       }
@@ -685,6 +721,88 @@ const handleBroadcast = async () => {
     }
   }
 
+  const handleResetSignupBonus = async () => {
+    if (!await appConfirm('Reset Signup Bonus', 'Reset the signup bonus counter?', { variant: 'warning', confirmLabel: 'Reset' })) return
+    try {
+      await resetSignupBonus()
+      showMsg('Signup bonus counter reset.')
+      const bonusRes = await getSignupBonusStatus()
+      setSignupBonus(bonusRes?.data || bonusRes || null)
+    } catch (err) { showMsg(err.message || 'Reset failed.', false) }
+  }
+
+  const handleCreateChatFrame = async () => {
+    if (!newChatFrame.name.trim() || !newChatFrame.url.trim()) { showMsg('Name and URL required.', false); return }
+    try {
+      const payload = { id: newChatFrame.id.trim() || `frame_${Date.now()}`, name: newChatFrame.name.trim(), url: newChatFrame.url.trim(), imageUrl: newChatFrame.url.trim(), price: Number(newChatFrame.price) || 5 }
+      await createChatFrame(payload)
+      rememberChatFrame(payload)
+      showMsg('Chat frame created!')
+      setNewChatFrame({ id: '', name: '', url: '', price: 5 })
+      if (chatFrameInputRef.current) chatFrameInputRef.current.value = ''
+      loadTabData('Gifts')
+    } catch (err) { showMsg(err.message || 'Failed.', false) }
+  }
+
+  const handleChatFrameFile = async (file) => {
+    if (!file) { showMsg('No file selected.', false); return }
+    if (!file.type.startsWith('image/')) {
+      showMsg(`Please select an image file. Got "${file.type || 'unknown'}".`, false)
+      return
+    }
+    setChatFrameUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'image')
+      const fallbackName = file.name.replace(/\.[^.]+$/, '').slice(0, 80)
+      setNewChatFrame(p => ({ ...p, name: p.name || fallbackName, url }))
+      showMsg('Frame image uploaded. Add a price, then create the frame.')
+    } catch (err) {
+      showMsg(err.message || 'Frame upload failed.', false)
+    } finally {
+      setChatFrameUploading(false)
+    }
+  }
+
+  const handleDeleteChatFrame = async (frame) => {
+    const fid = frame.id || frame._id
+    if (!await appConfirm('Delete Frame', `Delete "${frame.name || fid}"?`, { variant: 'danger', confirmLabel: 'Delete' })) return
+    try { await deleteChatFrame(fid); showMsg('Deleted.'); setAdminChatFrames(p => p.filter(f => (f.id || f._id) !== fid)) }
+    catch (err) { showMsg(err.message || 'Delete failed.', false) }
+  }
+
+  const handleCreateAdminGift = async () => {
+    if (!newGift.name.trim()) { showMsg('Gift name required.', false); return }
+    try {
+      await createAdminGift({ name: newGift.name.trim(), priceNgn: Number(newGift.priceNgn) || 500 })
+      showMsg('Gift created!')
+      setNewGift({ name: '', priceNgn: 500 })
+      loadTabData('Gifts')
+    } catch (err) { showMsg(err.message || 'Failed.', false) }
+  }
+
+  const handleDeleteAdminGift = async (gift) => {
+    const gid = gift.giftId || gift._id || gift.id || gift.name
+    if (!await appConfirm('Delete Gift', `Delete "${gift.name || gid}"?`, { variant: 'danger', confirmLabel: 'Delete' })) return
+    try { await deleteAdminGift(gid); showMsg('Deleted.'); setAdminGifts(p => p.filter(g => (g.giftId || g._id || g.id || g.name) !== gid)) }
+    catch (err) { showMsg(err.message || 'Delete failed.', false) }
+  }
+
+  const handleLoadDeliveryLogs = async () => {
+    if (!deliveryBroadcastId.trim()) { showMsg('Enter a broadcast ID.', false); return }
+    try {
+      const res = await getBroadcastDeliveryLogs({ broadcastId: deliveryBroadcastId.trim() })
+      const list = res?.data?.logs || res?.logs || res?.data || []
+      setDeliveryLogs(Array.isArray(list) ? list : [])
+      if (Array.isArray(list) && list.length === 0) showMsg('No delivery logs found.', false)
+    } catch (err) { showMsg(err.message || 'Failed.', false) }
+  }
+
+  const handleApproveBroadcast = async (broadcastId) => {
+    if (!await appConfirm('Approve Broadcast', 'Send this broadcast to all users?', { confirmLabel: 'Approve' })) return
+    try { await approveBroadcastRequest(broadcastId); showMsg('Broadcast approved!') }
+    catch (err) { showMsg(err.message || 'Failed.', false) }
+  }
+
   const handleMediaVideoFile = async (file) => {
     if (!file) { showMsg('No file selected.', false); return }
     if (!file.type.startsWith('video/')) {
@@ -737,7 +855,7 @@ const handleBroadcast = async () => {
         console.warn('[Admin] getMediaMusic failed', musicRes.reason)
       }
       if (profileBgRes.status === 'fulfilled') {
-        const list = pickList(profileBgRes.value, 'backgrounds', 'items', 'media')
+        const list = pickList(profileBgRes.value, 'backgrounds', 'profileBackgrounds', 'items', 'media')
         if (list !== null) setProfileBackgrounds(list)
       } else {
         console.warn('[Admin] getProfileBackgrounds failed', profileBgRes.reason)
@@ -788,7 +906,7 @@ const handleBroadcast = async () => {
       const finalName = (newProfileBg.name || '').trim() || fallbackName
       const id = `bg_${Date.now()}_${finalName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'profile'}`
       try {
-        await createProfileBackground({ id, name: finalName, url })
+        await createProfileBackground({ id, name: finalName, url, imageUrl: url })
         showMsg('Profile background added!')
         setNewProfileBg({ name: '', url: '' })
         if (profileBgInputRef.current) profileBgInputRef.current.value = ''
@@ -810,7 +928,7 @@ const handleBroadcast = async () => {
     if (!newProfileBg.name || !newProfileBg.url) { showMsg('Name and image required.', false); return }
     try {
       const id = `bg_${Date.now()}_${newProfileBg.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'profile'}`
-      await createProfileBackground({ id, name: newProfileBg.name, url: newProfileBg.url })
+      await createProfileBackground({ id, name: newProfileBg.name, url: newProfileBg.url, imageUrl: newProfileBg.url })
       showMsg('Profile background added!')
       setNewProfileBg({ name: '', url: '' })
       if (profileBgInputRef.current) profileBgInputRef.current.value = ''
@@ -1109,6 +1227,141 @@ const handleBroadcast = async () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* GIFTS & CHAT FRAMES */}
+        {activeTab === 'Gifts' && !loading && (
+          <div className="admin-section">
+            <h3 className="admin-section-title">Gift & Chat Frame Management</h3>
+
+            {/* Signup Bonus Controls */}
+            <div className="admin-sub-section">
+              <h4>Signup Bonus</h4>
+              {signupBonus ? (
+                <div className="admin-stats-grid">
+                  <div className="admin-stat-card"><div className="admin-stat-value">{signupBonus.limit ?? signupBonus.maxUses ?? '—'}</div><div className="admin-stat-label">Limit</div></div>
+                  <div className="admin-stat-card"><div className="admin-stat-value">{signupBonus.used ?? signupBonus.claimedCount ?? '—'}</div><div className="admin-stat-label">Used</div></div>
+                  <div className="admin-stat-card"><div className="admin-stat-value">{signupBonus.remaining ?? '—'}</div><div className="admin-stat-label">Remaining</div></div>
+                  <div className="admin-stat-card"><div className="admin-stat-value">{signupBonus.amount ?? signupBonus.bonusCC ?? '—'}</div><div className="admin-stat-label">CC Amount</div></div>
+                </div>
+              ) : <p style={{ color: 'rgba(220,240,247,0.4)' }}>Loading…</p>}
+              <button className="primary" type="button" onClick={handleResetSignupBonus} style={{ marginTop: 12 }}>Reset Signup Bonus Counter</button>
+            </div>
+
+            {/* Create Gift */}
+            <div className="admin-sub-section">
+              <h4>Create Gift</h4>
+              <div className="admin-inline-form">
+                <label className="admin-field"><span>Gift Name</span><input placeholder="e.g. spark" value={newGift.name} onChange={e => setNewGift(p => ({ ...p, name: e.target.value }))} /></label>
+                <label className="admin-field"><span>Price (NGN)</span><input type="number" placeholder="500" value={newGift.priceNgn} onChange={e => setNewGift(p => ({ ...p, priceNgn: Number(e.target.value) }))} /></label>
+                <button className="primary" type="button" onClick={handleCreateAdminGift}>Create Gift</button>
+              </div>
+            </div>
+
+            {/* Gift List */}
+            {adminGifts.length > 0 && (
+              <div className="admin-sub-section">
+                <h4>Existing Gifts ({adminGifts.length})</h4>
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead><tr><th>Name</th><th>Price (NGN)</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {adminGifts.map((g, i) => (
+                        <tr key={g.giftId || g._id || g.name || i}>
+                          <td>{g.name}</td>
+                          <td>{g.priceNgn ?? '—'}</td>
+                          <td><button type="button" className="admin-action-btn danger" onClick={() => handleDeleteAdminGift(g)}>Delete</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Create Chat Frame */}
+            <div className="admin-sub-section">
+              <h4>Create Chat Frame</h4>
+              <div className="admin-inline-form">
+                <label className="admin-field"><span>Frame ID</span><input placeholder="frame_neon (auto if empty)" value={newChatFrame.id} onChange={e => setNewChatFrame(p => ({ ...p, id: e.target.value }))} /></label>
+                <label className="admin-field"><span>Name</span><input placeholder="Neon Glow" value={newChatFrame.name} onChange={e => setNewChatFrame(p => ({ ...p, name: e.target.value }))} /></label>
+                <input
+                  ref={chatFrameInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={e => handleChatFrameFile(e.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  className={`admin-media-file-btn${newChatFrame.url ? ' ready' : ''}${chatFrameUploading ? ' uploading' : ''}`}
+                  onClick={() => !chatFrameUploading && chatFrameInputRef.current?.click()}
+                  disabled={chatFrameUploading}
+                >
+                  {chatFrameUploading ? (
+                    <><span className="admin-media-file-spinner" />Uploading...</>
+                  ) : newChatFrame.url ? (
+                    <><span>Ready</span> Replace image</>
+                  ) : (
+                    <><span className="admin-media-file-icon">Upload</span> Upload image</>
+                  )}
+                </button>
+                <label className="admin-field"><span>Price (CC)</span><input type="number" placeholder="5" value={newChatFrame.price} onChange={e => setNewChatFrame(p => ({ ...p, price: Number(e.target.value) }))} /></label>
+                <button className="primary" type="button" onClick={handleCreateChatFrame} disabled={chatFrameUploading || !newChatFrame.url}>Create Frame</button>
+              </div>
+              {newChatFrame.url && (
+                <p className="admin-media-hint">Uploaded to Cloudinary. The returned URL will be saved with this frame.</p>
+              )}
+            </div>
+
+            {/* Chat Frame List */}
+            {adminChatFrames.length > 0 && (
+              <div className="admin-sub-section">
+                <h4>Existing Chat Frames ({adminChatFrames.length})</h4>
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead><tr><th>Preview</th><th>ID</th><th>Name</th><th>Price</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {adminChatFrames.map((f, i) => (
+                        <tr key={f.id || f._id || i}>
+                          <td>{(f.url || f.imageUrl || f.assetUrl || f.cloudinaryUrl) ? <img src={f.url || f.imageUrl || f.assetUrl || f.cloudinaryUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} /> : '-'}</td>
+                          <td className="admin-cell-mono">{f.id || f._id || '—'}</td>
+                          <td>{f.name}</td>
+                          <td>{f.price ?? '—'} CC</td>
+                          <td><button type="button" className="admin-action-btn danger" onClick={() => handleDeleteChatFrame(f)}>Delete</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Broadcast Delivery Logs */}
+            <div className="admin-sub-section">
+              <h4>Broadcast Delivery Logs</h4>
+              <div className="admin-inline-form">
+                <label className="admin-field"><span>Broadcast ID</span><input placeholder="broadcast id" value={deliveryBroadcastId} onChange={e => setDeliveryBroadcastId(e.target.value)} /></label>
+                <button className="primary" type="button" onClick={handleLoadDeliveryLogs}>Look Up</button>
+              </div>
+              {deliveryLogs.length > 0 && (
+                <div className="admin-table-wrap" style={{ marginTop: 12 }}>
+                  <table className="admin-table">
+                    <thead><tr><th>Recipient</th><th>Status</th><th>Date</th></tr></thead>
+                    <tbody>
+                      {deliveryLogs.map((log, i) => (
+                        <tr key={log._id || i}>
+                          <td>{log.recipientEmail || log.recipientId || '—'}</td>
+                          <td><span className={`admin-status-chip ${log.status || 'pending'}`}>{log.status || 'pending'}</span></td>
+                          <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1756,7 +2009,7 @@ const handleBroadcast = async () => {
             {/* Profile Backgrounds */}
             <div className="admin-media-block">
               <div className="admin-media-block-header">
-                <span className="admin-media-block-icon">🖼</span>
+                <span className="admin-media-block-icon">Image</span>
                 <div>
                   <h4 className="admin-media-block-title">Premium Profile Backgrounds</h4>
                   <p className="admin-media-block-desc">Images premium users can apply to their profile and WorldChat profile modal.</p>
@@ -1813,7 +2066,7 @@ const handleBroadcast = async () => {
                 <div className="admin-profile-bg-grid">
                   {profileBackgrounds.map(bg => (
                     <div key={bg._id || bg.id || bg.url} className="admin-profile-bg-card">
-                      <img src={bg.url} alt={bg.name || ''} className="admin-profile-bg-thumb" />
+                      <img src={bg.url || bg.imageUrl || bg.assetUrl || bg.cloudinaryUrl} alt={bg.name || ''} className="admin-profile-bg-thumb" />
                       <div className="admin-media-video-footer">
                         <span className="admin-media-video-title">{bg.name || bg.title || 'Untitled'}</span>
                         <button

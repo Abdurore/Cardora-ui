@@ -379,13 +379,48 @@ function MainLayout() {
       return { ok: false, reason: 'auth' }
     }
     if (!gift) return { ok: false, reason: 'no-gift' }
+    const legacyGiftNames = {
+      tiny: 'spark',
+      sweet: 'sweetHeart',
+      purple: 'purpleLove',
+      ocean: 'oceanHeart',
+      emerald: 'emeraldHeart',
+      passion: 'passionHeart',
+      golden: 'goldenHeart',
+      crystal: 'crystalHeart',
+      diamond: 'diamondHeart',
+      legendary: 'legendaryHeart',
+    }
+    const titleKey = String(gift.title || '')
+      .trim()
+      .replace(/[^a-zA-Z0-9 ]+/g, '')
+      .replace(/\s+([a-zA-Z0-9])/g, (_, char) => char.toUpperCase())
+      .replace(/^./, char => char.toLowerCase())
+    const giftNameCandidates = [
+      gift.giftName,
+      gift.name,
+      gift.effectKey,
+      legacyGiftNames[gift.effectKey],
+      titleKey,
+      gift.title,
+    ].filter(Boolean)
+    const uniqueGiftNames = [...new Set(giftNameCandidates)]
     try {
-      const response = await createFlutterwaveGiftCheckout({
-        giftKey: gift.effectKey,
-        giftTitle: gift.title,
-        amount: gift.amount,
-        cc: gift.cc,
-      })
+      let response = null
+      let lastGiftError = null
+      for (const giftName of uniqueGiftNames) {
+        try {
+          response = await createFlutterwaveGiftCheckout({ giftName })
+          break
+        } catch (error) {
+          lastGiftError = error
+          const canTryNext =
+            [400, 404].includes(error?.status) &&
+            /gift/i.test(error?.message || '')
+          if (!canTryNext) throw error
+        }
+      }
+      if (!response && lastGiftError) throw lastGiftError
       const checkout = normalizeCheckoutSession(response)
       if (checkout.checkoutUrl) {
         window.location.href = checkout.checkoutUrl

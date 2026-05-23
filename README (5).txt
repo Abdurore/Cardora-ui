@@ -51,6 +51,288 @@ Latest Updates (May 10, 2026)
   - admin must approve moderator chat frame requests
   - users can buy chat frames with CC and equip one owned frame at a time
 
+Latest Updates (May 14, 2026)
+-----------------------------
+- Gift system (Flutterwave) added:
+  - `GET /gifts/catalog` for fixed gift names + NGN prices
+  - `POST /gifts/flutterwave/checkout` initializes Flutterwave checkout for one gift purchase
+  - `POST /webhook/flutterwave` verifies Flutterwave events and credits purchased gifts into user inventory
+- Gift attachment + claim flow:
+  - `POST /cards/attach-gift` attaches one owned gift inventory item to one personal card
+  - `POST /cards/:slug/claim-gift` lets recipient claim attached gift payout
+  - recipient receives `90%` of gift amount; Cardora keeps `10%`
+- Profile payload update:
+  - `GET /current-user` now includes `giftsInventory` and `giftWalletNgn`
+- User cards payload update:
+  - `GET /usercards` now includes `giftAttachment` per card (if attached/claimed)
+
+Latest Updates (May 20-21, 2026)
+--------------------------------
+This section documents implementation changes observed in backend source files modified on:
+- Tuesday, May 20, 2026
+- Wednesday, May 21, 2026
+
+These updates are now part of the backend contract and should be treated as source-of-truth unless superseded by newer dated sections.
+
+1) Validation and Input Sanitization Behavior (Global)
+------------------------------------------------------
+- Validation middleware uses:
+  - `abortEarly: false`
+  - `stripUnknown: true`
+  - `convert: true`
+- Impact:
+  - Unknown request fields are removed from `params`, `query`, and `body` after validation.
+  - Route handlers receive sanitized payloads only.
+  - Several endpoints now safely accept multiple identifier aliases without leaking extra fields to handlers.
+
+2) Admin Identity Resolution Expanded (ban/unban/set-role)
+-----------------------------------------------------------
+The following endpoints now resolve target users by any of:
+- `identifier` (user `id` OR `username`)
+- `userId` (alias for `identifier`)
+- `email`
+
+Endpoints:
+- `POST /admin/ban-user`
+- `POST /admin/unban-user`
+- `POST /admin/users/set-role`
+
+Detailed `POST /admin/ban-user` behavior:
+- Request accepts:
+  - identity: `identifier | userId | email` (at least one required)
+  - duration control:
+    - `until` (ISO date), OR
+    - `durationDays` and/or `durationHours` (non-negative, not both zero)
+  - optional `reason`
+- Validation rules:
+  - if no identity provided -> `400`
+  - if no duration provided -> `400`
+  - invalid `until` date -> `400`
+  - `durationDays/durationHours` negative -> `400`
+  - both duration values zero -> `400`
+- Persistence behavior:
+  - sets `isBanned: true`
+  - sets `bannedAt: <now>`
+  - sets computed `bannedUntil`
+  - sets `banReason` (trimmed, default empty string)
+- Response:
+  - `message`
+  - `identifier` (resolved identifier string when provided)
+  - `bannedUntil`
+
+Detailed `POST /admin/unban-user` behavior:
+- Identity required via `identifier | userId | email`
+- On success:
+  - `isBanned: false`
+  - `bannedUntil: null`
+  - `banReason: null`
+  - `unbannedAt: <now>`
+
+Detailed `POST /admin/users/set-role` behavior:
+- Identity required via `identifier | userId | email`
+- Role restricted to:
+  - `enterprise`
+  - `moderator`
+  - `user`
+- Rejects unsupported role values with `400`.
+
+3) Signup Bonus Admin Controls Finalized
+----------------------------------------
+Admin-only endpoints:
+- `GET /admin/signup-bonus-status`
+- `POST /admin/reset-signup-bonus`
+
+`GET /admin/signup-bonus-status` returns:
+- `status.limit`
+- `status.used`
+- `status.remaining`
+- `status.amount`
+
+`POST /admin/reset-signup-bonus` behavior:
+- upserts `systemCounters` record `name: "signup_bonus"`
+- resets:
+  - `used` -> `0`
+  - `limit` -> `SIGNUP_BONUS_LIMIT` env/default
+  - `amount` -> `SIGNUP_BONUS_AMOUNT` env/default
+  - `updatedAt` -> now
+
+4) User Data Retrieval Expansion
+--------------------------------
+`GET /current-user` now supports optional query override:
+- `?identifier=<userId_or_username>`
+- Auth is still required.
+- If `identifier` exists and matches another user:
+  - response returns that user’s current profile payload + analytics.
+- If not found:
+  - `404 User not found for identifier`
+
+Additional fields guaranteed in `/current-user` response object:
+- `isFirstTimeUser` (default `true` for legacy users missing the field)
+- `giftWalletNgn`
+- `giftsInventory`
+- `dailyClaimStreak`
+- `equippedProfileBackground`
+- `profileBackgroundUrl`
+- `ownedChatFrames`
+- `equippedChatFrameId`
+
+5) User Public Profile Payload Enriched
+---------------------------------------
+`GET /users/:identifier/profile` now includes:
+- premium status signals:
+  - `premiumUntil`
+  - `isPremiumActive`
+- profile decoration signals:
+  - `equippedProfileBackground`
+  - `profileBackgroundUrl`
+  - `equippedChatFrameId`
+- plus `profileBackgrounds` list from `profileBackgrounds` collection.
+
+6) Template Deletion and Lookup Improvements
+--------------------------------------------
+Creator delete now supports two route shapes:
+- `DELETE /delete-template` (body `templateId`)
+- `DELETE /delete-template/:templateId` (param version)
+
+Admin template tools:
+- `DELETE /admin/templates/:templateId`
+  - hard deletes template by `id`
+  - returns `Template deleted by admin`
+- `GET /admin/templates/lookup`
+  - accepts any of:
+    - `shareLink`
+    - `slug`
+    - `templateId`
+  - supports lookup by normalized shareLink fallbacks:
+    - direct `shareLink`
+    - same value as `slug`
+    - same value as `id`
+
+7) Card Read Reliability and Interaction Access Rules
+-----------------------------------------------------
+`GET /cards/:slug` reliability behavior:
+- input slug is:
+  - URL-decoded (`decodeURIComponent`)
+  - trimmed
+- lookup logic:
+  - exact slug match OR case-insensitive regex exact boundary match
+- view counting now increments by stable card `id` (not just slug), reducing mismatch risk.
+
+`GET /cards/prices`:
+- confirmed as active route + controller response contract:
+  - `message`
+  - `prices` object from backend pricing table
+
+Interaction endpoint auth/access matrix:
+- `POST /cards/:slug/response`
+  - requires auth
+- `POST /cards/:slug/poll-vote`
+  - optional auth (`optionalAuth`)
+  - guests are tracked as `guest:<ip>`
+- `POST /cards/:slug/chain-reply`
+  - optional auth
+- `POST /cards/:slug/trivia-submit`
+  - optional auth
+- `POST /cards/:slug/anonymous-message`
+  - public (no auth middleware)
+
+Interaction rate limiting:
+- shared limiter on poll/chain/anonymous/trivia interaction routes:
+  - window: 15 minutes
+  - max requests: 60 per IP
+
+8) Ads Listing and Analytics Payload Refinements
+------------------------------------------------
+`GET /admin/ads` now returns computed stats per ad by joining `ads` + `adAnalytics`:
+- `stats.views`
+- `stats.impressions`
+- `stats.clicks`
+- `stats.completions`
+- `stats.uniqueViewers` (count)
+- `stats.viewLimit`
+- `stats.remainingViews`
+
+Response shape:
+- `message`
+- `count`
+- `ads`
+
+`GET /admin/ads/analytics` returns:
+- aggregate rows from `adAnalytics` as `analytics`
+- per-day rows from `adAnalyticsDaily` as `daily`
+- supports optional `?adId=...`
+
+`GET /admin/ads/global-stats` includes:
+- totals from analytics collections
+- per-ad derived rows
+- daily rollups
+- rewarded CC reconciliation against user `ccIncomeHistory` ad reward entries
+
+9) Gift System Source-of-Truth Update (Catalog is DB-first)
+-----------------------------------------------------------
+`GET /gifts/catalog` behavior:
+- primary source: active records in `gifts` collection (`name`, `priceNgn`)
+- fallback source: built-in default gift map if DB has no active gift rows
+
+Important:
+- Frontend should no longer hardcode gift catalog values from static docs.
+- Always consume `/gifts/catalog` response at runtime.
+
+Admin gift management endpoints (admin only):
+- `POST /admin/gifts`
+  - body: `{ name, priceNgn }`
+- `GET /admin/gifts`
+- `DELETE /admin/gifts/:giftId`
+
+10) Daily Free Claim Behavior Clarified
+---------------------------------------
+`POST /claim-daily-free-coupon` now explicitly:
+- grants `2 CC` when premium active
+- grants `1 CC` otherwise
+- updates/increments `dailyClaimStreak` when prior claim was yesterday
+- pushes structured income history entry:
+  - `type: "daily_free_coupon"`
+  - `amount`
+  - `streak`
+  - `balanceBefore`
+  - `balanceAfter`
+  - `createdAt`
+
+11) Premium Gifting Guardrails Clarified
+----------------------------------------
+`POST /gift-premium` (`giftPremiumToFriend`) enforces:
+- sender must currently be premium
+- sender must have a paid premium source (not gifted-only chain abuse)
+- sender can only gift once per paid subscription window
+- sender cannot gift self
+- recipient receives premium extension and receives gift history entries
+
+12) Admin Broadcast Delivery Log Endpoint
+-----------------------------------------
+New documented admin endpoint:
+- `GET /admin/broadcast-delivery-logs`
+
+Query:
+- `broadcastId` (required)
+- `page` (default 1)
+- `limit` (default 100, max 200)
+
+Use-case:
+- audit per-recipient delivery outcomes for specific broadcast runs.
+
+13) Auth Middleware Behavior Note (Optional Auth)
+-------------------------------------------------
+`optionalAuth` now intentionally:
+- attaches `req.user` only when token is valid, user exists, not blacklisted, and not currently banned
+- otherwise continues silently as guest
+
+This affects card interaction endpoints that are guest-capable (poll/chain/trivia) and should be reflected in frontend analytics/identity handling.
+
+14) Documentation Date Scope
+----------------------------
+This section reflects changes observed from backend file edits timestamped May 20-21, 2026.
+If a newer dated section conflicts with this section, follow the newest dated section.
+
 Purpose
 -------
 This document is the source-of-truth integration guide for frontend engineers and AI coding assistants.
@@ -1232,6 +1514,78 @@ User Coupon Endpoints
 - `POST /create-paystack-checkout` (auth)
 - `POST /create-premium-checkout` (auth)
 - `POST /gift-premium` (auth)
+- `GET /gifts/catalog` (public/auth)
+- `POST /gifts/flutterwave/checkout` (auth)
+
+Gift Catalog + Prices (NGN)
+---------------------------
+`GET /gifts/catalog` returns:
+- `spark`: `500`
+- `sweetHeart`: `1000`
+- `purpleLove`: `2000`
+- `oceanHeart`: `3000`
+- `emeraldHeart`: `5000`
+- `passionHeart`: `10000`
+- `goldenHeart`: `20000`
+- `crystalHeart`: `50000`
+- `diamondHeart`: `100000`
+- `legendaryHeart`: `200000`
+
+Gift Checkout (Flutterwave)
+---------------------------
+`POST /gifts/flutterwave/checkout`
+
+Body:
+```json
+{
+  "giftName": "spark"
+}
+```
+
+Response includes:
+- `checkoutUrl` (Flutterwave hosted payment page)
+- `txRef`
+- gift price/currency metadata
+
+Gift payment crediting is webhook-driven (`POST /webhook/flutterwave`).
+
+Gift Attachment + Claim Endpoints
+---------------------------------
+Attach:
+- `POST /cards/attach-gift` (auth)
+
+Body:
+```json
+{
+  "cardId": "CARD_ID",
+  "inventoryId": "GIFT_INVENTORY_ID"
+}
+```
+
+Claim:
+- `POST /cards/:slug/claim-gift` (auth)
+
+Gift Rules (Backend-Enforced)
+-----------------------------
+- only `personal` cards can have gifts attached
+- only one gift can be attached to a card at a time
+- only the card owner can attach gifts to that card
+- only gifts in sender inventory with `status: available` can be attached
+- card owner cannot claim their own attached gift
+- claim is one-time; subsequent claim attempts fail
+- payout split on successful claim:
+  - recipient: `90%`
+  - Cardora/platform fee: `10%`
+
+Gift Data in User/Card Payloads
+-------------------------------
+`GET /current-user` now includes:
+- `giftsInventory: []`
+- `giftWalletNgn: number`
+
+`GET /usercards` now includes:
+- `giftAttachment` when present
+  - `status` transitions: `attached` -> `claimed`
 
 Premium Checkout
 ----------------
@@ -1545,10 +1899,13 @@ Optional:
 - `SMTP_PORT`
 - `SMTP_SECURE`
 - `EMAIL_FROM` (recommended, e.g. `Cardora <noreply@cardora.studio>`)
-- `EMAIL_REPLY_TO` (recommended, e.g. `support@cardora.studio`)
+- `EMAIL_REPLY_TO` (recommended, e.g. `cardoraofficial@gmail.com`)
 - `PAYSTACK_SECRET_KEY`
 - `PAYSTACK_CALLBACK_URL`
 - `PAYSTACK_PREMIUM_PLAN_CODE` (required for premium subscription checkout)
+- `FLUTTERWAVE_SECRET_KEY` (required for gift checkout + transaction verification)
+- `FLW_SECRET_HASH` or `FLUTTERWAVE_SECRET_HASH` (required for webhook signature verification)
+- `FLUTTERWAVE_REDIRECT_URL` (optional; fallback is `CORS_ORIGIN`)
 
 
 ================================================================
