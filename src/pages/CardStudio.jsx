@@ -939,6 +939,14 @@ function CardStudio() {
       // separate from the UI row id so duplicate gifts stay selectable.
       const selectedGift = flushedCardObject.giftEffect || {}
       if (selectedGift.enabled && selectedGift.giftId) {
+        if (selectedGift.isPendingLocal) {
+          setSendResult({
+            ok: false,
+            message: 'Your gift purchase is still pending verification. Please wait a few moments for the payment to confirm, then try sending again.'
+          })
+          setIsSending(false)
+          return
+        }
         const cardIdCandidates = [
           d.card?._id,
           d.card?.id,
@@ -974,7 +982,11 @@ function CardStudio() {
         }
 
         if (!attached) {
-          console.error('Failed to attach gift to card', lastAttachError)
+          setSendResult({
+            ok: false,
+            message: `Card created, but we failed to attach the gift: ${lastAttachError?.message || 'Unknown error'}. Please try again or check your inventory.`
+          })
+          return
         }
       }
 
@@ -2287,6 +2299,7 @@ function CardStudio() {
                 update('giftEffect.giftId', '')
                 update('giftEffect.giftInstanceId', '')
                 update('giftEffect.giftName', '')
+                update('giftEffect.isPendingLocal', false)
               }}
             >
               <span className="cs-gift-none-icon">✕</span>
@@ -2310,6 +2323,7 @@ function CardStudio() {
                         update('giftEffect.giftId', backendGiftId)
                         update('giftEffect.giftInstanceId', instanceId)
                         update('giftEffect.giftName', gift.giftName || gift.name || effectKeyToGiftName(gift.effectKey))
+                        update('giftEffect.isPendingLocal', !!gift.isPendingLocal)
                       }}
                     >
                       <GiftIcon effectKey={gift.effectKey} size={36} />

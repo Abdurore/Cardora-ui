@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
 import { getCardBySlug, submitCardResponse, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage } from '../lib/api.js'
 import { mapBackendCard } from '../lib/backendMappers.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
@@ -9,6 +9,7 @@ import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
 function CardView() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { currentUser, openAuthModal, refreshBalance } = useOutletContext() || {}
   const [card, setCard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(null)
@@ -43,9 +44,9 @@ function CardView() {
         if (backendCard) {
           const cardWithSidecars = {
             ...backendCard,
-            giftAttachment: backendCard.giftAttachment || res?.giftAttachment || res?.data?.giftAttachment || res?.payload?.giftAttachment,
-            gift: backendCard.gift || res?.gift || res?.data?.gift || res?.payload?.gift,
-            attachedGift: backendCard.attachedGift || res?.attachedGift || res?.data?.attachedGift || res?.payload?.attachedGift,
+            giftAttachment: backendCard.giftAttachment || backendCard.gift_attachment || backendCard.gift || backendCard.attachedGift || backendCard.attached_gift || res?.giftAttachment || res?.gift_attachment || res?.data?.giftAttachment || res?.data?.gift_attachment || res?.payload?.giftAttachment || res?.payload?.gift_attachment || res?.gift || res?.data?.gift || res?.payload?.gift || res?.attachedGift || res?.attached_gift || res?.data?.attachedGift || res?.data?.attached_gift || res?.payload?.attachedGift || res?.payload?.attached_gift,
+            gift: backendCard.gift || backendCard.gift_data || res?.gift || res?.gift_data || res?.data?.gift || res?.data?.gift_data || res?.payload?.gift || res?.payload?.gift_data,
+            attachedGift: backendCard.attachedGift || backendCard.attached_gift || res?.attachedGift || res?.attached_gift || res?.data?.attachedGift || res?.data?.attached_gift || res?.payload?.attachedGift || res?.payload?.attached_gift,
           }
           const mapped = mapBackendCard(cardWithSidecars)
           // Preserve raw state for chain replies feed
@@ -117,9 +118,9 @@ function CardView() {
       if (backendCard) {
         setCard(mapBackendCard({
           ...backendCard,
-          giftAttachment: backendCard.giftAttachment || res?.giftAttachment || res?.data?.giftAttachment,
-          gift: backendCard.gift || res?.gift || res?.data?.gift,
-          attachedGift: backendCard.attachedGift || res?.attachedGift || res?.data?.attachedGift,
+          giftAttachment: backendCard.giftAttachment || backendCard.gift_attachment || backendCard.gift || backendCard.attachedGift || backendCard.attached_gift || res?.giftAttachment || res?.gift_attachment || res?.data?.giftAttachment || res?.data?.gift_attachment || res?.payload?.giftAttachment || res?.payload?.gift_attachment || res?.gift || res?.data?.gift || res?.payload?.gift || res?.attachedGift || res?.attached_gift || res?.data?.attachedGift || res?.data?.attached_gift || res?.payload?.attachedGift || res?.payload?.attached_gift,
+          gift: backendCard.gift || backendCard.gift_data || res?.gift || res?.gift_data || res?.data?.gift || res?.data?.gift_data || res?.payload?.gift || res?.payload?.gift_data,
+          attachedGift: backendCard.attachedGift || backendCard.attached_gift || res?.attachedGift || res?.attached_gift || res?.data?.attachedGift || res?.data?.attached_gift || res?.payload?.attachedGift || res?.payload?.attached_gift,
         }))
         setNeedsPassword(false)
       }
@@ -245,6 +246,9 @@ function CardView() {
         chainState={card._chainState}
         cardId={card.slug || card.id || id}
         senderName={card.senderName || card.sender || card.creatorName || ''}
+        currentUser={currentUser}
+        openAuthModal={openAuthModal}
+        refreshBalance={refreshBalance}
       />
       {showReport && (
         <ReportModal

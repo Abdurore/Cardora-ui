@@ -57,6 +57,9 @@ function CardPreviewModal({
   chainState = null,
   cardId = '',
   senderName = '',
+  currentUser = null,
+  openAuthModal = null,
+  refreshBalance = null,
 }) {
   const navigate = useNavigate()
   // `allowedTools` gates tool visibility; `tierLimits` caps the content a
@@ -97,6 +100,7 @@ function CardPreviewModal({
 
   const [claimingGift, setClaimingGift] = useState(false)
   const [giftClaimMessage, setGiftClaimMessage] = useState('')
+  const [localClaimed, setLocalClaimed] = useState(false)
 
   // Card surface style. The colored layer is rendered as a `::before` pseudo
   // so adjusting opacity reveals the page background without dimming the card
@@ -1387,14 +1391,25 @@ function CardPreviewModal({
                     <p className="cp-trivia-score-label" style={{ color: c.card.textColor }}>
                       {correct} out of {total} correct
                     </p>
-                    <button
-                      type="button"
-                      className="cp-continue-btn visible"
-                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                      onClick={() => navigate('/chat')}
-                    >
-                      Talk to the sender
-                    </button>
+                    {hasGift ? (
+                      <button
+                        type="button"
+                        className="cp-continue-btn visible"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        onClick={() => setStage('end')}
+                      >
+                        Continue
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="cp-continue-btn visible"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        onClick={() => navigate('/chat')}
+                      >
+                        Talk to the sender
+                      </button>
+                    )}
                   </div>
                   )
                 })()}
@@ -1466,21 +1481,33 @@ function CardPreviewModal({
                     Your message was delivered. The creator won't know it was you.
                   </p>
                   <div className="cp-end-actions">
-                    <button
-                      className="cp-end-btn"
-                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                      onClick={handleReset}
-                    >
-                      Replay card
-                    </button>
-                    <button
-                      type="button"
-                      className="cp-end-btn ghost"
-                      style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                      onClick={() => navigate('/studio')}
-                    >
-                      Create yours →
-                    </button>
+                    {hasGift ? (
+                      <button
+                        className="cp-end-btn"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        onClick={() => setStage('end')}
+                      >
+                        Continue
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          className="cp-end-btn"
+                          style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                          onClick={handleReset}
+                        >
+                          Replay card
+                        </button>
+                        <button
+                          type="button"
+                          className="cp-end-btn ghost"
+                          style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                          onClick={() => navigate('/studio')}
+                        >
+                          Create yours →
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -1781,29 +1808,52 @@ function CardPreviewModal({
               </p>
             )}
             <div className="cp-end-actions">
-              <button
-                className="cp-end-btn"
-                style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor, opacity: claimingGift ? 0.7 : 1 }}
-                disabled={claimingGift}
-                onClick={async () => {
-                  if (!cardId) {
-                    setGiftClaimMessage('Cannot claim gift: no card ID.')
-                    return
-                  }
-                  setClaimingGift(true)
-                  setGiftClaimMessage('')
-                  try {
-                    const res = await claimGiftFromCard(cardId)
-                    setGiftClaimMessage(res?.message || 'Gift claimed successfully! It is now in your inventory.')
-                  } catch (err) {
-                    setGiftClaimMessage(err.message || 'Failed to claim gift.')
-                  } finally {
-                    setClaimingGift(false)
-                  }
-                }}
-              >
-                {claimingGift ? 'Claiming...' : 'Claim Gift'}
-              </button>
+              {(() => {
+                const isClaimed = c.giftEffect?.status === 'claimed' || localClaimed
+                return (
+                  <button
+                    className="cp-end-btn"
+                    style={{
+                      backgroundColor: isClaimed ? 'rgba(255,255,255,0.1)' : c.theme.accentColor,
+                      color: isClaimed ? 'rgba(255,255,255,0.4)' : c.card.backgroundColor,
+                      opacity: claimingGift ? 0.7 : 1,
+                      cursor: isClaimed ? 'not-allowed' : 'pointer',
+                    }}
+                    disabled={claimingGift || isClaimed}
+                    onClick={async () => {
+                      if (!currentUser) {
+                        setGiftClaimMessage('Please log in or sign up to claim this gift.')
+                        if (openAuthModal) {
+                          openAuthModal()
+                        } else {
+                          navigate('/login')
+                        }
+                        return
+                      }
+                      if (!cardId) {
+                        setGiftClaimMessage('Cannot claim gift: no card ID.')
+                        return
+                      }
+                      setClaimingGift(true)
+                      setGiftClaimMessage('')
+                      try {
+                        const res = await claimGiftFromCard(cardId)
+                        setGiftClaimMessage(res?.message || 'Gift claimed successfully! The payout has been added to your Gift Wallet.')
+                        setLocalClaimed(true)
+                        if (refreshBalance) {
+                          await refreshBalance()
+                        }
+                      } catch (err) {
+                        setGiftClaimMessage(err.message || 'Failed to claim gift.')
+                      } finally {
+                        setClaimingGift(false)
+                      }
+                    }}
+                  >
+                    {claimingGift ? 'Claiming...' : isClaimed ? 'Claimed' : 'Claim Gift'}
+                  </button>
+                )
+              })()}
               {giftClaimMessage && (
                 <p style={{ color: c.theme.accentColor, fontSize: '0.85rem', marginTop: '4px', textAlign: 'center' }}>
                   {giftClaimMessage}

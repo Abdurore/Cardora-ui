@@ -22,12 +22,17 @@ function extractNumber(value) {
 function normalizeAttachedGift(card = {}) {
   const attachment =
     card.giftAttachment ||
+    card.gift_attachment ||
     card.gift ||
     card.attachedGift ||
+    card.attached_gift ||
     card.giftEffect ||
+    card.gift_effect ||
     card.enhancements?.gift ||
     card.layoutdata?.giftEffect ||
+    card.layoutdata?.gift_effect ||
     card.layoutData?.giftEffect ||
+    card.layoutData?.gift_effect ||
     null
 
   if (!attachment) return null
@@ -427,15 +432,32 @@ function isLightColor(hex) {
  * cardObjectToLayoutData — returns the layoutdata branch.
  * Per the API handbook, layoutdata only carries paperTexture metadata.
  * The backend forces layoutdata.tier to match the card's tier automatically.
+ * We also embed giftEffect here so the gift data survives the roundtrip
+ * and is available when recipients view the card via GET /cards/:slug.
  */
-export function cardObjectToLayoutData() {
-  return {
+export function cardObjectToLayoutData(cardObject = null) {
+  const ld = {
     paperTexture: {
       type: 'none',
       opacity: 0,
       blendMode: 'normal',
     },
   }
+
+  // Embed gift effect in layoutdata so it persists with the card
+  const gift = cardObject?.giftEffect
+  if (gift && gift.enabled && gift.effectKey && gift.effectKey !== 'none') {
+    ld.giftEffect = {
+      enabled: true,
+      effectKey: gift.effectKey,
+      giftTitle: gift.giftTitle || '',
+      giftAmount: gift.giftAmount || '',
+      giftId: gift.giftId || '',
+      giftName: gift.giftName || gift.effectKey || '',
+    }
+  }
+
+  return ld
 }
 
 /**
@@ -725,12 +747,14 @@ export function cardObjectToBackendPayload(cardObject, {
     }
   }
 
-  // layoutdata is NOT sent — backend does not have a confirmed schema for it
-  // and allowUnknown:false causes Joi to fail the entire payload with
-  // "'value' failed custom validation because" when unknown keys are present.
+  // Include layoutdata so gift effect and paper texture data survive the roundtrip.
+  // The backend stores this as-is and returns it with GET /cards/:slug.
+  const layoutdata = cardObjectToLayoutData(cardObject)
+
   return {
     config: { colors, font, content },
     enhancements,
+    layoutdata,
   }
 }
 
@@ -892,7 +916,8 @@ export function backendCardToCardObject(card) {
       giftAmount: attachedGift.giftAmount || attachedGift.amount || '',
       giftId: attachedGift.giftId || attachedGift.inventoryId || attachedGift.id || '',
       giftName: attachedGift.giftName || attachedGift.name || '',
-    } : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '' },
+      status: attachedGift.status || 'available',
+    } : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '', status: 'available' },
   })
 }
 
