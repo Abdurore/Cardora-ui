@@ -221,15 +221,19 @@ function MainLayout() {
       const backendGifts = Array.isArray(normalized.giftsInventory)
         ? normalized.giftsInventory.filter(item => item.status === 'available' || !item.status)
         : []
-      const mappedGifts = backendGifts.map((item) => {
+      const mappedGifts = []
+      backendGifts.forEach((item) => {
         const name = item.giftName || item.name || ''
         const legacyKey = backendToLegacy[name] || name
-        return {
-          id: item.inventoryId || item._id || item.id || `gift-${Date.now()}-${Math.random()}`,
-          title: giftTitles[legacyKey] || item.title || String(name).replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim() || 'Gift',
-          effectKey: legacyKey,
-          amount: item.amount || 1,
-          status: item.status || 'available',
+        const amount = item.amount || 1
+        for (let i = 0; i < amount; i++) {
+          mappedGifts.push({
+            id: `${item.inventoryId || item._id || item.id || `gift-${Date.now()}-${Math.random()}`}-${i}`,
+            title: giftTitles[legacyKey] || item.title || String(name).replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim() || 'Gift',
+            effectKey: legacyKey,
+            amount: 1, // we break them into individual items, so each is amount 1
+            status: item.status || 'available',
+          })
         }
       })
 

@@ -6,6 +6,7 @@ import Envelope from './Envelope.jsx'
 import AmbientParticles from './AmbientParticles.jsx'
 import { fireOpenEffect } from '../lib/studioEffects.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
+import { claimGiftFromCard } from '../lib/api.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
 
 const LEGACY_EMOJI_AMBIENTS = new Set(['floating', 'reverse'])
@@ -93,6 +94,9 @@ function CardPreviewModal({
   // Device-frame preview. Fullscreen by default; lets the sender see how the
   // card scales on phone / tablet / desktop without leaving the modal.
   const [previewDevice, setPreviewDevice] = useState('fullscreen')
+
+  const [claimingGift, setClaimingGift] = useState(false)
+  const [giftClaimMessage, setGiftClaimMessage] = useState('')
 
   // Card surface style. The colored layer is rendered as a `::before` pseudo
   // so adjusting opacity reveals the page background without dimming the card
@@ -1772,11 +1776,32 @@ function CardPreviewModal({
             <div className="cp-end-actions">
               <button
                 className="cp-end-btn"
-                style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                onClick={() => { /* future: claim via backend */ }}
+                style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor, opacity: claimingGift ? 0.7 : 1 }}
+                disabled={claimingGift}
+                onClick={async () => {
+                  if (!cardId) {
+                    setGiftClaimMessage('Cannot claim gift: no card ID.')
+                    return
+                  }
+                  setClaimingGift(true)
+                  setGiftClaimMessage('')
+                  try {
+                    const res = await claimGiftFromCard(cardId)
+                    setGiftClaimMessage(res?.message || 'Gift claimed successfully! It is now in your inventory.')
+                  } catch (err) {
+                    setGiftClaimMessage(err.message || 'Failed to claim gift.')
+                  } finally {
+                    setClaimingGift(false)
+                  }
+                }}
               >
-                Claim Gift
+                {claimingGift ? 'Claiming...' : 'Claim Gift'}
               </button>
+              {giftClaimMessage && (
+                <p style={{ color: c.theme.accentColor, fontSize: '0.85rem', marginTop: '4px', textAlign: 'center' }}>
+                  {giftClaimMessage}
+                </p>
+              )}
               <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={handleReset}>
                 Replay
               </button>

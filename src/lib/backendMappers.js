@@ -714,6 +714,9 @@ export function backendCardToCardObject(card) {
   const enhancements = card.enhancements || {}
   const colors = config.colors || {}
   const content = config.content || {}
+  const layoutdata = card.layoutdata || {}
+
+  const attachedGift = card.gift || card.attachedGift || card.giftEffect || (card.enhancements && card.enhancements.gift) || layoutdata.giftEffect || null;
 
   const bgType = enhancements.background?.type || 'color'
   const isVideo = bgType === 'video'
@@ -846,7 +849,13 @@ export function backendCardToCardObject(card) {
       button: { textColor: onLight ? bgColor : '#ffffff', borderColor: primaryAccent, backgroundColor: primaryAccent },
       denyBehavior: 'none',
     },
-    giftEffect: { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '' },
+    giftEffect: attachedGift ? {
+      enabled: attachedGift.enabled !== false,
+      effectKey: attachedGift.effectKey || attachedGift.giftName || 'none',
+      giftTitle: attachedGift.giftTitle || attachedGift.title || attachedGift.giftName || '',
+      giftAmount: attachedGift.giftAmount || attachedGift.amount || '',
+      giftId: attachedGift.giftId || attachedGift.inventoryId || attachedGift.id || '',
+    } : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '' },
   })
 }
 

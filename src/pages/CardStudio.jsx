@@ -15,7 +15,7 @@ import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
-import { getMediaVideos, getMediaMusic } from '../lib/api.js'
+import { getMediaVideos, getMediaMusic, attachGiftToCard } from '../lib/api.js'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
 import { getMusicPresetsForTier } from '../data/cardDefaults.js'
 import { getTierLimits } from '../lib/tierLimits.js'
@@ -933,6 +933,20 @@ function CardStudio() {
       if (!slug) {
         console.warn('Card created but no slug returned. Response shape:', JSON.stringify(d))
       }
+
+      // Attach the gift if the user selected one
+      if (flushedCardObject.giftEffect?.enabled && flushedCardObject.giftEffect.giftId) {
+        try {
+          await attachGiftToCard({ 
+            cardId: slug, 
+            inventoryId: flushedCardObject.giftEffect.giftId,
+            giftId: flushedCardObject.giftEffect.giftId
+          })
+        } catch (err) {
+          console.error('Failed to attach gift to card', err)
+        }
+      }
+
       setSendResult({ ok: true, slug, message: result.message })
       refreshBalance?.()
       // Card sent successfully — clear the autosave so the next studio visit
@@ -2256,6 +2270,7 @@ function CardStudio() {
                       update('giftEffect.effectKey', gift.effectKey || gift.title)
                       update('giftEffect.giftTitle', gift.title)
                       update('giftEffect.giftAmount', gift.amount || '')
+                      update('giftEffect.giftId', gift.id || '')
                     }}
                   >
                     <GiftIcon effectKey={gift.effectKey} size={36} />
