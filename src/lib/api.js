@@ -473,7 +473,16 @@ export async function createFlutterwaveGiftCheckout(payload) {
 }
 
 export async function attachGiftToCard(payload) {
-  return request('/cards/attach-gift', { method: 'POST', auth: true, body: payload })
+  try {
+    return await request('/cards/attach-gift', { method: 'POST', auth: true, body: payload })
+  } catch (err) {
+    const cardId = payload.cardId || payload.id || payload.slug
+    if (cardId && (err.message?.includes('Card not found') || err.status === 404)) {
+      console.log(`[api] Body-based attach failed, trying fallback URL route: /cards/${cardId}/attach-gift`)
+      return await request(`/cards/${cardId}/attach-gift`, { method: 'POST', auth: true, body: payload })
+    }
+    throw err
+  }
 }
 
 export async function claimGiftFromCard(slug) {
