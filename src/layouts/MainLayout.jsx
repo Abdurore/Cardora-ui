@@ -1016,7 +1016,7 @@ function MainLayout() {
           },
           openEditor: (data) => {
             window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-            navigate('/studio', { state: { cardData: data || null } })
+            navigate('/studio', { state: { cardData: data || null, isNew: !data } })
           },
         }}
       />

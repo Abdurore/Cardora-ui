@@ -103,7 +103,7 @@ function CreateCardPicker() {
                   key={tier.id}
                   className="ccp-tier-card"
                   style={{ '--type-accent': selectedType.accent }}
-                  onClick={() => navigate(`/studio?type=${selectedType.id}&tier=${tier.id}`)}
+                  onClick={() => navigate(`/studio?type=${selectedType.id}&tier=${tier.id}`, { state: { isNew: true } })}
                 >
                   <div className="ccp-tier-top">
                     <strong className="ccp-tier-label">{tier.label}</strong>

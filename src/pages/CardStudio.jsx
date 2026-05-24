@@ -353,7 +353,7 @@ function CardStudio() {
     }
   }
   const autoSavedRef = useRef(null)
-  if (autoSavedRef.current === null && !location.state?.draftCardObject) {
+  if (autoSavedRef.current === null && !location.state?.draftCardObject && !location.state?.cardData && !location.state?.isNew) {
     // Lazy-init once. Skip when an explicit draft is being opened from the
     // drafts list — that path takes priority.
     autoSavedRef.current = readAutoSave() || false
@@ -510,22 +510,69 @@ function CardStudio() {
   // Poll / Trivia / Chain / Anonymous template state. Seed from the autosave
   // payload when one exists so a poll/trivia/chain in progress survives a
   // reload, just like the rest of cardObject does.
-  const [pollData, setPollData] = useState(() =>
-    initialAutoSaved?.pollData || { question: '', options: ['', ''], allowMultiple: false }
-  )
-  const [triviaData, setTriviaData] = useState(() =>
-    initialAutoSaved?.triviaData || {
+  const [pollData, setPollData] = useState(() => {
+    if (initialAutoSaved?.pollData) return initialAutoSaved.pollData
+    if (cardData?.poll) {
+      return {
+        question: cardData.poll.question || '',
+        options: Array.isArray(cardData.poll.options) 
+          ? cardData.poll.options.map(o => typeof o === 'string' ? o : o.text || '')
+          : ['', ''],
+        allowMultiple: !!cardData.poll.allowMultiple
+      }
+    }
+    if (cardData?.layoutConfig?.content?.question) {
+      return {
+        question: cardData.layoutConfig.content.question || '',
+        options: Array.isArray(cardData.layoutConfig.content.options)
+          ? cardData.layoutConfig.content.options.map(o => typeof o === 'string' ? o : o.text || '')
+          : ['', ''],
+        allowMultiple: false
+      }
+    }
+    return { question: '', options: ['', ''], allowMultiple: false }
+  })
+  const [triviaData, setTriviaData] = useState(() => {
+    if (initialAutoSaved?.triviaData) return initialAutoSaved.triviaData
+    if (cardData?.trivia) {
+      return {
+        questions: Array.isArray(cardData.trivia.questions) ? cardData.trivia.questions.map(q => ({
+          text: q.question || q.text || '',
+          options: Array.isArray(q.options) ? q.options.map(o => typeof o === 'string' ? o : o.text || '') : ['', '', '', ''],
+          correctIndex: q.correctIndex || 0
+        })) : [{ text: '', options: ['', '', '', ''], correctIndex: 0 }]
+      }
+    }
+    if (cardData?.layoutConfig?.content?.questions) {
+      return {
+        questions: Array.isArray(cardData.layoutConfig.content.questions) ? cardData.layoutConfig.content.questions.map(q => ({
+          text: q.question || q.text || '',
+          options: Array.isArray(q.options) ? q.options.map(o => typeof o === 'string' ? o : o.text || '') : ['', '', '', ''],
+          correctIndex: q.correctIndex || 0
+        })) : [{ text: '', options: ['', '', '', ''], correctIndex: 0 }]
+      }
+    }
+    return {
       questions: [{ text: '', options: ['', '', '', ''], correctIndex: 0 }],
     }
-  )
-  const [chainData, setChainData] = useState(() =>
-    initialAutoSaved?.chainData || { enabled: false, prompt: '' }
-  )
+  })
+  const [chainData, setChainData] = useState(() => {
+    if (initialAutoSaved?.chainData) return initialAutoSaved.chainData
+    if (cardData?.chain) {
+      return { enabled: true, prompt: cardData.chain.prompt || cardData.chain.challenge || '' }
+    }
+    if (cardData?.layoutConfig?.content?.challenge) {
+      return { enabled: true, prompt: cardData.layoutConfig.content.challenge || '' }
+    }
+    return { enabled: false, prompt: '' }
+  })
   const [anonTemplate, setAnonTemplate] = useState(() => {
     const saved = initialAutoSaved?.anonTemplate
     if (saved) {
-      // anonTemplate.tier must be classic|elite (not premium — anon is non-personal)
       return { ...saved, tier: saved.tier === 'premium' ? 'elite' : (saved.tier || 'classic') }
+    }
+    if (cardData?.anonTier) {
+      return { enabled: true, tier: cardData.anonTier === 'premium' ? 'elite' : cardData.anonTier || 'classic' }
     }
     return { enabled: false, tier: studioTier === 'elite' ? 'elite' : 'classic' }
   })

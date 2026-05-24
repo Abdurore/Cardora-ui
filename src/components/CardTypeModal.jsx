@@ -85,7 +85,7 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
     if (!selectedType || !selectedTier) return
     if (isArtist) {
       onClose()
-      navigate(`/studio?type=${selectedType}&tier=${selectedTier}`)
+      navigate(`/studio?type=${selectedType}&tier=${selectedTier}`, { state: { isNew: true } })
     } else {
       setModeStep(true)
     }
@@ -230,7 +230,7 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
               <button
                 type="button"
                 className="ctm-mode-card ctm-mode-studio"
-                onClick={() => { onClose(); navigate(`/studio?type=${selectedType}&tier=${selectedTier}`) }}
+                onClick={() => { onClose(); navigate(`/studio?type=${selectedType}&tier=${selectedTier}`, { state: { isNew: true } }) }}
               >
                 <div className="ctm-mode-icon">🎨</div>
                 <h3>Full Studio</h3>

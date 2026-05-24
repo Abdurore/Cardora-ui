@@ -1502,7 +1502,7 @@ function CardPreviewModal({
                           type="button"
                           className="cp-end-btn ghost"
                           style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                          onClick={() => navigate('/studio')}
+                          onClick={() => navigate('/studio', { state: { isNew: true } })}
                         >
                           Create yours →
                         </button>
@@ -1725,7 +1725,7 @@ function CardPreviewModal({
                     type="button"
                     className="cp-end-btn ghost"
                     style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                    onClick={() => navigate('/studio')}
+                    onClick={() => navigate('/studio', { state: { isNew: true } })}
                   >
                     Create yours →
                   </button>
@@ -1867,7 +1867,7 @@ function CardPreviewModal({
                   type="button"
                   className="cp-end-btn ghost"
                   style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                  onClick={() => navigate('/studio')}
+                  onClick={() => navigate('/studio', { state: { isNew: true } })}
                 >
                   Create yours →
                 </button>

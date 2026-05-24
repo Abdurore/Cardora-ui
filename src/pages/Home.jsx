@@ -243,7 +243,7 @@ function Home() {
               <p className="format-card-tagline">{format.tagline}</p>
               <p className="format-card-desc">{format.description}</p>
               {format.to ? (
-                <Link className="format-card-cta" to={format.to}>{format.cta} →</Link>
+                <Link className="format-card-cta" to={format.to} state={{ isNew: true }}>{format.cta} →</Link>
               ) : (
                 <button className="format-card-cta" type="button" onClick={() => openCardTypeModal?.(format.typePreselect)}>
                   {format.cta} →
