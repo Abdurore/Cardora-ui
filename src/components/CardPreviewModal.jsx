@@ -501,6 +501,12 @@ function CardPreviewModal({
     }
   }
 
+  useEffect(() => {
+    if (!pageMode || stage !== 'end' || !hasGift) return undefined
+    const id = window.setTimeout(() => setStage('giftIntro'), 900)
+    return () => window.clearTimeout(id)
+  }, [hasGift, pageMode, stage])
+
   // Close on Esc
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }

@@ -19,6 +19,41 @@ function extractNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+function normalizeAttachedGift(card = {}) {
+  const attachment =
+    card.giftAttachment ||
+    card.gift ||
+    card.attachedGift ||
+    card.giftEffect ||
+    card.enhancements?.gift ||
+    card.layoutdata?.giftEffect ||
+    card.layoutData?.giftEffect ||
+    null
+
+  if (!attachment) return null
+
+  const nested =
+    attachment.gift ||
+    attachment.giftItem ||
+    attachment.inventoryItem ||
+    attachment.inventory ||
+    attachment.item ||
+    {}
+
+  return {
+    ...nested,
+    ...attachment,
+    giftName: attachment.giftName || attachment.name || nested.giftName || nested.name || nested.effectKey,
+    name: attachment.name || attachment.giftName || nested.name || nested.giftName,
+    effectKey: attachment.effectKey || nested.effectKey || attachment.giftName || attachment.name || nested.giftName || nested.name,
+    title: attachment.giftTitle || attachment.title || nested.title,
+    amount: attachment.giftAmount || attachment.amount || attachment.valueNgn || attachment.priceNgn || nested.amount || nested.valueNgn || nested.priceNgn,
+    inventoryId: attachment.inventoryId || attachment.giftInventoryId || attachment.giftId || nested.inventoryId || nested._id || nested.id,
+    id: attachment.giftId || attachment.inventoryId || attachment._id || attachment.id || nested._id || nested.id,
+    enabled: attachment.enabled !== false && attachment.status !== 'removed',
+  }
+}
+
 export function unwrapData(payload) {
   if (!payload || typeof payload !== 'object') return payload
   return payload?.data && typeof payload.data === 'object' ? payload.data : payload
@@ -717,7 +752,7 @@ export function backendCardToCardObject(card) {
   const content = config.content || {}
   const layoutdata = card.layoutdata || {}
 
-  const attachedGift = card.gift || card.attachedGift || card.giftEffect || (card.enhancements && card.enhancements.gift) || layoutdata.giftEffect || null;
+  const attachedGift = normalizeAttachedGift(card)
 
   const bgType = enhancements.background?.type || 'color'
   const isVideo = bgType === 'video'

@@ -41,7 +41,13 @@ function CardView() {
 
         const backendCard = candidates.find(isCardLike)
         if (backendCard) {
-          const mapped = mapBackendCard(backendCard)
+          const cardWithSidecars = {
+            ...backendCard,
+            giftAttachment: backendCard.giftAttachment || res?.giftAttachment || res?.data?.giftAttachment || res?.payload?.giftAttachment,
+            gift: backendCard.gift || res?.gift || res?.data?.gift || res?.payload?.gift,
+            attachedGift: backendCard.attachedGift || res?.attachedGift || res?.data?.attachedGift || res?.payload?.attachedGift,
+          }
+          const mapped = mapBackendCard(cardWithSidecars)
           // Preserve raw state for chain replies feed
           mapped._chainState = backendCard.state || res?.state || null
           setCard(mapped)
@@ -109,7 +115,12 @@ function CardView() {
       const res = await getCardBySlug(id, passwordInput)
       const backendCard = res?.card || res?.data?.card || res?.data || res
       if (backendCard) {
-        setCard(mapBackendCard(backendCard))
+        setCard(mapBackendCard({
+          ...backendCard,
+          giftAttachment: backendCard.giftAttachment || res?.giftAttachment || res?.data?.giftAttachment,
+          gift: backendCard.gift || res?.gift || res?.data?.gift,
+          attachedGift: backendCard.attachedGift || res?.attachedGift || res?.data?.attachedGift,
+        }))
         setNeedsPassword(false)
       }
     } catch (err) {
