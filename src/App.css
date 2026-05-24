@@ -8497,6 +8497,8 @@ a {
   gap: 14px;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
   position: sticky;
   top: 100px;
   scrollbar-width: thin;
@@ -8518,6 +8520,12 @@ a {
   font-size: 1.15rem;
   color: #ecfbff;
   line-height: 1.2;
+}
+
+.cs-settings *,
+.cs-mobile-panel-body * {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .cs-panel-eyebrow {
@@ -8609,6 +8617,7 @@ a {
   border-radius: 14px;
   border: 1px solid rgba(118, 239, 255, 0.08);
   background: linear-gradient(180deg, rgba(8, 16, 20, 0.78), rgba(4, 10, 14, 0.92));
+  min-width: 0;
 }
 
 .cs-color-wrap input[type="color"] {
@@ -8641,9 +8650,11 @@ a {
 }
 
 .cs-color-row {
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 6px;
+  min-width: 0;
 }
 
 .cs-color-row .cs-color-field {
@@ -8672,9 +8683,10 @@ a {
 
 /* Chips */
 .cs-choice-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
   gap: 6px;
+  min-width: 0;
 }
 
 .cs-chip {
@@ -8687,6 +8699,8 @@ a {
   text-transform: capitalize;
   transition: all 0.2s ease;
   white-space: nowrap;
+  min-width: 0;
+  text-align: center;
 }
 
 .cs-chip:hover {
@@ -9848,17 +9862,21 @@ a {
 /* Device frame toolbar */
 .cp-device-toolbar {
   position: fixed;
-  top: 18px;
+  top: auto;
+  bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10003;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 4px;
   padding: 4px;
   border-radius: 999px;
   background: rgba(8, 14, 18, 0.7);
   border: 1px solid rgba(118, 239, 255, 0.18);
   backdrop-filter: blur(10px);
+  max-width: calc(100vw - 24px);
 }
 
 .cp-device-tab {
@@ -10414,15 +10432,18 @@ a {
 }
 
 .cp-personal-signature {
-  justify-self: end;
-  align-self: end;
-  width: min(190px, 58%);
-  margin: 12px 4px 4px auto;
+  position: absolute;
+  left: 18px;
+  bottom: 16px;
+  z-index: 3;
+  width: auto;
+  margin: 0;
   display: grid;
-  justify-items: end;
+  justify-items: start;
   gap: 2px;
-  text-align: right;
-  opacity: 1;
+  text-align: left;
+  opacity: 0.82;
+  pointer-events: none;
 }
 
 .cp-personal-signature-yours {
@@ -10438,13 +10459,13 @@ a {
 .cp-personal-signature-cardora {
   position: relative;
   font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
-  font-size: clamp(1.35rem, 3.2vw, 1.95rem);
+  font-size: clamp(0.95rem, 1.9vw, 1.25rem);
   font-weight: 700;
   font-style: italic;
   line-height: 1;
   color: var(--sig-accent, currentColor);
   opacity: 0;
-  transform: translateY(16px) rotate(-2deg);
+  transform: translateY(10px) rotate(-2deg);
   animation: cpSignatureName 1s cubic-bezier(0.16, 1, 0.3, 1) 0.95s both;
 }
 
@@ -20138,20 +20159,30 @@ a {
    PREVIEW WATERMARK — "Made with Cardora · Create yours →"
    ════════════════════════════════════════════════════════════════ */
 .cs-preview-watermark {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  z-index: 6;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 4px;
-  margin-top: auto;
-  padding: 8px 12px 4px;
-  font-size: 0.62rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.52rem;
   letter-spacing: 0.03em;
-  color: rgba(255, 255, 255, 0.28);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.36);
+  border-top: 0;
   user-select: none;
+  pointer-events: none;
+}
+.cs-preview-watermark > span:first-child,
+.cs-preview-watermark .cs-preview-watermark-sep,
+.cs-preview-watermark .cs-preview-watermark-cta:last-child {
+  display: none;
 }
 .cs-preview-watermark-cta {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.48);
   text-decoration: none;
   transition: color 0.2s;
 }
@@ -20172,6 +20203,8 @@ a {
 .cs-preview-anon .cs-preview-anon-template {
   display: flex;
   flex-direction: column;
+  position: relative;
+  padding-bottom: 30px;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -21215,9 +21248,10 @@ a {
 /* Video picker grid */
 .cs-video-picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 10px;
   margin-bottom: 12px;
+  min-width: 0;
 }
 
 .cs-video-picker-item {
@@ -21304,6 +21338,7 @@ a {
   background: rgba(255, 255, 255, 0.025);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s, transform 0.15s;
+  min-width: 0;
 }
 
 .cs-music-picker-item:hover {
@@ -21350,6 +21385,7 @@ a {
 
 .cs-music-picker-label {
   flex: 1;
+  min-width: 0;
   font-size: 0.82rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.72);

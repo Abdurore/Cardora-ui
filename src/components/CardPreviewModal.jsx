@@ -1093,16 +1093,16 @@ function CardPreviewModal({
                           &mdash; Sent by {senderName}
                         </p>
                       )}
-                      {isPersonalType && (
-                        <div className="cp-personal-signature" style={{ '--sig-accent': c.theme.accentColor, color: c.card.textColor }}>
-                          <span className="cp-personal-signature-yours">yours truly,</span>
-                          <span className="cp-personal-signature-cardora">Cardora</span>
-                        </div>
-                      )}
                     </div>
                   )
                   return null
                 })}
+
+                {isPersonalType && (
+                  <div className="cp-personal-signature" style={{ '--sig-accent': c.theme.accentColor, color: c.card.textColor }}>
+                    <span className="cp-personal-signature-cardora">Cardora</span>
+                  </div>
+                )}
 
                 {/* Continue */}
                 <div className={`cp-card-action-row cp-reveal-element ${revealStep >= 4 ? 'visible' : ''}`}>

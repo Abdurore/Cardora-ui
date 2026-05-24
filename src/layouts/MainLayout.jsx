@@ -143,12 +143,13 @@ function MainLayout() {
           resetSession()
           return null
         }
+        console.warn('Session refresh failed without an auth error; keeping the stored token.', userPayload.reason)
+        return hydratedUser || currentUser || null
       }
 
       const userData = userPayload.status === 'fulfilled' ? userPayload.value : null
       if (!userData) {
-        resetSession()
-        return null
+        return hydratedUser || currentUser || null
       }
 
       const couponsData = couponPayload.status === 'fulfilled' ? couponPayload.value : null
@@ -167,8 +168,7 @@ function MainLayout() {
       return normalized
     } catch (error) {
       console.error('Session hydration failed', error)
-      resetSession()
-      return null
+      return hydratedUser || currentUser || null
     }
   }
 
@@ -410,7 +410,15 @@ function MainLayout() {
       let lastGiftError = null
       for (const giftName of uniqueGiftNames) {
         try {
-          response = await createFlutterwaveGiftCheckout({ giftName })
+          const callbackUrl = `${window.location.origin}/store/gifts?gift=callback&giftName=${encodeURIComponent(giftName)}`
+          response = await createFlutterwaveGiftCheckout({
+            giftName,
+            callbackUrl,
+            callback_url: callbackUrl,
+            redirectUrl: callbackUrl,
+            redirect_url: callbackUrl,
+            returnUrl: callbackUrl,
+          })
           break
         } catch (error) {
           lastGiftError = error

@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link, useOutletContext } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
+import PremiumGiftReveal from '../components/PremiumGiftReveal.jsx'
 import { getGiftCatalog, createFlutterwaveGiftCheckout } from '../lib/api.js'
 import { normalizeCheckoutSession } from '../lib/backendMappers.js'
+
+const PENDING_GIFT_KEY = 'cardora:pendingGiftCheckout'
 
 const GIFT_META = {
   spark:          { emoji: '💫', gradient: 'linear-gradient(135deg, #fbbf24, #f59e0b)' },
@@ -35,14 +38,63 @@ function formatNgn(amount) {
   return '₦' + Number(amount || 0).toLocaleString()
 }
 
+function catalogItemsFromResponse(res) {
+  const raw = res?.gifts || res?.data?.gifts || res?.prices || res?.catalog || res?.data?.prices || res?.data || []
+  if (Array.isArray(raw)) {
+    return raw
+      .map(item => ({
+        name: item.name || item.giftName || item.id,
+        price: item.priceNgn ?? item.price ?? item.amount ?? item.valueNgn,
+      }))
+      .filter(item => item.name)
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([name, price]) => ({
+      name,
+      price: typeof price === 'object' ? price.priceNgn || price.price || price.amount : price,
+    }))
+  }
+  return []
+}
+
+function getStoredPendingGift() {
+  try {
+    const raw = sessionStorage.getItem(PENDING_GIFT_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function storePendingGift(gift, checkout = {}) {
+  try {
+    sessionStorage.setItem(PENDING_GIFT_KEY, JSON.stringify({
+      name: gift.name,
+      price: gift.price,
+      reference: checkout.reference || '',
+      savedAt: Date.now(),
+    }))
+  } catch { /* ignore */ }
+}
+
+function clearPendingGift() {
+  try {
+    sessionStorage.removeItem(PENDING_GIFT_KEY)
+  } catch { /* ignore */ }
+}
+
 function StoreGifts() {
   const { currentUser, openAuthModal, balance, refreshBalance } = useOutletContext()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [catalog, setCatalog] = useState([])
   const [loadingCatalog, setLoadingCatalog] = useState(true)
   const [buying, setBuying] = useState(null)
   const [confirmGift, setConfirmGift] = useState(null)
   const [msg, setMsg] = useState({ text: '', ok: false })
   const [activeView, setActiveView] = useState('catalog')
+  const [revealingGift, setRevealingGift] = useState(null)
+  const [returnRefreshing, setReturnRefreshing] = useState(false)
 
   const inventory = currentUser?.giftsInventory || []
   const walletBalance = currentUser?.giftWalletNgn || 0
@@ -52,11 +104,7 @@ function StoreGifts() {
     ;(async () => {
       try {
         const res = await getGiftCatalog()
-        const prices = res?.prices || res?.catalog || res?.gifts || res?.data?.prices || res?.data || {}
-        const items = Object.entries(prices).map(([name, price]) => ({
-          name,
-          price: typeof price === 'object' ? price.priceNgn || price.price : price,
-        }))
+        const items = catalogItemsFromResponse(res)
         if (!cancelled && items.length > 0) setCatalog(items)
         else if (!cancelled) {
           // Fallback to static defaults
@@ -95,6 +143,40 @@ function StoreGifts() {
     return () => { cancelled = true }
   }, [])
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const isGiftReturn =
+      params.get('gift') === 'callback' ||
+      params.has('tx_ref') ||
+      params.has('transaction_id') ||
+      params.has('status')
+    if (!isGiftReturn) return
+
+    const pending = getStoredPendingGift()
+    const returnedName = params.get('giftName') || pending?.name || ''
+    const returnedGift = returnedName ? { ...(pending || {}), name: returnedName } : pending
+    let cancelled = false
+
+    ;(async () => {
+      setReturnRefreshing(true)
+      setMsg({ text: 'Payment received. Refreshing your gift inventory...', ok: true })
+      for (const delay of [700, 1500, 2800]) {
+        await new Promise(resolve => setTimeout(resolve, delay))
+        if (cancelled) return
+        await refreshBalance?.()
+      }
+      if (cancelled) return
+      setActiveView('inventory')
+      if (returnedGift?.name) setRevealingGift(returnedGift)
+      setMsg({ text: 'Gift added. Your inventory has been refreshed.', ok: true })
+      clearPendingGift()
+      setReturnRefreshing(false)
+      navigate('/store/gifts', { replace: true })
+    })()
+
+    return () => { cancelled = true }
+  }, [location.search, navigate, refreshBalance])
+
   const handleBuyGift = async (gift) => {
     if (!currentUser) { openAuthModal(); return }
     setBuying(gift.name)
@@ -105,7 +187,15 @@ function StoreGifts() {
       const names = [...new Set([...(GIFT_NAME_ALIASES[gift.name] || []), gift.name].filter(Boolean))]
       for (const giftName of names) {
         try {
-          res = await createFlutterwaveGiftCheckout({ giftName })
+          const callbackUrl = `${window.location.origin}/store/gifts?gift=callback&giftName=${encodeURIComponent(gift.name)}`
+          res = await createFlutterwaveGiftCheckout({
+            giftName,
+            callbackUrl,
+            callback_url: callbackUrl,
+            redirectUrl: callbackUrl,
+            redirect_url: callbackUrl,
+            returnUrl: callbackUrl,
+          })
           break
         } catch (error) {
           lastGiftError = error
@@ -118,10 +208,13 @@ function StoreGifts() {
       if (!res && lastGiftError) throw lastGiftError
       const checkout = normalizeCheckoutSession(res)
       if (checkout.checkoutUrl) {
+        storePendingGift(gift, checkout)
         window.location.href = checkout.checkoutUrl
       } else {
         setMsg({ text: checkout.message || 'Gift added to inventory!', ok: true })
         await refreshBalance?.()
+        setActiveView('inventory')
+        setRevealingGift(gift)
       }
     } catch (err) {
       setMsg({ text: err?.message || 'Purchase failed. Please try again.', ok: false })
@@ -399,6 +492,13 @@ function StoreGifts() {
             </div>
           </div>
         </section>
+      )}
+
+      {revealingGift && (
+        <PremiumGiftReveal
+          effect={GIFT_NAME_ALIASES[revealingGift.name]?.[1] || revealingGift.name}
+          onComplete={() => setRevealingGift(null)}
+        />
       )}
     </div>
   )

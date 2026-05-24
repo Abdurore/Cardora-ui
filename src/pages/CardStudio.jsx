@@ -388,6 +388,7 @@ function CardStudio() {
     () => getTierLimits(studioTier, { isArtist }),
     [studioTier, isArtist],
   )
+  const canUseBackgroundMusic = tierLimits.allowMusic
   // Show all palettes; mark above-tier ones as locked (visual upgrade prompt)
   const availablePalettes = PALETTES
   const allowedPaletteIds = useMemo(
@@ -625,6 +626,28 @@ function CardStudio() {
       setActiveEditEl(null)
     }
   }, [showPreview])
+
+  // Enforce background and music limitations for Classic tier cards
+  useEffect(() => {
+    if (studioTier === 'classic' && !isArtist) {
+      setCardObject(prev => {
+        let changed = false
+        const next = structuredClone(prev)
+        if (next.background?.type && next.background.type !== 'color') {
+          next.background.type = 'color'
+          if (!next.background.colors || !next.background.colors.length) {
+            next.background.colors = ['#0a0a0a']
+          }
+          changed = true
+        }
+        if (next.background?.music?.url) {
+          next.background.music.url = ''
+          changed = true
+        }
+        return changed ? next : prev
+      })
+    }
+  }, [studioTier, isArtist])
 
   // Snap font to a tier-allowed family when the current pick isn't available at this tier.
   useEffect(() => {
@@ -1335,16 +1358,26 @@ function CardStudio() {
           <p className="cs-panel-eyebrow">Background</p>
           <h3>Set the stage</h3>
           <div className="cs-choice-row">
-            {['color', 'gradient', 'video', 'animated'].map(type => (
-              <button
-                key={type}
-                type="button"
-                className={`cs-chip ${c.background.type === type ? 'active' : ''}`}
-                onClick={() => update('background.type', type)}
-              >
-                {type}
-              </button>
-            ))}
+            {['color', 'gradient', 'video', 'animated'].map(type => {
+              const locked = !isArtist && studioTier === 'classic' && type !== 'color'
+              const badgeLabel = studioType === 'personal' ? 'Premium' : 'Elite'
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  className={`cs-chip ${c.background.type === type ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                  onClick={() => {
+                    if (locked) return
+                    update('background.type', type)
+                  }}
+                  title={locked ? `Requires ${badgeLabel}` : undefined}
+                  disabled={locked}
+                >
+                  {type}
+                  {locked && <span className="cs-chip-badge">{badgeLabel}</span>}
+                </button>
+              )
+            })}
           </div>
 
           {(c.background.type === 'color' || c.background.type === 'gradient' || c.background.type === 'animated') && (
@@ -1428,76 +1461,78 @@ function CardStudio() {
             </div>
           )}
 
-          <div className="cs-sub-section">
-            <p className="cs-sub-label"><HiOutlineMusicalNote style={{ verticalAlign: 'middle' }} /> Background Music</p>
-            {adminMusic.length > 0 ? (
-              <div className="cs-music-picker-list">
-                {adminMusic.map((track) => {
-                  const url = track.url || track.audioUrl || track.src || ''
-                  const label = track.title || track.name || track.label || 'Track'
-                  const selected = c.background.music.url === url
-                  // Carry the admin-configured trim points onto the card so the
-                  // recipient hears only the segment the admin curated.
-                  const startSec = Number(track.startSec) || 0
-                  const endSec = Number(track.endSec) || 0
-                  return (
-                    <button
-                      key={track._id || track.id || url}
-                      type="button"
-                      className={`cs-music-picker-item ${selected ? 'active' : ''}`}
-                      onClick={() => {
-                        update('background.music.url', url)
-                        update('background.music.isUploaded', false)
-                        update('background.music.startSec', startSec)
-                        update('background.music.endSec', endSec)
-                      }}
-                    >
-                      <span className="cs-music-picker-icon">♫</span>
-                      <span className="cs-music-picker-label">{label}</span>
-                      {endSec > 0 && endSec - startSec < (Number(track.duration) || Infinity) && (
-                        <span className="cs-music-picker-trim">trimmed</span>
-                      )}
-                      {selected && <span className="cs-music-picker-check">✓</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="cs-preset-list">
-                {musicPresets.map(preset => {
-                  const locked = !isArtist && preset.tier && !tierHasPresetAccess(studioTier, preset.tier)
-                  return (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      className={`cs-chip small ${c.background.music.url === preset.url ? 'active' : ''} ${locked ? 'locked' : ''}`}
-                      onClick={() => {
-                        if (locked) return
-                        update('background.music.url', preset.url)
-                        update('background.music.isUploaded', false)
-                      }}
-                      title={locked ? `Requires ${preset.tier === 'elite' ? 'Elite' : 'Premium'}` : undefined}
-                      disabled={locked}
-                    >
-                      ♫ {preset.label}
-                      {locked && <span className="cs-chip-badge">{preset.tier === 'elite' ? 'Elite' : 'Premium'}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            {c.background.music.url ? (
-              <>
-                <StudioAudioPlayer src={c.background.music.url} volume={c.background.music.volume} />
-                <button type="button" className="cs-inline-remove" style={{ marginTop: 4 }} onClick={() => update('background.music.url', '')}>Remove track</button>
-              </>
-            ) : null}
-            <label className="cs-field">
-              <span>Volume</span>
-              <input type="range" min="0" max="1" step="0.05" value={c.background.music.volume} onChange={e => update('background.music.volume', Number(e.target.value))} />
-              <span className="cs-range-val">{Math.round(c.background.music.volume * 100)}%</span>
-            </label>
-          </div>
+          {canUseBackgroundMusic && (
+            <div className="cs-sub-section">
+              <p className="cs-sub-label"><HiOutlineMusicalNote style={{ verticalAlign: 'middle' }} /> Background Music</p>
+              {adminMusic.length > 0 ? (
+                <div className="cs-music-picker-list">
+                  {adminMusic.map((track) => {
+                    const url = track.url || track.audioUrl || track.src || ''
+                    const label = track.title || track.name || track.label || 'Track'
+                    const selected = c.background.music.url === url
+                    // Carry the admin-configured trim points onto the card so the
+                    // recipient hears only the segment the admin curated.
+                    const startSec = Number(track.startSec) || 0
+                    const endSec = Number(track.endSec) || 0
+                    return (
+                      <button
+                        key={track._id || track.id || url}
+                        type="button"
+                        className={`cs-music-picker-item ${selected ? 'active' : ''}`}
+                        onClick={() => {
+                          update('background.music.url', url)
+                          update('background.music.isUploaded', false)
+                          update('background.music.startSec', startSec)
+                          update('background.music.endSec', endSec)
+                        }}
+                      >
+                        <span className="cs-music-picker-icon">♫</span>
+                        <span className="cs-music-picker-label">{label}</span>
+                        {endSec > 0 && endSec - startSec < (Number(track.duration) || Infinity) && (
+                          <span className="cs-music-picker-trim">trimmed</span>
+                        )}
+                        {selected && <span className="cs-music-picker-check">✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="cs-preset-list">
+                  {musicPresets.map(preset => {
+                    const locked = !isArtist && preset.tier && !tierHasPresetAccess(studioTier, preset.tier)
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        className={`cs-chip small ${c.background.music.url === preset.url ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                        onClick={() => {
+                          if (locked) return
+                          update('background.music.url', preset.url)
+                          update('background.music.isUploaded', false)
+                        }}
+                        title={locked ? `Requires ${preset.tier === 'elite' ? 'Elite' : 'Premium'}` : undefined}
+                        disabled={locked}
+                      >
+                        ♫ {preset.label}
+                        {locked && <span className="cs-chip-badge">{preset.tier === 'elite' ? 'Elite' : 'Premium'}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {c.background.music.url ? (
+                <>
+                  <StudioAudioPlayer src={c.background.music.url} volume={c.background.music.volume} />
+                  <button type="button" className="cs-inline-remove" style={{ marginTop: 4 }} onClick={() => update('background.music.url', '')}>Remove track</button>
+                </>
+              ) : null}
+              <label className="cs-field">
+                <span>Volume</span>
+                <input type="range" min="0" max="1" step="0.05" value={c.background.music.volume} onChange={e => update('background.music.volume', Number(e.target.value))} />
+                <span className="cs-range-val">{Math.round(c.background.music.volume * 100)}%</span>
+              </label>
+            </div>
+          )}
         </>
       )
     }

@@ -570,6 +570,18 @@ export function backfillEnvelope(card) {
   return card
 }
 
+function deepMerge(target, source) {
+  const result = { ...target }
+  for (const key of Object.keys(source || {})) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      result[key] = deepMerge(target[key] || {}, source[key])
+    } else {
+      result[key] = source[key]
+    }
+  }
+  return result
+}
+
 export function resolveTemplateCardObject(cardData) {
   if (!cardData) return backfillEnvelope(structuredClone(defaultCardObject))
 
@@ -579,16 +591,26 @@ export function resolveTemplateCardObject(cardData) {
   const layoutConfig =
     cardData.layoutConfig ||
     cardData.layoutdata ||
+    cardData.cardObject ||
     cardData.backendTemplate?.layoutConfig ||
     cardData.backendTemplate?.layoutdata ||
     null
 
-  if (layoutConfig && typeof layoutConfig === 'object' && Object.keys(layoutConfig).length > 0) {
-    const base = structuredClone(layoutConfig)
-    // Defensive fill: make sure required shape exists so downstream code doesn't crash.
-    base.content = base.content || structuredClone(defaultCardObject.content)
-    base.theme = base.theme || structuredClone(defaultCardObject.theme)
-    base.closedState = base.closedState || structuredClone(defaultCardObject.closedState)
+  let parsedLayout = null
+  if (layoutConfig) {
+    if (typeof layoutConfig === 'object') {
+      parsedLayout = layoutConfig
+    } else if (typeof layoutConfig === 'string') {
+      try {
+        parsedLayout = JSON.parse(layoutConfig)
+      } catch (e) {
+        console.warn('Failed to parse layoutConfig JSON string:', e)
+      }
+    }
+  }
+
+  if (parsedLayout && typeof parsedLayout === 'object' && Object.keys(parsedLayout).length > 0) {
+    const base = deepMerge(structuredClone(defaultCardObject), parsedLayout)
     return backfillEnvelope(base)
   }
 

@@ -292,6 +292,12 @@ export function normalizeCheckoutSession(payload) {
       root.paymentReference ||
       root.checkoutReference ||
       root.transactionRef ||
+      root.txRef ||
+      root.tx_ref ||
+      payload?.txRef ||
+      payload?.tx_ref ||
+      payload?.data?.txRef ||
+      payload?.data?.tx_ref ||
       '',
     message: getResponseMessage(payload, ''),
     raw: payload,
