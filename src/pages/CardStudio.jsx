@@ -964,19 +964,26 @@ function CardStudio() {
         let attached = false
         let lastAttachError = null
 
+        console.log('[GiftAttach] Attempting to attach gift with candidates:', uniqueCardIds, 'selectedGift:', selectedGift)
         for (const cardId of uniqueCardIds) {
           try {
+            console.log(`[GiftAttach] Trying cardId=${cardId}, slug=${slug}`)
             await attachGiftToCard({
               cardId,
+              id: cardId,
               slug,
+              cardSlug: slug,
               inventoryId: selectedGift.giftId,
               giftId: selectedGift.giftId,
+              giftInventoryId: selectedGift.giftId,
               giftName: selectedGift.giftName || effectKeyToGiftName(selectedGift.effectKey),
               effectKey: selectedGift.effectKey,
             })
             attached = true
+            console.log(`[GiftAttach] Successfully attached gift to cardId=${cardId}`)
             break
           } catch (err) {
+            console.warn(`[GiftAttach] Failed for cardId=${cardId}:`, err.message)
             lastAttachError = err
           }
         }
