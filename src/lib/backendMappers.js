@@ -518,7 +518,8 @@ export function cardObjectToBackendPayload(cardObject, {
           const options = (Array.isArray(q.options) ? q.options : [])
             .map(opt => String(opt || '').trim())
             .filter(Boolean) // each option text needs min(1)
-          const correctIndex = Number.isInteger(q.correctIndex) ? q.correctIndex : 0
+          const parsedCorrectIndex = parseInt(q.correctIndex, 10)
+          const correctIndex = isNaN(parsedCorrectIndex) ? 0 : parsedCorrectIndex
           return {
             question: String(q.text || q.question || '').trim(),
             options,
@@ -921,7 +922,7 @@ export function mapBackendCard(card) {
         text: q.text || q.question || '',
         question: q.question || q.text || '',
         options: Array.isArray(q.options) ? q.options : [],
-        correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : 0,
+        correctIndex: isNaN(parseInt(q.correctIndex, 10)) ? 0 : parseInt(q.correctIndex, 10),
       }))
     : []
 

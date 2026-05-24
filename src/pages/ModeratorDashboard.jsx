@@ -49,7 +49,7 @@ function ModeratorDashboard() {
   const [chatFrameForm, setChatFrameForm] = useState({ name: '', url: '', reason: '' })
   const [chatFrameSubmitting, setChatFrameSubmitting] = useState(false)
 
-  const isModerator = currentUser?.role === 'Moderator'
+  const isModerator = String(currentUser?.role || '').toLowerCase() === 'moderator'
 
   const showMsg = (text, ok = true) => {
     setStatusModal({ type: ok ? 'success' : 'error', message: text })

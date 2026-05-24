@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getRewardedAd, completeAd, getAdStats } from '../lib/api.js'
+import { getRewardedAd, completeAd, getAdStats, clickAd, trackAdView } from '../lib/api.js'
 
 const AD_COOLDOWN_SECS = 30
 const MIN_WATCH_PCT = 80   // must watch 80% to get full reward
@@ -86,6 +86,10 @@ function RewardedAds({ onBalanceUpdate }) {
       }
       setAd(adData)
       setPhase('watching')
+      const adId = adData.id || adData._id
+      if (adId) {
+        trackAdView(adId).catch(err => console.warn('[RewardedAds] View tracking failed:', err))
+      }
 
       // Fallback timer for non-video ads (image/placeholder)
       if (!adData.videoUrl) {
@@ -131,11 +135,14 @@ function RewardedAds({ onBalanceUpdate }) {
     else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen()
   }
 
-  const adsWatched = stats?.adsWatchedToday ?? stats?.watched ?? 0
-  const remaining = stats?.remainingAdsToday ?? stats?.remaining ?? 10
-  const earned = stats?.ccEarnedToday ?? stats?.earned ?? 0
+  // Deeply unwrap the stats response — backend may return nested shapes
+  const _raw = stats?.data || stats
+  const adStats = _raw?.stats || _raw?.data?.stats || _raw || {}
+  const adsWatched = adStats?.adsWatchedToday ?? adStats?.watched ?? _raw?.adsWatchedToday ?? 0
+  const remaining = adStats?.remainingAdsToday ?? adStats?.remaining ?? _raw?.remainingAdsToday ?? (typeof _raw?.adsWatchedToday === 'number' ? Math.max(0, 10 - _raw.adsWatchedToday) : null)
+  const earned = adStats?.ccEarnedToday ?? adStats?.earned ?? _raw?.ccEarnedToday ?? 0
   const cooldownPct = Math.round(((AD_COOLDOWN_SECS - cooldown) / AD_COOLDOWN_SECS) * 100)
-  const ctaUrl = ad?.ctaUrl || ad?.actionUrl || ad?.url || ad?.link
+  const ctaUrl = ad?.ctaUrl || ad?.actionUrl || ad?.url || ad?.link || ad?.linkUrl
 
   return (
     <div className="rad-container">
@@ -150,14 +157,14 @@ function RewardedAds({ onBalanceUpdate }) {
       {stats && (
         <div className="rad-stats">
           <div className="rad-stat"><strong>{adsWatched}</strong><span>Watched</span></div>
-          <div className="rad-stat"><strong>{remaining}</strong><span>Remaining</span></div>
+          <div className="rad-stat"><strong>{remaining !== null ? remaining : '—'}</strong><span>Remaining</span></div>
           <div className="rad-stat"><strong>{earned} CC</strong><span>Earned Today</span></div>
         </div>
       )}
 
       {phase === 'idle' && (
-        <button className="rad-watch-btn" type="button" onClick={loadAd} disabled={remaining <= 0}>
-          {remaining <= 0 ? 'Daily Limit Reached' : '▶ Watch Ad & Earn CC'}
+        <button className="rad-watch-btn" type="button" onClick={loadAd} disabled={stats && remaining !== null && remaining <= 0}>
+          {stats && remaining !== null && remaining <= 0 ? 'Daily Limit Reached' : '▶ Watch Ad & Earn CC'}
         </button>
       )}
 
@@ -167,7 +174,7 @@ function RewardedAds({ onBalanceUpdate }) {
             <svg viewBox="0 0 44 44" className="rad-cooldown-svg">
               <circle cx="22" cy="22" r="18" className="rad-cooldown-track" />
               <circle cx="22" cy="22" r="18" className="rad-cooldown-fill"
-                strokeDasharray={`${(cooldownPct / 100) * 113} 113`} strokeDashoffset="28" />
+                strokeDasharray={`${(cooldownPct / 100) * 113} 113`} strokeDashoffset="0" />
             </svg>
             <span className="rad-cooldown-num">{cooldown}</span>
           </div>
@@ -207,7 +214,19 @@ function RewardedAds({ onBalanceUpdate }) {
           {/* Bottom overlay: CTA + controls */}
           <div className="rad-overlay-bottom">
             {ctaUrl ? (
-              <a href={ctaUrl} target="_blank" rel="noopener noreferrer" className="rad-cta-btn">
+              <a
+                href={ctaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rad-cta-btn"
+                onClick={async () => {
+                  const adId = ad.id || ad._id
+                  if (adId) {
+                    try { await clickAd(adId) }
+                    catch (err) { console.warn('[RewardedAds] Click tracking failed:', err) }
+                  }
+                }}
+              >
                 {ad.ctaText || ad.actionText || 'Learn More →'}
               </a>
             ) : <span />}

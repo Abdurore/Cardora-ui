@@ -495,6 +495,26 @@ export async function getAdStats() {
   return request('/ads/stats', { auth: true })
 }
 
+export async function clickAd(adId) {
+  return requestFirstSuccess([
+    `/ads/${adId}/click`,
+    `/ads/click`,
+    `/ads/track-click`,
+    `/ads/interaction`,
+    `/admin/ads/${adId}/click`,
+  ], { method: 'POST', auth: true, body: { adId, id: adId, action: 'click' } })
+}
+
+export async function trackAdView(adId) {
+  return requestFirstSuccess([
+    `/ads/${adId}/view`,
+    `/ads/view`,
+    `/ads/track-view`,
+    `/ads/interaction`,
+    `/admin/ads/${adId}/view`,
+  ], { method: 'POST', auth: true, body: { adId, id: adId, action: 'view' } })
+}
+
 /* ═══════════════════════════════════════════════
    WORLD CHAT
    ═══════════════════════════════════════════════ */
@@ -509,8 +529,15 @@ export async function getTemplates(query = 'page=1&limit=24') {
   return request(`/templates?${query}`)
 }
 
-export async function getMyTemplates() {
-  return request('/my-templates', { auth: true })
+export async function getMyTemplates(userId) {
+  try {
+    return await request('/my-templates', { auth: true })
+  } catch (err) {
+    if (userId && (err.status === 404 || err.message?.includes('not found') || String(err.status) === '404')) {
+      return await request(`/templates?artist=${encodeURIComponent(userId)}`, { auth: true })
+    }
+    throw err
+  }
 }
 
 export async function getPopularTemplates(query = 'days=7&page=1&limit=10') {
@@ -554,22 +581,32 @@ export async function updateTemplate(payload) {
 }
 
 export async function deleteTemplate(payload) {
-  const templateId = payload?.templateId || payload?.id || payload?._id
+  const templateId = payload?.templateId || payload?.id || payload?._id || (typeof payload === 'string' ? payload : '')
+  if (!templateId) {
+    throw new Error('Template ID is required for deletion.')
+  }
+
   const candidates = [
-    payload,
-    { templateId },
-    { id: templateId },
-    { _id: templateId },
-    { templateId, id: templateId, _id: templateId },
-  ].filter(Boolean)
+    { path: `/templates/${templateId}`, options: { method: 'DELETE', auth: true } },
+    { path: '/delete-template', options: { method: 'DELETE', auth: true, body: { templateId } } },
+    { path: '/delete-template', options: { method: 'DELETE', auth: true, body: { id: templateId } } },
+    { path: '/delete-template', options: { method: 'DELETE', auth: true, body: { _id: templateId } } },
+    { path: '/delete-template', options: { method: 'DELETE', auth: true, body: { templateId, id: templateId, _id: templateId } } },
+    { path: `/templates/delete/${templateId}`, options: { method: 'DELETE', auth: true } },
+    { path: `/templates/${templateId}/delete`, options: { method: 'POST', auth: true } },
+    { path: '/delete-template', options: { method: 'POST', auth: true, body: { templateId } } },
+    { path: '/delete-template', options: { method: 'POST', auth: true, body: { id: templateId } } },
+    { path: `/my-templates/${templateId}`, options: { method: 'DELETE', auth: true } },
+    { path: `/artist/templates/${templateId}`, options: { method: 'DELETE', auth: true } },
+  ]
 
   let lastError = null
-  for (const body of candidates) {
+  for (const item of candidates) {
     try {
-      return await request('/delete-template', { method: 'DELETE', auth: true, body })
+      return await request(item.path, item.options)
     } catch (error) {
       lastError = error
-      if (![404, 400].includes(error.status)) throw error
+      if (![404, 405, 400].includes(error.status)) throw error
     }
   }
   throw lastError || new Error('Could not delete template.')
@@ -717,7 +754,13 @@ export async function disableAdminTemplate(templateId) {
 }
 
 export async function getEnterpriseAdStats() {
-  return request('/ads/enterprise-stats', { auth: true })
+  return requestFirstSuccess([
+    '/ads/enterprise-stats',
+    '/ads/enterprise/stats',
+    '/enterprise/ads/stats',
+    '/enterprise/ads',
+    '/ads/my-stats',
+  ], { auth: true })
 }
 
 export async function getAdminTemplatesLookup(query = '') {

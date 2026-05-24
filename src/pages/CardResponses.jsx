@@ -457,6 +457,17 @@ function CardResponses() {
         {type === 'chain' && <ChainRepliesView state={state} content={content} />}
         {type === 'personal' && <PersonalResponsesView state={state} content={content} />}
 
+        {/* Slashed Cardora signature animation at the bottom left */}
+        <div className="cp-personal-signature" style={{ 
+          '--sig-accent': meta.color, 
+          color: 'rgba(223, 244, 248, 0.9)', 
+          position: 'absolute', 
+          left: '24px', 
+          bottom: '28px', 
+          zIndex: 1 
+        }}>
+          <span className="cp-personal-signature-cardora">Cardora</span>
+        </div>
       </div>
       <ScreenNav />
     </div>

@@ -61,7 +61,7 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
   const [selectedType, setSelectedType] = useState(null)
   const [selectedTier, setSelectedTier] = useState(null)
   const [modeStep, setModeStep] = useState(false)
-  const isArtist = currentUser?.role === 'Artist'
+  const isArtist = String(currentUser?.role || '').toLowerCase() === 'artist'
 
   // Reset state when modal opens / closes or preselection changes
   useEffect(() => {

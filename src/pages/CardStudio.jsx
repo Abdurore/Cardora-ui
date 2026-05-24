@@ -369,7 +369,7 @@ function CardStudio() {
   const tierCost = (TIER_COST_BY_TYPE[studioType] || TIER_COST_BY_TYPE.personal)[studioTier] ?? 0
 
   // Filter tools by type + tier — aligned to home page tier promises
-  const isArtist = currentUser?.role === 'Artist'
+  const isArtist = String(currentUser?.role || '').toLowerCase() === 'artist'
   const allowedToolIds = useMemo(() => {
     if (isArtist) {
       // Artists bypass tool visibility gating — they can use every tool the type supports.

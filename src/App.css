@@ -13874,6 +13874,9 @@ a {
   right: 8px;
   z-index: 3;
 }
+.profile-template-actions {
+  right: 76px !important;
+}
 
 .profile-card-action-btn {
   width: 30px;
@@ -19561,15 +19564,19 @@ a {
   overflow: hidden;
 }
 
-/* Profile Background Banner */
-.chat-profile-bg-banner {
+/* Ensure all card content sits above the background image */
+.chat-profile-card > * {
   position: relative;
-  width: 100%;
-  height: 110px;
-  margin: -28px -24px 0;
-  width: calc(100% + 48px);
-  flex-shrink: 0;
+  z-index: 1;
+}
+
+/* Profile Background — covers the entire card */
+.chat-profile-bg-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   overflow: hidden;
+  border-radius: inherit;
 }
 .chat-profile-bg-img {
   width: 100%;
@@ -19579,15 +19586,16 @@ a {
 }
 .chat-profile-bg-fade {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: linear-gradient(to top, rgba(6, 14, 20, 0.95), transparent);
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 14, 20, 0.35) 0%,
+    rgba(6, 14, 20, 0.65) 40%,
+    rgba(6, 14, 20, 0.88) 100%
+  );
   pointer-events: none;
 }
 .chat-profile-header--with-bg {
-  margin-top: -30px;
   position: relative;
   z-index: 2;
 }
@@ -19769,15 +19777,16 @@ a {
   position: absolute;
   top: 12px;
   right: 14px;
-  background: none;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.35);
   border: none;
-  color: rgba(180, 200, 210, 0.5);
+  color: rgba(220, 230, 240, 0.8);
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 6px;
-  transition: color 0.15s;
+  transition: color 0.15s, background 0.15s;
 }
 
 .chat-profile-close:hover {
@@ -22046,8 +22055,8 @@ a {
 .rad-overlay-top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 10px; background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent); pointer-events: none; }
 .rad-brand-pill { font-size: 0.7rem; color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.4); border-radius: 6px; padding: 2px 8px; pointer-events: none; }
 .rad-skip-btn { font-size: 0.72rem; color: #fff; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 3px 10px; cursor: pointer; pointer-events: all; }
-.rad-overlay-bottom { position: absolute; bottom: 28px; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; }
-.rad-cta-btn { font-size: 0.78rem; font-weight: 600; color: #0b0f12; background: linear-gradient(135deg, #7ef7ff, #62ffa2); border: none; border-radius: 8px; padding: 6px 16px; cursor: pointer; text-decoration: none; }
+.rad-overlay-bottom { position: absolute; bottom: 28px; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; z-index: 10; pointer-events: auto; }
+.rad-cta-btn { font-size: 0.78rem; font-weight: 600; color: #0b0f12; background: linear-gradient(135deg, #7ef7ff, #62ffa2); border: none; border-radius: 8px; padding: 6px 16px; cursor: pointer; text-decoration: none; position: relative; z-index: 11; pointer-events: auto; }
 .rad-video-controls { display: flex; gap: 6px; margin-left: auto; }
 .rad-ctrl-btn { width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .rad-progress-bar { height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; margin-top: 0; }
@@ -23923,7 +23932,7 @@ a {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #080e12;
+  background: transparent !important;
 }
 
 .cr-loading {
@@ -23939,14 +23948,30 @@ a {
 
 .cr-wrap {
   flex: 1;
-  max-width: 680px;
+  max-width: 540px;
   width: 100%;
-  margin: 0 auto;
-  padding: 16px 20px 120px;
+  margin: 106px auto 32px !important;
+  padding: 24px 28px 120px;
   display: flex;
   flex-direction: column;
   gap: 24px;
+  position: relative;
+  border-radius: 24px;
+  background: rgba(10, 20, 26, 0.45);
+  border: 1px solid rgba(126, 247, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
 }
+
+/* Immediate signature animation on Responses page */
+.cr-wrap .cp-personal-signature-cardora {
+  animation: cpSignatureName 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both !important;
+}
+.cr-wrap .cp-personal-signature-cardora::after {
+  animation: cpSignatureSlash 0.6s cubic-bezier(0.65, 0, 0.35, 1) 0.85s both !important;
+}
+
 
 /* Back button */
 .cr-page-header { display: flex; align-items: center; }
@@ -25652,8 +25677,14 @@ a {
 }
 
 /* ── Card Responses Page ─────────────────────────────── */
-[data-theme="light"] .cr-page { background: var(--bg) !important; }
-[data-theme="light"] .cr-wrap { background: var(--surface) !important; border-color: var(--accent-tint) !important; }
+[data-theme="light"] .cr-page { background: transparent !important; }
+[data-theme="light"] .cr-wrap {
+  background: rgba(255, 255, 255, 0.62) !important;
+  border: 1px solid rgba(0, 214, 255, 0.12) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05) !important;
+}
 [data-theme="light"] .cr-card-title,
 [data-theme="light"] .cr-section-title,
 [data-theme="light"] .cr-poll-question { color: var(--text) !important; }
@@ -26767,7 +26798,12 @@ a {
   box-shadow: var(--shadow-lg) !important;
 }
 [data-theme="light"] .chat-profile-bg-fade {
-  background: linear-gradient(to top, var(--elevated), transparent) !important;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.6) 40%,
+    rgba(255, 255, 255, 0.88) 100%
+  ) !important;
 }
 [data-theme="light"] .chat-profile-fullname { color: var(--text) !important; }
 [data-theme="light"] .chat-profile-bio      { color: var(--text-muted) !important; }

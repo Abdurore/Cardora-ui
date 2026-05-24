@@ -157,11 +157,92 @@ function MainLayout() {
       const meta = readUserMeta(rawUser?._id || rawUser?.id || rawUser?.userId || rawUser?.email)
       const session = normalizeUserSession(userData, couponsData, meta)
       const normalized = session.normalized
+
+      // Blend pending purchased gift from session storage if not already credited in backend
+      try {
+        const pendingRaw = sessionStorage.getItem('cardora:pendingGiftCheckout')
+        if (pendingRaw) {
+          const pending = JSON.parse(pendingRaw)
+          if (pending && pending.name && Date.now() - pending.savedAt < 300000) { // 5 minutes
+            const hasGained = Array.isArray(normalized.giftsInventory) && normalized.giftsInventory.some(
+              item => (item.giftName || item.name) === pending.name
+            )
+            if (hasGained) {
+              sessionStorage.removeItem('cardora:pendingGiftCheckout')
+            } else {
+              normalized.giftsInventory = [
+                ...(Array.isArray(normalized.giftsInventory) ? normalized.giftsInventory : []),
+                {
+                  giftName: pending.name,
+                  name: pending.name,
+                  status: 'available',
+                  inventoryId: `pending-${pending.savedAt}`,
+                  _id: `pending-${pending.savedAt}`,
+                  amount: 1,
+                  isPendingLocal: true,
+                }
+              ]
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+
       setCurrentUser(normalized)
       setBalance(normalized.balance)
       setFavorites(meta.favorites || [])
       setLikedTemplates(meta.likedTemplates || [])
-      setInventory(meta.inventory || [])
+      // Map backend giftsInventory to studio-compatible shape
+      const backendToLegacy = {
+        spark: 'tiny',
+        sweetHeart: 'sweet',
+        purpleLove: 'purple',
+        oceanHeart: 'ocean',
+        emeraldHeart: 'emerald',
+        passionHeart: 'passion',
+        goldenHeart: 'golden',
+        crystalHeart: 'crystal',
+        diamondHeart: 'diamond',
+        legendaryHeart: 'legendary',
+      }
+      
+      const giftTitles = {
+        tiny: 'Tiny Heart',
+        sweet: 'Sweet Heart',
+        purple: 'Purple Love',
+        ocean: 'Ocean Heart',
+        emerald: 'Emerald Heart',
+        passion: 'Passion Heart',
+        golden: 'Golden Heart',
+        crystal: 'Crystal Heart',
+        diamond: 'Diamond Heart',
+        legendary: 'Legendary Heart',
+      }
+
+      const backendGifts = Array.isArray(normalized.giftsInventory)
+        ? normalized.giftsInventory.filter(item => item.status === 'available' || !item.status)
+        : []
+      const mappedGifts = backendGifts.map((item) => {
+        const name = item.giftName || item.name || ''
+        const legacyKey = backendToLegacy[name] || name
+        return {
+          id: item.inventoryId || item._id || item.id || `gift-${Date.now()}-${Math.random()}`,
+          title: giftTitles[legacyKey] || item.title || String(name).replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim() || 'Gift',
+          effectKey: legacyKey,
+          amount: item.amount || 1,
+          status: item.status || 'available',
+        }
+      })
+
+      // Merge local storage inventory (if any custom drafts are kept) with backend gifts, avoiding duplicates
+      const localGifts = meta.inventory || []
+      const mergedGifts = [...mappedGifts]
+      localGifts.forEach((lg) => {
+        if (!mergedGifts.some((mg) => mg.id === lg.id)) {
+          mergedGifts.push(lg)
+        }
+      })
+
+      setInventory(mergedGifts)
       setAvatarUrl(normalized.avatarUrl || '')
       setAvatarColor(meta.avatarColor || normalized.avatarColor)
       if (normalized.currency) setUserCurrency(normalized.currency)
@@ -665,7 +746,7 @@ function MainLayout() {
           .some((id) => id && String(id) === String(templateId))
       ))
       const backendId = template?.backendTemplate?._id || template?.backendTemplate?.templateId || template?.templateId || template?.id || templateId
-      if (currentUser?.role === 'Admin') {
+      if (String(currentUser?.role || '').toLowerCase() === 'admin') {
         await adminDeleteTemplate(backendId)
       } else {
         await deleteTemplate({ templateId: backendId, id: backendId, _id: backendId })

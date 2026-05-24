@@ -1271,7 +1271,7 @@ function CardPreviewModal({
                         disabled={triviaLocked}
                         className={`cp-trivia-option cp-cascade-in ${previewTriviaAnswers[previewTriviaIdx] === oi ? 'selected' : ''} ${
                           triviaLocked && previewTriviaAnswers[previewTriviaIdx] === oi
-                            ? (oi === (triviaData.questions[previewTriviaIdx]?.correctIndex ?? 0) ? 'correct' : 'wrong')
+                            ? (Number(oi) === Number(triviaData.questions[previewTriviaIdx]?.correctIndex ?? 0) ? 'correct' : 'wrong')
                             : ''
                         }`}
                         style={{ color: c.card.textColor, '--i': oi }}
@@ -1346,7 +1346,7 @@ function CardPreviewModal({
             >
               <div className="cp-card-inner cp-card-inner-full">
                 {(() => {
-                  const correct = triviaData.questions.filter((q, i) => previewTriviaAnswers[i] === q.correctIndex).length
+                  const correct = triviaData.questions.filter((q, i) => Number(previewTriviaAnswers[i]) === Number(q.correctIndex)).length
                   const total = triviaData.questions.length
                   const pct = total > 0 ? correct / total : 0
                   const circumference = 2 * Math.PI * 44

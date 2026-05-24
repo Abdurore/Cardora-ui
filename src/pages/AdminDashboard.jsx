@@ -1,4 +1,4 @@
-﻿import { useOutletContext, useNavigate } from 'react-router-dom'
+import { useOutletContext, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { trimAudioFile, getAudioDuration } from '../lib/audioTrim.js'
@@ -289,7 +289,7 @@ function AdminDashboard() {
   // useEffect — runs on every render. Without this, currentUser flipping from
   // null to Admin during auth hydration changes the hook count between renders
   // and React silently aborts the load effects, leaving the dashboard empty.
-  const isAdminGate = currentUser && currentUser.role === 'Admin'
+  const isAdminGate = currentUser && String(currentUser.role || '').toLowerCase() === 'admin'
 
   // Pagination state for long admin tables
   const usersPaging = usePagination(users, 20)
@@ -421,8 +421,21 @@ function AdminDashboard() {
         }
         case 'Ads': {
           const [adsRes, analyticsRes, usersRes] = await Promise.allSettled([getAdminAds(), getAdminAdsAnalytics(), getAdminUsers()])
-          if (adsRes.status === 'fulfilled') setAds(adsRes.value?.data?.ads || adsRes.value?.ads || [])
-          if (analyticsRes.status === 'fulfilled') setAdsAnalytics(analyticsRes.value?.data || analyticsRes.value || null)
+          const adsData = adsRes.status === 'fulfilled' ? (adsRes.value?.data?.ads || adsRes.value?.ads || []) : []
+          if (adsRes.status === 'fulfilled') setAds(adsData)
+          if (analyticsRes.status === 'fulfilled') {
+            const raw = analyticsRes.value?.data || analyticsRes.value
+            setAdsAnalytics(raw?.analytics || raw?.stats || raw || null)
+          } else {
+            // Fallback: compute aggregate analytics from individual ad objects
+            if (adsData.length > 0) {
+              const totalViews = adsData.reduce((s, a) => s + (a.currentViews ?? a.views ?? 0), 0)
+              const totalClicks = adsData.reduce((s, a) => s + (a.clicks ?? a.clickCount ?? 0), 0)
+              const totalCompletions = adsData.reduce((s, a) => s + (a.completions ?? a.completed ?? 0), 0)
+              const totalCCPaid = adsData.reduce((s, a) => s + ((a.completions ?? a.completed ?? 0) * (a.rewardCC ?? 2)), 0)
+              setAdsAnalytics({ totalViews, totalClicks, totalCompletions, totalCCPaid, uniqueUsers: 0 })
+            }
+          }
           if (usersRes.status === 'fulfilled') setUsers(usersRes.value?.data?.users || usersRes.value?.users || [])
           break
         }
@@ -691,11 +704,12 @@ function AdminDashboard() {
     try {
       const payload = { ...newAd }
       if (!payload.linkUrl) delete payload.linkUrl
-      if (payload.enterpriseId) {
-        payload.enterpriseAccountId = payload.enterpriseId
+      if (payload.enterpriseName) {
+        payload.enterpriseAccountUsername = payload.enterpriseName
       }
       delete payload.enterpriseId
-      if (!payload.enterpriseAccountId) delete payload.enterpriseAccountId
+      delete payload.enterpriseName
+      if (!payload.enterpriseAccountUsername) delete payload.enterpriseAccountUsername
       if (!payload.maxViews) delete payload.maxViews
       else payload.maxViews = Number(payload.maxViews)
       await createAdminAd(payload)
@@ -1822,26 +1836,25 @@ const handleBroadcast = async () => {
                 <label className="admin-field">
                   <span>Enterprise Account <small>(optional)</small></span>
                   <select
-                    value={newAd.enterpriseId}
+                    value={newAd.enterpriseName}
                     onChange={e => {
-                      const enterpriseId = e.target.value
-                      const owner = enterpriseUsers.find(user => String(user._id || user.id) === enterpriseId)
+                      const username = e.target.value
                       setNewAd(p => ({
                         ...p,
-                        enterpriseId,
-                        enterpriseName: owner?.username || owner?.name || owner?.email || '',
+                        enterpriseId: username,
+                        enterpriseName: username,
                       }))
                     }}
                   >
                     <option value="">No enterprise owner</option>
                     {enterpriseUsers.map(user => {
-                        const uid = user._id || user.id
-                        return (
-                          <option key={uid} value={uid}>
-                            {user.username || user.name || user.email || uid}
-                          </option>
-                        )
-                      })}
+                      const username = user.username || user.name || user.email
+                      return (
+                        <option key={username} value={username}>
+                          {username}
+                        </option>
+                      )
+                    })}
                   </select>
                 </label>
 
@@ -1921,6 +1934,16 @@ const handleBroadcast = async () => {
                   <div className="admin-stat-label">Total Views</div>
                 </div>
                 <div className="admin-stat-card">
+                  <span className="admin-stat-icon">{"\u{1F5B1}"}</span>
+                  <div className="admin-stat-value">{adsAnalytics.totalClicks ?? adsAnalytics.clicks ?? 0}</div>
+                  <div className="admin-stat-label">Total Clicks</div>
+                </div>
+                <div className="admin-stat-card">
+                  <span className="admin-stat-icon">{"\u{2705}"}</span>
+                  <div className="admin-stat-value">{adsAnalytics.totalCompletions ?? adsAnalytics.completions ?? 0}</div>
+                  <div className="admin-stat-label">Completions</div>
+                </div>
+                <div className="admin-stat-card">
                   <span className="admin-stat-icon">{"\u{1F4B0}"}</span>
                   <div className="admin-stat-value">{adsAnalytics.totalCCPaid ?? adsAnalytics.ccPaid ?? 0}</div>
                   <div className="admin-stat-label">CC Paid Out</div>
@@ -1935,7 +1958,7 @@ const handleBroadcast = async () => {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Name</th><th>Enterprise</th><th>Type</th><th>Reward</th><th>Duration</th><th>Views</th><th>CTA</th><th>Active</th><th>Actions</th></tr>
+                  <tr><th>Name</th><th>Enterprise</th><th>Type</th><th>Reward</th><th>Duration</th><th>Views</th><th>Clicks</th><th>CTA</th><th>Active</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {pagedAds.map(ad => {
@@ -1944,41 +1967,47 @@ const handleBroadcast = async () => {
                     <tr key={adId}>
                       <td>{ad.name || '—'}</td>
                       <td>
-                        <select
-                          value={ad.enterpriseAccountId || ad.enterpriseId || ad.enterpriseUserId || ad.enterprise?._id || ''}
-                          onChange={async e => {
-                            const enterpriseId = e.target.value
-                            const owner = enterpriseUsers.find(user => String(user._id || user.id) === enterpriseId)
-                            const adId = ad._id || ad.id
-                            if (!adId) return
-                            try {
-                              await updateAdminAd(adId, {
-                                enterpriseAccountId: enterpriseId || null,
-                                enterpriseUserId: enterpriseId || null,
-                                enterpriseName: owner?.username || owner?.name || owner?.email || '',
-                              })
-                              showMsg('Enterprise account assigned.')
-                              loadTabData('Ads')
-                            } catch (err) {
-                              showMsg(err.message || 'Could not assign enterprise account.', false)
-                            }
-                          }}
-                        >
-                          <option value="">Unassigned</option>
-                          {enterpriseUsers.map(user => {
-                            const uid = user._id || user.id
-                            return (
-                              <option key={uid} value={uid}>
-                                {user.username || user.name || user.email || uid}
-                              </option>
-                            )
-                          })}
-                        </select>
+                        {(() => {
+                          const displayValue = ad.enterpriseAccountUsername || ad.enterpriseAccountName || ad.enterpriseName || ad.owner?.username || ad.enterprise?.username || ''
+                          return (
+                            <select
+                              value={displayValue}
+                              onChange={async e => {
+                                const selectedUsername = e.target.value
+                                const adId = ad._id || ad.id
+                                if (!adId) return
+                                try {
+                                  await updateAdminAd(adId, { enterpriseAccountUsername: selectedUsername || null })
+                                  showMsg('Enterprise account assigned.')
+                                  loadTabData('Ads')
+                                } catch (err) {
+                                  showMsg(err.message || 'Could not assign enterprise account.', false)
+                                }
+                              }}
+                            >
+                              <option value="">Unassigned</option>
+                              {displayValue && !enterpriseUsers.some(u => (u.username || u.name || u.email) === displayValue) && (
+                                <option value={displayValue}>
+                                  {displayValue}
+                                </option>
+                              )}
+                              {enterpriseUsers.map(user => {
+                                const username = user.username || user.name || user.email
+                                return (
+                                  <option key={username} value={username}>
+                                    {username}
+                                  </option>
+                                )
+                              })}
+                            </select>
+                          )
+                        })()}
                       </td>
                       <td>{ad.type}</td>
                       <td>{ad.rewardCC} CC</td>
                       <td>{ad.duration}s</td>
                       <td>{ad.currentViews ?? 0}{ad.maxViews ? `/${ad.maxViews}` : ''}</td>
+                      <td>{ad.clicks ?? ad.clickCount ?? ad.totalClicks ?? 0}</td>
                       <td>{ad.linkUrl ? <a href={ad.linkUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7ef7ff', fontSize: '0.75rem' }}>Link</a> : '—'}</td>
                       <td>{ad.isActive ? 'Yes' : 'No'}</td>
                       <td style={{ display: 'flex', gap: 4 }}>
@@ -1992,7 +2021,7 @@ const handleBroadcast = async () => {
                     </tr>
                     )
                   })}
-                  {ads.length === 0 && <tr><td colSpan={9}>No ads.</td></tr>}
+                  {ads.length === 0 && <tr><td colSpan={10}>No ads.</td></tr>}
                 </tbody>
               </table>
             </div>

@@ -3,6 +3,9 @@ import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-d
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import PremiumGiftReveal from '../components/PremiumGiftReveal.jsx'
+import GiftPreviewModal from '../components/GiftPreviewModal.jsx'
+import { GiftIcon } from '../components/GiftCard.jsx'
+import { storeGifts } from '../data/catalog.js'
 import { getGiftCatalog, createFlutterwaveGiftCheckout } from '../lib/api.js'
 import { normalizeCheckoutSession } from '../lib/backendMappers.js'
 
@@ -91,12 +94,13 @@ function StoreGifts() {
   const [loadingCatalog, setLoadingCatalog] = useState(true)
   const [buying, setBuying] = useState(null)
   const [confirmGift, setConfirmGift] = useState(null)
+  const [activeGift, setActiveGift] = useState(null)
   const [msg, setMsg] = useState({ text: '', ok: false })
   const [activeView, setActiveView] = useState('catalog')
   const [revealingGift, setRevealingGift] = useState(null)
   const [returnRefreshing, setReturnRefreshing] = useState(false)
 
-  const inventory = currentUser?.giftsInventory || []
+  const inventory = (currentUser?.giftsInventory || []).filter(item => item.status === 'available' || !item.status)
   const walletBalance = currentUser?.giftWalletNgn || 0
 
   useEffect(() => {
@@ -160,7 +164,7 @@ function StoreGifts() {
     ;(async () => {
       setReturnRefreshing(true)
       setMsg({ text: 'Payment received. Refreshing your gift inventory...', ok: true })
-      for (const delay of [700, 1500, 2800]) {
+      for (const delay of [500, 1000, 1800, 2800, 4000, 5500]) {
         await new Promise(resolve => setTimeout(resolve, delay))
         if (cancelled) return
         await refreshBalance?.()
@@ -233,61 +237,74 @@ function StoreGifts() {
     <div className="page-body">
       <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
       <div className="screen-body">
-        <div className="tabs">
-          <Link className="tab" to="/store">Get CC</Link>
-          <span className="tab active">Gift Store</span>
+        <div className="tabs store-tabs">
+          <button
+            type="button"
+            className="tab"
+            onClick={() => navigate('/store?tab=buy')}
+          >
+            Buy CC
+          </button>
+          <button
+            type="button"
+            className="tab"
+            onClick={() => navigate('/store?tab=cosmetics')}
+          >
+            Cosmetics
+          </button>
+          <button
+            type="button"
+            className="tab"
+            onClick={() => navigate('/store?tab=rewards')}
+          >
+            Rewards Hub
+          </button>
+          <button
+            type="button"
+            className="tab active"
+            onClick={() => navigate('/store/gifts')}
+          >
+            Gifts
+          </button>
         </div>
 
-        {/* Wallet Banner */}
+        {/* Catalog & Inventory Toggle buttons */}
         <div style={{
-          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)',
-          borderRadius: 16, padding: '20px 24px', margin: '0 0 20px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-          border: '1px solid rgba(139, 92, 246, 0.3)',
+          display: 'flex', gap: 8, justifyContent: 'center', margin: '20px 0',
         }}>
-          <div>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, margin: 0 }}>Gift Wallet</p>
-            <h3 style={{ color: '#fff', margin: '4px 0 0', fontSize: 24, fontWeight: 700 }}>
-              {formatNgn(walletBalance)}
-            </h3>
-          </div>
-          <div style={{
-            display: 'flex', gap: 8,
-          }}>
-            <button
-              type="button"
-              onClick={() => setActiveView('catalog')}
-              style={{
-                padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: activeView === 'catalog' ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.08)',
-                color: '#fff', fontSize: 13, fontWeight: 600,
-                transition: 'background 0.2s',
-              }}
-            >
-              🎁 Catalog
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveView('inventory')}
-              style={{
-                padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: activeView === 'inventory' ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.08)',
-                color: '#fff', fontSize: 13, fontWeight: 600,
-                transition: 'background 0.2s',
-                position: 'relative',
-              }}
-            >
-              📦 Inventory
-              {inventory.length > 0 && (
-                <span style={{
-                  position: 'absolute', top: -6, right: -6,
-                  background: '#8b5cf6', color: '#fff', borderRadius: '50%',
-                  width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700,
-                }}>{inventory.length}</span>
-              )}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveView('catalog')}
+            style={{
+              padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: activeView === 'catalog' ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.08)',
+              color: '#fff', fontSize: 13, fontWeight: 600,
+              transition: 'background 0.2s',
+            }}
+          >
+            🎁 Catalog
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveView('inventory')}
+            style={{
+              padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: activeView === 'inventory' ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.08)',
+              color: '#fff', fontSize: 13, fontWeight: 600,
+              transition: 'background 0.2s',
+              position: 'relative',
+            }}
+          >
+            📦 Inventory
+            {inventory.length > 0 && (
+              <span style={{
+                position: 'absolute', top: -6, right: -6,
+                background: '#8b5cf6', color: '#fff', borderRadius: '50%',
+                width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 700,
+              }}>{inventory.length}</span>
+            )}
+          </button>
         </div>
 
         {msg.text && (
@@ -319,10 +336,19 @@ function StoreGifts() {
                 gap: 14,
               }}>
                 {catalog.map((gift) => {
-                  const meta = GIFT_META[gift.name] || { emoji: '🎁', gradient: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }
+                  const legacyKey = GIFT_NAME_ALIASES[gift.name]?.[1] || gift.name
+                  const staticItem = storeGifts.find(sg => sg.effectKey === legacyKey) || {}
+                  const resolvedGift = {
+                    name: gift.name,
+                    price: gift.price,
+                    title: formatGiftName(gift.name),
+                    effectKey: legacyKey,
+                    note: staticItem.note || `A premium ${formatGiftName(gift.name)} gift.`,
+                  }
                   return (
                     <div
                       key={gift.name}
+                      onClick={() => setActiveGift(resolvedGift)}
                       style={{
                         background: 'rgba(255,255,255,0.04)',
                         borderRadius: 14, padding: 16,
@@ -343,15 +369,13 @@ function StoreGifts() {
                       }}
                     >
                       <div style={{
-                        width: 56, height: 56, borderRadius: '50%',
-                        background: meta.gradient,
+                        width: 56, height: 56,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 26, boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
                       }}>
-                        {meta.emoji}
+                        <GiftIcon effectKey={legacyKey} size={56} />
                       </div>
                       <strong style={{ color: '#fff', fontSize: 13, textAlign: 'center' }}>
-                        {formatGiftName(gift.name)}
+                        {resolvedGift.title}
                       </strong>
                       <span style={{
                         color: '#a78bfa', fontSize: 15, fontWeight: 700,
@@ -360,21 +384,19 @@ function StoreGifts() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (!currentUser) { openAuthModal(); return }
-                          setConfirmGift(gift)
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveGift(resolvedGift)
                         }}
-                        disabled={buying === gift.name}
                         style={{
                           width: '100%', padding: '8px 0', borderRadius: 8,
-                          border: 'none', cursor: buying === gift.name ? 'wait' : 'pointer',
-                          background: buying === gift.name ? 'rgba(139, 92, 246, 0.3)' : 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+                          border: 'none', cursor: 'pointer',
+                          background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
                           color: '#fff', fontSize: 13, fontWeight: 600,
                           transition: 'opacity 0.2s',
-                          opacity: buying === gift.name ? 0.7 : 1,
                         }}
                       >
-                        {buying === gift.name ? 'Processing...' : 'Buy Gift'}
+                        Preview
                       </button>
                     </div>
                   )
@@ -415,7 +437,8 @@ function StoreGifts() {
                 gap: 12,
               }}>
                 {inventory.map((item, idx) => {
-                  const meta = GIFT_META[item.giftName || item.name] || { emoji: '🎁', gradient: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }
+                  const giftName = item.giftName || item.name || 'spark'
+                  const legacyKey = GIFT_NAME_ALIASES[giftName]?.[1] || giftName
                   return (
                     <div
                       key={item.inventoryId || item._id || idx}
@@ -427,15 +450,13 @@ function StoreGifts() {
                       }}
                     >
                       <div style={{
-                        width: 48, height: 48, borderRadius: '50%',
-                        background: meta.gradient,
+                        width: 48, height: 48,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 22,
                       }}>
-                        {meta.emoji}
+                        <GiftIcon effectKey={legacyKey} size={48} />
                       </div>
                       <strong style={{ color: '#fff', fontSize: 13, textAlign: 'center' }}>
-                        {formatGiftName(item.giftName || item.name || 'Gift')}
+                        {formatGiftName(giftName)}
                       </strong>
                       <span style={{
                         fontSize: 11, padding: '2px 8px', borderRadius: 6,
@@ -455,6 +476,19 @@ function StoreGifts() {
         )}
       </div>
       <ScreenNav />
+
+      {activeGift && (
+        <GiftPreviewModal
+          gift={activeGift}
+          disabled={buying === activeGift.name}
+          onClose={() => setActiveGift(null)}
+          onBuy={() => {
+            if (!currentUser) { openAuthModal(); return }
+            setConfirmGift(activeGift)
+            setActiveGift(null)
+          }}
+        />
+      )}
 
       {confirmGift && (
         <section className="detail-modal" role="dialog" aria-modal="true">

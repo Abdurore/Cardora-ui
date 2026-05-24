@@ -1,5 +1,5 @@
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import { getEnterpriseAdStats, updateAdminAd } from '../lib/api.js'
@@ -13,7 +13,7 @@ function EnterpriseDashboard() {
   const [error, setError] = useState('')
   const [updatingAdId, setUpdatingAdId] = useState('')
 
-  const isEnterprise = currentUser?.role === 'Enterprise'
+  const isEnterprise = String(currentUser?.role || '').toLowerCase() === 'enterprise'
 
   useEffect(() => {
     if (!isEnterprise) return
@@ -22,7 +22,9 @@ function EnterpriseDashboard() {
       .then(res => {
         const payload = res?.data || res
         setStats(payload)
-        setAds(payload?.ads || [])
+        // Extract ads from any possible nesting shape
+        const adsList = payload?.ads || payload?.data?.ads || payload?.adsList || []
+        setAds(adsList)
       })
       .catch(err => setError(err?.message || 'Failed to load stats.'))
       .finally(() => setLoading(false))
@@ -63,7 +65,25 @@ function EnterpriseDashboard() {
     )
   }
 
-  const adStats = stats?.stats || stats?.adStats || stats
+  // Deeply unwrap stats — try top-level fields, then nested shapes
+  const _rawStats = stats?.stats || stats?.adStats || stats?.data?.stats || stats
+  
+  // Compute aggregate analytics from individual ad data as fallback
+  const computedStats = useMemo(() => {
+    const totalViews = ads.reduce((sum, ad) => sum + (ad.views ?? ad.currentViews ?? ad.viewCount ?? 0), 0)
+    const totalClicks = ads.reduce((sum, ad) => sum + (ad.clicks ?? ad.clickCount ?? ad.totalClicks ?? 0), 0)
+    const totalImpressions = ads.reduce((sum, ad) => sum + (ad.impressions ?? ad.impressionCount ?? ad.views ?? ad.currentViews ?? 0), 0)
+    const totalCompletions = ads.reduce((sum, ad) => sum + (ad.completions ?? ad.completionCount ?? ad.completed ?? 0), 0)
+    const uniqueViewers = ads.reduce((sum, ad) => sum + (ad.uniqueViewers ?? ad.uniqueUsers ?? 0), 0)
+    return { totalViews, totalClicks, totalImpressions, totalCompletions, uniqueViewers }
+  }, [ads])
+
+  // Use API-provided stats if they exist, otherwise fall back to computed
+  const adViews = _rawStats?.views ?? _rawStats?.totalViews ?? (computedStats.totalViews || '—')
+  const adImpressions = _rawStats?.impressions ?? _rawStats?.totalImpressions ?? (computedStats.totalImpressions || '—')
+  const adClicks = _rawStats?.clicks ?? _rawStats?.totalClicks ?? (computedStats.totalClicks || '—')
+  const adCompletions = _rawStats?.completions ?? _rawStats?.totalCompletions ?? (computedStats.totalCompletions || '—')
+  const adUniqueViewers = _rawStats?.uniqueViewers ?? _rawStats?.uniqueUsers ?? (computedStats.uniqueViewers || '—')
 
   return (
     <div className="page-body">
@@ -91,27 +111,27 @@ function EnterpriseDashboard() {
               <div className="admin-stats-grid">
                 <div className="admin-stat-card">
                   <span className="admin-stat-icon">👁</span>
-                  <div className="admin-stat-value">{adStats?.views ?? adStats?.totalViews ?? '—'}</div>
+                  <div className="admin-stat-value">{adViews}</div>
                   <div className="admin-stat-label">Views</div>
                 </div>
                 <div className="admin-stat-card">
                   <span className="admin-stat-icon">📣</span>
-                  <div className="admin-stat-value">{adStats?.impressions ?? adStats?.totalImpressions ?? '—'}</div>
+                  <div className="admin-stat-value">{adImpressions}</div>
                   <div className="admin-stat-label">Impressions</div>
                 </div>
                 <div className="admin-stat-card">
                   <span className="admin-stat-icon">🖱</span>
-                  <div className="admin-stat-value">{adStats?.clicks ?? adStats?.totalClicks ?? '—'}</div>
+                  <div className="admin-stat-value">{adClicks}</div>
                   <div className="admin-stat-label">Clicks</div>
                 </div>
                 <div className="admin-stat-card">
                   <span className="admin-stat-icon">✅</span>
-                  <div className="admin-stat-value">{adStats?.completions ?? adStats?.totalCompletions ?? '—'}</div>
+                  <div className="admin-stat-value">{adCompletions}</div>
                   <div className="admin-stat-label">Completions</div>
                 </div>
                 <div className="admin-stat-card">
                   <span className="admin-stat-icon">👤</span>
-                  <div className="admin-stat-value">{adStats?.uniqueViewers ?? adStats?.uniqueUsers ?? '—'}</div>
+                  <div className="admin-stat-value">{adUniqueViewers}</div>
                   <div className="admin-stat-label">Unique Viewers</div>
                 </div>
               </div>
@@ -131,6 +151,7 @@ function EnterpriseDashboard() {
                         <th>Reward</th>
                         <th>Duration</th>
                         <th>Views / Max</th>
+                        <th>Clicks</th>
                         <th>Status</th>
                         <th>Control</th>
                       </tr>
@@ -142,7 +163,8 @@ function EnterpriseDashboard() {
                           <td>{ad.type || '—'}</td>
                           <td>{ad.reward ?? ad.rewardCC ?? '—'} CC</td>
                           <td>{ad.duration ? `${ad.duration}s` : '—'}</td>
-                          <td>{ad.views ?? 0} / {ad.maxViews ?? '∞'}</td>
+                          <td>{ad.views ?? ad.currentViews ?? 0} / {ad.maxViews ?? '∞'}</td>
+                          <td>{ad.clicks ?? ad.clickCount ?? ad.totalClicks ?? 0}</td>
                           <td>
                             <span className={`admin-status-chip ${ad.active || ad.isActive ? 'open' : 'resolved'}`}>
                               {ad.active || ad.isActive ? 'Active' : 'Inactive'}

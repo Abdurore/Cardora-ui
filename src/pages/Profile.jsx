@@ -1,4 +1,4 @@
-﻿import { useOutletContext, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useOutletContext, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -173,9 +173,10 @@ function Profile() {
   // Favorites resolve against whatever the user has favorited from the live
   // marketplace — no demo-data fallback.
   const favoriteCards = (marketplaceTemplates || []).filter((card) => favorites.includes(card.id))
-  const giftInventory = currentUser?.giftsInventory || []
+  const giftInventory = (currentUser?.giftsInventory || []).filter(item => item.status === 'available' || !item.status)
   const giftWalletNgn = currentUser?.giftWalletNgn || 0
-  const roleName = currentUser?.role || 'Visitor'
+  const rawRole = String(currentUser?.role || 'Visitor').trim().toLowerCase()
+  const roleName = rawRole.charAt(0).toUpperCase() + rawRole.slice(1)
   const totalCardCount = userCards.length + savedDrafts.length
   const roleInfo = ROLE_CONFIG[roleName] || ROLE_CONFIG.Visitor
   const isAdmin = roleName === 'Admin'
@@ -187,7 +188,7 @@ function Profile() {
   const publishedTemplates = myTemplates !== null
     ? myTemplates
     : (marketplaceTemplates || []).filter((t) => {
-        if (!isArtist || !currentUser?.id) return false
+        if (!currentUser?.id) return false
         return t.ownerId && String(t.ownerId) === String(currentUser.id)
       })
 
@@ -211,12 +212,11 @@ function Profile() {
     let cancelled = false
     ;(async () => {
       try {
-        const isArtistRole = (currentUser.role || '').toLowerCase() === 'artist'
         const [a, c, uc, myT] = await Promise.all([
           getUserAnalytics().catch(() => null),
           getCurrencies().catch(() => null),
           getUserCurrency().catch(() => null),
-          isArtistRole ? getMyTemplates().catch(() => null) : Promise.resolve(null),
+          getMyTemplates(currentUser.id || currentUser._id).catch(() => null),
         ])
         if (cancelled) return
         if (a) setAnalytics(a.analytics || a.data || a)
@@ -230,7 +230,7 @@ function Profile() {
         }
         if (uc) setUserCurrency(uc.currency || uc.code || uc.data?.currency || '')
         if (myT) {
-          const raw = myT.templates || myT.data?.templates || myT.data || (Array.isArray(myT) ? myT : null)
+          const raw = pickList(myT, 'templates', 'items', 'docs', 'results')
           if (Array.isArray(raw)) setMyTemplates(raw.map((t, i) => mapTemplateToCard(t, i)))
         }
       } catch { /* silent */ }
@@ -785,7 +785,7 @@ function Profile() {
           </div>
         ) : null}
 
-        {/* Published Templates (artists only) — owner-scoped: deletion happens here only */}
+        {/* Published Templates — owner-scoped: deletion happens here only */}
         {isArtist && (
           <div>
             <h4 className="section-title">
@@ -817,7 +817,7 @@ function Profile() {
                         <strong>{card.usageCount ?? card.userCount ?? 0}</strong> users
                       </span>
                     </div>
-                    <div className="profile-card-actions">
+                    <div className="profile-card-actions profile-template-actions">
                       <button
                         type="button"
                         className="profile-card-action-btn delete"
@@ -876,7 +876,7 @@ function Profile() {
                         : openCardDetails({ ...card, variant: typeVariant })
                       }
                     />
-                    <div className="profile-card-actions">
+                    <div className="profile-card-actions profile-template-actions">
                       {card.slug && (
                         <button
                           className="profile-card-action-btn share"

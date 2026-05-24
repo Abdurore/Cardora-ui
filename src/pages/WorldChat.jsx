@@ -229,18 +229,20 @@ function WorldChat() {
   }
 
   function roleBadgeClass(role) {
-    if (role === 'Admin') return 'role-admin'
-    if (role === 'Artist') return 'role-artist'
-    if (role === 'Moderator') return 'role-moderator'
-    if (role === 'Enterprise') return 'role-enterprise'
+    const r = String(role || '').toLowerCase()
+    if (r === 'admin') return 'role-admin'
+    if (r === 'artist') return 'role-artist'
+    if (r === 'moderator') return 'role-moderator'
+    if (r === 'enterprise') return 'role-enterprise'
     return 'role-visitor'
   }
 
   function roleIcon(role) {
-    if (role === 'Admin') return '⚡'
-    if (role === 'Artist') return '🎨'
-    if (role === 'Moderator') return '🛡'
-    if (role === 'Enterprise') return '🏢'
+    const r = String(role || '').toLowerCase()
+    if (r === 'admin') return '⚡'
+    if (r === 'artist') return '🎨'
+    if (r === 'moderator') return '🛡'
+    if (r === 'enterprise') return '🏢'
     return '👤'
   }
 

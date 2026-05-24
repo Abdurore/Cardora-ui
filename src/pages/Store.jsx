@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, useEffect } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useNavigate, useLocation } from 'react-router-dom'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import PackCard from '../components/PackCard.jsx'
@@ -85,6 +85,8 @@ function Store() {
     purchaseGift,
   } = useOutletContext()
 
+  const navigate = useNavigate()
+
   const [activeGift, setActiveGift] = useState(null)
   const [confirmGift, setConfirmGift] = useState(null)
   const [isPurchasingGift, setIsPurchasingGift] = useState(false)
@@ -93,7 +95,19 @@ function Store() {
   const [checkoutMessage, setCheckoutMessage] = useState('')
   const [activePack, setActivePack] = useState(null)
   const [isLaunchingCheckout, setIsLaunchingCheckout] = useState(false)
+  const location = useLocation()
+  const queryTab = useMemo(() => {
+    const search = new URLSearchParams(location.search)
+    return search.get('tab')
+  }, [location.search])
+
   const [activeSection, setActiveSection] = useState('buy')
+
+  useEffect(() => {
+    if (queryTab && ['buy', 'cosmetics', 'rewards'].includes(queryTab)) {
+      setActiveSection(queryTab)
+    }
+  }, [queryTab])
   const [activeRewardTab, setActiveRewardTab] = useState('earn')
   const [redeemInput, setRedeemInput] = useState('')
   const [redeemMsg, setRedeemMsg] = useState({ text: '', ok: false })
@@ -299,8 +313,8 @@ function Store() {
           </button>
           <button
             type="button"
-            className={`tab ${activeSection === 'gifts' ? 'active' : ''}`}
-            onClick={() => setActiveSection('gifts')}
+            className="tab"
+            onClick={() => navigate('/store/gifts')}
           >
             Gifts
           </button>
