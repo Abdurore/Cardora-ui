@@ -68,6 +68,7 @@ function Profile() {
     deleteMarketplaceTemplate,
     onCurrencyChange,
     refreshBalance,
+    inventory = [],
   } = useOutletContext()
   const navigate = useNavigate()
   const location = useLocation()
@@ -173,7 +174,7 @@ function Profile() {
   // Favorites resolve against whatever the user has favorited from the live
   // marketplace — no demo-data fallback.
   const favoriteCards = (marketplaceTemplates || []).filter((card) => favorites.includes(card.id))
-  const giftInventory = (currentUser?.giftsInventory || []).filter(item => item.status === 'available' || !item.status)
+  const giftInventory = inventory
   const giftWalletNgn = currentUser?.giftWalletNgn || 0
   const rawRole = String(currentUser?.role || 'Visitor').trim().toLowerCase()
   const roleName = rawRole.charAt(0).toUpperCase() + rawRole.slice(1)
@@ -960,7 +961,7 @@ function Profile() {
             <div className="inventory inventory-clean">
               {giftInventory.map((gift, index) => (
                 <InventoryCard
-                  key={gift.inventoryId || gift._id || gift.id || `${gift.giftName || gift.name || 'gift'}-${index}`}
+                  key={gift.id || gift.inventoryId || gift._id || `${gift.giftName || gift.name || 'gift'}-${index}`}
                   {...gift}
                   variant={`v${(index % 4) + 1}`}
                 />

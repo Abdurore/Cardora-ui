@@ -8,6 +8,7 @@ import { GiftIcon } from '../components/GiftCard.jsx'
 import { storeGifts } from '../data/catalog.js'
 import { getGiftCatalog, createFlutterwaveGiftCheckout } from '../lib/api.js'
 import { normalizeCheckoutSession } from '../lib/backendMappers.js'
+import { formatGiftName as formatGiftLabel, normalizeGiftInventory } from '../lib/gifts.js'
 
 const PENDING_GIFT_KEY = 'cardora:pendingGiftCheckout'
 
@@ -87,7 +88,7 @@ function clearPendingGift() {
 }
 
 function StoreGifts() {
-  const { currentUser, openAuthModal, balance, refreshBalance } = useOutletContext()
+  const { currentUser, openAuthModal, balance, refreshBalance, inventory: appInventory = [] } = useOutletContext()
   const location = useLocation()
   const navigate = useNavigate()
   const [catalog, setCatalog] = useState([])
@@ -100,7 +101,7 @@ function StoreGifts() {
   const [revealingGift, setRevealingGift] = useState(null)
   const [returnRefreshing, setReturnRefreshing] = useState(false)
 
-  const inventory = (currentUser?.giftsInventory || []).filter(item => item.status === 'available' || !item.status)
+  const inventory = appInventory.length ? appInventory : normalizeGiftInventory(currentUser?.giftsInventory || [])
   const walletBalance = currentUser?.giftWalletNgn || 0
 
   useEffect(() => {
@@ -229,9 +230,7 @@ function StoreGifts() {
     }
   }
 
-  const formatGiftName = (name) => {
-    return name.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim()
-  }
+  const formatGiftName = formatGiftLabel
 
   return (
     <div className="page-body">
@@ -438,10 +437,10 @@ function StoreGifts() {
               }}>
                 {inventory.map((item, idx) => {
                   const giftName = item.giftName || item.name || 'spark'
-                  const legacyKey = GIFT_NAME_ALIASES[giftName]?.[1] || giftName
+                  const legacyKey = item.effectKey || GIFT_NAME_ALIASES[giftName]?.[1] || giftName
                   return (
                     <div
-                      key={item.inventoryId || item._id || idx}
+                      key={item.id || item.inventoryId || item._id || idx}
                       style={{
                         background: 'rgba(255,255,255,0.04)',
                         borderRadius: 14, padding: 16,
@@ -458,6 +457,11 @@ function StoreGifts() {
                       <strong style={{ color: '#fff', fontSize: 13, textAlign: 'center' }}>
                         {formatGiftName(giftName)}
                       </strong>
+                      {item.amount && (
+                        <span style={{ color: 'rgba(226,234,240,0.65)', fontSize: 12 }}>
+                          {item.amount}
+                        </span>
+                      )}
                       <span style={{
                         fontSize: 11, padding: '2px 8px', borderRadius: 6,
                         background: item.status === 'available'

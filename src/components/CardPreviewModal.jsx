@@ -237,7 +237,8 @@ function CardPreviewModal({
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const c = cardObject
-  const hasGift = toolAllowed('gifts') && limit('allowGifts') && c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
+  const giftAllowed = pageMode ? true : limit('allowGifts')
+  const hasGift = toolAllowed('gifts') && giftAllowed && c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
   const hasFadeIn = toolAllowed('cardStyle') && limit('allowFadeIn') && Number(c.card.textBodyAnimation.fadeInDuration) > 0
   const hasTypewriter = toolAllowed('cardStyle') && limit('allowTypewriter') && Number(c.card.textBodyAnimation.selfTypeSpeed) > 0
   const typeSpeed = hasTypewriter ? parseFloat(c.card.textBodyAnimation.selfTypeSpeed) || 2 : 2

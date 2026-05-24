@@ -20,6 +20,7 @@ import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
 import { getMusicPresetsForTier } from '../data/cardDefaults.js'
 import { getTierLimits } from '../lib/tierLimits.js'
 import { PALETTES, getPalettesForTier, applyPalette, getPaletteById } from '../lib/palettes.js'
+import { effectKeyToGiftName } from '../lib/gifts.js'
 import InlineColorPicker from '../components/InlineColorPicker.jsx'
 import { GiftIcon } from '../components/GiftCard.jsx'
 
@@ -934,16 +935,46 @@ function CardStudio() {
         console.warn('Card created but no slug returned. Response shape:', JSON.stringify(d))
       }
 
-      // Attach the gift if the user selected one
-      if (flushedCardObject.giftEffect?.enabled && flushedCardObject.giftEffect.giftId) {
-        try {
-          await attachGiftToCard({ 
-            cardId: slug, 
-            inventoryId: flushedCardObject.giftEffect.giftId,
-            giftId: flushedCardObject.giftEffect.giftId
-          })
-        } catch (err) {
-          console.error('Failed to attach gift to card', err)
+      // Attach the gift if the user selected one. Keep the real inventory id
+      // separate from the UI row id so duplicate gifts stay selectable.
+      const selectedGift = flushedCardObject.giftEffect || {}
+      if (selectedGift.enabled && selectedGift.giftId) {
+        const cardIdCandidates = [
+          d.card?._id,
+          d.card?.id,
+          d.card?.cardId,
+          d.card?.slug,
+          d.card?.shareSlug,
+          d._id,
+          d.id,
+          d.cardId,
+          d.slug,
+          d.shareSlug,
+          slug,
+        ].filter(Boolean)
+        const uniqueCardIds = [...new Set(cardIdCandidates.map(String))]
+        let attached = false
+        let lastAttachError = null
+
+        for (const cardId of uniqueCardIds) {
+          try {
+            await attachGiftToCard({
+              cardId,
+              slug,
+              inventoryId: selectedGift.giftId,
+              giftId: selectedGift.giftId,
+              giftName: selectedGift.giftName || effectKeyToGiftName(selectedGift.effectKey),
+              effectKey: selectedGift.effectKey,
+            })
+            attached = true
+            break
+          } catch (err) {
+            lastAttachError = err
+          }
+        }
+
+        if (!attached) {
+          console.error('Failed to attach gift to card', lastAttachError)
         }
       }
 
@@ -2234,7 +2265,7 @@ function CardStudio() {
 
     // GIFTS
     if (activeTool === 'gifts') {
-      const selectedKey = c.giftEffect?.effectKey || 'none'
+      const selectedGiftInstance = c.giftEffect?.giftInstanceId || c.giftEffect?.giftId || 'none'
       return (
         <>
           <p className="cs-panel-eyebrow">Gifts</p>
@@ -2247,12 +2278,15 @@ function CardStudio() {
             <p className="cs-sub-label">Select a Gift</p>
             <button
               type="button"
-              className={`cs-gift-option ${selectedKey === 'none' ? 'active' : ''}`}
+              className={`cs-gift-option ${selectedGiftInstance === 'none' ? 'active' : ''}`}
               onClick={() => {
                 update('giftEffect.enabled', false)
                 update('giftEffect.effectKey', 'none')
                 update('giftEffect.giftTitle', '')
                 update('giftEffect.giftAmount', '')
+                update('giftEffect.giftId', '')
+                update('giftEffect.giftInstanceId', '')
+                update('giftEffect.giftName', '')
               }}
             >
               <span className="cs-gift-none-icon">✕</span>
@@ -2260,23 +2294,30 @@ function CardStudio() {
             </button>
             {inventory.length > 0 ? (
               <div className="cs-gift-grid">
-                {inventory.map((gift, idx) => (
-                  <button
-                    key={gift.id || idx}
-                    type="button"
-                    className={`cs-gift-option ${selectedKey === (gift.effectKey || gift.title) ? 'active' : ''}`}
-                    onClick={() => {
-                      update('giftEffect.enabled', true)
-                      update('giftEffect.effectKey', gift.effectKey || gift.title)
-                      update('giftEffect.giftTitle', gift.title)
-                      update('giftEffect.giftAmount', gift.amount || '')
-                      update('giftEffect.giftId', gift.id || '')
-                    }}
-                  >
-                    <GiftIcon effectKey={gift.effectKey} size={36} />
-                    <span>{gift.title}</span>
-                  </button>
-                ))}
+                {inventory.map((gift, idx) => {
+                  const instanceId = gift.id || `${gift.inventoryId || gift.giftId || gift.effectKey || gift.title}-${idx}`
+                  const backendGiftId = gift.inventoryId || gift.giftId || gift._id || gift.id || ''
+                  return (
+                    <button
+                      key={instanceId}
+                      type="button"
+                      className={`cs-gift-option ${selectedGiftInstance === instanceId ? 'active' : ''}`}
+                      onClick={() => {
+                        update('giftEffect.enabled', true)
+                        update('giftEffect.effectKey', gift.effectKey || gift.title)
+                        update('giftEffect.giftTitle', gift.title)
+                        update('giftEffect.giftAmount', gift.amount || '')
+                        update('giftEffect.giftId', backendGiftId)
+                        update('giftEffect.giftInstanceId', instanceId)
+                        update('giftEffect.giftName', gift.giftName || gift.name || effectKeyToGiftName(gift.effectKey))
+                      }}
+                    >
+                      <GiftIcon effectKey={gift.effectKey} size={36} />
+                      <span>{gift.title}</span>
+                      {gift.amount && <small>{gift.amount}</small>}
+                    </button>
+                  )
+                })}
               </div>
             ) : (
               <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.5 }}>

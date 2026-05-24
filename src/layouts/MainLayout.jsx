@@ -63,6 +63,7 @@ import {
   cardObjectToBackendPayload,
   mapBackendCard,
 } from '../lib/backendMappers.js'
+import { normalizeGiftInventory } from '../lib/gifts.js'
 
 const USER_META_PREFIX = 'cardora:userMeta:'
 
@@ -164,9 +165,16 @@ function MainLayout() {
         if (pendingRaw) {
           const pending = JSON.parse(pendingRaw)
           if (pending && pending.name && Date.now() - pending.savedAt < 300000) { // 5 minutes
-            const hasGained = Array.isArray(normalized.giftsInventory) && normalized.giftsInventory.some(
-              item => (item.giftName || item.name) === pending.name
+            const beforeCount = Array.isArray(hydratedUser?.giftsInventory) ? hydratedUser.giftsInventory.length : 0
+            const afterCount = Array.isArray(normalized.giftsInventory) ? normalized.giftsInventory.length : 0
+            const hasExactPending = Array.isArray(normalized.giftsInventory) && normalized.giftsInventory.some(
+              item => (
+                (pending.reference && (item.reference === pending.reference || item.txRef === pending.reference || item.transactionRef === pending.reference)) ||
+                item.inventoryId === `pending-${pending.savedAt}` ||
+                item._id === `pending-${pending.savedAt}`
+              )
             )
+            const hasGained = hasExactPending || afterCount > beforeCount
             if (hasGained) {
               sessionStorage.removeItem('cardora:pendingGiftCheckout')
             } else {
@@ -179,6 +187,7 @@ function MainLayout() {
                   inventoryId: `pending-${pending.savedAt}`,
                   _id: `pending-${pending.savedAt}`,
                   amount: 1,
+                  priceNgn: pending.price,
                   isPendingLocal: true,
                 }
               ]
@@ -191,51 +200,7 @@ function MainLayout() {
       setBalance(normalized.balance)
       setFavorites(meta.favorites || [])
       setLikedTemplates(meta.likedTemplates || [])
-      // Map backend giftsInventory to studio-compatible shape
-      const backendToLegacy = {
-        spark: 'tiny',
-        sweetHeart: 'sweet',
-        purpleLove: 'purple',
-        oceanHeart: 'ocean',
-        emeraldHeart: 'emerald',
-        passionHeart: 'passion',
-        goldenHeart: 'golden',
-        crystalHeart: 'crystal',
-        diamondHeart: 'diamond',
-        legendaryHeart: 'legendary',
-      }
-      
-      const giftTitles = {
-        tiny: 'Tiny Heart',
-        sweet: 'Sweet Heart',
-        purple: 'Purple Love',
-        ocean: 'Ocean Heart',
-        emerald: 'Emerald Heart',
-        passion: 'Passion Heart',
-        golden: 'Golden Heart',
-        crystal: 'Crystal Heart',
-        diamond: 'Diamond Heart',
-        legendary: 'Legendary Heart',
-      }
-
-      const backendGifts = Array.isArray(normalized.giftsInventory)
-        ? normalized.giftsInventory.filter(item => item.status === 'available' || !item.status)
-        : []
-      const mappedGifts = []
-      backendGifts.forEach((item) => {
-        const name = item.giftName || item.name || ''
-        const legacyKey = backendToLegacy[name] || name
-        const amount = item.amount || 1
-        for (let i = 0; i < amount; i++) {
-          mappedGifts.push({
-            id: `${item.inventoryId || item._id || item.id || `gift-${Date.now()}-${Math.random()}`}-${i}`,
-            title: giftTitles[legacyKey] || item.title || String(name).replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim() || 'Gift',
-            effectKey: legacyKey,
-            amount: 1, // we break them into individual items, so each is amount 1
-            status: item.status || 'available',
-          })
-        }
-      })
+      const mappedGifts = normalizeGiftInventory(normalized.giftsInventory)
 
       // Merge local storage inventory (if any custom drafts are kept) with backend gifts, avoiding duplicates
       const localGifts = meta.inventory || []

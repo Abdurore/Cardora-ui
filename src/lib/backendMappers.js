@@ -1,4 +1,5 @@
 import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
+import { formatGiftName, giftNameToEffectKey } from './gifts.js'
 
 const ROLE_MAP = {
   admin: 'Admin',
@@ -851,10 +852,11 @@ export function backendCardToCardObject(card) {
     },
     giftEffect: attachedGift ? {
       enabled: attachedGift.enabled !== false,
-      effectKey: attachedGift.effectKey || attachedGift.giftName || 'none',
-      giftTitle: attachedGift.giftTitle || attachedGift.title || attachedGift.giftName || '',
+      effectKey: giftNameToEffectKey(attachedGift.effectKey || attachedGift.giftName || attachedGift.name || 'none'),
+      giftTitle: attachedGift.giftTitle || attachedGift.title || formatGiftName(attachedGift.giftName || attachedGift.name || attachedGift.effectKey),
       giftAmount: attachedGift.giftAmount || attachedGift.amount || '',
       giftId: attachedGift.giftId || attachedGift.inventoryId || attachedGift.id || '',
+      giftName: attachedGift.giftName || attachedGift.name || '',
     } : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '' },
   })
 }
