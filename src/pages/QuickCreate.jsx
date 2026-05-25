@@ -5,6 +5,9 @@ import { useOutletContext } from 'react-router-dom'
 import { MdOutlineDiamond } from 'react-icons/md'
 import { PALETTES, applyPalette, getPalettesForTier } from '../lib/palettes.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
+import { attachGiftToCard } from '../lib/api.js'
+import { effectKeyToGiftName } from '../lib/gifts.js'
+import { GiftIcon } from '../components/GiftCard.jsx'
 
 const QUICK_FONTS = [
   { label: 'Poppins',          value: 'Poppins',          sample: 'Modern & Clean',   tier: 'classic' },
@@ -98,7 +101,7 @@ function QuickCreate() {
   const cardTierRaw = (params.get('tier') || 'classic').toLowerCase()
   const cardTier = resolveTier(cardType, cardTierRaw)
 
-  const { createCardOnBackend, currentUser, openAuthModal, balance } = useOutletContext()
+  const { createCardOnBackend, currentUser, openAuthModal, balance, inventory = [] } = useOutletContext()
 
   const tierRank = TIER_RANK[cardTier] ?? 0
   const tierCost = (TIER_COST_BY_TYPE[cardType] || TIER_COST_BY_TYPE.personal)[cardTier] ?? 0
@@ -142,6 +145,7 @@ function QuickCreate() {
   const [sendCopied, setSendCopied] = useState(false)
   const [sendEmail, setSendEmail] = useState('')
   const [error, setError] = useState(null)
+  const [selectedGiftId, setSelectedGiftId] = useState('none')
 
   const fileInputRef = useRef(null)
 
@@ -287,7 +291,34 @@ function QuickCreate() {
         d?.slug || d?.shareSlug || d?.cardId ||
         d?.data?.card?.slug || d?.data?.slug || null
 
-      setSendResult({ ok: true, slug, message: result.message })
+      let finalMessage = result.message
+
+      // Attach gift if selected
+      if (selectedGiftId && selectedGiftId !== 'none') {
+        const gift = inventory.find((g, i) => {
+          const instanceId = g.id || `${g.inventoryId || g.giftId || g.effectKey || g.title}-${i}`
+          return instanceId === selectedGiftId
+        })
+        if (gift) {
+          try {
+            const cardId = d?.card?.cardId || d?.cardId || d?.card?.id || d?.id || slug
+            const backendGiftId = gift.inventoryId || gift.giftId || gift._id || gift.id || ''
+            await attachGiftToCard({
+              cardId: cardId,
+              inventoryId: backendGiftId,
+              giftId: backendGiftId,
+              giftInventoryId: backendGiftId,
+              giftName: gift.giftName || gift.name || effectKeyToGiftName(gift.effectKey),
+              effectKey: gift.effectKey,
+              amount: gift.amount || ''
+            })
+          } catch (err) {
+            finalMessage = `Card created, but we failed to attach the gift: ${err.message || 'Unknown error'}. Please try again or check your inventory.`
+          }
+        }
+      }
+
+      setSendResult({ ok: true, slug, message: finalMessage })
     } catch (err) {
       setSendResult({ ok: false, message: 'Something went wrong. Please try again.' })
     } finally {
@@ -701,6 +732,54 @@ function QuickCreate() {
                 </div>
               )}
             </section>
+
+            {/* Step 5: Gift */}
+            {cardType === 'personal' && cardTier === 'elite' && (
+              <section className="qc-step">
+                <div className="qc-step-header">
+                  <span className="qc-step-num">5</span>
+                  <div>
+                    <h3 className="qc-step-title">
+                      Gift <span className="qc-optional">optional</span>
+                    </h3>
+                    <p className="qc-step-sub">Attach an end-of-card surprise</p>
+                  </div>
+                </div>
+
+                <div className="cs-gift-grid">
+                  <button
+                    type="button"
+                    className={`cs-gift-option ${!selectedGiftId || selectedGiftId === 'none' ? 'active' : ''}`}
+                    onClick={() => setSelectedGiftId('none')}
+                  >
+                    <span className="cs-gift-none-icon">?</span>
+                    <span>No Gift</span>
+                  </button>
+
+                  {inventory.map((gift, idx) => {
+                    const instanceId = gift.id || `${gift.inventoryId || gift.giftId || gift.effectKey || gift.title}-${idx}`
+                    return (
+                      <button
+                        key={instanceId}
+                        type="button"
+                        className={`cs-gift-option ${selectedGiftId === instanceId ? 'active' : ''}`}
+                        onClick={() => setSelectedGiftId(instanceId)}
+                      >
+                        <GiftIcon effectKey={gift.effectKey} size={36} />
+                        <span>{gift.title}</span>
+                        {gift.amount && <small>{gift.amount}</small>}
+                      </button>
+                    )
+                  })}
+                </div>
+                
+                {inventory.length === 0 && (
+                  <p className="qc-type-hint" style={{ marginTop: '0.75rem' }}>
+                    No gifts in your inventory. <Link to="/store">Visit the Store</Link> to purchase gifts.
+                  </p>
+                )}
+              </section>
+            )}
 
             {/* Submit */}
             <div className="qc-submit-area">

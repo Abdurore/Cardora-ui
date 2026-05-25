@@ -87,6 +87,7 @@ function Store() {
     refreshBalance,
     userCurrency,
     purchaseGift,
+    authReady,
   } = useOutletContext()
 
   const navigate = useNavigate()
@@ -331,13 +332,17 @@ function Store() {
             {userCurrency && (
               <p className="pack-currency-note">Prices shown in {userCurrency}. Change currency in your profile settings.</p>
             )}
-            {packs.map((pack, index) => (
-              <PackCard
-                key={pack.id || `${pack.title}-${index}`}
-                {...pack}
-                onSelect={() => handleSelect(pack)}
-              />
-            ))}
+            {!authReady ? (
+              <div className="store-frame-empty">Loading store packages...</div>
+            ) : (
+              packs.map((pack, index) => (
+                <PackCard
+                  key={pack.id || `${pack.title}-${index}`}
+                  {...pack}
+                  onSelect={() => handleSelect(pack)}
+                />
+              ))
+            )}
           </div>
         )}
 

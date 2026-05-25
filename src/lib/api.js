@@ -785,7 +785,7 @@ export async function reportCard(targetId, reason, details = '') {
 }
 
 export async function reportTemplate(targetId, reason, details = '') {
-  return request('/reports/templates', { method: 'POST', auth: true, body: { targetId, reason, details } })
+  return request('/reports/templates', { method: 'POST', auth: true, body: { targetId, type: 'template', targetType: 'template', reason, details } })
 }
 
 export async function createAdminPackage(payload) {

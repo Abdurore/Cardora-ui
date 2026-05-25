@@ -463,8 +463,10 @@ function AdminDashboard() {
           break
         }
         case 'Reports': {
-          const q = `type=${reportFilter.type}&status=${reportFilter.status}&page=1&limit=100`
-          const res = await getAdminReports(q)
+          const params = new URLSearchParams({ page: '1', limit: '100' })
+          if (reportFilter.type) params.append('type', reportFilter.type)
+          if (reportFilter.status) params.append('status', reportFilter.status)
+          const res = await getAdminReports(params.toString())
           setReports(res?.data?.reports || res?.reports || [])
           break
         }
@@ -584,8 +586,10 @@ function AdminDashboard() {
     const f = { ...reportFilter, ...overrides }
     setLoading(true)
     try {
-      const q = `type=${f.type}&status=${f.status}&page=1&limit=100`
-      const res = await getAdminReports(q)
+      const params = new URLSearchParams({ page: '1', limit: '100' })
+      if (f.type) params.append('type', f.type)
+      if (f.status) params.append('status', f.status)
+      const res = await getAdminReports(params.toString())
       setReports(res?.data?.reports || res?.reports || [])
     } catch (err) {
       console.error('Reports load failed', err)
@@ -1550,28 +1554,90 @@ const handleBroadcast = async () => {
                 <thead>
                   <tr>
                     <th>Type</th>
-                    <th>Target ID</th>
+                    <th>Target Info</th>
                     <th>Reason</th>
                     <th>Details</th>
                     <th>Reported by</th>
                     <th>Status</th>
                     <th>Date</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedReports.map((rep, i) => (
-                    <tr key={rep.reportId || rep._id || i}>
-                      <td><span className={`admin-role-chip ${rep.type || 'user'}`}>{rep.type || '—'}</span></td>
-                      <td className="admin-cell-mono">{rep.targetId || '—'}</td>
-                      <td>{rep.reason || '—'}</td>
-                      <td className="admin-cell-details">{rep.details || '—'}</td>
-                      <td>{rep.reportedByUsername || rep.reportedById || '—'}</td>
-                      <td><span className={`admin-status-chip ${rep.status || 'open'}`}>{rep.status || 'open'}</span></td>
-                      <td>{rep.createdAt ? new Date(rep.createdAt).toLocaleDateString() : '—'}</td>
-                    </tr>
-                  ))}
+                  {pagedReports.map((rep, i) => {
+                    const targetId = rep.targetId || rep.templateId;
+                    const isTemplate = rep.type === 'template';
+                    const isUser = rep.type === 'user';
+                    
+                    let targetContext = '';
+                    let artistName = '';
+                    
+                    if (isTemplate) {
+                      const tpl = allTemplates.find(t => (t.id || t.templateId) === targetId);
+                      if (tpl) {
+                        targetContext = tpl.title || 'Unknown Template';
+                        artistName = tpl.ownerId || tpl.artist || tpl.createdBy || 'Unknown Artist';
+                        const user = users.find(u => (u.id || u._id) === artistName);
+                        if (user) artistName = user.username || user.name || artistName;
+                      }
+                    } else if (isUser) {
+                      const user = users.find(u => (u.id || u._id || u.username) === targetId);
+                      if (user) {
+                        targetContext = user.username || user.name;
+                      }
+                    }
+                    
+                    const reportCount = reports.filter(r => (r.targetId || r.templateId) === targetId).length;
+
+                    return (
+                      <tr key={rep.reportId || rep._id || i}>
+                        <td>
+                          <span className={`admin-role-chip ${rep.type || 'user'}`}>{rep.type || '—'}</span>
+                          {reportCount > 1 && <span style={{fontSize: '0.7rem', color: '#ffb74d', display: 'block', marginTop: 4}}>{reportCount} reports</span>}
+                        </td>
+                        <td className="admin-cell-mono" style={{ maxWidth: 200, wordWrap: 'break-word' }}>
+                          <div>{targetId || '—'}</div>
+                          {targetContext && <div style={{fontSize: '0.75rem', opacity: 0.7, marginTop: 4}}>Name: {targetContext}</div>}
+                          {artistName && <div style={{fontSize: '0.75rem', opacity: 0.7}}>Artist: {artistName}</div>}
+                        </td>
+                        <td>{rep.reason || '—'}</td>
+                        <td className="admin-cell-details">{rep.details || '—'}</td>
+                        <td>{rep.reportedByUsername || rep.reportedById || '—'}</td>
+                        <td><span className={`admin-status-chip ${rep.status || 'open'}`}>{rep.status || 'open'}</span></td>
+                        <td>{rep.createdAt ? new Date(rep.createdAt).toLocaleDateString() : '—'}</td>
+                        <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {isTemplate && (
+                            <button 
+                              type="button" 
+                              className="admin-action-btn warn"
+                              onClick={async () => {
+                                const disableId = (typeof tpl !== 'undefined' && tpl ? (tpl.templateId || tpl.id) : null) || targetId;
+                                if (!await appConfirm('Disable Template', `Disable this template?`, { variant: 'warning', confirmLabel: 'Disable' })) return
+                                try { await disableAdminTemplate(disableId); showMsg('Template disabled.'); }
+                                catch (err) { showMsg(err.message || 'Disable failed', false) }
+                              }}
+                            >
+                              Disable
+                            </button>
+                          )}
+                          {isUser && (
+                            <button 
+                              type="button" 
+                              className="admin-action-btn reject"
+                              onClick={() => {
+                                setBanForm(p => ({ ...p, identifier: targetId }))
+                                openBanConfirm()
+                              }}
+                            >
+                              Ban User
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                   {reports.length === 0 && (
-                    <tr><td colSpan={7} style={{ textAlign: 'center', opacity: 0.5 }}>No reports found.</td></tr>
+                    <tr><td colSpan={8} style={{ textAlign: 'center', opacity: 0.5 }}>No reports found.</td></tr>
                   )}
                 </tbody>
               </table>
