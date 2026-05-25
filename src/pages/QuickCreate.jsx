@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
+import { MdOutlineDiamond } from 'react-icons/md'
 import { PALETTES, applyPalette, getPalettesForTier } from '../lib/palettes.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
 
@@ -772,7 +773,7 @@ function QuickCreate() {
             {/* CC confirmation (paid tier, before send) */}
             {!isSending && !sendResult && tierCost > 0 && (
               <div className="cs-send-confirm">
-                <div className="cs-send-confirm-icon">💎</div>
+                <div className="cs-send-confirm-icon"><MdOutlineDiamond size={32} style={{ color: '#a78bfa' }} /></div>
                 <p className="cs-send-confirm-text">
                   Sending this <strong>{TIER_LABELS[cardTier]}</strong> card will cost
                 </p>

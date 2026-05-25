@@ -4,6 +4,10 @@ import { useOutletContext, useNavigate, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import ScreenNav from '../components/ScreenNav.jsx'
 import { getWorldChat, getPublicProfile, API_BASE } from '../lib/api.js'
+import { MdBolt, MdPalette, MdDomain } from 'react-icons/md'
+import { BiShield } from 'react-icons/bi'
+import { IoPersonOutline, IoSparkles } from 'react-icons/io5'
+import { FaCrown } from 'react-icons/fa'
 import { mapChatMessage } from '../lib/backendMappers.js'
 
 function formatAge(isoStr) {
@@ -239,11 +243,11 @@ function WorldChat() {
 
   function roleIcon(role) {
     const r = String(role || '').toLowerCase()
-    if (r === 'admin') return '⚡'
-    if (r === 'artist') return '🎨'
-    if (r === 'moderator') return '🛡'
-    if (r === 'enterprise') return '🏢'
-    return '👤'
+    if (r === 'admin') return <MdBolt size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+    if (r === 'artist') return <MdPalette size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+    if (r === 'moderator') return <BiShield size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+    if (r === 'enterprise') return <MdDomain size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+    return <IoPersonOutline size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
   }
 
   function formatJoined(isoStr) {
@@ -313,7 +317,7 @@ function WorldChat() {
             </div>
           ) : messages.length === 0 ? (
             <div className="chat-empty">
-              <span>✨</span>
+              <IoSparkles size={24} style={{ marginBottom: 12 }} />
               <p>No messages yet. Be the first to say something!</p>
             </div>
           ) : (
@@ -500,7 +504,7 @@ function WorldChat() {
                         </span>
                         {(isPremium) && (
                           <span className="profile-role-badge profile-premium-badge">
-                            ⭐ Premium
+                            <FaCrown size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Premium
                           </span>
                         )}
                         {status && <span className="chat-profile-status-pill">{status}</span>}

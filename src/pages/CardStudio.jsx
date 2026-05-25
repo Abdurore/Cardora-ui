@@ -10,6 +10,7 @@ import {
 } from 'react-icons/hi2'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 import { IoColorPaletteOutline } from 'react-icons/io5'
+import { MdBolt, MdPalette, MdOutlineDiamond } from 'react-icons/md'
 import { defaultCardObject, resolveTemplateCardObject, musicPresets, getFontsForTier } from '../data/cardDefaults.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
@@ -423,7 +424,25 @@ function CardStudio() {
   const [cardObject, setCardObject] = useState(() => {
     if (existingDraftObject) return structuredClone(existingDraftObject)
     if (initialAutoSaved?.cardObject) return structuredClone(initialAutoSaved.cardObject)
-    return resolveTemplateCardObject(cardData)
+    
+    let base = resolveTemplateCardObject(cardData)
+    const isLightMode = document.documentElement.getAttribute('data-theme') === 'light'
+    if (isLightMode && !cardData && !existingDraftObject && !initialAutoSaved) {
+       base.card.backgroundColor = '#ffffff'
+       base.card.textColor = '#111111'
+       base.card.headingColor = '#000000'
+       base.closedState.backgroundColor = '#f0f4f8'
+       base.closedState.textColor = '#333333'
+       base.closedState.headingColor = '#111111'
+       base.card.cardBorder.colors = ['#e5e7eb']
+       base.closedState.borderColor = '#e5e7eb'
+       base.background.colors = ['#f8fafc']
+       // Set the closed button text color to black and background to white
+       base.closedState.button.backgroundColor = '#ffffff'
+       base.closedState.button.textColor = '#000000'
+       base.closedState.button.borderColor = '#e5e7eb'
+    }
+    return base
   })
   const [activeTool, setActiveTool] = useState(defaultToolId)
   const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'closed' : 'card')
@@ -734,7 +753,26 @@ function CardStudio() {
     return JSON.parse(json)
   }
 
-  const c = cardObject
+  const isLightTheme = document.documentElement.getAttribute('data-theme') === 'light'
+  const c = {
+    ...cardObject,
+    background: {
+      ...cardObject?.background,
+      colors: cardObject?.background?.colors?.map(col => (isLightTheme && col === '#0a0a0a') ? '#ffffff' : col) || (isLightTheme ? ['#ffffff'] : ['#0a0a0a']),
+    },
+    card: {
+      ...cardObject?.card,
+      backgroundColor: (isLightTheme && cardObject?.card?.backgroundColor === '#111111') ? '#ffffff' : (cardObject?.card?.backgroundColor || '#111111'),
+      textColor: (isLightTheme && cardObject?.card?.textColor === '#ffffff') ? '#0c1929' : (cardObject?.card?.textColor || '#ffffff'),
+      headingColor: (isLightTheme && cardObject?.card?.headingColor === '#ffffff') ? '#0c1929' : (cardObject?.card?.headingColor || '#ffffff'),
+    },
+    closedState: {
+      ...cardObject?.closedState,
+      backgroundColor: (isLightTheme && cardObject?.closedState?.backgroundColor === '#111111') ? '#ffffff' : (cardObject?.closedState?.backgroundColor || '#111111'),
+      textColor: (isLightTheme && cardObject?.closedState?.textColor === '#cccccc') ? '#4b6577' : (cardObject?.closedState?.textColor || '#cccccc'),
+      headingColor: (isLightTheme && cardObject?.closedState?.headingColor === '#ffffff') ? '#0c1929' : (cardObject?.closedState?.headingColor || '#ffffff'),
+    }
+  }
   const canUndo = historyVersion >= 0 && undoStackRef.current.length > 0
   const canRedo = redoStackRef.current.length > 0
 
@@ -4024,7 +4062,7 @@ function CardStudio() {
             {/* ── CC Confirmation Step (shown before sending when cost > 0) ── */}
             {!isSending && !sendResult && tierCost > 0 && (
               <div className="cs-send-confirm">
-                <div className="cs-send-confirm-icon">💎</div>
+                <div className="cs-send-confirm-icon"><MdOutlineDiamond size={32} style={{ color: '#a78bfa' }} /></div>
                 <p className="cs-send-confirm-text">
                   Sending this <strong>{tierLabel}</strong> card will cost
                 </p>

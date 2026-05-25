@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { MdLightMode, MdDarkMode } from 'react-icons/md'
 
 const BRAND_LOGO = '/cardora-logo.png?v=4'
 
@@ -55,7 +56,7 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
           aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
           title={theme === 'light' ? 'Dark mode' : 'Light mode'}
         >
-          {theme === 'light' ? '🌙' : '☀️'}
+          {theme === 'light' ? <MdDarkMode size={20} /> : <MdLightMode size={20} />}
         </button>
         {user ? (
           <Link to="/profile" className="header-user-capsule" aria-label="Profile">

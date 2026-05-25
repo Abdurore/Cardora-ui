@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { MdBolt, MdPalette } from 'react-icons/md'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
 
 const CARD_TYPES = [
@@ -222,7 +223,7 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
                 className="ctm-mode-card ctm-mode-quick"
                 onClick={() => { onClose(); navigate(`/quick?type=${selectedType}&tier=${selectedTier}`) }}
               >
-                <div className="ctm-mode-icon">⚡</div>
+                <div className="ctm-mode-icon"><MdBolt size={24} /></div>
                 <h3>Quick Start</h3>
                 <p>Pick a theme, add your text and a photo — ready in minutes.</p>
                 <span className="ctm-mode-hint">Simple · Fast · Clean</span>
@@ -232,7 +233,7 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
                 className="ctm-mode-card ctm-mode-studio"
                 onClick={() => { onClose(); navigate(`/studio?type=${selectedType}&tier=${selectedTier}`, { state: { isNew: true } }) }}
               >
-                <div className="ctm-mode-icon">🎨</div>
+                <div className="ctm-mode-icon"><MdPalette size={24} /></div>
                 <h3>Full Studio</h3>
                 <p>Complete control — design, effects, music, and more.</p>
                 <span className="ctm-mode-hint">Advanced · Creative · Powerful</span>

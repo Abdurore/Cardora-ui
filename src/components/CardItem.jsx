@@ -41,6 +41,7 @@ function CardItem({
   onClick,
   isLiked,
   onToggleLike,
+  hoverLabel = 'Open Template',
 }) {
   const tierInfo = getTierInfo(tier)
   const displayLikes = Number(likeCount ?? likes ?? 0) || 0
@@ -107,7 +108,7 @@ function CardItem({
 
       <div className="card-overlay">
         <div className="card-overlay-copy">
-          <p>Open Template</p>
+          <p>{hoverLabel}</p>
           <span>Preview the full Cardora experience</span>
         </div>
       </div>

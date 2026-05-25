@@ -62,6 +62,26 @@ function CardPreviewModal({
   refreshBalance = null,
 }) {
   const navigate = useNavigate()
+  const isLightTheme = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light'
+  const c = {
+    ...cardObject,
+    background: {
+      ...cardObject?.background,
+      colors: cardObject?.background?.colors?.map(col => (isLightTheme && col === '#0a0a0a') ? '#ffffff' : col) || (isLightTheme ? ['#ffffff'] : ['#0a0a0a']),
+    },
+    card: {
+      ...cardObject?.card,
+      backgroundColor: (isLightTheme && cardObject?.card?.backgroundColor === '#111111') ? '#ffffff' : (cardObject?.card?.backgroundColor || '#111111'),
+      textColor: (isLightTheme && cardObject?.card?.textColor === '#ffffff') ? '#0c1929' : (cardObject?.card?.textColor || '#ffffff'),
+      headingColor: (isLightTheme && cardObject?.card?.headingColor === '#ffffff') ? '#0c1929' : (cardObject?.card?.headingColor || '#ffffff'),
+    },
+    closedState: {
+      ...cardObject?.closedState,
+      backgroundColor: (isLightTheme && cardObject?.closedState?.backgroundColor === '#111111') ? '#ffffff' : (cardObject?.closedState?.backgroundColor || '#111111'),
+      textColor: (isLightTheme && cardObject?.closedState?.textColor === '#cccccc') ? '#4b6577' : (cardObject?.closedState?.textColor || '#cccccc'),
+      headingColor: (isLightTheme && cardObject?.closedState?.headingColor === '#ffffff') ? '#0c1929' : (cardObject?.closedState?.headingColor || '#ffffff'),
+    }
+  }
   // `allowedTools` gates tool visibility; `tierLimits` caps the content a
   // visible tool is allowed to contribute (e.g. music allowed, images > 1).
   // Both null = public viewer, render everything the card has.
@@ -107,8 +127,8 @@ function CardPreviewModal({
   // text or images.
   const cardSurfaceStyle = (extra = {}) => ({
     backgroundColor: 'transparent',
-    '--card-bg': cardObject?.card?.backgroundColor || '#111111',
-    '--card-bg-opacity': String(1 - (Number(cardObject?.card?.backgroundOpacity) || 0)),
+    '--card-bg': c?.card?.backgroundColor || '#111111',
+    '--card-bg-opacity': String(1 - (Number(c?.card?.backgroundOpacity) || 0)),
     ...extra,
   })
 
@@ -146,7 +166,7 @@ function CardPreviewModal({
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.globalCompositeOperation = 'source-over'
-    const bg = cardObject?.card?.backgroundColor || '#0b0f14'
+    const bg = c?.card?.backgroundColor || '#0b0f14'
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     // Decorative overlay text
@@ -156,7 +176,7 @@ function CardPreviewModal({
     const rows = ['SCRATCH', 'TO', 'REVEAL']
     rows.forEach((t, i) => ctx.fillText(t, canvas.width / 2, canvas.height / 2 - 18 + i * 22))
     setScratchPct(0)
-  }, [lockSpec.type, unlocked, cardObject?.card?.backgroundColor])
+  }, [lockSpec.type, unlocked, c?.card?.backgroundColor])
 
   const handleScratch = useCallback((e) => {
     if (!scratchingRef.current || unlocked) return
@@ -240,7 +260,6 @@ function CardPreviewModal({
   const [localChainReplies, setLocalChainReplies] = useState([])
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
-  const c = cardObject
   const giftAllowed = pageMode ? true : limit('allowGifts')
   const hasGift = toolAllowed('gifts') && giftAllowed && c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
   const hasFadeIn = toolAllowed('cardStyle') && limit('allowFadeIn') && Number(c.card.textBodyAnimation.fadeInDuration) > 0

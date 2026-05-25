@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
+import { HiOutlineTrophy } from 'react-icons/hi2'
 import { getMyCard } from '../lib/api.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -186,7 +187,7 @@ function TriviaLeaderboardView({ state, content }) {
         <span className="cr-count-badge">{players.length} player{players.length !== 1 ? 's' : ''}</span>
       </div>
       {players.length === 0 ? (
-        <EmptyState icon="🏆" message="No players yet. Share your trivia card to challenge people." />
+        <EmptyState icon={<HiOutlineTrophy size={32} />} message="No players yet. Share your trivia card to challenge people." />
       ) : (
         <div className="cr-trivia-board">
           {ranked.map((player, i) => {

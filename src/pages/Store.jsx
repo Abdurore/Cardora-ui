@@ -1,5 +1,9 @@
 import { useCallback, useMemo, useState, useEffect } from 'react'
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom'
+import { IoSparkles } from 'react-icons/io5'
+import { TiGift } from 'react-icons/ti'
+import { MdHandshake } from 'react-icons/md'
+import { HiOutlineFire } from 'react-icons/hi2'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import PackCard from '../components/PackCard.jsx'
@@ -408,7 +412,7 @@ function Store() {
                 className={`store-reward-tab ${activeRewardTab === 'earn' ? 'active' : ''}`}
                 onClick={() => setActiveRewardTab('earn')}
               >
-                <span className="store-reward-tab-icon">&#x2728;</span>
+                <span className="store-reward-tab-icon"><IoSparkles size={18} /></span>
                 Earn CC
               </button>
               <button
@@ -416,7 +420,7 @@ function Store() {
                 className={`store-reward-tab ${activeRewardTab === 'redeem' ? 'active' : ''}`}
                 onClick={() => setActiveRewardTab('redeem')}
               >
-                <span className="store-reward-tab-icon">&#x1F3AB;</span>
+                <span className="store-reward-tab-icon"><TiGift size={18} /></span>
                 Redeem
               </button>
               <button
@@ -424,7 +428,7 @@ function Store() {
                 className={`store-reward-tab ${activeRewardTab === 'referral' ? 'active' : ''}`}
                 onClick={() => setActiveRewardTab('referral')}
               >
-                <span className="store-reward-tab-icon">&#x1F91D;</span>
+                <span className="store-reward-tab-icon"><MdHandshake size={18} /></span>
                 Referrals
               </button>
             </div>
@@ -433,14 +437,14 @@ function Store() {
               <div className="store-earn-section">
                 <div className="store-earn-card">
                   <div className="store-earn-badge">
-                    <span className="store-earn-badge-icon">&#x1F381;</span>
+                    <span className="store-earn-badge-icon"><TiGift size={24} /></span>
                   </div>
                   <div className="store-earn-info">
                     <h4>Daily Free Coupon</h4>
                     <p>Claim {streakInfo?.isPremium ? '2 CC' : '1 CC'} every day. {streakInfo?.isPremium ? '(Premium bonus!)' : 'Premium users earn 2×!'}</p>
                     {streakInfo && streakInfo.streak > 0 && (
                       <div className="store-streak-badge">
-                        <span className="store-streak-fire">🔥</span>
+                        <span className="store-streak-fire"><HiOutlineFire size={16} /></span>
                         <span>{streakInfo.streak}-day streak</span>
                       </div>
                     )}
@@ -466,7 +470,7 @@ function Store() {
               <div className="store-redeem-section">
                 <div className="store-redeem-card">
                   <div className="store-redeem-badge">
-                    <span>&#x1F3AB;</span>
+                    <span><TiGift size={24} /></span>
                   </div>
                   <h4>Redeem a Code</h4>
                   <p>Enter a promo or gift code to add CC to your wallet.</p>

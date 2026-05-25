@@ -1,5 +1,9 @@
 import { useOutletContext, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
+import { MdPalette, MdBolt, MdDomain } from 'react-icons/md'
+import { IoSparkles, IoPersonOutline } from 'react-icons/io5'
+import { BiShield } from 'react-icons/bi'
+import { FaCrown } from 'react-icons/fa'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
@@ -18,12 +22,12 @@ import { mapTemplateToCard, normalizeCheckoutSession } from '../lib/backendMappe
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
 const ROLE_CONFIG = {
-  Artist: { badge: 'role-artist', icon: '🎨', desc: 'Create and publish templates to the marketplace' },
-  User: { badge: 'role-user', icon: '✨', desc: 'Build and send personalized card experiences' },
-  Admin: { badge: 'role-admin', icon: '⚡', desc: 'Monitor platform activity and manage content' },
-  Moderator: { badge: 'role-moderator', icon: '🛡', desc: 'Help keep Cardora safe and welcoming' },
-  Enterprise: { badge: 'role-enterprise', icon: '🏢', desc: 'Business account with analytics and ad management' },
-  Visitor: { badge: 'role-visitor', icon: '👤', desc: 'Sign in to start creating' },
+  Artist: { badge: 'role-artist', icon: <MdPalette size={16} />, desc: 'Create and publish templates to the marketplace' },
+  User: { badge: 'role-user', icon: <IoSparkles size={16} />, desc: 'Build and send personalized card experiences' },
+  Admin: { badge: 'role-admin', icon: <MdBolt size={16} />, desc: 'Monitor platform activity and manage content' },
+  Moderator: { badge: 'role-moderator', icon: <BiShield size={16} />, desc: 'Help keep Cardora safe and welcoming' },
+  Enterprise: { badge: 'role-enterprise', icon: <MdDomain size={16} />, desc: 'Business account with analytics and ad management' },
+  Visitor: { badge: 'role-visitor', icon: <IoPersonOutline size={16} />, desc: 'Sign in to start creating' },
 }
 
 function pickList(res, ...keys) {
@@ -451,7 +455,7 @@ function Profile() {
           </div>
           {currentUser?.isPremiumActive && (
             <div className="profile-role-badge profile-premium-badge">
-              <span className="role-icon">⭐</span>
+              <span className="role-icon"><FaCrown size={16} /></span>
               <span className="role-name">Premium</span>
             </div>
           )}
@@ -556,17 +560,17 @@ function Profile() {
           {/* Role dashboard quick links */}
           {isAdmin && (
             <Link to="/admin" className="profile-admin-link">
-              <span>⚡</span> Open Admin Dashboard
+              <span><MdBolt size={18} /></span> Open Admin Dashboard
             </Link>
           )}
           {isModerator && (
             <Link to="/moderator" className="profile-admin-link">
-              <span>🛡</span> Open Moderator Dashboard
+              <span><BiShield size={18} /></span> Open Moderator Dashboard
             </Link>
           )}
           {isEnterprise && (
             <Link to="/enterprise" className="profile-admin-link">
-              <span>🏢</span> Open Enterprise Dashboard
+              <span><MdDomain size={18} /></span> Open Enterprise Dashboard
             </Link>
           )}
 
@@ -577,7 +581,7 @@ function Profile() {
               type="button"
               onClick={() => setShowArtistForm(true)}
             >
-              🎨 Apply as Artist
+              <MdPalette size={18} style={{ marginRight: 6 }} /> Apply as Artist
             </button>
           )}
         </div>
@@ -591,7 +595,7 @@ function Profile() {
           <div className="profile-premium-section">
             <div className="profile-premium-card">
               <div className="profile-premium-header">
-                <span className="profile-premium-star">⭐</span>
+                <span className="profile-premium-star"><FaCrown size={24} /></span>
                 <div>
                   <h4 className="profile-premium-title">Cardora Premium</h4>
                   <p className="profile-premium-sub">₦500 / 30 days — double daily CC, exclusive profile backgrounds, streak tracking, and more.</p>
@@ -633,7 +637,7 @@ function Profile() {
             {/* Gift Premium */}
             {currentUser?.isPremiumActive && (
             <div className="profile-premium-gift">
-              <p className="profile-premium-gift-label">🎁 Gift 7 days of Premium to a friend</p>
+              <p className="profile-premium-gift-label"><MdPalette size={16} style={{ marginRight: 6, display: 'inline-block' }} /> Gift 7 days of Premium to a friend</p>
               <div className="profile-premium-gift-row">
                 <input
                   type="text"
@@ -736,6 +740,7 @@ function Profile() {
                 <div key={draft.id} className="profile-card-wrap">
                   <CardItem
                     {...draft}
+                    hoverLabel="Open Draft"
                     variant={`v${(index % 4) + 1}`}
                     isFavorite={false}
                     onToggleFavorite={() => {}}
@@ -868,6 +873,7 @@ function Profile() {
                   <div key={card.id} className={`profile-card-wrap profile-card-type-${card.type || 'personal'}`}>
                     <CardItem
                       {...card}
+                      hoverLabel="Open Card"
                       variant={typeVariant}
                       showTypeBadge={true}
                       isLiked={likedTemplates.includes(card.id)}

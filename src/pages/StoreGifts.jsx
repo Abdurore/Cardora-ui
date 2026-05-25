@@ -5,6 +5,7 @@ import ScreenNav from '../components/ScreenNav.jsx'
 import PremiumGiftReveal from '../components/PremiumGiftReveal.jsx'
 import GiftPreviewModal from '../components/GiftPreviewModal.jsx'
 import { GiftIcon } from '../components/GiftCard.jsx'
+import { MdCardGiftcard, MdInventory } from 'react-icons/md'
 import { storeGifts } from '../data/catalog.js'
 import { getGiftCatalog, createFlutterwaveGiftCheckout } from '../lib/api.js'
 import { normalizeCheckoutSession } from '../lib/backendMappers.js'
@@ -15,7 +16,7 @@ const PENDING_GIFT_KEY = 'cardora:pendingGiftCheckout'
 const GIFT_META = {
   spark:          { emoji: '💫', gradient: 'linear-gradient(135deg, #fbbf24, #f59e0b)' },
   sweetHeart:     { emoji: '💝', gradient: 'linear-gradient(135deg, #f472b6, #ec4899)' },
-  purpleLove:     { emoji: '💜', gradient: 'linear-gradient(135deg, #a78bfa, #8b5cf6)' },
+  purpleLove:     { emoji: '💜', gradient: 'linear-gradient(135deg, #1dd1a1, #0d9488)' },
   oceanHeart:     { emoji: '🌊', gradient: 'linear-gradient(135deg, #38bdf8, #0284c7)' },
   emeraldHeart:   { emoji: '💚', gradient: 'linear-gradient(135deg, #34d399, #059669)' },
   passionHeart:   { emoji: '❤️‍🔥', gradient: 'linear-gradient(135deg, #fb7185, #e11d48)' },
@@ -276,29 +277,31 @@ function StoreGifts() {
             onClick={() => setActiveView('catalog')}
             style={{
               padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: activeView === 'catalog' ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.08)',
-              color: '#fff', fontSize: 13, fontWeight: 600,
-              transition: 'background 0.2s',
+              background: activeView === 'catalog' ? 'var(--btn-bg-hover)' : 'var(--inset)',
+              color: activeView === 'catalog' ? 'var(--primary)' : 'var(--text-muted)',
+              fontSize: 13, fontWeight: 600,
+              transition: 'background 0.2s, color 0.2s',
             }}
           >
-            🎁 Catalog
+            <MdCardGiftcard size={16} style={{ marginRight: 6, verticalAlign: 'text-bottom' }} /> Catalog
           </button>
           <button
             type="button"
             onClick={() => setActiveView('inventory')}
             style={{
               padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: activeView === 'inventory' ? 'rgba(139, 92, 246, 0.4)' : 'rgba(255,255,255,0.08)',
-              color: '#fff', fontSize: 13, fontWeight: 600,
-              transition: 'background 0.2s',
+              background: activeView === 'inventory' ? 'var(--btn-bg-hover)' : 'var(--inset)',
+              color: activeView === 'inventory' ? 'var(--primary)' : 'var(--text-muted)',
+              fontSize: 13, fontWeight: 600,
+              transition: 'background 0.2s, color 0.2s',
               position: 'relative',
             }}
           >
-            📦 Inventory
+            <MdInventory size={16} style={{ marginRight: 6, verticalAlign: 'text-bottom' }} /> Inventory
             {inventory.length > 0 && (
               <span style={{
                 position: 'absolute', top: -6, right: -6,
-                background: '#8b5cf6', color: '#fff', borderRadius: '50%',
+                background: '#1dd1a1', color: '#fff', borderRadius: '50%',
                 width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 11, fontWeight: 700,
               }}>{inventory.length}</span>
@@ -309,23 +312,23 @@ function StoreGifts() {
         {msg.text && (
           <p style={{
             padding: '10px 16px', borderRadius: 10, margin: '0 0 16px', fontSize: 13, fontWeight: 500,
-            background: msg.ok ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-            color: msg.ok ? '#6ee7b7' : '#fca5a5',
-            border: `1px solid ${msg.ok ? 'rgba(52, 211, 153, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+            background: msg.ok ? 'var(--accent-soft)' : 'rgba(220, 38, 38, 0.08)',
+            color: msg.ok ? 'var(--success)' : 'var(--danger)',
+            border: `1px solid ${msg.ok ? 'var(--hairline)' : 'rgba(220, 38, 38, 0.2)'}`,
           }}>{msg.text}</p>
         )}
 
         {activeView === 'catalog' && (
           <>
             <div style={{ marginBottom: 16 }}>
-              <h4 style={{ color: '#fff', margin: '0 0 4px', fontSize: 16 }}>Send a Gift with Your Card</h4>
-              <p style={{ color: 'rgba(255,255,255,0.5)', margin: 0, fontSize: 13 }}>
+              <h4 style={{ color: 'var(--text)', margin: '0 0 4px', fontSize: 16 }}>Send a Gift with Your Card</h4>
+              <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 13 }}>
                 Buy a gift, attach it to your personal card in Studio. Recipients receive 90% of the gift value.
               </p>
             </div>
 
             {loadingCatalog ? (
-              <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.4)' }}>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
                 <div className="chat-loading-spinner" />
                 <p>Loading gift catalog...</p>
               </div>
@@ -349,21 +352,21 @@ function StoreGifts() {
                       key={gift.name}
                       onClick={() => setActiveGift(resolvedGift)}
                       style={{
-                        background: 'rgba(255,255,255,0.04)',
+                        background: 'var(--surface)',
                         borderRadius: 14, padding: 16,
-                        border: '1px solid rgba(255,255,255,0.08)',
+                        border: '1px solid var(--border)',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
                         transition: 'transform 0.2s, border-color 0.2s, box-shadow 0.2s',
                         cursor: 'pointer',
                       }}
                       onMouseEnter={e => {
                         e.currentTarget.style.transform = 'translateY(-4px)'
-                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)'
-                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(139, 92, 246, 0.15)'
+                        e.currentTarget.style.borderColor = 'var(--primary)'
+                        e.currentTarget.style.boxShadow = 'var(--shadow-md)'
                       }}
                       onMouseLeave={e => {
                         e.currentTarget.style.transform = ''
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+                        e.currentTarget.style.borderColor = 'var(--border)'
                         e.currentTarget.style.boxShadow = ''
                       }}
                     >
@@ -373,11 +376,11 @@ function StoreGifts() {
                       }}>
                         <GiftIcon effectKey={legacyKey} size={56} />
                       </div>
-                      <strong style={{ color: '#fff', fontSize: 13, textAlign: 'center' }}>
+                      <strong style={{ color: 'var(--text)', fontSize: 13, textAlign: 'center' }}>
                         {resolvedGift.title}
                       </strong>
                       <span style={{
-                        color: '#a78bfa', fontSize: 15, fontWeight: 700,
+                        color: 'var(--success)', fontSize: 15, fontWeight: 700,
                       }}>
                         {formatNgn(gift.price)}
                       </span>
@@ -390,8 +393,8 @@ function StoreGifts() {
                         style={{
                           width: '100%', padding: '8px 0', borderRadius: 8,
                           border: 'none', cursor: 'pointer',
-                          background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-                          color: '#fff', fontSize: 13, fontWeight: 600,
+                          background: 'var(--btn-primary-bg)',
+                          color: 'var(--btn-primary-text)', fontSize: 13, fontWeight: 600,
                           transition: 'opacity 0.2s',
                         }}
                       >
@@ -407,15 +410,15 @@ function StoreGifts() {
 
         {activeView === 'inventory' && (
           <>
-            <h4 style={{ color: '#fff', margin: '0 0 12px', fontSize: 16 }}>Your Gift Inventory</h4>
+            <h4 style={{ color: 'var(--text)', margin: '0 0 12px', fontSize: 16 }}>Your Gift Inventory</h4>
             {inventory.length === 0 ? (
               <div style={{
                 textAlign: 'center', padding: '40px 20px',
-                background: 'rgba(255,255,255,0.03)', borderRadius: 14,
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: 'var(--surface)', borderRadius: 14,
+                border: '1px solid var(--border)',
               }}>
-                <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>📦</span>
-                <p style={{ color: 'rgba(255,255,255,0.5)', margin: 0, fontSize: 14 }}>
+                <MdInventory size={40} style={{ display: 'block', marginBottom: 12, margin: '0 auto', color: 'var(--text-muted)' }} />
+                <p style={{ color: 'var(--text-dim)', margin: 0, fontSize: 14 }}>
                   No gifts yet. Buy a gift from the catalog to get started!
                 </p>
                 <button
@@ -423,8 +426,8 @@ function StoreGifts() {
                   onClick={() => setActiveView('catalog')}
                   style={{
                     marginTop: 16, padding: '10px 24px', borderRadius: 8,
-                    background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-                    color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    background: 'var(--btn-primary-bg)',
+                    color: 'var(--btn-primary-text)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                   }}
                 >
                   Browse Catalog
@@ -442,9 +445,9 @@ function StoreGifts() {
                     <div
                       key={item.id || item.inventoryId || item._id || idx}
                       style={{
-                        background: 'rgba(255,255,255,0.04)',
+                        background: 'var(--surface)',
                         borderRadius: 14, padding: 16,
-                        border: '1px solid rgba(255,255,255,0.08)',
+                        border: '1px solid var(--border)',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
                       }}
                     >
@@ -454,19 +457,20 @@ function StoreGifts() {
                       }}>
                         <GiftIcon effectKey={legacyKey} size={48} />
                       </div>
-                      <strong style={{ color: '#fff', fontSize: 13, textAlign: 'center' }}>
+                      <strong style={{ color: 'var(--text)', fontSize: 13, textAlign: 'center' }}>
                         {formatGiftName(giftName)}
                       </strong>
                       {item.amount && (
-                        <span style={{ color: 'rgba(226,234,240,0.65)', fontSize: 12 }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                           {item.amount}
                         </span>
                       )}
                       <span style={{
                         fontSize: 11, padding: '2px 8px', borderRadius: 6,
                         background: item.status === 'available'
-                          ? 'rgba(52, 211, 153, 0.15)' : 'rgba(251, 191, 36, 0.15)',
-                        color: item.status === 'available' ? '#6ee7b7' : '#fcd34d',
+                          ? 'var(--accent-soft)' : 'rgba(217, 119, 6, 0.08)',
+                        color: item.status === 'available' ? 'var(--success)' : 'var(--warning)',
+                        border: `1px solid ${item.status === 'available' ? 'var(--hairline)' : 'rgba(217, 119, 6, 0.15)'}`,
                         fontWeight: 600, textTransform: 'capitalize',
                       }}>
                         {item.status || 'available'}
