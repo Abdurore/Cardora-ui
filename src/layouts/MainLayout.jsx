@@ -651,7 +651,7 @@ function MainLayout() {
     }
   }
 
-  const publishTemplate = async ({ name, type, tier, category, previewImage, layoutConfig }) => {
+  const publishTemplate = async ({ name, type, tier, category, previewImage, layoutConfig, poll, trivia, chain }) => {
     try {
       const resolvedCategory = category || layoutConfig?.category || 'birthday'
       const resolvedPreviewImage = previewImage || layoutConfig?.previewImage || layoutConfig?.previewUrl || ''
@@ -670,6 +670,9 @@ function MainLayout() {
         category: resolvedCategory,
         previewImage: resolvedPreviewImage,
         layoutConfig: normalizedLayoutConfig,
+        poll,
+        trivia,
+        chain,
       })
 
       // Optimistically add the newly-published template to local state so the

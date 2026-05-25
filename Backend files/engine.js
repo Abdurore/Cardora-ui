@@ -342,6 +342,7 @@ export function sanitizeCardForClient(card) {
     safe.config.content.questions = safe.config.content.questions.map((q) => ({
       question: q.question,
       options: q.options,
+      correctIndex: q.correctIndex,
     }));
   }
   return safe;

@@ -1303,18 +1303,13 @@ function CardPreviewModal({
                         key={oi}
                         type="button"
                         disabled={triviaLocked}
-                        className={`cp-trivia-option cp-cascade-in ${previewTriviaAnswers[previewTriviaIdx] === oi ? 'selected' : ''} ${
-                          triviaLocked && previewTriviaAnswers[previewTriviaIdx] === oi
-                            ? (Number(oi) === Number(triviaData.questions[previewTriviaIdx]?.correctIndex ?? 0) ? 'correct' : 'wrong')
-                            : ''
-                        }`}
+                        className={`cp-trivia-option cp-cascade-in ${previewTriviaAnswers[previewTriviaIdx] === oi ? 'selected' : ''}`}
                         style={{ color: c.card.textColor, '--i': oi }}
                         onClick={() => {
                           if (triviaLocked) return
                           const next = [...previewTriviaAnswers]
                           next[previewTriviaIdx] = oi
                           setPreviewTriviaAnswers(next)
-                          setTriviaLocked(true)
                         }}
                       >
                         <span className="cp-trivia-option-letter">{String.fromCharCode(65 + oi)}</span>
@@ -1410,6 +1405,40 @@ function CardPreviewModal({
                     <p className="cp-trivia-score-label" style={{ color: c.card.textColor }}>
                       {correct} out of {total} correct
                     </p>
+                    <div className="cp-trivia-review-list">
+                      {triviaData.questions.map((q, qi) => {
+                        const userAnswer = previewTriviaAnswers[qi]
+                        return (
+                          <div key={qi} className="cp-trivia-review-item">
+                            <h4 className="cp-trivia-review-question" style={{ color: c.card.headingColor }}>
+                              {qi + 1}. {q.text || q.question || 'Question'}
+                            </h4>
+                            <div className="cp-trivia-review-options">
+                              {(q.options || []).map((opt, oi) => {
+                                const isUserSelected = Number(userAnswer) === oi
+                                const isCorrectOpt = Number(q.correctIndex) === oi
+                                let optionClass = "cp-trivia-review-option"
+                                if (isCorrectOpt) optionClass += " correct"
+                                else if (isUserSelected && !isCorrectOpt) optionClass += " wrong"
+                                return (
+                                  <div key={oi} className={optionClass}>
+                                    <div className="cp-trivia-review-opt-left">
+                                      <span className="cp-trivia-review-letter">{String.fromCharCode(65 + oi)}</span>
+                                      <span className="cp-trivia-review-text">{opt}</span>
+                                    </div>
+                                    <div className="cp-trivia-review-badges">
+                                      {isCorrectOpt && !isUserSelected && <span className="cp-trivia-review-badge correct">Correct Answer</span>}
+                                      {isUserSelected && !isCorrectOpt && <span className="cp-trivia-review-badge wrong">Your Choice</span>}
+                                      {isUserSelected && isCorrectOpt && <span className="cp-trivia-review-badge correct-choice">Your Choice & Correct</span>}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                     {hasGift ? (
                       <button
                         type="button"
@@ -1424,9 +1453,9 @@ function CardPreviewModal({
                         type="button"
                         className="cp-continue-btn visible"
                         style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                        onClick={() => navigate('/chat')}
+                        onClick={() => navigate('/studio', { state: { isNew: true } })}
                       >
-                        Talk to the sender
+                        Create yours →
                       </button>
                     )}
                   </div>

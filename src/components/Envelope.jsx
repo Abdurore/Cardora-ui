@@ -190,11 +190,6 @@ function Envelope({
           ))}
         </div>
       )}
-
-      {profile.caption && recipientName && (
-        <p className="envelope-caption">For {recipientName},</p>
-      )}
-
       <div className="envelope-parallax-wrap" style={parallaxStyle}>
         <div
           className={`envelope-body ${paperTextureClass} ${stage === 'sealed' || stage === 'arriving' ? 'is-tappable' : ''}`}

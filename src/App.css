@@ -152,16 +152,17 @@
 
 
 .envelope-body.paper-linen {
-  background:
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 2px, transparent 2px 4px),
-    var(--envelope-body, #1a1f2c);
+  background-image: 
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 2px, transparent 2px 4px),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.06) 0 2px, transparent 2px 4px);
+  background-color: var(--envelope-body, #1a1f2c);
 }
 
 .envelope-body.paper-parchment {
-  background:
-    radial-gradient(circle at 30% 20%, rgba(255, 220, 160, 0.08), transparent 60%),
-    radial-gradient(circle at 70% 80%, rgba(180, 130, 90, 0.08), transparent 60%),
-    var(--envelope-body, #1a1f2c);
+  background-image: 
+    radial-gradient(circle at 30% 20%, rgba(255, 220, 160, 0.15), transparent 60%),
+    radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.1), transparent 60%);
+  background-color: var(--envelope-body, #1a1f2c);
 }
 
 @keyframes envelopeArrive {
@@ -574,6 +575,52 @@
 @keyframes dropdownFade {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dropdownFadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Portal menu — rendered at document.body, escapes any overflow/transform ancestor */
+.cs-dropdown-portal-menu {
+  position: fixed !important;
+  top: auto;
+  bottom: auto;
+  left: auto;
+  right: auto !important;
+  width: max-content !important;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  border-radius: 14px;
+  border: 1px solid rgba(126, 247, 255, 0.3);
+  background: linear-gradient(180deg, rgba(10,20,28,0.99), rgba(5,12,18,0.99));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 -16px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(126,247,255,0.08);
+  animation: dropdownFadeUp 0.15s ease both;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 2147483647 !important;
+}
+.cs-dropdown-portal-menu .dropdown-option {
+  padding: 10px 14px;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  color: #d7eff5;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  list-style: none;
+}
+.cs-dropdown-portal-menu .dropdown-option:hover {
+  background: rgba(126, 247, 255, 0.1);
+  color: #7ef7ff;
+}
+.cs-dropdown-portal-menu .dropdown-option.selected {
+  background: rgba(126, 247, 255, 0.14);
+  color: #7ef7ff;
+  font-weight: 600;
 }
 
 .dropdown-menu::-webkit-scrollbar {
@@ -7761,7 +7808,8 @@ a {
 .cs-canvas-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  position: relative;
   gap: 14px;
   margin-bottom: 12px;
   padding-bottom: 10px;
@@ -7769,13 +7817,17 @@ a {
 }
 
 .cs-canvas-head-label {
-  margin: 0;
+  margin: 0 auto;
   font-size: 0.72rem;
   color: rgba(180, 220, 230, 0.45);
   letter-spacing: 0.03em;
 }
 
 .cs-preview-toggle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   padding: 9px 16px;
   border-radius: 999px;
   border: 1px solid rgba(118, 239, 255, 0.18);
@@ -7788,7 +7840,7 @@ a {
 .cs-preview-toggle:hover {
   background: rgba(118, 239, 255, 0.12);
   border-color: rgba(118, 239, 255, 0.35);
-  transform: translateY(-1px);
+  transform: translateY(-50%) translateY(-1px);
   box-shadow: 0 8px 20px rgba(118, 239, 255, 0.1);
 }
 
@@ -7796,8 +7848,7 @@ a {
 .cs-step-timeline {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 1;
+  gap: 12px;
 }
 .cs-step-timeline-item {
   display: flex;
@@ -7884,7 +7935,7 @@ a {
   padding: 20px;
   display: grid;
   place-items: center;
-  align-content: start;
+  align-content: center;
   gap: 16px;
   transition: background 0.4s ease;
 }
@@ -7949,12 +8000,67 @@ a {
 }
 
 /* Floating toolbar pinned inside closed-state preview */
+/* Envelope preview container — centers the envelope in the phone screen */
+.cs-preview-envelope-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 0;
+}
+
 .cs-edit-toolbar-closed {
   position: absolute;
   top: -48px;
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
+}
+
+/* Floating toolbar for envelope (desktop phone preview) */
+.cs-edit-toolbar-envelope {
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 50;
+}
+
+/* Toolbar anchored inside the envelope body element */
+.cs-edit-toolbar-envelope-inner {
+  position: absolute;
+  bottom: -52px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 100;
+}
+
+/* Compact dropdown used inside edit toolbars (desktop) */
+.cs-toolbar-dropdown {
+  display: inline-flex;
+  margin-left: 6px;
+}
+.cs-toolbar-dropdown .dropdown-trigger {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(126, 247, 255, 0.25);
+  background: rgba(6, 14, 20, 0.85);
+  color: #c8e8f0;
+  font-size: 0.78rem;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cs-toolbar-dropdown .dropdown-trigger:hover {
+  border-color: rgba(126, 247, 255, 0.5);
+  color: #7ef7ff;
+}
+.cs-toolbar-dropdown .dropdown-chevron {
+  width: 9px;
+  height: 9px;
+  opacity: 0.7;
 }
 
 .cs-preview-closed.compact {
@@ -13860,11 +13966,7 @@ a {
 .profile-card-wrap {
   position: relative;
 }
-.profile-card-type-poll .card { border-top: 3px solid #7eb3ff; }
-.profile-card-type-trivia .card { border-top: 3px solid #ffe066; }
-.profile-card-type-chain .card { border-top: 3px solid #62ffa2; }
-.profile-card-type-anonymous .card { border-top: 3px solid #c084fc; }
-.profile-card-type-personal .card { border-top: 3px solid #e2b96e; }
+
 
 .profile-card-actions {
   display: flex;
@@ -18136,6 +18238,118 @@ a {
   opacity: 0.7;
 }
 
+/* Trivia Review List (End of flow) */
+.cp-trivia-review-list {
+  width: 100%;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+}
+
+.cp-trivia-review-list::-webkit-scrollbar {
+  width: 5px;
+}
+.cp-trivia-review-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+.cp-trivia-review-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.cp-trivia-review-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.cp-trivia-review-question {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+}
+
+.cp-trivia-review-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cp-trivia-review-option {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.cp-trivia-review-option.correct {
+  border-color: rgba(98, 255, 162, 0.45);
+  background: rgba(98, 255, 162, 0.08);
+  color: var(--text);
+}
+
+.cp-trivia-review-option.wrong {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.08);
+  color: var(--text);
+}
+
+.cp-trivia-review-opt-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cp-trivia-review-letter {
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.cp-trivia-review-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.cp-trivia-review-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.cp-trivia-review-badge.correct {
+  background: rgba(98, 255, 162, 0.2);
+  color: #62ffa2;
+}
+
+.cp-trivia-review-badge.wrong {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+}
+
+.cp-trivia-review-badge.correct-choice {
+  background: rgba(118, 239, 255, 0.2);
+  color: #76efff;
+}
+
 .cp-type-entry-screen .cp-entry-content {
   gap: 18px;
 }
@@ -22345,12 +22559,13 @@ a {
   cursor: pointer;
   flex-shrink: 0;
 }
-.icp-native-hidden {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  pointer-events: none;
+.icp-advanced {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}
+.icp-advanced .react-colorful {
+  width: 100%;
 }
 
 /* ——— ANIMATED GRADIENT BACKGROUND ——— */
@@ -22928,7 +23143,8 @@ a {
     align-items: center;
     gap: 8px;
     padding: 8px 14px 10px;
-    overflow-x: auto;
+    overflow: visible;
+    position: relative;
     scrollbar-width: none;
   }
   .cs-m2-edit-controls::-webkit-scrollbar { display: none; }
@@ -22970,12 +23186,46 @@ a {
     box-shadow: 0 0 0 2px rgba(118,239,255,0.4);
   }
   .cs-m2-select {
-    padding: 5px 8px;
+    padding: 5px 24px 5px 8px;
     border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(12,20,28,0.8);
+    background: rgba(12,20,28,0.8) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237ef7ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 6px center;
     color: #e2eaf0;
     font-size: 0.74rem;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  .cs-m2-dropdown {
+    width: auto;
+    min-width: 90px;
+    position: static;
+  }
+  .cs-m2-dropdown .dropdown-trigger {
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(18,28,40,0.95);
+    color: #e2eaf0;
+    font-size: 0.74rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .cs-m2-dropdown .dropdown-option {
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: #e2eaf0;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .cs-m2-dropdown .dropdown-option:hover,
+  .cs-m2-dropdown .dropdown-option.selected {
+    background: rgba(126,239,255,0.12);
+    color: #7ef7ff;
   }
   .cs-m2-slider { width: 80px; height: 3px; accent-color: #7ef7ff; }
   .cs-m2-slider-label { font-size: 0.68rem; color: rgba(200,230,240,0.45); flex-shrink: 0; }
@@ -24040,6 +24290,11 @@ a {
 }
 .cr-action-btn:hover:not(:disabled) { background: rgba(255,255,255,0.09); color: #e2eaf0; }
 .cr-action-btn:disabled { opacity: 0.5; cursor: default; }
+.cr-action-btn.copied {
+  background: rgba(98, 255, 162, 0.15) !important;
+  color: #62ffa2 !important;
+  border-color: rgba(98, 255, 162, 0.4) !important;
+}
 [data-theme="light"] .role-enterprise { background: rgba(180,120,20,0.1); border-color: rgba(180,120,20,0.2); color: #7a4a00; }
 
 /* ── Profile: Income History light ── */
@@ -24849,6 +25104,25 @@ a {
 [data-theme="light"] .store-referral-card h4 { color: var(--text) !important; }
 [data-theme="light"] .store-coming-card p,
 [data-theme="light"] .store-referral-card p { color: rgba(44,90,110,0.72) !important; }
+[data-theme="light"] .store-referral-item {
+  background: var(--surface) !important;
+  border-color: var(--accent-border) !important;
+}
+[data-theme="light"] .store-referral-item strong {
+  color: var(--text) !important;
+}
+[data-theme="light"] .store-referral-count {
+  background: var(--accent-tint) !important;
+  border-color: var(--primary) !important;
+  box-shadow: none !important;
+}
+[data-theme="light"] .store-referral-count strong {
+  color: var(--primary-strong) !important;
+  text-shadow: none !important;
+}
+[data-theme="light"] .store-referral-count span {
+  color: var(--text-muted) !important;
+}
 
 /* ── Modals ──────────────────────────────────────────── */
 [data-theme="light"] .modal-overlay { background: rgba(5,20,30,0.4); }
@@ -24884,6 +25158,7 @@ a {
 [data-theme="light"] .auth-page-header h1 { color: var(--text) !important; }
 [data-theme="light"] .auth-page-copy { color: var(--text-muted) !important; }
 [data-theme="light"] .auth-page-card label { color: var(--text-muted); }
+[data-theme="light"] .detail-hint { color: var(--text-dim); }
 [data-theme="light"] .auth-page-card input {
   background: var(--surface);
   border-color: var(--accent-border);
@@ -25706,10 +25981,176 @@ a {
 [data-theme="light"] .cr-anon-item { background: var(--accent-soft) !important; border-color: var(--accent-mid) !important; }
 [data-theme="light"] .cr-count-badge { background: var(--accent-tint) !important; color: var(--primary) !important; }
 [data-theme="light"] .cr-type-chip { background: var(--accent-soft) !important; color: var(--text-muted) !important; }
-[data-theme="light"] .cr-back-btn { color: var(--primary) !important; }
-[data-theme="light"] .cr-back-btn:hover { background: var(--accent-soft) !important; }
-[data-theme="light"] .cr-poll-bar { background: var(--accent-soft) !important; color: var(--text) !important; }
+[data-theme="light"] .cr-back-btn {
+  background: var(--btn-bg) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--primary) !important;
+}
+[data-theme="light"] .cr-back-btn:hover {
+  background: var(--btn-bg-hover) !important;
+  color: var(--primary-strong) !important;
+}
+[data-theme="light"] .cr-action-btn {
+  background: var(--btn-bg) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .cr-action-btn:hover:not(:disabled) {
+  background: var(--btn-bg-hover) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .cr-action-btn.copied {
+  background: rgba(22, 163, 74, 0.15) !important;
+  color: #16a34a !important;
+  border-color: rgba(22, 163, 74, 0.4) !important;
+}
 
+/* Poll bars */
+[data-theme="light"] .cr-poll-bar {
+  background: var(--accent-soft) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .cr-poll-bar-text {
+  color: var(--text) !important;
+}
+[data-theme="light"] .cr-poll-bar-pct {
+  color: var(--text) !important;
+}
+[data-theme="light"] .cr-poll-bar-track {
+  background: var(--border) !important;
+}
+[data-theme="light"] .cr-poll-bar-votes {
+  color: var(--text-dim) !important;
+}
+
+/* Trivia leaderboard */
+[data-theme="light"] .cr-trivia-row {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .cr-trivia-row-top {
+  background: rgba(255, 220, 60, 0.08) !important;
+  border-color: rgba(255, 220, 60, 0.3) !important;
+}
+[data-theme="light"] .cr-trivia-rank-num {
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .cr-trivia-name {
+  color: var(--text) !important;
+}
+[data-theme="light"] .cr-trivia-score-num {
+  color: var(--text) !important;
+}
+[data-theme="light"] .cr-trivia-score-total {
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .cr-trivia-pct {
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .cr-trivia-pct.perfect {
+  color: var(--warning) !important;
+}
+[data-theme="light"] .cr-trivia-bar-mini {
+  background: var(--border) !important;
+}
+
+/* Chain replies */
+[data-theme="light"] .cr-chain-challenge {
+  background: rgba(5, 150, 105, 0.05) !important;
+  border-color: rgba(5, 150, 105, 0.18) !important;
+}
+[data-theme="light"] .cr-chain-challenge-label {
+  color: var(--secondary) !important;
+}
+[data-theme="light"] .cr-chain-challenge-text {
+  color: var(--text) !important;
+}
+[data-theme="light"] .cr-chain-name {
+  color: var(--text) !important;
+}
+[data-theme="light"] .cr-chain-time {
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .cr-chain-text {
+  color: var(--text) !important;
+}
+
+/* Empty states */
+[data-theme="light"] .cr-empty-msg {
+  color: var(--text-dim) !important;
+}
+
+/* Trivia recipient flow options */
+[data-theme="light"] .cp-trivia-option {
+  border-color: var(--border-strong) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .cp-trivia-option:hover {
+  background: var(--hover) !important;
+  border-color: var(--primary) !important;
+}
+[data-theme="light"] .cp-trivia-option.selected {
+  background: var(--accent-tint) !important;
+  border-color: var(--primary) !important;
+}
+[data-theme="light"] .cp-trivia-option-letter {
+  background: var(--btn-bg) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .cp-trivia-option.selected .cp-trivia-option-letter {
+  background: var(--primary) !important;
+  color: var(--text-inverse) !important;
+}
+[data-theme="light"] .cp-trivia-option.correct {
+  background: rgba(5, 150, 105, 0.1) !important;
+  border-color: rgba(5, 150, 105, 0.5) !important;
+  color: #047857 !important;
+}
+[data-theme="light"] .cp-trivia-option.correct .cp-trivia-option-letter {
+  background: #059669 !important;
+  color: #ffffff !important;
+}
+[data-theme="light"] .cp-trivia-option.wrong {
+  background: rgba(220, 38, 38, 0.1) !important;
+  border-color: rgba(220, 38, 38, 0.5) !important;
+  color: #b91c1c !important;
+}
+[data-theme="light"] .cp-trivia-option.wrong .cp-trivia-option-letter {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .cp-trivia-review-item {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+[data-theme="light"] .cp-trivia-review-option {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.05) !important;
+}
+[data-theme="light"] .cp-trivia-review-option.correct {
+  border-color: rgba(22, 163, 74, 0.45) !important;
+  background: rgba(22, 163, 74, 0.08) !important;
+  color: #16a34a !important;
+}
+[data-theme="light"] .cp-trivia-review-option.wrong {
+  border-color: rgba(220, 38, 38, 0.45) !important;
+  background: rgba(220, 38, 38, 0.08) !important;
+  color: #dc2626 !important;
+}
+[data-theme="light"] .cp-trivia-review-badge.correct {
+  background: rgba(22, 163, 74, 0.15) !important;
+  color: #16a34a !important;
+}
+[data-theme="light"] .cp-trivia-review-badge.wrong {
+  background: rgba(220, 38, 38, 0.15) !important;
+  color: #dc2626 !important;
+}
+[data-theme="light"] .cp-trivia-review-badge.correct-choice {
+  background: rgba(2, 132, 199, 0.15) !important;
+  color: #0284c7 !important;
+}
 /* ── Card Detail Modal (Template Preview) ────────────── */
 [data-theme="light"] .detail-card {
   background: var(--elevated) !important;
@@ -28698,7 +29139,7 @@ a {
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.05) !important;
 }
 [data-theme="light"] .icp-preset {
-  border-color: var(--border) !important;
+  border-color: rgba(0,0,0,0.2) !important;
 }
 [data-theme="light"] .icp-preset.active {
   border-color: var(--primary) !important;
@@ -28730,12 +29171,12 @@ a {
   color: var(--text-muted) !important;
   border-right-color: var(--border) !important;
 }
-[data-theme="light"] .cs-edit-toolbar button {
+[data-theme="light"] .cs-edit-toolbar button:not(.icp-preset):not(.icp-swatch) {
   background: var(--inset) !important;
   border-color: var(--border) !important;
   color: var(--text) !important;
 }
-[data-theme="light"] .cs-edit-toolbar button:hover {
+[data-theme="light"] .cs-edit-toolbar button:not(.icp-preset):not(.icp-swatch):hover {
   background: var(--hover) !important;
 }
 [data-theme="light"] .cs-edit-toolbar select {
@@ -28752,3 +29193,411 @@ a {
 .icp-popover {
   max-width: none !important;
 }
+
+/* ── Report Modal Light Mode overrides ────────────────────── */
+[data-theme="light"] .report-modal {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+[data-theme="light"] .report-modal-close {
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .report-modal-close:hover {
+  color: var(--text) !important;
+}
+[data-theme="light"] .report-modal-title {
+  color: var(--text) !important;
+}
+[data-theme="light"] .report-modal-sub {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .report-reason-chip {
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .report-reason-chip:hover {
+  background: var(--accent-soft) !important;
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+[data-theme="light"] .report-reason-chip.active {
+  background: var(--accent-soft) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+[data-theme="light"] .report-modal-details {
+  background: var(--inset) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .report-modal-details:focus {
+  border-color: var(--primary) !important;
+}
+[data-theme="light"] .report-modal-done h3 {
+  color: var(--text) !important;
+}
+[data-theme="light"] .report-modal-done p {
+  color: var(--text-muted) !important;
+}
+
+/* ── Artist Apply Modal & Edit Profile Modal ──────────────── */
+[data-theme="light"] .artist-apply-modal {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+[data-theme="light"] .artist-apply-modal h3 {
+  color: var(--text) !important;
+}
+[data-theme="light"] .artist-apply-modal .detail-subtitle {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .artist-apply-modal .detail-field {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .artist-apply-modal .detail-field input,
+[data-theme="light"] .artist-apply-modal .detail-field textarea {
+  background: var(--inset) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .artist-apply-modal .detail-field input:focus,
+[data-theme="light"] .artist-apply-modal .detail-field textarea:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px var(--accent-tint) !important;
+}
+[data-theme="light"] .artist-apply-info {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .artist-apply-copy {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .artist-apply-list {
+  color: var(--text) !important;
+}
+[data-theme="light"] .artist-apply-list li::marker {
+  color: var(--primary) !important;
+}
+
+/* ── Delete Account Confirm Modal ─────────────────────────── */
+[data-theme="light"] .delete-confirm-modal {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .delete-confirm-instruction {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .delete-confirm-input {
+  background: var(--inset) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* ── Crop Avatar Modal Light Mode overrides ───────────────── */
+[data-theme="light"] .crop-card {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+[data-theme="light"] .crop-card h3 {
+  color: var(--text) !important;
+}
+[data-theme="light"] .crop-hint {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .crop-preview {
+  background: var(--inset) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .crop-rect {
+  border-color: var(--primary) !important;
+  background: rgba(8, 145, 178, 0.15) !important;
+  box-shadow: 0 0 0 999px rgba(255, 255, 255, 0.45) !important;
+}
+
+/* ── Profile Display Currency Light Mode overrides ────────── */
+[data-theme="light"] .profile-currency,
+[data-theme="light"] .profile-analytics {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+[data-theme="light"] .profile-currency .section-title,
+[data-theme="light"] .profile-analytics .section-title {
+  color: var(--text) !important;
+}
+[data-theme="light"] .profile-currency-row select {
+  background: var(--inset) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .profile-currency-saving {
+  color: var(--success) !important;
+}
+
+/* ── Share Modal Light Mode overrides ─────────────────────── */
+[data-theme="light"] .share-modal-card {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+[data-theme="light"] .share-modal-close {
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .share-modal-close:hover {
+  background: var(--hover) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .share-modal-heading {
+  color: var(--text) !important;
+}
+[data-theme="light"] .share-modal-sub {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .share-modal-link-row {
+  background: var(--inset) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .share-modal-link-pill {
+  color: var(--text-muted) !important;
+}
+[data-theme="light"] .share-modal-copy-btn {
+  background: var(--btn-bg) !important;
+  border-color: var(--border) !important;
+  color: var(--primary) !important;
+}
+[data-theme="light"] .share-modal-copy-btn:hover {
+  background: var(--btn-bg-hover) !important;
+}
+[data-theme="light"] .share-modal-copy-btn.copied {
+  background: var(--accent-soft) !important;
+  color: var(--success) !important;
+  border-color: var(--success) !important;
+}
+[data-theme="light"] .share-modal-label {
+  color: var(--text-dim) !important;
+}
+[data-theme="light"] .share-modal-platform-btn {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--platform-color) !important;
+}
+[data-theme="light"] .share-modal-platform-btn:hover {
+  background: var(--hover) !important;
+  border-color: var(--primary) !important;
+}
+
+/* ── Card Type Icon Badge (non-templates) ─────────────────── */
+.card-type-icon-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(8, 16, 20, 0.85);
+  border: 1px solid rgba(126, 247, 255, 0.25);
+  display: grid;
+  place-items: center;
+  color: #7ef7ff;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  backdrop-filter: blur(4px);
+  transition: border-color 0.2s, color 0.2s;
+}
+[data-theme="light"] .card-type-icon-badge {
+  background: var(--elevated) !important;
+  border-color: var(--border) !important;
+  color: var(--primary) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* ── Envelope & Letter Peek Preview Modes inside Phone Frame ── */
+/* ── Flat 2D Envelope Live Preview in Studio ───────────────── */
+.cs-envelope-scene {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.cs-envelope-recipient {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  color: #7ef7ff;
+  margin-bottom: 24px;
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+[data-theme="light"] .cs-envelope-recipient {
+  color: var(--primary) !important;
+  text-shadow: none;
+}
+
+.cs-envelope-body {
+  position: relative;
+  width: 280px;
+  height: 175px;
+  border-radius: 12px;
+  background: var(--envelope-body, #1a1f2c);
+  border: 1px solid var(--envelope-border, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.cs-envelope-body:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 25px 55px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.cs-envelope-body.cs-edit-active {
+  box-shadow: 0 0 0 3px var(--primary), 0 25px 55px rgba(0, 0, 0, 0.55) !important;
+  border-color: var(--primary) !important;
+}
+
+/* Paper Textures for Studio Envelope */
+.cs-envelope-body.paper-linen {
+  background-image: 
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 2px, transparent 2px 4px),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.06) 0 2px, transparent 2px 4px);
+  background-color: var(--envelope-body, #1a1f2c);
+}
+
+.cs-envelope-body.paper-parchment {
+  background-image: 
+    radial-gradient(circle at 30% 20%, rgba(255, 220, 160, 0.15), transparent 60%),
+    radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.1), transparent 60%);
+  background-color: var(--envelope-body, #1a1f2c);
+}
+
+.cs-envelope-flap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 62%;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--envelope-flap, #242a38) 92%, white 8%) 0%,
+    var(--envelope-flap, #242a38) 55%,
+    var(--envelope-body, #1a1f2c) 100%);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  z-index: 4;
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
+
+/* Crease highlights along the flap's diagonal fold lines */
+.cs-envelope-flap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(225deg, transparent 49.5%, rgba(255, 255, 255, 0.06) 50%, transparent 50.5%),
+    linear-gradient(135deg, transparent 49.5%, rgba(255, 255, 255, 0.06) 50%, transparent 50.5%);
+  pointer-events: none;
+}
+
+.cs-envelope-flap.cs-edit-active {
+  filter: drop-shadow(0 2px 4px var(--primary));
+}
+
+.cs-envelope-seal {
+  position: absolute;
+  top: 62%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.25), transparent 55%), var(--seal-color, #b03030);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4), inset 0 0 15px rgba(0, 0, 0, 0.3);
+  display: grid;
+  place-items: center;
+  color: #fff1e6;
+  z-index: 5;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Highlight outlines for envelope hitboxes */
+.envelope-body-hitbox.cs-edit-active,
+.envelope-flap.cs-edit-active,
+.envelope-seal.cs-edit-active {
+  outline: none !important;
+}
+
+.envelope-body-hitbox.cs-edit-active {
+  box-shadow: 0 0 0 2px rgba(126, 239, 255, 0.6), 0 0 10px rgba(126, 239, 255, 0.35) !important;
+  border-radius: 6px;
+}
+
+/* Flap highlight is handled by SVG overlay — no CSS needed here */
+
+.envelope-seal.cs-edit-active {
+  box-shadow: 0 0 0 2px rgba(126, 239, 255, 0.6), 0 0 10px rgba(126, 239, 255, 0.35) !important;
+  border-radius: 50%;
+  z-index: 20 !important;
+}
+
+/* Flap glow wrapper (legacy — kept for safety, superseded by SVG overlay) */
+.cs-flap-glow-wrapper {
+  z-index: 3 !important;
+  cursor: pointer;
+}
+
+/* Custom color picker wrapper for mobile */
+.cs-m2-color-input-wrap {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  margin-left: 6px;
+  cursor: pointer;
+}
+.cs-m2-color-input-wrap input[type="color"] {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 50px;
+  height: 50px;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+.cs-envelope-seal:hover {
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.cs-envelope-seal.cs-edit-active {
+  box-shadow: 0 0 0 3px var(--primary), 0 6px 14px rgba(0, 0, 0, 0.4) !important;
+}
+
+.cs-envelope-seal svg {
+  width: 22px;
+  height: 22px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.cs-envelope-seal-monogram {
+  font-family: 'Cinzel', serif;
+  font-size: 1.15rem;
+  font-weight: bold;
+}
+
+
+
+
+

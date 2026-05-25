@@ -31,19 +31,19 @@ const BRAND_LOGO = '/cardora-logo.png?v=4'
 
 // Steps vary by type — non-personal cards don't have envelope
 const STEPS_BY_TYPE = {
-  personal:  ['closed', 'card', 'preview'],
-  poll:      ['card', 'preview'],
-  trivia:    ['card', 'preview'],
-  chain:     ['card', 'preview'],
-  anonymous: ['card', 'preview'],
+  personal:  ['envelope', 'letterPeek', 'card'],
+  poll:      ['card'],
+  trivia:    ['card'],
+  chain:     ['card'],
+  anonymous: ['card'],
 }
 
 const STEP_LABELS_BY_TYPE = {
-  personal:  { closed: 'Envelope', card: 'Card', preview: 'Preview' },
-  poll:      { card: 'Poll', preview: 'Preview' },
-  trivia:    { card: 'Trivia', preview: 'Preview' },
-  chain:     { card: 'Chain', preview: 'Preview' },
-  anonymous: { card: 'Card', preview: 'Preview' },
+  personal:  { envelope: 'Envelope', letterPeek: 'Letter Peek', card: 'Card' },
+  poll:      { card: 'Poll' },
+  trivia:    { card: 'Trivia' },
+  chain:     { card: 'Chain' },
+  anonymous: { card: 'Card' },
 }
 
 const ALL_TOOLS = [
@@ -196,6 +196,19 @@ function deepMerge(target, source) {
     }
   }
   return result
+}
+
+function deriveRecipientName(explicit, email) {
+  if (explicit) return explicit
+  if (!email || typeof email !== 'string') return ''
+  const local = email.split('@')[0] || ''
+  if (!local) return ''
+  return local
+    .replace(/[._-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
 }
 
 function ColorInput({ value, onChange, label }) {
@@ -445,7 +458,7 @@ function CardStudio() {
     return base
   })
   const [activeTool, setActiveTool] = useState(defaultToolId)
-  const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'closed' : 'card')
+  const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'envelope' : 'card')
   const [showPreview, setShowPreview] = useState(false)
   const [savedState, setSavedState] = useState(initialAutoSaved ? 'Restored from last session' : 'Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
@@ -687,6 +700,21 @@ function CardStudio() {
     else if (studioType === 'anonymous') { setAnonTemplate(prev => ({ ...prev, enabled: true, tier: studioTier })); setActiveTool(defaultToolId) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (activeTool === 'closedState') {
+      const panel = document.querySelector('.cs-settings')
+      if (panel) {
+        if (activeStep === 'letterPeek') {
+          const letterPeekSection = document.getElementById('letterPeekSettings')
+          if (letterPeekSection) letterPeekSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        } else if (activeStep === 'envelope') {
+          const envelopeSection = document.getElementById('envelopeSettings')
+          if (envelopeSection) envelopeSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }
+    }
+  }, [activeTool, activeStep])
+
   // Clear inline edit state when preview closes to prevent blank page bug
   useEffect(() => {
     if (!showPreview) {
@@ -822,6 +850,9 @@ function CardStudio() {
         tier: studioTier,
         category: publishForm.category || 'birthday',
         previewImage,
+        poll: studioType === 'poll' ? pollData : undefined,
+        trivia: studioType === 'trivia' ? triviaData : undefined,
+        chain: chainData.enabled ? chainData : undefined,
         layoutConfig: structuredClone({
           ...flushedForPublish,
           type: publishedType,
@@ -829,6 +860,9 @@ function CardStudio() {
           category: publishForm.category || 'birthday',
           previewImage,
           previewUrl: previewImage,
+          poll: studioType === 'poll' ? pollData : undefined,
+          trivia: studioType === 'trivia' ? triviaData : undefined,
+          chain: chainData.enabled ? chainData : undefined,
         }),
       })
 
@@ -957,7 +991,7 @@ function CardStudio() {
 
   const goToStep = (step) => {
     setActiveStep(step)
-    if (step === 'closed') setActiveTool('closedState')
+    if (step === 'envelope' || step === 'letterPeek') setActiveTool('closedState')
     if (step === 'card') {
       // Switch to the type-specific editing tool
       if (studioType === 'poll') setActiveTool('poll')
@@ -1126,6 +1160,10 @@ function CardStudio() {
         meta: 'Draft',
         updatedAt: new Date().toISOString(),
         cardObject: structuredClone(cardObject),
+        poll: studioType === 'poll' ? pollData : undefined,
+        trivia: studioType === 'trivia' ? triviaData : undefined,
+        chain: chainData.enabled ? chainData : undefined,
+        anonTemplate: studioType === 'anonymous' ? anonTemplate : undefined,
       }
       localStorage.setItem('cardora:studioCard', JSON.stringify(cardObject))
       const existingDrafts = JSON.parse(localStorage.getItem(draftStorageKey) || '[]')
@@ -1293,7 +1331,7 @@ function CardStudio() {
               Colors cascading from "{getPaletteById(c.palette.id)?.label || 'palette'}" — change in Theme.
             </p>
           )}
-          <div className="cs-sub-section">
+          <div className="cs-sub-section" id="envelopeSettings">
             <p className="cs-sub-label">Envelope</p>
             {(tierLimits.allowCustomPalette || isArtist) && (
               <>
@@ -1327,14 +1365,7 @@ function CardStudio() {
                 ]}
               />
             </label>
-            <label className="cs-field">
-              <span>Recipient Caption</span>
-              <input
-                value={env.recipientCaption || ''}
-                placeholder="Auto from recipient email"
-                onChange={e => update('closedState.envelope.recipientCaption', e.target.value)}
-              />
-            </label>
+
             <label className="cs-field">
               <span>Pacing</span>
               <Dropdown
@@ -1348,7 +1379,7 @@ function CardStudio() {
               />
             </label>
           </div>
-          <div className="cs-sub-section">
+          <div className="cs-sub-section" id="letterPeekSettings">
             <p className="cs-sub-label">Inner Letter Peek</p>
             {(tierLimits.allowCustomPalette || isArtist) && (
               <>
@@ -3278,8 +3309,159 @@ function CardStudio() {
                 {c.background.type === 'video' && c.background.videoUrl ? (
                   <video className="cs-screen-background video" src={c.background.videoUrl} autoPlay muted loop playsInline />
                 ) : null}
-                {/* Closed State Preview — editable */}
-                {activeStep === 'closed' && (
+                {/* Envelope State Preview — editable */}
+                {activeStep === 'envelope' && (() => {
+                  const env = c.closedState.envelope || {}
+                  const paperTextureClass = `paper-${env.paperTexture || 'smooth'}`
+                  const sealIconKey = env.sealIcon || 'monogram'
+                  const recipientName = deriveRecipientName(env.recipientCaption, currentUser?.email)
+                  const monogramLetter = recipientName ? recipientName.charAt(0).toUpperCase() : '♥'
+                  
+                  const sealContent = sealIconKey === 'monogram' ? <span className="envelope-seal-monogram">{monogramLetter}</span> : (
+                    sealIconKey === 'heart' ? (
+                      <svg viewBox="0 0 24 24" aria-hidden="true" style={{width:'24px', height:'24px', color:'inherit'}}>
+                        <path d="M12 21s-7.5-4.8-7.5-11a4.5 4.5 0 0 1 8.25-2.5A4.5 4.5 0 0 1 21 10c0 6.2-9 11-9 11z" fill="currentColor" />
+                      </svg>
+                    ) : sealIconKey === 'star' ? (
+                      <svg viewBox="0 0 24 24" aria-hidden="true" style={{width:'24px', height:'24px', color:'inherit'}}>
+                        <path d="M12 2l2.9 6.6 7.1.7-5.4 4.9 1.6 7L12 17.8 5.8 21.2l1.6-7L2 9.3l7.1-.7z" fill="currentColor" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" aria-hidden="true" style={{width:'24px', height:'24px', color:'inherit'}}>
+                        <circle cx="12" cy="12" r="8" fill="currentColor" />
+                      </svg>
+                    )
+                  )
+
+                  return (
+                    <div
+                      className="cs-preview-envelope-container"
+                      onClick={() => setActiveEditEl(null)}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {/* Envelope body — natural 240px width, no scale tricks */}
+                      <div
+                        className={`envelope-body ${paperTextureClass} cs-editable-envelope`}
+                        style={{
+                          '--envelope-body': env.bodyColor || '#1a1f2c',
+                          '--envelope-flap': env.flapColor || '#242a38',
+                          '--envelope-border': c.closedState.borderColor || 'rgba(126, 247, 255, 0.25)',
+                          width: '240px',
+                          position: 'relative',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div className="envelope-inside-glow" />
+
+                        {/* Body hitbox — covers full envelope at z:1 */}
+                        <div
+                          className={`envelope-body-hitbox${activeEditEl?.type === 'envelopeBody' ? ' cs-edit-active' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeBody', index: 0 }) }}
+                          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}
+                        />
+
+                        {/* Visual flap — no pointer events, purely decorative */}
+                        <div className="envelope-flap" style={{ pointerEvents: 'none' }} />
+
+                        {/* SVG glowing triangle outline — only when flap is active */}
+                        {activeEditEl?.type === 'envelopeFlap' && (
+                          <svg
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '62%', zIndex: 5, pointerEvents: 'none', overflow: 'visible' }}
+                            viewBox="0 0 100 100"
+                            preserveAspectRatio="none"
+                          >
+                            <defs>
+                              <filter id="flap-glow" x="-40%" y="-40%" width="180%" height="180%">
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+                                <feMerge>
+                                  <feMergeNode in="blur" />
+                                  <feMergeNode in="blur" />
+                                  <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                              </filter>
+                            </defs>
+                            <polygon
+                              points="0,0 100,0 50,100"
+                              fill="none"
+                              stroke="rgba(126,247,255,0.45)"
+                              strokeWidth="2"
+                              filter="url(#flap-glow)"
+                            />
+                          </svg>
+                        )}
+
+                        {/* Transparent flap hit zone at z:3 — above flap visual but below seal */}
+                        <div
+                          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '62%', zIndex: 3, cursor: 'pointer', clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
+                          onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeFlap', index: 0 }) }}
+                        />
+
+                        {/* Seal — z:10 so it's always on top and clickable */}
+                        <span
+                          className={`envelope-seal${activeEditEl?.type === 'envelopeSeal' ? ' cs-edit-active' : ''}`}
+                          style={{ '--seal-color': env.sealColor || '#b03030', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}
+                          onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeSeal', index: 0 }) }}
+                        >
+                          {sealContent}
+                        </span>
+
+                        {/* Floating toolbar for desktop — anchored inside envelope body */}
+                        {activeEditEl && (activeEditEl.type === 'envelopeBody' || activeEditEl.type === 'envelopeFlap' || activeEditEl.type === 'envelopeSeal') && (
+                          <div className="cs-edit-toolbar cs-edit-toolbar-envelope-inner" onClick={e => e.stopPropagation()}>
+                            {activeEditEl.type === 'envelopeBody' && (
+                              <>
+                                <span className="cs-edit-toolbar-label">Body</span>
+                                <InlineColorPicker value={env.bodyColor || '#1a1f2c'} onChange={e => update('closedState.envelope.bodyColor', e.target.value)} presets={colorPresets} label="Color" />
+                                <Dropdown
+                                  usePortal
+                                  className="cs-toolbar-dropdown"
+                                  value={env.paperTexture || 'smooth'}
+                                  onChange={v => update('closedState.envelope.paperTexture', v)}
+                                  options={[
+                                    { label: 'Smooth', value: 'smooth' },
+                                    { label: 'Linen', value: 'linen' },
+                                    { label: 'Parchment', value: 'parchment' },
+                                  ]}
+                                />
+                              </>
+                            )}
+                            {activeEditEl.type === 'envelopeFlap' && (
+                              <>
+                                <span className="cs-edit-toolbar-label">Flap</span>
+                                <InlineColorPicker value={env.flapColor || '#242a38'} onChange={e => update('closedState.envelope.flapColor', e.target.value)} presets={colorPresets} label="Color" />
+                              </>
+                            )}
+                            {activeEditEl.type === 'envelopeSeal' && (
+                              <>
+                                <span className="cs-edit-toolbar-label">Seal</span>
+                                <InlineColorPicker value={env.sealColor || '#b03030'} onChange={e => update('closedState.envelope.sealColor', e.target.value)} presets={colorPresets} label="Color" />
+                                <Dropdown
+                                  usePortal
+                                  className="cs-toolbar-dropdown"
+                                  value={env.sealIcon || 'monogram'}
+                                  onChange={v => update('closedState.envelope.sealIcon', v)}
+                                  options={[
+                                    { label: 'Monogram', value: 'monogram' },
+                                    { label: 'Heart', value: 'heart' },
+                                    { label: 'Star', value: 'star' },
+                                    { label: 'Wax', value: 'wax' },
+                                  ]}
+                                />
+                              </>
+                            )}
+                            <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+                  )
+
+                })()}
+
+                {/* Letter Peek State Preview — editable */}
+                {activeStep === 'letterPeek' && (
                   <div
                     className="cs-preview-closed"
                     style={{ backgroundColor: c.closedState.backgroundColor, border: `2px solid ${c.closedState.borderColor}` }}
@@ -3384,9 +3566,8 @@ function CardStudio() {
             <span className="cs-m2-meta-tools">{activeTools.length} tools</span>
             <span className="cs-m2-cc-pill">◈ {balance ?? 0} CC</span>
           </div>
-          {/* Row 3: dimensions · live · undo/redo */}
+          {/* Row 3: live · undo/redo */}
           <div className="cs-m2-controls-row">
-            <span className="cs-m2-dimensions">320 × 568</span>
             <span className="cs-m2-live-pill">
               <span className="cs-m2-live-dot" />LIVE
             </span>
@@ -3409,7 +3590,87 @@ function CardStudio() {
           {c.background.type === 'video' && c.background.videoUrl ? (
             <video className="cs-mobile-background video" src={c.background.videoUrl} autoPlay muted loop playsInline />
           ) : null}
-          {activeStep === 'closed' ? (
+          {activeStep === 'envelope' ? (
+            (() => {
+              const env = c.closedState.envelope || {}
+              const paperTextureClass = `paper-${env.paperTexture || 'smooth'}`
+              const sealIconKey = env.sealIcon || 'monogram'
+              const recipientName = deriveRecipientName(env.recipientCaption, currentUser?.email)
+              const monogramLetter = recipientName ? recipientName.charAt(0).toUpperCase() : '♥'
+              
+              const sealContent = sealIconKey === 'monogram' ? <span className="envelope-seal-monogram">{monogramLetter}</span> : (
+                sealIconKey === 'heart' ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" style={{width:'24px', height:'24px', color:'inherit'}}>
+                    <path d="M12 21s-7.5-4.8-7.5-11a4.5 4.5 0 0 1 8.25-2.5A4.5 4.5 0 0 1 21 10c0 6.2-9 11-9 11z" fill="currentColor" />
+                  </svg>
+                ) : sealIconKey === 'star' ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" style={{width:'24px', height:'24px', color:'inherit'}}>
+                    <path d="M12 2l2.9 6.6 7.1.7-5.4 4.9 1.6 7L12 17.8 5.8 21.2l1.6-7L2 9.3l7.1-.7z" fill="currentColor" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" style={{width:'24px', height:'24px', color:'inherit'}}>
+                    <circle cx="12" cy="12" r="8" fill="currentColor" />
+                  </svg>
+                )
+              )
+
+              return (
+                <div className="cs-preview-envelope-container" onClick={() => setActiveEditEl(null)} style={{width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                  <div
+                    className={`envelope-body ${paperTextureClass} cs-editable-envelope`}
+                    style={{
+                      '--envelope-body': env.bodyColor || '#1a1f2c',
+                      '--envelope-flap': env.flapColor || '#242a38',
+                      '--envelope-border': c.closedState.borderColor || 'rgba(126, 247, 255, 0.25)',
+                      width: '260px',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div className="envelope-inside-glow" />
+                    {/* Body hitbox at z:1 — full coverage */}
+                    <div
+                      className={`envelope-body-hitbox${activeEditEl?.type === 'envelopeBody' ? ' cs-edit-active' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeBody', index: 0 }) }}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}
+                    />
+                    {/* Visual flap — pointer-events none */}
+                    <div className="envelope-flap" style={{ pointerEvents: 'none' }} />
+                    {/* SVG triangle glow when flap selected */}
+                    {activeEditEl?.type === 'envelopeFlap' && (
+                      <svg
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '62%', zIndex: 5, pointerEvents: 'none', overflow: 'visible' }}
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                      >
+                        <defs>
+                          <filter id="flap-glow-m" x="-40%" y="-40%" width="180%" height="180%">
+                            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+                            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                          </filter>
+                        </defs>
+                        <polygon points="0,0 100,0 50,100" fill="none" stroke="rgba(126,247,255,0.45)" strokeWidth="2" filter="url(#flap-glow-m)" />
+                      </svg>
+                    )}
+                    {/* Flap hit zone at z:3 */}
+                    <div
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '62%', zIndex: 3, cursor: 'pointer', clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
+                      onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeFlap', index: 0 }) }}
+                    />
+                    {/* Seal at z:10 */}
+                    <span
+                      className={`envelope-seal${activeEditEl?.type === 'envelopeSeal' ? ' cs-edit-active' : ''}`}
+                      style={{ '--seal-color': env.sealColor || '#b03030', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}
+                      onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeSeal', index: 0 }) }}
+                    >
+                      {sealContent}
+                    </span>
+                  </div>
+                </div>
+              )
+            })()
+          ) : activeStep === 'letterPeek' ? (
             <div className="cs-preview-closed compact" style={{ backgroundColor: c.closedState.backgroundColor, border: `2px solid ${c.closedState.borderColor}` }} onClick={() => setActiveEditEl(null)}>
               <h3
                 contentEditable
@@ -3457,7 +3718,10 @@ function CardStudio() {
                  activeEditEl.type === 'extendedBody' ? 'BODY' :
                  activeEditEl.type === 'image' ? 'IMAGE' :
                  activeEditEl.type === 'closedHeading' ? 'ENVELOPE TITLE' :
-                 activeEditEl.type === 'closedBody' ? 'ENVELOPE TEXT' : 'ELEMENT'}
+                 activeEditEl.type === 'closedBody' ? 'ENVELOPE TEXT' :
+                 activeEditEl.type === 'envelopeBody' ? 'ENVELOPE BODY' :
+                 activeEditEl.type === 'envelopeFlap' ? 'ENVELOPE FLAP' :
+                 activeEditEl.type === 'envelopeSeal' ? 'ENVELOPE SEAL' : 'ELEMENT'}
               </span>
               {(activeEditEl.type === 'heading' || activeEditEl.type === 'closedHeading') && (
                 <span className="cs-m2-edit-preview">
@@ -3469,6 +3733,75 @@ function CardStudio() {
             </div>
             {/* Row 2: controls for the selected element */}
             <div className="cs-m2-edit-controls">
+              {/* Envelope Body controls */}
+              {activeEditEl.type === 'envelopeBody' && (() => {
+                const env = c.closedState.envelope || {}
+                return (
+                  <>
+                    {colorPresets.map((col, i) => (
+                      <button key={i} type="button" className={`cs-m2-color-dot${env.bodyColor === col ? ' active' : ''}`} style={{ background: col }} onClick={() => update('closedState.envelope.bodyColor', col)} />
+                    ))}
+                    <div className="cs-m2-color-input-wrap" title="Custom color">
+                      <input type="color" value={env.bodyColor || '#1a1f2c'} onChange={e => update('closedState.envelope.bodyColor', e.target.value)} />
+                    </div>
+                    <span className="cs-m2-ctrl-sep" />
+                    <span className="cs-m2-slider-label">Texture</span>
+                    <Dropdown
+                      className="cs-m2-dropdown"
+                      usePortal
+                      value={env.paperTexture || 'smooth'}
+                      onChange={v => update('closedState.envelope.paperTexture', v)}
+                      options={[
+                        { label: 'Smooth', value: 'smooth' },
+                        { label: 'Linen', value: 'linen' },
+                        { label: 'Parchment', value: 'parchment' }
+                      ]}
+                    />
+                  </>
+                )
+              })()}
+              {/* Envelope Flap controls */}
+              {activeEditEl.type === 'envelopeFlap' && (() => {
+                const env = c.closedState.envelope || {}
+                return (
+                  <>
+                    {colorPresets.map((col, i) => (
+                      <button key={i} type="button" className={`cs-m2-color-dot${env.flapColor === col ? ' active' : ''}`} style={{ background: col }} onClick={() => update('closedState.envelope.flapColor', col)} />
+                    ))}
+                    <div className="cs-m2-color-input-wrap" title="Custom color">
+                      <input type="color" value={env.flapColor || '#242a38'} onChange={e => update('closedState.envelope.flapColor', e.target.value)} />
+                    </div>
+                  </>
+                )
+              })()}
+              {/* Envelope Seal controls */}
+              {activeEditEl.type === 'envelopeSeal' && (() => {
+                const env = c.closedState.envelope || {}
+                return (
+                  <>
+                    {colorPresets.map((col, i) => (
+                      <button key={i} type="button" className={`cs-m2-color-dot${env.sealColor === col ? ' active' : ''}`} style={{ background: col }} onClick={() => update('closedState.envelope.sealColor', col)} />
+                    ))}
+                    <div className="cs-m2-color-input-wrap" title="Custom color">
+                      <input type="color" value={env.sealColor || '#b03030'} onChange={e => update('closedState.envelope.sealColor', e.target.value)} />
+                    </div>
+                    <span className="cs-m2-ctrl-sep" />
+                    <span className="cs-m2-slider-label">Icon</span>
+                    <Dropdown
+                      className="cs-m2-dropdown"
+                      usePortal
+                      value={env.sealIcon || 'monogram'}
+                      onChange={v => update('closedState.envelope.sealIcon', v)}
+                      options={[
+                        { label: 'Monogram', value: 'monogram' },
+                        { label: 'Heart', value: 'heart' },
+                        { label: 'Star', value: 'star' },
+                        { label: 'Wax', value: 'wax' }
+                      ]}
+                    />
+                  </>
+                )
+              })()}
               {/* Heading controls */}
               {activeEditEl.type === 'heading' && (
                 <>
@@ -3534,11 +3867,13 @@ function CardStudio() {
             {/* ── Step tabs ── */}
             <div className="cs-m2-step-tabs">
               {studioSteps.filter(s => s !== 'preview').map((step, i) => {
-                const icon = step === 'closed' ? '✉' : '□'
+                let StepIcon = HiOutlineDocumentText
+                if (step === 'envelope') StepIcon = HiOutlineEnvelope
+                if (step === 'letterPeek') StepIcon = HiOutlineEye
                 return (
                   <button key={step} type="button" className={`cs-m2-step-tab${activeStep === step ? ' active' : ''}`} onClick={() => goToStep(step)}>
                     <span className="cs-m2-step-num">0{i + 1}</span>
-                    <span className="cs-m2-step-icon">{icon}</span>
+                    <span className="cs-m2-step-icon"><StepIcon size={14} /></span>
                     <span className="cs-m2-step-label">{stepLabels[step] || step}</span>
                   </button>
                 )

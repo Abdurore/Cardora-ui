@@ -316,8 +316,8 @@ function Home() {
               aria-pressed={showFavoritesOnly}
               onClick={() => setShowFavoritesOnly((prev) => !prev)}
             >
-              <svg className="heart" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 20.5s-6.7-4.6-9.2-8.3C.7 9.3 2 6.1 4.9 5.2c2-.6 4.1.2 5.1 1.9 1-1.7 3.2-2.5 5.1-1.9 2.9.9 4.2 4.1 2.1 7-2.5 3.7-9.2 8.3-9.2 8.3z" />
+              <svg className="bookmark" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                <path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z" />
               </svg>
             </button>
           </div>

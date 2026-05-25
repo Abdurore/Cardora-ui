@@ -878,12 +878,13 @@ function Profile() {
                       showTypeBadge={true}
                       isLiked={likedTemplates.includes(card.id)}
                       onToggleLike={toggleLike}
+                      isTemplate={false}
                       onClick={() => card.slug
                         ? navigate(`/card/${card.slug}/responses`)
                         : openCardDetails({ ...card, variant: typeVariant })
                       }
                     />
-                    <div className="profile-card-actions profile-template-actions">
+                    <div className="profile-card-actions">
                       {card.slug && (
                         <button
                           className="profile-card-action-btn share"
@@ -897,16 +898,6 @@ function Profile() {
                           🔗
                         </button>
                       )}
-                      {card.slug && (
-                        <button
-                          className="profile-card-action-btn stats"
-                          type="button"
-                          onClick={() => fetchCardAnalytics(card.slug)}
-                          title="View analytics"
-                        >
-                          📊
-                        </button>
-                      )}
                       <button
                         className="profile-card-action-btn delete"
                         type="button"
@@ -916,21 +907,6 @@ function Profile() {
                         🗑
                       </button>
                     </div>
-                    {card.slug && cardAnalytics[card.slug] !== undefined && (
-                      <div className="profile-card-analytics">
-                        {loadingCardAnalytics[card.slug] ? (
-                          <span className="profile-card-analytics-loading">Loading…</span>
-                        ) : cardAnalytics[card.slug] ? (
-                          <>
-                            <span>{cardAnalytics[card.slug].views ?? 0} views</span>
-                            <span>{cardAnalytics[card.slug].likes ?? 0} likes</span>
-                            <span>{cardAnalytics[card.slug].responses ?? cardAnalytics[card.slug].replies ?? 0} replies</span>
-                          </>
-                        ) : (
-                          <span className="profile-card-analytics-empty">No data yet</span>
-                        )}
-                      </div>
-                    )}
                   </div>
                   )
                 })}

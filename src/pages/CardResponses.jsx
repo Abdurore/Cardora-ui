@@ -319,6 +319,7 @@ function CardResponses() {
   const [error, setError] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(null)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const loadCard = useCallback(async () => {
     try {
@@ -433,13 +434,16 @@ function CardResponses() {
               {refreshing ? 'Refreshing…' : lastRefresh ? `Updated ${timeSince(lastRefresh)}` : 'Refresh'}
             </button>
             {rawCard.slug && (
-              <button className="cr-action-btn" type="button"
+              <button className={`cr-action-btn ${linkCopied ? 'copied' : ''}`} type="button"
                 onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/card/${rawCard.slug}`)
-                  .then(() => alert('Card link copied!'))}>
+                  .then(() => {
+                    setLinkCopied(true)
+                    setTimeout(() => setLinkCopied(false), 1600)
+                  })}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
                 </svg>
-                Copy Link
+                {linkCopied ? '✨ Copied' : 'Copy Link'}
               </button>
             )}
           </div>

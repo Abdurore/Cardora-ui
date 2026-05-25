@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
+import { HexColorPicker } from 'react-colorful'
 
 export default function InlineColorPicker({ value = '#ffffff', onChange, presets = [], label }) {
   const [open, setOpen] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [hex, setHex] = useState(value)
   const wrapRef = useRef(null)
-  const nativeRef = useRef(null)
 
   useEffect(() => { setHex(value) }, [value])
 
@@ -16,7 +17,7 @@ export default function InlineColorPicker({ value = '#ffffff', onChange, presets
   }, [open])
 
   const commit = v => { onChange({ target: { value: v } }); setHex(v) }
-  const tryHex = v => { if (/^#[0-9a-f]{6}$/i.test(v)) { commit(v); setOpen(false) } }
+  const tryHex = v => { if (/^#[0-9a-fA-F]{6}$/i.test(v)) { commit(v) } }
 
   return (
     <div className="icp-wrap" ref={wrapRef}>
@@ -28,7 +29,7 @@ export default function InlineColorPicker({ value = '#ffffff', onChange, presets
             <div className="icp-presets">
               {presets.map((p, i) => (
                 <button key={i} type="button" className={`icp-preset${p === value ? ' active' : ''}`} style={{ background: p }}
-                  onClick={() => { commit(p); setOpen(false) }} />
+                  onClick={() => { commit(p) }} />
               ))}
             </div>
           )}
@@ -42,9 +43,15 @@ export default function InlineColorPicker({ value = '#ffffff', onChange, presets
               maxLength={7}
               spellCheck={false}
             />
-            <button type="button" className="icp-more-btn" onClick={() => nativeRef.current?.click()}>⊕</button>
-            <input ref={nativeRef} type="color" value={value} onChange={e => commit(e.target.value)} className="icp-native-hidden" />
+            <button type="button" className="icp-more-btn" onClick={() => setShowAdvanced(v => !v)} title="Advanced picker">
+              {showAdvanced ? '⊖' : '⊕'}
+            </button>
           </div>
+          {showAdvanced && (
+            <div className="icp-advanced">
+              <HexColorPicker color={value} onChange={commit} />
+            </div>
+          )}
         </div>
       )}
     </div>
