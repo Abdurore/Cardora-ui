@@ -154,8 +154,11 @@ body {
 button,
 input,
 select,
-textarea {
+textarea,
+[contenteditable] {
   font-family: inherit;
+  background-color: transparent;
+  color: inherit;
 }
 
 select {

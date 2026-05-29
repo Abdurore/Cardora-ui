@@ -589,9 +589,9 @@ export function resolveTemplateCardObject(cardData) {
   // artist already designed exactly what users should see. Never replace it
   // with a category preset.
   const layoutConfig =
+    cardData.cardObject ||
     cardData.layoutConfig ||
     cardData.layoutdata ||
-    cardData.cardObject ||
     cardData.backendTemplate?.layoutConfig ||
     cardData.backendTemplate?.layoutdata ||
     null

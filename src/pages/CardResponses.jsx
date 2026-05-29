@@ -58,14 +58,20 @@ function normalizeResponsesState(rawCard, type) {
   if (type === 'trivia') {
     return {
       ...state,
-      players: arrayFrom(state.players, state.leaderboard, state.submissions, state.responses, rawCard.triviaSubmissions, rawCard.leaderboard),
+      players: arrayFrom(
+        rawCard.triviaSubmissions, rawCard.leaderboard,
+        state.players, state.leaderboard, state.submissions, state.responses,
+        state.triviaSubmissions, stats.players, stats.leaderboard, stats.submissions,
+        rawCard.players, rawCard.submissions,
+      ),
+      totalQuestions: state.totalQuestions || rawCard.totalQuestions || stats.totalQuestions || 0,
     }
   }
 
   if (type === 'chain') {
     return {
       ...state,
-      responses: arrayFrom(state.responses, state.replies, state.chainReplies, rawCard.chainReplies, rawCard.responses, rawCard.replies),
+      responses: arrayFrom(rawCard.chainReplies, state.chainReplies, state.replies, state.responses, rawCard.responses, rawCard.replies),
     }
   }
 
@@ -172,12 +178,23 @@ function PollResultsView({ state, content }) {
 }
 
 // ── Trivia leaderboard ────────────────────────────────────────────────
+
+// Resolve player display name from the many possible backend field names
+function getPlayerName(player) {
+  return player.name || player.username || player.displayName || player.playerName || player.user?.username || player.user?.name || ''
+}
+
 function TriviaLeaderboardView({ state, content }) {
   const players = state?.players || []
-  const questions = content?.questions || []
-  const total = questions.length || 1
 
-  const ranked = [...players].sort((a, b) => b.score - a.score)
+  // Find questions from all possible backend locations (mirrors mapBackendCard logic)
+  const triviaContent = content?.trivia || content
+  const questions = Array.isArray(triviaContent?.questions) ? triviaContent.questions : []
+  // Also check state for totalQuestions sent by the submitter
+  const totalFromState = state?.totalQuestions || 0
+  const total = questions.length || totalFromState || (players.length > 0 ? (players.reduce((max, p) => Math.max(max, p.totalQuestions || 0), 0) || 1) : 1)
+
+  const ranked = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
   const medals = ['🥇', '🥈', '🥉']
 
   return (
@@ -191,18 +208,22 @@ function TriviaLeaderboardView({ state, content }) {
       ) : (
         <div className="cr-trivia-board">
           {ranked.map((player, i) => {
-            const pct = Math.round((player.score / total) * 100)
+            const playerScore = player.score || 0
+            // Use the player's own totalQuestions if available, otherwise use the card-level total
+            const playerTotal = player.totalQuestions || total
+            const pct = playerTotal > 0 ? Math.round((playerScore / playerTotal) * 100) : 0
+            const displayName = getPlayerName(player) || 'Anonymous'
             return (
               <div key={player.userId || player.id || i} className={`cr-trivia-row ${i === 0 ? 'cr-trivia-row-top' : ''}`}>
                 <div className="cr-trivia-rank">
                   {medals[i] || <span className="cr-trivia-rank-num">{i + 1}</span>}
                 </div>
                 <div className="cr-trivia-player-info">
-                  <div className="cr-trivia-avatar">{(player.name || '?')[0].toUpperCase()}</div>
-                  <span className="cr-trivia-name">{player.name || 'Anonymous'}</span>
+                  <div className="cr-trivia-avatar">{displayName[0].toUpperCase()}</div>
+                  <span className="cr-trivia-name">{displayName}</span>
                 </div>
                 <div className="cr-trivia-score-col">
-                  <span className="cr-trivia-score-num">{player.score}<span className="cr-trivia-score-total">/{total}</span></span>
+                  <span className="cr-trivia-score-num">{playerScore}<span className="cr-trivia-score-total">/{playerTotal}</span></span>
                   <span className={`cr-trivia-pct ${pct === 100 ? 'perfect' : ''}`}>{pct}%</span>
                 </div>
                 <div className="cr-trivia-bar-mini">
@@ -395,6 +416,13 @@ function CardResponses() {
   const state = normalizeResponsesState(rawCard, type)
   const config = rawCard.config || {}
   const content = config.content || rawCard.content || {}
+  // For trivia, questions may be nested under config.trivia, rawCard.trivia, etc.
+  const layout = rawCard.layoutdata || rawCard.layoutData || {}
+  const triviaContent = {
+    ...content,
+    trivia: content.trivia || config.trivia || rawCard.trivia || layout.trivia || null,
+    questions: content.questions || (content.trivia || config.trivia || rawCard.trivia || layout.trivia || {}).questions || [],
+  }
   const title = rawCard.title || content.header || content.message || content.question || 'Card'
   const createdAt = rawCard.createdAt || rawCard.created_at
 
@@ -458,7 +486,7 @@ function CardResponses() {
         {/* Type-specific content */}
         {(type === 'anonymous' || type === 'anon') && <AnonInboxView state={state} />}
         {type === 'poll' && <PollResultsView state={state} content={content} />}
-        {type === 'trivia' && <TriviaLeaderboardView state={state} content={content} />}
+        {type === 'trivia' && <TriviaLeaderboardView state={state} content={triviaContent} />}
         {type === 'chain' && <ChainRepliesView state={state} content={content} />}
         {type === 'personal' && <PersonalResponsesView state={state} content={content} />}
 

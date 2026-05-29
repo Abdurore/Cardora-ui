@@ -28,7 +28,7 @@ function RewardedAds({ onBalanceUpdate }) {
       } catch { /* ignore */ }
     })()
     return () => { cancelled = true }
-  }, [reward])
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -39,24 +39,53 @@ function RewardedAds({ onBalanceUpdate }) {
 
   const startCooldown = (secs = AD_COOLDOWN_SECS) => {
     setCooldown(secs)
-    setPhase('cooldown')
     clearInterval(cooldownRef.current)
     cooldownRef.current = setInterval(() => {
       setCooldown(prev => {
-        if (prev <= 1) { clearInterval(cooldownRef.current); setPhase('idle'); return 0 }
+        if (prev <= 1) { clearInterval(cooldownRef.current); return 0 }
         return prev - 1
       })
     }, 1000)
   }
+
+  useEffect(() => {
+    if (cooldown === 0 && phase === 'cooldown') {
+      setPhase('idle')
+    }
+  }, [cooldown, phase])
 
   const handleComplete = useCallback(async (adData) => {
     clearInterval(timerRef.current)
     setPhase('completing')
     try {
       const res = await completeAd({ adId: adData.id || adData._id })
-      setReward({ cc: res?.cc || 0, amount: res?.rewardAmount || adData.rewardCC || res?.reward || 2 })
+      const amountEarned = res?.rewardAmount || adData.rewardCC || res?.reward || 2
+      setReward({ cc: res?.cc || 0, amount: amountEarned })
+      
+      setStats(prev => {
+        const pRaw = prev?.data || prev || {}
+        const pStats = pRaw?.stats || pRaw?.data?.stats || pRaw || {}
+        const currentWatched = pStats?.adsWatchedToday ?? pStats?.watched ?? pRaw?.adsWatchedToday ?? 0
+        const currentEarned = pStats?.ccEarnedToday ?? pStats?.earned ?? pRaw?.ccEarnedToday ?? 0
+        const currentRemaining = pStats?.remainingAdsToday ?? pStats?.remaining ?? pRaw?.remainingAdsToday ?? Math.max(0, 10 - currentWatched)
+        
+        return {
+          ...pRaw,
+          adsWatchedToday: currentWatched + 1,
+          remainingAdsToday: Math.max(0, currentRemaining - 1),
+          ccEarnedToday: currentEarned + amountEarned,
+          stats: {
+            ...pStats,
+            adsWatchedToday: currentWatched + 1,
+            remainingAdsToday: Math.max(0, currentRemaining - 1),
+            ccEarnedToday: currentEarned + amountEarned
+          }
+        }
+      })
+      
       onBalanceUpdate?.()
       setPhase('done')
+      startCooldown()
     } catch (err) {
       setError(err.message || 'Could not claim reward.')
       setPhase('error')
@@ -139,7 +168,7 @@ function RewardedAds({ onBalanceUpdate }) {
   const _raw = stats?.data || stats
   const adStats = _raw?.stats || _raw?.data?.stats || _raw || {}
   const adsWatched = adStats?.adsWatchedToday ?? adStats?.watched ?? _raw?.adsWatchedToday ?? 0
-  const remaining = adStats?.remainingAdsToday ?? adStats?.remaining ?? _raw?.remainingAdsToday ?? (typeof _raw?.adsWatchedToday === 'number' ? Math.max(0, 10 - _raw.adsWatchedToday) : null)
+  const remaining = adStats?.remainingAdsToday ?? adStats?.remaining ?? _raw?.remainingAdsToday ?? Math.max(0, 10 - adsWatched)
   const earned = adStats?.ccEarnedToday ?? adStats?.earned ?? _raw?.ccEarnedToday ?? 0
   const cooldownPct = Math.round(((AD_COOLDOWN_SECS - cooldown) / AD_COOLDOWN_SECS) * 100)
   const ctaUrl = ad?.ctaUrl || ad?.actionUrl || ad?.url || ad?.link || ad?.linkUrl
@@ -261,7 +290,11 @@ function RewardedAds({ onBalanceUpdate }) {
           <h4>+{reward.amount} CC earned!</h4>
           <p>Your new balance has been updated.</p>
           {remaining > 1 ? (
-            <button className="rad-watch-btn" type="button" onClick={() => { setAd(null); startCooldown() }}>Watch Another</button>
+            <button className="rad-watch-btn" type="button" onClick={() => { 
+              setAd(null); 
+              if (cooldown > 0) setPhase('cooldown'); 
+              else setPhase('idle'); 
+            }}>Watch Another</button>
           ) : (
             <button className="rad-watch-btn" type="button" onClick={() => { setPhase('idle'); setAd(null) }}>Done</button>
           )}

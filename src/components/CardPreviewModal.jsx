@@ -321,11 +321,14 @@ function CardPreviewModal({
       if (nameSaved) {
         setParticipantName(nameSaved)
         setChainName(nameSaved)
+      } else if (currentUser?.username) {
+        setParticipantName(currentUser.username)
+        setChainName(currentUser.username)
       }
     } catch {
       /* localStorage may be unavailable in private contexts */
     }
-  }, [pageMode, receiverStorageKey])
+  }, [pageMode, receiverStorageKey, currentUser])
 
   useEffect(() => {
     if (!audioRef.current || !musicAllowed) return undefined
@@ -819,7 +822,7 @@ function CardPreviewModal({
       )}
 
       {stage === 'assetLoading' && (
-        <div className="cp-asset-loader" style={{ '--loader-accent': c.theme.accentColor || '#7ef7ff' }}>
+        <div className="cp-asset-loader" style={{ '--loader-accent': 'rgba(255, 255, 255, 0.7)' }}>
           <div className="cp-asset-loader-mark">
             <img src="/cardora-logo.png?v=4" alt="" />
           </div>
@@ -933,16 +936,6 @@ function CardPreviewModal({
             className="cp-entry-screen"
             style={{ '--entry-bg': bg, '--entry-g1': g1, '--entry-g2': g2, '--entry-accent': accent }}
           >
-            {/* Atmospheric orbs */}
-            <div className="cp-entry-orb cp-entry-orb-1" />
-            <div className="cp-entry-orb cp-entry-orb-2" />
-            <div className="cp-entry-orb cp-entry-orb-3" />
-
-            {/* Particle layer */}
-            <div className="cp-entry-particles" aria-hidden="true">
-              {renderBgEffect()}
-            </div>
-
             {/* Center content */}
             <div className="cp-entry-content">
               <div className="cp-entry-brand">
@@ -1383,9 +1376,10 @@ function CardPreviewModal({
                   const perfMsg = pct === 1 ? 'Perfect score!' : pct >= 0.75 ? 'Great job!' : pct >= 0.5 ? 'Not bad!' : 'Keep practicing!'
                   const perfEmoji = pct === 1 ? '🏆' : pct >= 0.75 ? '🎉' : pct >= 0.5 ? '👏' : '💪'
                   return (
-                  <div className="cp-trivia-results">
-                    <svg className="cp-trivia-score-ring" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="7" />
+                    <>
+                    <div className="cp-trivia-results cp-cascade-in">
+                      <svg className="cp-trivia-score-ring" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="7" />
                       <circle
                         cx="50" cy="50" r="44" fill="none"
                         stroke={c.theme.accentColor}
@@ -1439,27 +1433,29 @@ function CardPreviewModal({
                         )
                       })}
                     </div>
-                    {hasGift ? (
-                      <button
-                        type="button"
-                        className="cp-continue-btn visible"
-                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                        onClick={() => setStage('end')}
-                      >
-                        Continue
-                      </button>
-                    ) : (
+                  </div>
+                  <div className="cp-end-actions" style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                    {giftAllowed && (
                       <button
                         type="button"
                         className="cp-continue-btn visible"
                         style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
                         onClick={() => navigate('/studio', { state: { isNew: true } })}
                       >
-                        Create yours →
+                        Create yours
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="cp-end-btn ghost"
+                      style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }}
+                      onClick={() => navigate('/')}
+                    >
+                      Done
+                    </button>
                   </div>
-                  )
+                </>
+                )
                 })()}
               </div>
             </article>,
@@ -1552,7 +1548,15 @@ function CardPreviewModal({
                           style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
                           onClick={() => navigate('/studio', { state: { isNew: true } })}
                         >
-                          Create yours →
+                          Create yours
+                        </button>
+                        <button
+                          type="button"
+                          className="cp-end-btn ghost"
+                          style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)', marginLeft: '12px' }}
+                          onClick={() => navigate('/')}
+                        >
+                          Done
                         </button>
                       </>
                     )}
@@ -1662,7 +1666,7 @@ function CardPreviewModal({
                     <input
                       type="text"
                       className="cp-chain-name-input"
-                      style={{ background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${c.theme.accentColor}40`, color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif` }}
+                      style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif` }}
                       placeholder="Your name or handle…"
                       maxLength={50}
                       value={chainName}
@@ -1670,7 +1674,7 @@ function CardPreviewModal({
                     />
                     <textarea
                       className="cp-anon-textarea"
-                      style={{ background: 'rgba(255,255,255,0.06)', border: `1.5px solid ${c.theme.accentColor}40`, color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif` }}
+                      style={{ color: c.card.textColor, fontFamily: `'${c.theme.fontFamily}', sans-serif` }}
                       placeholder="Add your reply to the chain…"
                       maxLength={500}
                       value={chainMessage}
@@ -1775,7 +1779,15 @@ function CardPreviewModal({
                     style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
                     onClick={() => navigate('/studio', { state: { isNew: true } })}
                   >
-                    Create yours →
+                    Create yours
+                  </button>
+                  <button
+                    type="button"
+                    className="cp-end-btn ghost"
+                    style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)', marginLeft: '12px' }}
+                    onClick={() => navigate('/')}
+                  >
+                    Done
                   </button>
                 </div>
               </div>
@@ -1911,14 +1923,24 @@ function CardPreviewModal({
                 Replay
               </button>
               {pageMode ? (
+                <>
                 <button
                   type="button"
                   className="cp-end-btn ghost"
                   style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
                   onClick={() => navigate('/studio', { state: { isNew: true } })}
                 >
-                  Create yours →
+                  Create yours
                 </button>
+                <button
+                  type="button"
+                  className="cp-end-btn ghost"
+                  style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)', marginLeft: '12px' }}
+                  onClick={() => navigate('/')}
+                >
+                  Done
+                </button>
+                </>
               ) : (
                 <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={onClose}>
                   Back to Editor

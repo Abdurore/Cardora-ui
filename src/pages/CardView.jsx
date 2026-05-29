@@ -203,8 +203,18 @@ function CardView() {
       await submitCardResponse(card.slug || id, payload)
     }
   }
-  const handleTriviaComplete = async (answers) => {
-    const payload = { answers }
+  const handleTriviaComplete = async (answers, name) => {
+    // Calculate score: count how many answers match the correctIndex for each question
+    const questions = triviaData?.questions || []
+    const score = questions.reduce((acc, q, i) => {
+      return acc + (Number(answers[i]) === Number(q.correctIndex) ? 1 : 0)
+    }, 0)
+    const payload = {
+      answers,
+      name: name || currentUser?.username || 'Anonymous',
+      score,
+      totalQuestions: questions.length,
+    }
     try {
       await submitTriviaAnswer(card.slug || id, payload)
     } catch (e) {
@@ -213,7 +223,7 @@ function CardView() {
       await submitCardResponse(card.slug || id, payload)
     }
   }
-  const handleChainReply = async (message) => {
+  const handleChainReply = async (message, name) => {
     const payload = { response: message }
     try {
       await submitChainReply(card.slug || id, payload)
