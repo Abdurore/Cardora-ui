@@ -792,7 +792,7 @@ function QuickCreate() {
               )}
               <button
                 type="button"
-                className="qc-submit-btn"
+                className={`qc-submit-btn type-${cardType}`}
                 disabled={isSending || isLowBalance}
                 onClick={handleSendClick}
               >

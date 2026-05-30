@@ -15,6 +15,27 @@
   --secondary:      #c4a8ff;      /* violet — secondary actions */
   --tertiary:       #ffd47a;      /* amber — warnings / featured */
 
+  /* ── Type Colors (Universal System) ── */
+  --type-personal: #ffd47a; /* Amber/Gold */
+  --type-personal-bg: rgba(255, 212, 122, 0.15);
+  --type-personal-grad: linear-gradient(135deg, #fbbf24, #f97316);
+
+  --type-poll: #60a5fa; /* Blue */
+  --type-poll-bg: rgba(96, 165, 250, 0.15);
+  --type-poll-grad: linear-gradient(135deg, #60a5fa, #818cf8);
+
+  --type-trivia: #c084fc; /* Purple */
+  --type-trivia-bg: rgba(192, 132, 252, 0.15);
+  --type-trivia-grad: linear-gradient(135deg, #c084fc, #a78bfa);
+
+  --type-chain: #f472b6; /* Pink/Rose */
+  --type-chain-bg: rgba(244, 114, 182, 0.15);
+  --type-chain-grad: linear-gradient(135deg, #f472b6, #e11d48);
+
+  --type-anonymous: #7ef7ff; /* Cyan */
+  --type-anonymous-bg: rgba(126, 247, 255, 0.15);
+  --type-anonymous-grad: linear-gradient(135deg, #7ef7ff, #62ffa2);
+
   /* ── Surfaces ── */
   --bg:        #0b0f12;                    /* page bg */
   --surface:   rgba(14, 24, 30, 0.92);     /* cards, panels */

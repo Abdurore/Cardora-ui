@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { MdLightMode, MdDarkMode } from 'react-icons/md'
 
-const BRAND_LOGO = '/cardora-logo.png?v=4'
+const BRAND_LOGO = '/cardora-icon.png?v=3'
 
 function getDeviceTheme() {
   try {
@@ -43,10 +43,7 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
   return (
     <header className="screen-header">
       <div className="brand">
-        <div className="brand-lockup">
-          <img src={BRAND_LOGO} alt="Cardora logo" className="brand-logo" />
-          <span className="brand-wordmark">Cardora</span>
-        </div>
+        <span className="brand-wordmark">CARDORA</span>
       </div>
       <div className="header-actions">
         <button

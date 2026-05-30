@@ -116,11 +116,11 @@ const TYPE_ACCENT = {
 }
 
 const TYPE_SEND_GRADIENT = {
-  personal:  'linear-gradient(135deg, #fbbf24, #f97316)',
-  poll:      'linear-gradient(135deg, #60a5fa, #818cf8)',
-  trivia:    'linear-gradient(135deg, #c084fc, #a78bfa)',
-  chain:     'linear-gradient(135deg, #34d399, #10b981)',
-  anonymous: 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
+  personal:  'var(--type-personal-grad)',
+  poll:      'var(--type-poll-grad)',
+  trivia:    'var(--type-trivia-grad)',
+  chain:     'var(--type-chain-grad)',
+  anonymous: 'var(--type-anonymous-grad)',
 }
 
 const TIER_LABELS = { classic: 'Classic', premium: 'Premium', elite: 'Elite' }
@@ -2829,120 +2829,53 @@ function CardStudio() {
       const headingSize = c.theme.headingSize ?? 28
       return (
         <div className={`cs-preview-anon ${compact ? 'compact' : ''}`} onClick={() => setActiveEditEl(null)}>
-          {/* View toggle */}
-          <div className="cs-anon-preview-tabs">
-            <button
-              type="button"
-              className={`cs-anon-preview-tab ${anonPreviewTab === 'sender' ? 'active' : ''}`}
-              onClick={() => setAnonPreviewTab('sender')}
-            >
-              Sender view
-            </button>
-            <button
-              type="button"
-              className={`cs-anon-preview-tab ${anonPreviewTab === 'recipient' ? 'active' : ''}`}
-              onClick={() => setAnonPreviewTab('recipient')}
-            >
-              Recipient view
-            </button>
-          </div>
-
-          {/* SENDER VIEW — what opens at /ask/@username */}
-          {anonPreviewTab === 'sender' && (
-            <div className="cs-preview-anon-sender" style={{ background: cardBg, borderColor: `${accent}1a`, ...cardBorderCss }}>
-              <div className="cs-preview-anon-sender-header">
-                <div className="cs-preview-anon-avatar-mock" style={{ borderColor: `${accent}44` }}>
-                  <span style={{ color: accent }}>U</span>
-                </div>
-                <div>
-                  <p className="cs-preview-anon-label" style={{ color: `${accent}99` }}>Anonymous message for</p>
-                  <p className="cs-preview-anon-username" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>@recipient</p>
-                </div>
+          <div className="cs-preview-anon-sender" style={{ background: cardBg, borderColor: `${accent}1a`, ...cardBorderCss }}>
+            <div className="cs-preview-anon-sender-header">
+              <div className="cs-preview-anon-avatar-mock" style={{ borderColor: `${accent}44` }}>
+                <span style={{ color: accent }}>U</span>
               </div>
-              <div className="cs-preview-anon-copy">
-                <h4
-                  contentEditable={!compact}
-                  suppressContentEditableWarning
-                  data-placeholder="Heading (optional)"
-                  className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
-                  style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
-                  onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
-                  onBlur={e => { if (!compact) update('content.heading', editableText(e.currentTarget)) }}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
-                >
-                  {c.content.heading || ''}
-                </h4>
-                <p
-                  contentEditable={!compact}
-                  suppressContentEditableWarning
-                  data-placeholder="A note for senders (optional)…"
-                  className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
-                  style={{ color: c.card.textColor, outline: 'none' }}
-                  onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
-                  onBlur={e => { if (!compact) update('content.body', editableText(e.currentTarget)) }}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
-                >
-                  {c.content.body || ''}
-                </p>
-              </div>
-              <div className="cs-preview-anon-textarea-mock" style={{ borderColor: `${accent}28`, color: `${c.card.textColor}88` }}>
-                Write something honest, kind, or surprising…
-              </div>
-              <div className="cs-preview-anon-meta-mock">
-                <span style={{ color: `${c.card.textColor}66` }}>0/500</span>
-                <span style={{ color: accent }}>&#x1F441;&#xFE0F; Anonymous</span>
-              </div>
-              <div className="cs-preview-anon-send-mock" style={{ background: accent, color: cardBg }}>
-                Send Anonymously
+              <div>
+                <p className="cs-preview-anon-label" style={{ color: `${accent}99` }}>Anonymous message for</p>
+                <p className="cs-preview-anon-username" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>@recipient</p>
               </div>
             </div>
-          )}
-
-          {/* RECIPIENT VIEW — the card in their profile with messages */}
-          {anonPreviewTab === 'recipient' && (
-            <div className="cs-preview-anon-recipient" style={{ background: cardBg, borderColor: `${accent}1a`, ...cardBorderCss }}>
-              <div className="cs-preview-anon-head">
-                <p className="cs-preview-anon-eyebrow">&#x1F441;&#xFE0F; Anonymous Inbox</p>
-                <span className="cs-preview-pill">{anonTemplate.tier === 'elite' ? 'Elite' : 'Classic'}</span>
-              </div>
-              <h3
+            <div className="cs-preview-anon-copy">
+              <h4
                 contentEditable={!compact}
                 suppressContentEditableWarning
-                data-placeholder="Your inbox card"
+                data-placeholder="Heading (optional)"
                 className={`cs-editable${!compact && activeEditEl?.type === 'heading' ? ' cs-edit-active' : ''}`}
-                style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, outline: 'none' }}
+                style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, fontSize: `${headingSize}px`, outline: 'none' }}
                 onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'heading', index: 0 }) } }}
                 onBlur={e => { if (!compact) update('content.heading', editableText(e.currentTarget)) }}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
               >
-                {c.content.heading || 'Your inbox card'}
-              </h3>
+                {c.content.heading || ''}
+              </h4>
               <p
                 contentEditable={!compact}
                 suppressContentEditableWarning
-                data-placeholder="Add a description…"
+                data-placeholder="A note for senders (optional)…"
                 className={`cs-editable${!compact && activeEditEl?.type === 'body' ? ' cs-edit-active' : ''}`}
-                style={{ color: c.card.textColor, fontSize: '0.8rem', marginBottom: 10, outline: 'none' }}
+                style={{ color: c.card.textColor, outline: 'none' }}
                 onClick={e => { if (!compact) { e.stopPropagation(); setActiveEditEl({ type: 'body', index: 0 }) } }}
                 onBlur={e => { if (!compact) update('content.body', editableText(e.currentTarget)) }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur() } }}
               >
                 {c.content.body || ''}
               </p>
-              <div className="cs-preview-anon-messages">
-                {[
-                  '"You make people feel seen. Keep going."',
-                  '"That thing you did last week was genuinely kind."',
-                  '"Still thinking about how you handled that situation."',
-                ].map((msg, i) => (
-                  <div key={i} className="cs-preview-anon-msg-bubble" style={{ borderColor: `${accent}22`, background: `${accent}08` }}>
-                    <p style={{ color: c.card.textColor }}>{msg}</p>
-                    <span className="cs-preview-anon-msg-time" style={{ color: `${accent}66` }}>Anonymous · just now</span>
-                  </div>
-                ))}
-              </div>
             </div>
-          )}
+            <div className="cs-preview-anon-textarea-mock" style={{ borderColor: `${accent}28`, color: `${c.card.textColor}88` }}>
+              Write something honest, kind, or surprising…
+            </div>
+            <div className="cs-preview-anon-meta-mock">
+              <span style={{ color: `${c.card.textColor}66` }}>0/500</span>
+              <span style={{ color: accent }}>&#x1F441;&#xFE0F; Anonymous</span>
+            </div>
+            <div className="cs-preview-anon-send-mock" style={{ background: accent, color: cardBg }}>
+              Send Anonymously
+            </div>
+          </div>
 
           {/* Floating toolbar for anon heading / body */}
           {!compact && activeEditEl && (activeEditEl.type === 'heading' || activeEditEl.type === 'body') && (

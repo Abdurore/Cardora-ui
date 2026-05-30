@@ -7,7 +7,7 @@ import { getSignupBonusAvailability } from '../lib/api.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 
 const FORMAT_CHIPS = [
-  { Icon: PersonalCardIcon, label: 'Greeting', cls: 'chip-greeting' },
+  { Icon: PersonalCardIcon, label: 'Personal', cls: 'chip-greeting' },
   { Icon: PollCardIcon,     label: 'Poll',     cls: 'chip-poll' },
   { Icon: TriviaCardIcon,  label: 'Trivia',   cls: 'chip-trivia' },
   { Icon: AnonCardIcon,    label: 'Anonymous', cls: 'chip-anon' },
@@ -67,7 +67,7 @@ const HOW_IT_WORKS = [
   {
     icon: '01',
     title: 'Choose a Format',
-    description: 'Pick from Greeting, Poll, Trivia, Chain, or Anonymous Inbox — each format built for a different kind of moment.',
+    description: 'Pick from Personal, Poll, Trivia, Chain, or Anonymous Inbox — each format built for a different kind of moment.',
   },
   {
     icon: '02',
