@@ -57,15 +57,19 @@ import {
   resetSignupBonus,
   createChatFrame,
   deleteChatFrame,
+  forgetCachedChatFrame,
   approveChatFrameRequest,
   rememberChatFrame,
   createAdminGift,
   getAdminGifts,
   deleteAdminGift,
   getBroadcastDeliveryLogs,
+  getAdminChatFrames,
   getChatFrames,
+  getCachedChatFrames,
 } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
+import { getChatFrameId, getChatFrameUrl, normalizeChatFrame } from '../lib/chatFrames.js'
 import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
 const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Packages', 'Codes', 'Ads', 'Media', 'Gifts', 'Coupons', 'Logs']
@@ -320,9 +324,17 @@ function AdminDashboard() {
     for (const key of keys) {
       if (Array.isArray(res?.[key])) return res[key]
       if (Array.isArray(res?.data?.[key])) return res.data[key]
+      if (Array.isArray(res?.data?.[key]?.docs)) return res.data[key].docs
+      if (Array.isArray(res?.data?.[key]?.items)) return res.data[key].items
+      if (Array.isArray(res?.result?.[key])) return res.result[key]
+      if (Array.isArray(res?.result?.[key]?.docs)) return res.result[key].docs
+      if (Array.isArray(res?.result?.[key]?.items)) return res.result[key].items
     }
     if (Array.isArray(res)) return res
     if (Array.isArray(res?.data)) return res.data
+    if (Array.isArray(res?.data?.docs)) return res.data.docs
+    if (Array.isArray(res?.data?.items)) return res.data.items
+    if (Array.isArray(res?.results)) return res.results
     return null
   }
 
@@ -482,14 +494,24 @@ function AdminDashboard() {
           break
         }
         case 'Gifts': {
-          const [giftsRes, framesRes] = await Promise.allSettled([getAdminGifts(), getChatFrames()])
+          const [giftsRes, framesRes] = await Promise.allSettled([getAdminGifts(), getAdminChatFrames().catch(() => getChatFrames())])
           if (giftsRes.status === 'fulfilled') {
             const list = giftsRes.value?.data?.gifts || giftsRes.value?.gifts || giftsRes.value?.data || []
             setAdminGifts(Array.isArray(list) ? list : [])
           }
           if (framesRes.status === 'fulfilled') {
-            const list = framesRes.value?.chatFrames || framesRes.value?.data?.chatFrames || framesRes.value?.data || []
-            setAdminChatFrames(Array.isArray(list) ? list : [])
+            const list = pickList(framesRes.value, 'chatFrames', 'frames', 'items') || []
+            const frames = [...list, ...getCachedChatFrames()]
+              .map(normalizeChatFrame)
+              .filter(Boolean)
+            const seen = new Set()
+            setAdminChatFrames(frames.filter(frame => {
+              if (seen.has(frame.id)) return false
+              seen.add(frame.id)
+              return true
+            }))
+          } else {
+            setAdminChatFrames(getCachedChatFrames().map(normalizeChatFrame).filter(Boolean))
           }
           break
         }
@@ -782,9 +804,15 @@ const handleBroadcast = async () => {
   }
 
   const handleDeleteChatFrame = async (frame) => {
-    const fid = frame.id || frame._id
+    const fid = getChatFrameId(frame)
+    if (!fid) { showMsg('Missing frame identifier.', false); return }
     if (!await appConfirm('Delete Frame', `Delete "${frame.name || fid}"?`, { variant: 'danger', confirmLabel: 'Delete' })) return
-    try { await deleteChatFrame(fid); showMsg('Deleted.'); setAdminChatFrames(p => p.filter(f => (f.id || f._id) !== fid)) }
+    try {
+      await deleteChatFrame(fid)
+      forgetCachedChatFrame(fid)
+      showMsg('Deleted.')
+      setAdminChatFrames(p => p.filter(f => getChatFrameId(f) !== fid))
+    }
     catch (err) { showMsg(err.message || 'Delete failed.', false) }
   }
 
@@ -1335,27 +1363,41 @@ const handleBroadcast = async () => {
             </div>
 
             {/* Chat Frame List */}
-            {adminChatFrames.length > 0 && (
-              <div className="admin-sub-section">
-                <h4>Existing Chat Frames ({adminChatFrames.length})</h4>
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead><tr><th>Preview</th><th>ID</th><th>Name</th><th>Price</th><th>Actions</th></tr></thead>
-                    <tbody>
-                      {adminChatFrames.map((f, i) => (
-                        <tr key={f.id || f._id || i}>
-                          <td>{(f.url || f.imageUrl || f.assetUrl || f.cloudinaryUrl) ? <img src={f.url || f.imageUrl || f.assetUrl || f.cloudinaryUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} /> : '-'}</td>
-                          <td className="admin-cell-mono">{f.id || f._id || '—'}</td>
-                          <td>{f.name}</td>
-                          <td>{f.price ?? '—'} CC</td>
-                          <td><button type="button" className="admin-action-btn danger" onClick={() => handleDeleteChatFrame(f)}>Delete</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            <div className="admin-sub-section">
+              <h4>Existing Chat Frames ({adminChatFrames.length})</h4>
+              {adminChatFrames.length === 0 ? (
+                <p style={{ color: 'rgba(220,240,247,0.4)', fontSize: '0.85rem' }}>No frames uploaded yet.</p>
+              ) : (
+                <div className="admin-frame-grid">
+                  {adminChatFrames.map((f, i) => {
+                    const imgUrl = getChatFrameUrl(f)
+                    const frameId = getChatFrameId(f)
+                    return (
+                      <div key={frameId || i} className="admin-frame-tile">
+                        <div className="admin-frame-tile-preview">
+                          {imgUrl
+                            ? <img src={imgUrl} alt={f.name || 'Frame'} />
+                            : <span className="admin-frame-tile-no-img">No image</span>
+                          }
+                        </div>
+                        <div className="admin-frame-tile-info">
+                          <span className="admin-frame-tile-name">{f.name || '—'}</span>
+                          <span className="admin-frame-tile-price">{f.price ?? '—'} CC</span>
+                          <span className="admin-frame-tile-id">{frameId || '—'}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="admin-action-btn danger admin-frame-tile-delete"
+                          onClick={() => handleDeleteChatFrame(f)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Broadcast Delivery Logs */}
             <div className="admin-sub-section">

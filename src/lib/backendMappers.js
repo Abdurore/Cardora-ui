@@ -1,6 +1,8 @@
 import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
 import { formatGiftName, giftNameToEffectKey } from './gifts.js'
 
+import { getChatFrameId, getChatFrameUrl } from './chatFrames.js'
+
 const ROLE_MAP = {
   admin: 'Admin',
   artist: 'Artist',
@@ -136,6 +138,7 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     []
 
   return {
+    ...user,
     id: userId,
     name: user.username || user.name || user.displayName || 'Cardora User',
     username: user.username || user.handle || user.name || 'cardora',
@@ -156,6 +159,10 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     profileBackground: user.profileBackground || user.equippedBackground || user.selectedProfileBackground || user.background || null,
     equippedBackground: user.equippedBackground || user.profileBackground || user.selectedProfileBackground || null,
     profileBackgroundUrl: user.profileBackgroundUrl || user.backgroundUrl || user.selectedProfileBackgroundUrl || user.profileBackground?.url || user.equippedBackground?.url || user.selectedProfileBackground?.url || '',
+    chatFrameId: user.chatFrameId || user.equippedChatFrameId || user.equippedFrameId || getChatFrameId(user.chatFrame) || getChatFrameId(user.equippedChatFrame) || getChatFrameId(user.equippedFrame) || '',
+    chatFrameUrl: getChatFrameUrl(user),
+    equippedChatFrame: user.equippedChatFrame || user.chatFrame || user.equippedFrame || null,
+    chatFrames: user.chatFrames || user.purchasedChatFrames || user.ownedChatFrames || user.unlockedChatFrames || user.unlockedFrames || [],
     createdAt: user.createdAt || '',
     avatarColor: extras.avatarColor || 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
     avatarUrl: user.profilePictureUrl || extras.avatarUrl || '',
@@ -1041,14 +1048,17 @@ export function mapBackendCard(card) {
  * Map a chat message for the frontend
  */
 export function mapChatMessage(msg) {
+  const user = msg.user || msg.sender || msg.author || {}
   return {
     id: msg.id || msg._id || `msg-${Date.now()}-${Math.random()}`,
-    userId: msg.userId || '',
-    username: msg.username || 'Anonymous',
-    content: msg.content || '',
-    profilePictureUrl: msg.profilePictureUrl || null,
-    role: msg.role || '',
+    userId: msg.userId || msg.senderId || msg.authorId || user.id || user._id || '',
+    username: msg.username || user.username || user.name || 'Anonymous',
+    content: msg.content || msg.message || msg.text || '',
+    profilePictureUrl: msg.profilePictureUrl || msg.avatarUrl || user.profilePictureUrl || user.avatarUrl || null,
+    role: msg.role || user.role || '',
     createdAt: msg.createdAt || new Date().toISOString(),
+    chatFrameUrl: getChatFrameUrl(msg) || getChatFrameUrl(user) || null,
+    chatFrameId: msg.chatFrameId || msg.equippedChatFrameId || msg.equippedFrameId || getChatFrameId(msg.chatFrame) || getChatFrameId(msg.equippedChatFrame) || user.chatFrameId || user.equippedChatFrameId || user.equippedFrameId || getChatFrameId(user.chatFrame) || getChatFrameId(user.equippedChatFrame) || null,
   }
 }
 

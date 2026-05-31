@@ -1,3 +1,5 @@
+import { getChatFrameId, getChatFrameUrl } from './chatFrames.js'
+
 const DEFAULT_API_BASE = 'https://cardora-uss3.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, '')
 const TOKEN_KEY = 'cardora:authToken'
@@ -19,8 +21,8 @@ export function getCachedChatFrames() {
 
 export function rememberChatFrame(frame) {
   if (!frame || typeof frame !== 'object') return
-  const id = frame.id || frame.frameId || frame.chatFrameId || frame._id
-  const url = frame.url || frame.imageUrl || frame.frameUrl || frame.chatFrameUrl || frame.cloudinaryUrl || frame.mediaUrl
+  const id = getChatFrameId(frame)
+  const url = getChatFrameUrl(frame)
   if (!id || !url) return
   const nextFrame = {
     ...frame,
@@ -34,6 +36,16 @@ export function rememberChatFrame(frame) {
   const next = existingIndex >= 0
     ? frames.map((item, index) => (index === existingIndex ? { ...item, ...nextFrame } : item))
     : [nextFrame, ...frames]
+  try {
+    localStorage.setItem(CHAT_FRAME_CACHE_KEY, JSON.stringify(next))
+  } catch { /* storage can be unavailable in private contexts */ }
+}
+
+export function forgetCachedChatFrame(frameId) {
+  if (!frameId) return
+  const id = String(frameId)
+  const frames = getCachedChatFrames()
+  const next = frames.filter(item => getChatFrameId(item) !== id)
   try {
     localStorage.setItem(CHAT_FRAME_CACHE_KEY, JSON.stringify(next))
   } catch { /* storage can be unavailable in private contexts */ }
@@ -206,25 +218,7 @@ function pickChatFrameList(payload) {
 }
 
 function chatFrameHasAsset(frame) {
-  const image = frame?.image && typeof frame.image === 'object'
-    ? frame.image.url || frame.image.secure_url || frame.image.secureUrl
-    : frame?.image
-  return Boolean(
-    frame?.url ||
-    frame?.imageUrl ||
-    image ||
-    frame?.assetUrl ||
-    frame?.asset?.url ||
-    frame?.asset?.secure_url ||
-    frame?.cloudinaryUrl ||
-    frame?.secure_url ||
-    frame?.secureUrl ||
-    frame?.mediaUrl ||
-    frame?.fileUrl ||
-    frame?.previewUrl ||
-    frame?.frameUrl ||
-    frame?.chatFrameUrl
-  )
+  return Boolean(getChatFrameUrl(frame))
 }
 
 async function requestFirstChatFrames(paths, options = {}) {
@@ -308,7 +302,26 @@ export async function equipProfileBackground(backgroundId, blur = false) {
 }
 
 export async function equipChatFrame(frameId) {
-  return request('/users/equip-chat-frame', { method: 'PATCH', auth: true, body: { frameId } })
+  if (typeof frameId === 'string' && frameId) {
+    return request('/users/equip-chat-frame', { method: 'PATCH', auth: true, body: { frameId } })
+  }
+  const acceptedMissingRouteStatuses = [404, 405]
+  try {
+    return await request('/users/unequip-chat-frame', { method: 'PATCH', auth: true })
+  } catch (firstError) {
+    if (!acceptedMissingRouteStatuses.includes(firstError.status)) throw firstError
+    try {
+      return await request('/users/remove-chat-frame', { method: 'PATCH', auth: true })
+    } catch (secondError) {
+      if (!acceptedMissingRouteStatuses.includes(secondError.status)) throw secondError
+      try {
+        return await request('/users/chat-frame', { method: 'DELETE', auth: true })
+      } catch (thirdError) {
+        if (!acceptedMissingRouteStatuses.includes(thirdError.status)) throw thirdError
+        return { ok: true, localOnly: true, message: 'Frame removed on this device.' }
+      }
+    }
+  }
 }
 
 export async function buyChatFrame(frameId) {
@@ -333,10 +346,26 @@ export async function deleteProfileBackground(backgroundId) {
 
 export async function getChatFrames() {
   return requestFirstChatFrames([
+    '/admin/chat-frames?page=1&limit=500',
     '/admin/chat-frames',
+    '/chat-frames?page=1&limit=500',
     '/chat-frames',
-    '/users/chat-frames',
   ], { auth: true })
+}
+
+export async function getAdminChatFrames() {
+  return requestFirstChatFrames([
+    '/admin/chat-frames?page=1&limit=500',
+    '/admin/chat-frames',
+    '/chat-frames?page=1&limit=500',
+    '/chat-frames',
+  ], { auth: true })
+}
+
+export async function getOwnedChatFrames() {
+  return requestFirstChatFrames([
+    '/users/chat-frames',
+  ], { auth: true }).catch(() => [])
 }
 
 /* ═══════════════════════════════════════════════
@@ -995,7 +1024,12 @@ export async function createChatFrame(payload) {
 }
 
 export async function deleteChatFrame(frameId) {
-  return request(`/admin/chat-frames/${encodeURIComponent(frameId)}`, { method: 'DELETE', auth: true })
+  const id = encodeURIComponent(frameId)
+  return requestFirstSuccess([
+    `/admin/chat-frames/${id}`,
+    `/chat-frames/${id}`,
+    `/admin/chat-frame/${id}`,
+  ], { method: 'DELETE', auth: true })
 }
 
 export async function requestChatFrame(payload) {

@@ -13342,6 +13342,38 @@ a {
   box-shadow: 0 12px 28px rgba(12, 60, 72, 0.4);
 }
 
+/* Chat bubble wrapper for frame overlay */
+.chat-msg-bubble-wrap {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  isolation: isolate;
+}
+
+.chat-msg-frame-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chat-msg-bubble-wrap.has-frame {
+  padding: 12px;
+  margin: 4px 4px 4px 0;
+}
+
+.chat-msg.me .chat-msg-bubble-wrap.has-frame {
+  margin: 4px 0 4px 4px;
+}
+
+.chat-msg-bubble-wrap.has-frame .chat-msg-bubble {
+  position: relative;
+  z-index: 1;
+}
+
 .chat-msg-time {
   font-size: 0.65rem;
   color: rgba(220, 242, 247, 0.35);
@@ -16826,10 +16858,6 @@ a {
     flex-wrap: wrap;
     justify-content: flex-end;
   }
-  .chat-online-count {
-    font-size: 0.62rem;
-    padding: 2px 8px;
-  }
   .chat-status {
     font-size: 0.6rem;
     letter-spacing: 0.06em;
@@ -17159,11 +17187,18 @@ a {
   padding: 32px 28px 28px;
 }
 
+
 .ctm-shell::-webkit-scrollbar { width: 4px; }
 .ctm-shell::-webkit-scrollbar-thumb {
   background: rgba(126, 247, 255, 0.15);
   border-radius: 99px;
 }
+
+.ctm-start-warm { --btn-hover-border: var(--type-personal); --btn-hover-shadow: var(--type-personal-bg); background: linear-gradient(135deg, var(--type-personal-bg), transparent); border-color: color-mix(in srgb, var(--type-personal) 40%, transparent); }
+.ctm-start-cool { --btn-hover-border: var(--type-poll); --btn-hover-shadow: var(--type-poll-bg); background: linear-gradient(135deg, var(--type-poll-bg), transparent); border-color: color-mix(in srgb, var(--type-poll) 40%, transparent); }
+.ctm-start-rose { --btn-hover-border: var(--type-trivia); --btn-hover-shadow: var(--type-trivia-bg); background: linear-gradient(135deg, var(--type-trivia-bg), transparent); border-color: color-mix(in srgb, var(--type-trivia) 40%, transparent); }
+.ctm-start-mint { --btn-hover-border: var(--type-anonymous); --btn-hover-shadow: var(--type-anonymous-bg); background: linear-gradient(135deg, var(--type-anonymous-bg), transparent); border-color: color-mix(in srgb, var(--type-anonymous) 40%, transparent); }
+.ctm-start-emerald { --btn-hover-border: var(--type-chain); --btn-hover-shadow: var(--type-chain-bg); background: linear-gradient(135deg, var(--type-chain-bg), transparent); border-color: color-mix(in srgb, var(--type-chain) 40%, transparent); }
 
 /* Header */
 .ctm-header {
@@ -17518,11 +17553,11 @@ a {
   cursor: not-allowed;
 }
 
-.ctm-start-warm { background: linear-gradient(135deg, rgba(255, 160, 100, 0.14), rgba(255, 120, 160, 0.08)); border-color: rgba(255, 160, 100, 0.25); }
-.ctm-start-cool { background: linear-gradient(135deg, rgba(96, 165, 250, 0.14), rgba(126, 247, 255, 0.08)); border-color: rgba(96, 165, 250, 0.25); }
-.ctm-start-rose { background: linear-gradient(135deg, rgba(167, 139, 250, 0.14), rgba(244, 114, 182, 0.08)); border-color: rgba(167, 139, 250, 0.25); }
-.ctm-start-mint { background: linear-gradient(135deg, rgba(98, 255, 162, 0.14), rgba(126, 247, 255, 0.08)); border-color: rgba(98, 255, 162, 0.25); }
-.ctm-start-emerald { background: linear-gradient(135deg, rgba(52, 211, 153, 0.14), rgba(110, 231, 183, 0.08)); border-color: rgba(52, 211, 153, 0.25); }
+.ctm-start-warm { --btn-hover-border: var(--type-personal); --btn-hover-shadow: var(--type-personal-bg); background: linear-gradient(135deg, var(--type-personal-bg), transparent); border-color: color-mix(in srgb, var(--type-personal) 40%, transparent); }
+.ctm-start-cool { --btn-hover-border: var(--type-poll); --btn-hover-shadow: var(--type-poll-bg); background: linear-gradient(135deg, var(--type-poll-bg), transparent); border-color: color-mix(in srgb, var(--type-poll) 40%, transparent); }
+.ctm-start-rose { --btn-hover-border: var(--type-trivia); --btn-hover-shadow: var(--type-trivia-bg); background: linear-gradient(135deg, var(--type-trivia-bg), transparent); border-color: color-mix(in srgb, var(--type-trivia) 40%, transparent); }
+.ctm-start-mint { --btn-hover-border: var(--type-anonymous); --btn-hover-shadow: var(--type-anonymous-bg); background: linear-gradient(135deg, var(--type-anonymous-bg), transparent); border-color: color-mix(in srgb, var(--type-anonymous) 40%, transparent); }
+.ctm-start-emerald { --btn-hover-border: var(--type-chain); --btn-hover-shadow: var(--type-chain-bg); background: linear-gradient(135deg, var(--type-chain-bg), transparent); border-color: color-mix(in srgb, var(--type-chain) 40%, transparent); }
 
 /* ——— CardTypeModal mode selection ——— */
 .ctm-mode-section { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; }
@@ -23425,7 +23460,7 @@ a {
     min-width: 108px;
     background:
       radial-gradient(circle at 20% 0%, rgba(255,255,255,0.28), transparent 34%),
-      linear-gradient(135deg, var(--type-accent, #7ef7ff), #62ffa2);
+      var(--send-gradient, linear-gradient(135deg, #7ef7ff, #62ffa2));
     color: #041015;
     font-size: 0.76rem;
     font-weight: 700;
@@ -29137,6 +29172,44 @@ a {
   box-shadow: 0 10px 24px rgba(1,8,12,0.3);
 }
 
+.store-frame-chat-bubble.framed {
+  /* legacy - kept for reference, actual preview uses cf-bubble-wrap */
+  display: none;
+}
+
+/* Store card preview bubble with overlay frame */
+.cf-bubble-wrap {
+  position: relative;
+  display: inline-flex;
+  width: 100%;
+  padding: 12px;
+  isolation: isolate;
+}
+
+.cf-frame-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.cf-bubble-text {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 14px 14px 14px 4px;
+  background: linear-gradient(180deg, rgba(16, 30, 38, 0.92), rgba(10, 20, 26, 0.96));
+  border: 1px solid rgba(126, 247, 255, 0.1);
+  color: #e8f6fa;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .store-frame-info {
   display: grid;
   gap: 5px;
@@ -29195,6 +29268,342 @@ a {
   border-color: var(--accent-tint);
   color: var(--text-muted);
 }
+
+/* ── Chat Frame Cards (cf-*) ── */
+.store-cosmetics-content {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.cf-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cf-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cf-section-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(220, 242, 247, 0.55);
+}
+
+.cf-section-count {
+  font-size: 0.75rem;
+  color: rgba(220, 242, 247, 0.35);
+  background: rgba(126, 247, 255, 0.06);
+  border: 1px solid rgba(126, 247, 255, 0.1);
+  padding: 3px 10px;
+  border-radius: 100px;
+}
+
+.cf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
+  gap: 16px;
+}
+
+.cf-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(126, 247, 255, 0.1);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cf-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(126, 247, 255, 0.24);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+}
+
+.cf-card--equipped {
+  border-color: rgba(98, 255, 162, 0.4);
+  box-shadow: 0 0 0 1px rgba(98, 255, 162, 0.2), 0 8px 28px rgba(0, 0, 0, 0.3);
+}
+
+.cf-equipped-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  background: linear-gradient(135deg, #62ffa2, #7ef7ff);
+  color: #041015;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 100px;
+  pointer-events: none;
+}
+
+.cf-preview {
+  width: 100%;
+  padding: 28px 22px 28px 18px;
+  background:
+    radial-gradient(circle at top left, rgba(126, 247, 255, 0.12), transparent 50%),
+    linear-gradient(180deg, rgba(8, 18, 24, 0.97) 0%, rgba(4, 10, 14, 0.99) 100%);
+  border-bottom: 1px solid rgba(126, 247, 255, 0.08);
+  overflow: visible;
+  border-radius: 16px 16px 0 0;
+}
+
+.cf-preview-inner {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.cf-avatar-wrap {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.cf-avatar {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7ef7ff, #62ffa2);
+  color: #041015;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.cf-avatar-img {
+  display: block;
+  object-fit: cover;
+}
+
+.cf-bubble-col {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.cf-bubble-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cf-bubble-meta strong {
+  color: #7ef7ff;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.cf-bubble-meta span {
+  color: rgba(220, 242, 247, 0.32);
+  font-size: 0.64rem;
+}
+
+.cf-info {
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.cf-info-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cf-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ddf3fa;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cf-price {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #7ef7ff;
+  background: rgba(126, 247, 255, 0.1);
+  padding: 3px 9px;
+  border-radius: 100px;
+  border: 1px solid rgba(126, 247, 255, 0.18);
+  white-space: nowrap;
+}
+
+.cf-owned-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #62ffa2;
+  background: rgba(98, 255, 162, 0.1);
+  padding: 3px 9px;
+  border-radius: 100px;
+  border: 1px solid rgba(98, 255, 162, 0.2);
+  white-space: nowrap;
+}
+
+.cf-equipped-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #041015;
+  background: linear-gradient(135deg, #62ffa2, #7ef7ff);
+  padding: 3px 9px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+.cf-desc {
+  font-size: 0.76rem;
+  color: rgba(200, 230, 240, 0.45);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cf-actions {
+  padding: 0 14px 14px;
+}
+
+.cf-btn {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: opacity 0.18s ease, transform 0.15s ease, background 0.2s ease;
+  letter-spacing: 0.01em;
+}
+
+.cf-btn:active {
+  transform: scale(0.97);
+}
+
+.cf-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.cf-btn--buy {
+  background: linear-gradient(135deg, #7ef7ff 0%, #62ffa2 100%);
+  color: #041015;
+  box-shadow: 0 4px 16px rgba(126, 247, 255, 0.25);
+}
+
+.cf-btn--buy:not(:disabled):hover {
+  opacity: 0.88;
+  box-shadow: 0 6px 22px rgba(126, 247, 255, 0.35);
+}
+
+.cf-btn--equip {
+  background: rgba(126, 247, 255, 0.1);
+  color: #7ef7ff;
+  border: 1px solid rgba(126, 247, 255, 0.22);
+}
+
+.cf-btn--equip:not(:disabled):hover {
+  background: rgba(126, 247, 255, 0.18);
+}
+
+.cf-btn--equipped {
+  background: rgba(98, 255, 162, 0.08);
+  color: #62ffa2;
+  border: 1px solid rgba(98, 255, 162, 0.2);
+}
+
+.cf-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: cf-spin 0.65s linear infinite;
+  display: inline-block;
+}
+
+@keyframes cf-spin {
+  to { transform: rotate(360deg); }
+}
+
+.store-frame-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 170px;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px dashed rgba(126, 247, 255, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(200, 230, 240, 0.55);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.store-frame-empty-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+/* Light theme overrides */
+[data-theme="light"] .cf-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: var(--accent-tint);
+}
+
+[data-theme="light"] .cf-card--equipped {
+  border-color: var(--primary);
+}
+
+[data-theme="light"] .cf-preview {
+  background: linear-gradient(180deg, rgba(235, 250, 255, 0.96), rgba(220, 243, 252, 0.98));
+  border-bottom-color: var(--accent-tint);
+}
+
+[data-theme="light"] .cf-section-title { color: var(--text-muted); }
+[data-theme="light"] .cf-section-count { color: var(--text-muted); }
+[data-theme="light"] .cf-name { color: var(--text); }
+[data-theme="light"] .cf-bubble-meta strong { color: var(--primary); }
+[data-theme="light"] .cf-bubble-meta span { color: rgba(44, 90, 110, 0.5); }
+[data-theme="light"] .cf-desc { color: var(--text-muted); }
+[data-theme="light"] .cf-price {
+  color: var(--primary);
+  background: rgba(10, 122, 143, 0.08);
+  border-color: rgba(10, 122, 143, 0.2);
+}
+[data-theme="light"] .cf-btn--equip {
+  color: var(--primary);
+  background: rgba(10, 122, 143, 0.08);
+  border-color: rgba(10, 122, 143, 0.2);
+}
+
 
 [data-theme="light"] .card:hover {
   border-color: var(--primary);
@@ -29782,3 +30191,83 @@ a {
 
 
 
+
+/* -- Admin Chat Frame Tiles -- */
+.admin-frame-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.admin-frame-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(126,247,255,0.12);
+  padding: 12px;
+  transition: border-color 0.2s;
+}
+
+.admin-frame-tile:hover {
+  border-color: rgba(126,247,255,0.28);
+}
+
+.admin-frame-tile-preview {
+  width: 100%;
+  aspect-ratio: 1;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-frame-tile-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.admin-frame-tile-no-img {
+  font-size: 0.72rem;
+  color: rgba(220,240,247,0.3);
+}
+
+.admin-frame-tile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.admin-frame-tile-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ddf3fa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-frame-tile-price {
+  font-size: 0.72rem;
+  color: #7ef7ff;
+  font-weight: 600;
+}
+
+.admin-frame-tile-id {
+  font-size: 0.62rem;
+  color: rgba(220,240,247,0.3);
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-frame-tile-delete {
+  width: 100%;
+  margin-top: auto;
+}

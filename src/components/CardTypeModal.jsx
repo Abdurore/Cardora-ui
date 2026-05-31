@@ -54,7 +54,7 @@ const CARD_TYPES = [
 const TIER_INFO = {
   classic: { label: 'Classic', note: 'Free · Clean animated reveal' },
   premium: { label: 'Premium', note: 'Music + richer visuals · Costs CC' },
-  elite: { label: 'Elite', note: 'Full effects + gifts · Costs CC' },
+  elite: { label: 'Elite', note: /'Full cinematic experience · Costs CC'/ },
 }
 
 function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
@@ -181,12 +181,17 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
 
             <div className="ctm-tier-grid">
               {activeType.tiers.map((tier) => {
-                const info = TIER_INFO[tier]
+                const info = { ...TIER_INFO[tier] }
+                if (tier === 'elite' && activeType.id === 'personal') {
+                  info.note = 'Full effects + gifts · Costs CC'
+                } else if (tier === 'elite') {
+                  info.note = 'Full cinematic experience · Costs CC'
+                }
                 const artistNote = tier === 'classic'
                   ? 'Free tier feel · Minimal reveal'
                   : tier === 'premium'
                   ? 'Music + richer visuals'
-                  : 'Full cinematic experience'
+                  : (activeType.id === 'personal' ? 'Full effects + gifts' : 'Full cinematic experience')
                 return (
                   <button
                     key={tier}

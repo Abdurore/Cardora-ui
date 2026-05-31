@@ -3835,7 +3835,7 @@ function CardStudio() {
                 className="cs-m2-send-btn"
                 disabled={isSending}
                 onClick={isArtist ? () => setShowPublish(true) : handleSendClick}
-                style={!isArtist ? { '--type-accent': TYPE_ACCENT[studioType] || TYPE_ACCENT.personal } : undefined}
+                style={!isArtist ? { '--send-gradient': TYPE_SEND_GRADIENT[studioType] || TYPE_SEND_GRADIENT.personal } : undefined}
               >
                 <span className="cs-m2-send-arrow">▷</span>
                 <span>{isArtist ? 'Publish' : tierCost > 0 ? `Create (${tierCost}cc)` : 'Create Card'}</span>
