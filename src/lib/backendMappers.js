@@ -800,6 +800,7 @@ export function backendCardToCardObject(card) {
   const layoutdata = card.layoutdata || {}
 
   const attachedGift = normalizeAttachedGift(card)
+  const storedGiftEffect = card.cardObject?.giftEffect || card.layoutdata?.giftEffect || card.layoutConfig?.giftEffect || card.giftEffect || {}
 
   const bgType = enhancements.background?.type || 'color'
   const isVideo = bgType === 'video'
@@ -934,13 +935,13 @@ export function backendCardToCardObject(card) {
     },
     giftEffect: attachedGift ? {
       enabled: attachedGift.enabled !== false,
-      effectKey: giftNameToEffectKey(attachedGift.effectKey || attachedGift.giftName || attachedGift.name || backfilled.giftEffect?.effectKey || 'none'),
-      giftTitle: attachedGift.giftTitle || attachedGift.title || formatGiftName(attachedGift.giftName || attachedGift.name || attachedGift.effectKey || backfilled.giftEffect?.giftName || backfilled.giftEffect?.effectKey),
-      giftAmount: attachedGift.giftAmount || attachedGift.amount || backfilled.giftEffect?.giftAmount || '',
-      giftId: attachedGift.giftId || attachedGift.inventoryId || attachedGift.id || backfilled.giftEffect?.giftId || '',
-      giftName: attachedGift.giftName || attachedGift.name || backfilled.giftEffect?.giftName || '',
-      status: attachedGift.status || backfilled.giftEffect?.status || 'available',
-    } : (backfilled.giftEffect?.enabled ? backfilled.giftEffect : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '', status: 'available' }),
+      effectKey: giftNameToEffectKey(attachedGift.effectKey || attachedGift.giftName || attachedGift.name || storedGiftEffect.effectKey || 'none'),
+      giftTitle: attachedGift.giftTitle || attachedGift.title || formatGiftName(attachedGift.giftName || attachedGift.name || attachedGift.effectKey || storedGiftEffect.giftName || storedGiftEffect.effectKey),
+      giftAmount: attachedGift.giftAmount || attachedGift.amount || storedGiftEffect.giftAmount || '',
+      giftId: attachedGift.giftId || attachedGift.inventoryId || attachedGift.id || storedGiftEffect.giftId || '',
+      giftName: attachedGift.giftName || attachedGift.name || storedGiftEffect.giftName || '',
+      status: attachedGift.status || storedGiftEffect.status || 'available',
+    } : (storedGiftEffect.enabled ? storedGiftEffect : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '', status: 'available' }),
   })
 }
 
