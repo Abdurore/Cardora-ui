@@ -1063,11 +1063,12 @@ function CardStudio() {
     let selectedGift = flushedCardObject.giftEffect || {}
     if (selectedGift.enabled && selectedGift.isPendingLocal) {
       const refreshedUser = await refreshBalance?.()
-      const resolvedGift = refreshedUser?.giftsInventory?.find(g => 
-        g.name === selectedGift.giftName && 
-        !g.isPendingLocal && 
-        (g.status === 'available' || g.status === 'active')
-      )
+      const resolvedGift = refreshedUser?.giftsInventory?.find(g => {
+        const gName = g.giftName || g.name || effectKeyToGiftName(g.effectKey) || ''
+        const sName = selectedGift.giftName || selectedGift.name || effectKeyToGiftName(selectedGift.effectKey) || ''
+        const statusOk = !g.status || g.status === 'available' || g.status === 'active'
+        return gName === sName && !g.isPendingLocal && statusOk
+      })
       
       if (resolvedGift) {
         selectedGift = { 
