@@ -934,13 +934,13 @@ export function backendCardToCardObject(card) {
     },
     giftEffect: attachedGift ? {
       enabled: attachedGift.enabled !== false,
-      effectKey: giftNameToEffectKey(attachedGift.effectKey || attachedGift.giftName || attachedGift.name || 'none'),
-      giftTitle: attachedGift.giftTitle || attachedGift.title || formatGiftName(attachedGift.giftName || attachedGift.name || attachedGift.effectKey),
-      giftAmount: attachedGift.giftAmount || attachedGift.amount || '',
-      giftId: attachedGift.giftId || attachedGift.inventoryId || attachedGift.id || '',
-      giftName: attachedGift.giftName || attachedGift.name || '',
-      status: attachedGift.status || 'available',
-    } : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '', status: 'available' },
+      effectKey: giftNameToEffectKey(attachedGift.effectKey || attachedGift.giftName || attachedGift.name || backfilled.giftEffect?.effectKey || 'none'),
+      giftTitle: attachedGift.giftTitle || attachedGift.title || formatGiftName(attachedGift.giftName || attachedGift.name || attachedGift.effectKey || backfilled.giftEffect?.giftName || backfilled.giftEffect?.effectKey),
+      giftAmount: attachedGift.giftAmount || attachedGift.amount || backfilled.giftEffect?.giftAmount || '',
+      giftId: attachedGift.giftId || attachedGift.inventoryId || attachedGift.id || backfilled.giftEffect?.giftId || '',
+      giftName: attachedGift.giftName || attachedGift.name || backfilled.giftEffect?.giftName || '',
+      status: attachedGift.status || backfilled.giftEffect?.status || 'available',
+    } : (backfilled.giftEffect?.enabled ? backfilled.giftEffect : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '', status: 'available' }),
   })
 }
 
