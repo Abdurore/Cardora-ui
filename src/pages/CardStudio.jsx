@@ -1060,6 +1060,33 @@ function CardStudio() {
       return
     }
 
+    let selectedGift = flushedCardObject.giftEffect || {}
+    if (selectedGift.enabled && selectedGift.isPendingLocal) {
+      const refreshedUser = await refreshBalance?.()
+      const resolvedGift = refreshedUser?.giftsInventory?.find(g => 
+        g.name === selectedGift.giftName && 
+        !g.isPendingLocal && 
+        (g.status === 'available' || g.status === 'active')
+      )
+      
+      if (resolvedGift) {
+        selectedGift = { 
+          ...selectedGift, 
+          giftId: resolvedGift._id || resolvedGift.id || resolvedGift.inventoryId, 
+          isPendingLocal: false 
+        }
+        flushedCardObject.giftEffect = selectedGift
+        setCardObject(flushedCardObject)
+      } else {
+        setSendResult({
+          ok: false,
+          message: 'Your gift purchase is still pending verification. Please wait a few moments for the payment to confirm, then try sending again.'
+        })
+        setIsSending(false)
+        return
+      }
+    }
+
     const extras = {
       title: flushedCardObject.content?.heading || 'Untitled Card',
       templateId: cardData?.id || 'custom',
@@ -1090,14 +1117,6 @@ function CardStudio() {
       // separate from the UI row id so duplicate gifts stay selectable.
       const selectedGift = flushedCardObject.giftEffect || {}
       if (selectedGift.enabled && selectedGift.giftId) {
-        if (selectedGift.isPendingLocal) {
-          setSendResult({
-            ok: false,
-            message: 'Your gift purchase is still pending verification. Please wait a few moments for the payment to confirm, then try sending again.'
-          })
-          setIsSending(false)
-          return
-        }
         const cardIdCandidates = [
           d.card?._id,
           d.card?.id,

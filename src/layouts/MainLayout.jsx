@@ -950,7 +950,7 @@ function MainLayout() {
   }
 
   const refreshBalance = async () => {
-    await hydrateSession()
+    return await hydrateSession()
   }
 
   const handleCurrencyChange = async (code) => {
