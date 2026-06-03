@@ -117,7 +117,7 @@ function ModeratorDashboard() {
     if (!id) { showMsg('User ID or username required.', false); return }
     if (!await appConfirm('Unban User', `Unban "${id}"?`)) return
     try {
-      await unbanUser({ userId: id })
+      await unbanUser({ identifier: id, userId: id })
       showMsg(`"${id}" unbanned.`)
       setUnbanId('')
     } catch (err) {
@@ -305,7 +305,7 @@ function ModeratorDashboard() {
                   onClick={() => {
                     const id = banForm.identifier.trim()
                     if (!id) { showMsg('User ID or username required.', false); return }
-                    setBanConfirm({ identifier: id, payload: { userId: id, durationDays: banForm.durationDays, reason: banForm.reason } })
+                    setBanConfirm({ identifier: id, payload: { identifier: id, userId: id, durationDays: banForm.durationDays, reason: banForm.reason } })
                   }}
                 >
                   Ban

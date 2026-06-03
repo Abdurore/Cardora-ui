@@ -277,8 +277,9 @@ export async function getSignupBonusAvailability() {
 /* ═══════════════════════════════════════════════
    USERS
    ═══════════════════════════════════════════════ */
-export async function getCurrentUser() {
-  return request('/current-user', { auth: true })
+export async function getCurrentUser(identifier) {
+  const qs = identifier ? `?identifier=${encodeURIComponent(identifier)}` : ''
+  return request(`/current-user${qs}`, { auth: true })
 }
 
 export async function updateProfile(payload) {
@@ -382,7 +383,14 @@ export async function updateCard(payload) {
 
 export async function deleteCard(payload) {
   const cardId = payload?.cardId || payload?.id
-  return request('/delete-card', { method: 'DELETE', auth: true, body: { cardId, id: cardId } })
+  try {
+    return await request('/delete-card', { method: 'DELETE', auth: true, body: { cardId, id: cardId } })
+  } catch (err) {
+    if (cardId && [404, 405].includes(err.status)) {
+      return request(`/delete-card/${encodeURIComponent(cardId)}`, { method: 'DELETE', auth: true })
+    }
+    throw err
+  }
 }
 
 export async function getCardPrices() {
@@ -626,13 +634,8 @@ export async function deleteTemplate(payload) {
 
   const candidates = [
     { path: `/templates/${templateId}`, options: { method: 'DELETE', auth: true } },
+    { path: `/delete-template/${encodeURIComponent(templateId)}`, options: { method: 'DELETE', auth: true } },
     { path: '/delete-template', options: { method: 'DELETE', auth: true, body: { templateId } } },
-    { path: '/delete-template', options: { method: 'DELETE', auth: true, body: { id: templateId } } },
-    { path: '/delete-template', options: { method: 'DELETE', auth: true, body: { _id: templateId } } },
-    { path: '/delete-template', options: { method: 'DELETE', auth: true, body: { templateId, id: templateId, _id: templateId } } },
-    { path: `/templates/delete/${templateId}`, options: { method: 'DELETE', auth: true } },
-    { path: `/templates/${templateId}/delete`, options: { method: 'POST', auth: true } },
-    { path: '/delete-template', options: { method: 'POST', auth: true, body: { templateId } } },
     { path: '/delete-template', options: { method: 'POST', auth: true, body: { id: templateId } } },
     { path: `/my-templates/${templateId}`, options: { method: 'DELETE', auth: true } },
     { path: `/artist/templates/${templateId}`, options: { method: 'DELETE', auth: true } },
@@ -653,7 +656,14 @@ export async function deleteTemplate(payload) {
 // Admin-only template delete. Backend enforces role === 'admin' here so the
 // artist-owned /delete-template endpoint doesn't reject the request.
 export async function adminDeleteTemplate(templateId) {
-  return request(`/admin/templates/${templateId}`, { method: 'DELETE', auth: true })
+  try {
+    return await request(`/admin/templates/${encodeURIComponent(templateId)}`, { method: 'DELETE', auth: true })
+  } catch (err) {
+    if ([404, 405].includes(err.status)) {
+      return request('/admin/templates', { method: 'DELETE', auth: true, body: { templateId, id: templateId, _id: templateId } })
+    }
+    throw err
+  }
 }
 
 // Admin template review — list everything, approve, or reject a submission.
@@ -814,7 +824,7 @@ export async function reportCard(targetId, reason, details = '') {
 }
 
 export async function reportTemplate(targetId, reason, details = '') {
-  return request('/reports/templates', { method: 'POST', auth: true, body: { targetId, type: 'template', targetType: 'template', reason, details } })
+  return request('/reports/templates', { method: 'POST', auth: true, body: { targetId, templateId: targetId, type: 'template', targetType: 'template', reason, details } })
 }
 
 export async function createAdminPackage(payload) {
@@ -983,7 +993,14 @@ export async function uploadMediaVideo(payload) {
 }
 
 export async function deleteMediaVideo(nameKey) {
-  return request('/media/videos', { method: 'DELETE', auth: true, body: { nameKey } })
+  try {
+    return await request('/media/videos', { method: 'DELETE', auth: true, body: { nameKey } })
+  } catch (err) {
+    if (nameKey && [404, 405].includes(err.status)) {
+      return request(`/media/videos/${encodeURIComponent(nameKey)}`, { method: 'DELETE', auth: true })
+    }
+    throw err
+  }
 }
 
 export async function getMediaMusic() {
@@ -995,7 +1012,14 @@ export async function uploadMediaMusic(payload) {
 }
 
 export async function deleteMediaMusic(nameKey) {
-  return request('/media/music', { method: 'DELETE', auth: true, body: { nameKey } })
+  try {
+    return await request('/media/music', { method: 'DELETE', auth: true, body: { nameKey } })
+  } catch (err) {
+    if (nameKey && [404, 405].includes(err.status)) {
+      return request(`/media/music/${encodeURIComponent(nameKey)}`, { method: 'DELETE', auth: true })
+    }
+    throw err
+  }
 }
 
 // Patch a music track — currently used to persist trim points (startSec /

@@ -540,6 +540,7 @@ function AdminDashboard() {
       user: match || null,
       identifier: id,
       payload: {
+        identifier: id,
         userId: id,
         durationDays: banForm.durationDays,
         reason: banForm.reason,
@@ -568,7 +569,7 @@ function AdminDashboard() {
     if (!id) { showMsg('User ID or username required', false); return }
     if (!await appConfirm('Unban User', `Unban "${id}"?`)) return
     try {
-      await unbanUser({ userId: id })
+      await unbanUser({ identifier: id, userId: id })
       showMsg(`User "${id}" unbanned.`)
       setUnbanIdentifier('')
       loadTabData('Users')
@@ -592,7 +593,7 @@ function AdminDashboard() {
     setRoleSubmitting(true)
     setRoleError('')
     try {
-      await setUserRole({ userId: roleConfirm.identifier, role: roleConfirm.role })
+      await setUserRole({ identifier: roleConfirm.identifier, userId: roleConfirm.identifier, role: roleConfirm.role })
       showMsg(`Role updated to "${roleConfirm.role}".`)
       setRoleForm({ identifier: '', role: 'moderator' })
       setRoleConfirm(null)
@@ -1522,8 +1523,13 @@ const handleBroadcast = async () => {
                             type="button"
                             className="admin-action-btn reject"
                             onClick={() => {
-                              setBanForm(p => ({ ...p, identifier: uname }))
-                              openBanConfirm()
+                              const identifier = uid || uname
+                              setBanForm(p => ({ ...p, identifier }))
+                              setBanConfirm({
+                                user,
+                                identifier,
+                                payload: { identifier, userId: identifier, durationDays: banForm.durationDays, reason: banForm.reason },
+                              })
                             }}
                           >
                             Ban
@@ -1532,7 +1538,7 @@ const handleBroadcast = async () => {
                             type="button"
                             className="admin-action-btn approve"
                             onClick={async () => {
-                              try { await unbanUser({ userId: uid || uname }); showMsg(`"${uname}" unbanned.`); loadTabData('Users') }
+                              try { const identifier = uid || uname; await unbanUser({ identifier, userId: identifier }); showMsg(`"${uname}" unbanned.`); loadTabData('Users') }
                               catch (err) { showMsg(err.message || 'Failed', false) }
                             }}
                           >

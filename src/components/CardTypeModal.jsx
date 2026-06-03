@@ -54,7 +54,7 @@ const CARD_TYPES = [
 const TIER_INFO = {
   classic: { label: 'Classic', note: 'Free · Clean animated reveal' },
   premium: { label: 'Premium', note: 'Music + richer visuals · Costs CC' },
-  elite: { label: 'Elite', note: /'Full cinematic experience · Costs CC'/ },
+  elite: { label: 'Elite', note: 'Full cinematic experience · Costs CC' },
 }
 
 function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {

@@ -1,6 +1,29 @@
 Cardora Backend API Handbook (Frontend + AI Integration)
 =========================================================
 
+Latest Updates (June 1, 2026)
+-----------------------------
+- Interactive card names:
+  - poll, chain, and trivia cards now support a top-level `name`
+  - backend also mirrors the resolved name into `config.content.name`
+  - if no name is provided, backend derives one from question/challenge/default type label
+  - `PUT /update-card` can update `name`
+  - `GET /usercards` uses `name`/`config.content.name` when building card titles
+- Gift attachment during card creation:
+  - create-card payloads may include `giftInventoryId` or `inventoryId`
+  - gifts can still be attached later through `POST /cards/attach-gift`
+  - gifts are allowed only on `personal` cards
+- Deletion endpoint compatibility:
+  - card delete now supports `DELETE /delete-card` and `DELETE /delete-card/:cardId`
+  - template delete accepts `templateId` from body, params, or query
+  - admin gift/profile-background/chat-frame/template/redeem-code deletes accept IDs from params, body, or query where applicable
+  - media deletes now support `/media/videos/:nameKey` and `/media/music/:nameKey`
+- Template report fix:
+  - `POST /reports/templates` now accepts `templateId` directly, in addition to generic `targetId`
+- Account deletion cleanup:
+  - `DELETE /delete-account` removes the user and deletes owned cards/templates
+  - reports made by the deleted user are marked with `reportedByDeleted: true`
+
 Latest Updates (May 6, 2026)
 ----------------------------
 - Card read reliability improved:
@@ -191,10 +214,12 @@ Additional fields guaranteed in `/current-user` response object:
 6) Template Deletion and Lookup Improvements
 --------------------------------------------
 Creator delete now supports two route shapes:
-- `DELETE /delete-template` (body `templateId`)
+- `DELETE /delete-template` (body/query `templateId`)
 - `DELETE /delete-template/:templateId` (param version)
 
 Admin template tools:
+- `DELETE /admin/templates`
+  - accepts `templateId` from body or query
 - `DELETE /admin/templates/:templateId`
   - hard deletes template by `id`
   - returns `Template deleted by admin`
@@ -537,9 +562,21 @@ DELETE /delete-account (auth)
 -----------------------------
 Deletes own account.
 
+Cleanup behavior:
+- deletes the user row
+- deletes cards owned by the user
+- deletes templates owned by the user
+- marks reports submitted by that user with `reportedByDeleted: true`
+
 GET /usercards (auth)
 ---------------------
 Query: `page`, `limit`
+
+Card title behavior:
+- uses top-level `name` first
+- then `config.content.name`
+- then type-specific content (`header`, `question`, `challenge`, `message`)
+- falls back to `Untitled Card`
 
 GET /users/:identifier/profile (auth)
 -------------------------------------
@@ -604,6 +641,20 @@ Body:
 }
 ```
 
+Target ID aliases are also accepted:
+```json
+{
+  "templateId": "TEMPLATE_ID",
+  "reason": "Inappropriate content",
+  "details": "Optional context"
+}
+```
+
+Alias map:
+- `/reports/users`: `userId` or `targetId`
+- `/reports/cards`: `cardId` or `targetId`
+- `/reports/templates`: `templateId` or `targetId`
+
 Moderation Report Review
 ------------------------
 `GET /admin/reports` (admin/moderator)
@@ -645,6 +696,7 @@ At rest in DB (simplified):
 ```json
 {
   "id": "uuid",
+  "name": "Card display name",
   "slug": "public-card-slug",
   "userId": "creator-user-id",
   "type": "personal|poll|chain|trivia|anonymous",
@@ -668,6 +720,13 @@ At rest in DB (simplified):
   },
   "enhancements": {},
   "state": {},
+  "giftAttachment": {
+    "inventoryId": "gift-inventory-id",
+    "giftName": "spark",
+    "priceNgn": 500,
+    "ownerUserId": "creator-user-id",
+    "status": "attached|claimed"
+  },
   "meta": {
     "creatorId": "creator-user-id",
     "createdAt": "ISO_DATE"
@@ -682,6 +741,9 @@ At rest in DB (simplified):
 Important invariant:
 - `card.tier` is canonical for pricing/feature rules.
 - `layoutdata.tier` is always synchronized to the same value by backend normalization.
+- interactive cards (`poll`, `chain`, `trivia`) have a top-level `name`.
+- backend mirrors interactive card names into `config.content.name`.
+- `giftAttachment` exists only when a gift has been attached.
 
 AI-Safe Card Payload Map (Use This to Avoid Structure Errors)
 --------------------------------------------------------------
@@ -962,6 +1024,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
 4) Poll + Classic
 ```json
 {
+  "name": "Preference Poll",
   "type": "poll",
   "tier": "classic",
   "config": {
@@ -972,6 +1035,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
     },
     "font": "Poppins",
     "content": {
+      "name": "Preference Poll",
       "question": "Which one do you prefer?",
       "options": [
         { "id": "opt_a", "text": "Option A" },
@@ -989,6 +1053,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
 5) Poll + Elite
 ```json
 {
+  "name": "Date Ideas",
   "type": "poll",
   "tier": "elite",
   "config": {
@@ -999,6 +1064,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
     },
     "font": "Poppins",
     "content": {
+      "name": "Date Ideas",
       "question": "Best date idea?",
       "options": [
         { "id": "movie", "text": "Movie Night" },
@@ -1030,6 +1096,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
 6) Chain + Classic
 ```json
 {
+  "name": "Kindness Chain",
   "type": "chain",
   "tier": "classic",
   "config": {
@@ -1040,6 +1107,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
     },
     "font": "Poppins",
     "content": {
+      "name": "Kindness Chain",
       "challenge": "Share one kind thing you did today.",
       "rules": ["Be respectful", "Keep it short"]
     }
@@ -1054,6 +1122,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
 7) Chain + Elite
 ```json
 {
+  "name": "Motivation Chain",
   "type": "chain",
   "tier": "elite",
   "config": {
@@ -1064,6 +1133,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
     },
     "font": "Poppins",
     "content": {
+      "name": "Motivation Chain",
       "challenge": "Drop your best motivation quote.",
       "rules": ["No hate speech", "Keep it meaningful"]
     }
@@ -1091,6 +1161,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
 8) Trivia + Classic
 ```json
 {
+  "name": "Quick Math",
   "type": "trivia",
   "tier": "classic",
   "config": {
@@ -1101,6 +1172,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
     },
     "font": "Poppins",
     "content": {
+      "name": "Quick Math",
       "questions": [
         {
           "question": "2 + 2 = ?",
@@ -1120,6 +1192,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
 9) Trivia + Elite
 ```json
 {
+  "name": "World Capitals",
   "type": "trivia",
   "tier": "elite",
   "config": {
@@ -1130,6 +1203,7 @@ Each sample shows correct branch placement for `config`, `layoutdata`, and `enha
     },
     "font": "Poppins",
     "content": {
+      "name": "World Capitals",
       "questions": [
         {
           "question": "Capital of France?",
@@ -1309,12 +1383,51 @@ Forced type+tier routes:
 - `POST /create-card/anonymous/classic`
 - `POST /create-card/anonymous/elite`
 
+Create Payload Notes
+--------------------
+- Optional top-level `name` is supported for all cards.
+- For `poll`, `chain`, and `trivia`, backend mirrors the resolved name into `config.content.name`.
+- If interactive card `name` is omitted, backend derives one from:
+  - poll: `config.content.question`
+  - chain: `config.content.challenge`
+  - trivia: default `Trivia Card`
+- To attach a gift during creation, include either `giftInventoryId` or `inventoryId`.
+- Gift-at-create is allowed only for `personal` cards.
+
+Create personal card with gift attached:
+```json
+{
+  "type": "personal",
+  "tier": "classic",
+  "giftInventoryId": "GIFT_INVENTORY_ID",
+  "config": {
+    "colors": {
+      "background": "#ffffff",
+      "accent": "#111111",
+      "gradient": ["#ffffff", "#f3f4f6"]
+    },
+    "font": "Poppins",
+    "content": {
+      "header": "A gift for you",
+      "body": "Open this with love.",
+      "questionBlock": {
+        "enabled": false,
+        "question": "",
+        "suspenseTexts": [],
+        "answerType": "yes_no"
+      }
+    }
+  }
+}
+```
+
 Read/Update/Delete
 ------------------
 - `GET /cards/prices`
 - `GET /cards/:slug`
 - `PUT /update-card` (auth)
-- `DELETE /delete-card` (auth)
+- `DELETE /delete-card` (auth, body/query `cardId`)
+- `DELETE /delete-card/:cardId` (auth)
 
 Card Pricing Endpoint
 ---------------------
@@ -1327,6 +1440,7 @@ Current values:
 - anonymous: classic `0`, elite `45`
 
 Update-card supports partial patching of:
+- `name`
 - `config`
 - `layoutdata`
 - `enhancements`
@@ -1336,10 +1450,10 @@ Backend re-sanitizes after patch, so type/tier invariants are preserved.
 Interaction Routes (By Type)
 ----------------------------
 - `POST /cards/:slug/response` (auth) -> personal yes/no
-- `POST /cards/:slug/poll-vote` (auth) -> poll options
-- `POST /cards/:slug/chain-reply` (auth) -> chain responses
+- `POST /cards/:slug/poll-vote` (optional auth, guests allowed) -> poll options
+- `POST /cards/:slug/chain-reply` (optional auth, guests allowed) -> chain responses
 - `POST /cards/:slug/anonymous-message` (public, rate-limited) -> anonymous responses
-- `POST /cards/:slug/trivia-submit` (auth) -> trivia attempts
+- `POST /cards/:slug/trivia-submit` (optional auth, guests allowed) -> trivia attempts
 
 Card Type Semantics (Thorough)
 ------------------------------
@@ -1358,6 +1472,7 @@ Card Type Semantics (Thorough)
 2) Poll Cards
 - `type = poll`
 - Content:
+  - `name`
   - `question`
   - `options[]` with stable option IDs
 - State:
@@ -1373,6 +1488,7 @@ Card Type Semantics (Thorough)
 3) Chain Cards
 - `type = chain`
 - Content:
+  - `name`
   - `challenge`
   - optional `rules[]`
 - State:
@@ -1385,6 +1501,7 @@ Card Type Semantics (Thorough)
 4) Trivia Cards
 - `type = trivia`
 - Content:
+  - `name`
   - `questions[]`
   - each question has `options[]` + `correctIndex`
 - State:
@@ -1451,7 +1568,8 @@ Artist Template CRUD
 --------------------
 - `POST /create-template` (auth, artist role)
 - `PUT /update-template` (auth, artist role)
-- `DELETE /delete-template` (auth, artist role)
+- `DELETE /delete-template` (auth, artist role, body/query `templateId`)
+- `DELETE /delete-template/:templateId` (auth, artist role)
 
 Public Template Reads
 ---------------------
@@ -1470,6 +1588,7 @@ Admin/Moderator Template Moderation
 - `GET /admin/templates/lookup` (admin)
   - query by `shareLink` or `slug` or `templateId`
 - `PATCH /admin/templates/:templateId/disable` (admin/moderator)
+- `DELETE /admin/templates` (admin, body/query `templateId`)
 - `DELETE /admin/templates/:templateId` (admin)
 
 
@@ -1562,6 +1681,35 @@ Body:
 }
 ```
 
+`giftInventoryId` is also accepted as an alias for `inventoryId`.
+
+Attach during card creation:
+```json
+{
+  "type": "personal",
+  "tier": "classic",
+  "giftInventoryId": "GIFT_INVENTORY_ID",
+  "config": {
+    "colors": {
+      "background": "#ffffff",
+      "accent": "#111111",
+      "gradient": ["#ffffff", "#f3f4f6"]
+    },
+    "font": "Poppins",
+    "content": {
+      "header": "A gift for you",
+      "body": "This card has a gift attached.",
+      "questionBlock": {
+        "enabled": false,
+        "question": "",
+        "suspenseTexts": [],
+        "answerType": "yes_no"
+      }
+    }
+  }
+}
+```
+
 Claim:
 - `POST /cards/:slug/claim-gift` (auth)
 
@@ -1571,6 +1719,7 @@ Gift Rules (Backend-Enforced)
 - only one gift can be attached to a card at a time
 - only the card owner can attach gifts to that card
 - only gifts in sender inventory with `status: available` can be attached
+- deleting an unclaimed gift-attached card returns the inventory item to `available`
 - card owner cannot claim their own attached gift
 - claim is one-time; subsequent claim attempts fail
 - payout split on successful claim:

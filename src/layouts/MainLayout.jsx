@@ -961,6 +961,10 @@ function MainLayout() {
     await loadPublicData(code)
   }
 
+  const consumeGift = (giftId) => {
+    setInventory((prev) => prev.filter((g) => g.id !== giftId && g.inventoryId !== giftId && g.giftId !== giftId))
+  }
+
   return (
     <div className={`page ${location.pathname === '/studio' ? 'page-studio' : ''}`}>
       <Outlet
@@ -988,6 +992,7 @@ function MainLayout() {
           updateProfile: handleProfileUpdate,
           deductCC,
           addGift,
+          consumeGift,
           onLogin: handleLogin,
           onSignup: handleSignup,
           onVerifyEmail: handleVerifyEmail,

@@ -559,6 +559,7 @@ export function cardObjectToBackendPayload(cardObject, {
   } else if (normalType === 'poll' && poll) {
     const rawOptions = Array.isArray(poll.options) ? poll.options : []
     content = {
+      name: poll.name || poll.title || cardObject.content?.heading || poll.question || '',
       question: poll.question || '',
       options: rawOptions
         .map((o, i) => {
@@ -571,6 +572,7 @@ export function cardObjectToBackendPayload(cardObject, {
   } else if (normalType === 'chain') {
     const c = chain || {}
     content = {
+      name: c.name || c.title || cardObject.content?.heading || c.prompt || c.challenge || '',
       challenge: c.prompt || c.challenge || '',
       // each rule needs min(1) — drop empty entries
       rules: Array.isArray(c.rules) ? c.rules.map(r => String(r || '').trim()).filter(Boolean) : [],
@@ -578,6 +580,7 @@ export function cardObjectToBackendPayload(cardObject, {
   } else if (normalType === 'trivia' && trivia) {
     const rawQuestions = Array.isArray(trivia.questions) ? trivia.questions : []
     content = {
+      name: trivia.name || trivia.title || cardObject.content?.heading || rawQuestions[0]?.text || rawQuestions[0]?.question || '',
       questions: rawQuestions
         .map(q => {
           const options = (Array.isArray(q.options) ? q.options : [])
@@ -597,6 +600,7 @@ export function cardObjectToBackendPayload(cardObject, {
     }
   } else if (normalType === 'anonymous') {
     content = {
+      name: cardObject.content?.heading || '',
       message: cardObject.content?.body || cardObject.content?.heading || '',
     }
   }
@@ -758,11 +762,23 @@ export function cardObjectToBackendPayload(cardObject, {
   // The backend stores this as-is and returns it with GET /cards/:slug.
   const layoutdata = cardObjectToLayoutData(cardObject)
 
-  return {
+  const payload = {
     config: { colors, font, content },
     enhancements,
     layoutdata,
   }
+
+  if (normalType !== 'personal' && content.name) {
+    payload.name = content.name
+  }
+
+  const giftInventoryId = cardObject.giftEffect?.giftInventoryId || cardObject.giftEffect?.inventoryId || cardObject.giftEffect?.giftId
+  if (normalType === 'personal' && giftInventoryId) {
+    payload.giftInventoryId = giftInventoryId
+    payload.inventoryId = giftInventoryId
+  }
+
+  return payload
 }
 
 // Back-compat shim.
@@ -1008,11 +1024,25 @@ export function mapBackendCard(card) {
     const lt = enhancements.lock?.type || 'none'
     return lt === 'timer' ? 'time' : lt
   })()
+  const title = (
+    card.name ||
+    card.title ||
+    content.name ||
+    config.content?.name ||
+    content.header ||
+    pollContent.question ||
+    chainContent.challenge ||
+    chainContent.prompt ||
+    triviaQuestions[0]?.question ||
+    triviaQuestions[0]?.text ||
+    content.message ||
+    'Untitled Card'
+  )
 
   return {
     id: card.cardId || card.id || card._id || slug,
     slug,
-    title: card.title || content.header || content.question || content.challenge || 'Untitled Card',
+    title,
     subtitle: content.body || '',
     message: content.body || content.message || '',
     type,

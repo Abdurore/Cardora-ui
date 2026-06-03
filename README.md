@@ -21,6 +21,18 @@ npm run build
 npm run lint
 ```
 
+## Features & Integration
+
+The frontend is fully aligned with the backend API specification (June 2026 Update):
+
+- **Dynamic Pricing:** Card pricing is fetched from the backend (`GET /cards/prices`) and dynamically calculated in the Studio based on card type and tier.
+- **Robust API Layer:** The API client uses `requestFirstSuccess` to gracefully fall back between parameter-based routes and body-based routes for `deleteCard`, `deleteTemplate`, and media deletion.
+- **Systematic Gifts:** Premium users can attach gifts from their inventory directly during card creation (`giftInventoryId` payload field). The catalog is fetched dynamically from the backend (`/gifts/catalog`).
+- **Interactive Cards:** Poll, trivia, and chain cards properly send top-level `name` fields.
+- **Rewards Hub:** The Store UI displays a daily claim streak counter with dynamic flame animations, and premium users receive double CC bonuses.
+- **Premium Decorators:** Users can equip chat frames and profile backgrounds, which are dynamically loaded and managed in the Profile and Store.
+- **Moderation Tools:** Admin and Moderator dashboards fully support the `identifier` alias for resolving users by ID or username during bans, unbans, and role assignment.
+
 ## Routes
 
 The app is routed from `src/App.jsx`. Main routes include `/`, `/explore`, `/store`, `/studio`, `/create`, `/profile`, `/chat`, `/inbox`, dashboard routes, and the public anonymous-send route `/ask/:username`.

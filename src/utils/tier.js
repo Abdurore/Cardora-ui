@@ -42,10 +42,32 @@ export const TIER_INFO = {
   },
 }
 
+export const VALID_TIERS_BY_TYPE = {
+  personal: ['classic', 'premium', 'elite'],
+  poll: ['classic', 'elite'],
+  chain: ['classic', 'elite'],
+  trivia: ['classic', 'elite'],
+  anonymous: ['classic', 'elite'],
+}
+
+export const CARD_TYPE_PRICING = {
+  personal: { classic: 0, premium: 25, elite: 35 },
+  poll: { classic: 0, elite: 35 },
+  chain: { classic: 0, elite: 40 },
+  trivia: { classic: 0, elite: 50 },
+  anonymous: { classic: 0, elite: 45 },
+}
+
 const TIER_ALIASES = {
   simple: 'classic',
   special: 'premium',
   signature: 'elite',
+}
+
+const TYPE_ALIASES = {
+  moment: 'personal',
+  standard: 'personal',
+  anon: 'anonymous',
 }
 
 function normaliseKey(tier) {
@@ -54,6 +76,23 @@ function normaliseKey(tier) {
   return TIER_ALIASES[key] || key
 }
 
+function normaliseType(type) {
+  if (!type) return 'personal'
+  const key = String(type).toLowerCase()
+  return TYPE_ALIASES[key] || key
+}
+
 export const getTierInfo = (tier = 'classic') => TIER_INFO[normaliseKey(tier)] || TIER_INFO.classic
 
-export const getTierCost = (tier) => getTierInfo(tier).cost
+export const getValidTiersForType = (type = 'personal') => VALID_TIERS_BY_TYPE[normaliseType(type)] || VALID_TIERS_BY_TYPE.personal
+
+export const isValidTierForType = (type = 'personal', tier = 'classic') => getValidTiersForType(type).includes(normaliseKey(tier))
+
+export const getCardCost = (type = 'personal', tier = 'classic', prices = null) => {
+  const resolvedType = normaliseType(type)
+  const resolvedTier = normaliseKey(tier)
+  const priceMap = prices?.[resolvedType] || prices?.[type] || CARD_TYPE_PRICING[resolvedType] || CARD_TYPE_PRICING.personal
+  return Number(priceMap?.[resolvedTier] ?? CARD_TYPE_PRICING[resolvedType]?.[resolvedTier] ?? 0)
+}
+
+export const getTierCost = (tier, type = 'personal', prices = null) => getCardCost(type, tier, prices)

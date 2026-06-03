@@ -184,6 +184,9 @@ function CardView() {
 
   // ── Card found — derive cardObject ───────────────────────────────────
   const cardObject = backfillEnvelope(card.cardObject || structuredClone(defaultCardObject))
+  if (card.giftEffect) {
+    cardObject.giftEffect = card.giftEffect
+  }
   const studioType = (card.type || 'personal').toLowerCase().replace('standard', 'personal').replace('moment', 'personal')
   const pollData = card.poll || null
   const triviaData = card.trivia || null

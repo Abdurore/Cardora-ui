@@ -16,7 +16,7 @@ import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
-import { getMediaVideos, getMediaMusic, attachGiftToCard } from '../lib/api.js'
+import { getCardPrices, getMediaVideos, getMediaMusic, attachGiftToCard } from '../lib/api.js'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
 import { getMusicPresetsForTier } from '../data/cardDefaults.js'
 import { getTierLimits } from '../lib/tierLimits.js'
@@ -90,13 +90,13 @@ const TOOLS_BY_TYPE_TIER = {
   'personal:premium': ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation'],
   'personal:elite':   ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'gifts'],
   'poll:classic':   ['content', 'background', 'theme', 'poll'],
-  'poll:premium':   ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'poll'],
+  'poll:elite':     ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'poll'],
   'trivia:classic': ['content', 'background', 'theme', 'trivia'],
-  'trivia:premium': ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'trivia'],
+  'trivia:elite':   ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'trivia'],
   'chain:classic':  ['content', 'background', 'theme', 'chain'],
-  'chain:premium':  ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'chain'],
+  'chain:elite':    ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'chain'],
   'anonymous:classic':   ['content', 'background', 'theme', 'anon'],
-  'anonymous:premium':   ['content', 'media', 'background', 'theme', 'animation', 'anon'],
+  'anonymous:elite':     ['content', 'media', 'background', 'theme', 'animation', 'anon'],
 }
 
 const STUDIO_TYPE_META = {
@@ -131,6 +131,22 @@ const TIER_COST_BY_TYPE = {
   trivia:    { classic: 0, premium: null, elite: 50 },
   chain:     { classic: 0, premium: null, elite: 40 },
   anonymous: { classic: 0, premium: null, elite: 45 },
+}
+
+function normalizeCardPrices(payload) {
+  const source = payload?.prices || payload?.data?.prices || payload?.data || payload || {}
+  const normalized = { ...TIER_COST_BY_TYPE }
+  for (const type of Object.keys(TIER_COST_BY_TYPE)) {
+    const rawType = source[type] || source[type === 'anonymous' ? 'anon' : type] || {}
+    normalized[type] = { ...TIER_COST_BY_TYPE[type] }
+    for (const tier of Object.keys(normalized[type])) {
+      const rawValue = rawType[tier] ?? rawType[`${tier}Cost`] ?? rawType[`${tier}Cc`]
+      if (rawValue !== undefined && rawValue !== null && rawValue !== '') {
+        normalized[type][tier] = Number(rawValue)
+      }
+    }
+  }
+  return normalized
 }
 
 // Premium is personal-only (engine throws otherwise). For non-personal
@@ -330,7 +346,8 @@ function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const { currentUser, publishTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, inventory = [] } = useOutletContext() || {}
+  const { currentUser, publishTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, consumeGift, inventory = [] } = useOutletContext() || {}
+  const [cardPrices, setCardPrices] = useState(TIER_COST_BY_TYPE)
   // Read card type and tier from location state (set by CreateCardPicker)
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   const existingDraftObject = useMemo(() => location.state?.draftCardObject || null, [location.state])
@@ -381,7 +398,22 @@ function CardStudio() {
   const studioTier = resolveTier(studioType, searchParams.get('tier') || 'classic')
   const typeMeta = STUDIO_TYPE_META[studioType] || STUDIO_TYPE_META.personal
   const tierLabel = TIER_LABELS[studioTier] || 'Classic'
-  const tierCost = (TIER_COST_BY_TYPE[studioType] || TIER_COST_BY_TYPE.personal)[studioTier] ?? 0
+  const tierCost = (cardPrices[studioType] || cardPrices.personal || TIER_COST_BY_TYPE.personal)[studioTier] ?? 0
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const payload = await getCardPrices()
+        if (mounted) setCardPrices(normalizeCardPrices(payload))
+      } catch (error) {
+        console.warn('Card pricing load failed; using bundled fallback prices.', error)
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   // Filter tools by type + tier — aligned to home page tier promises
   const isArtist = String(currentUser?.role || '').toLowerCase() === 'artist'
@@ -1118,6 +1150,9 @@ function CardStudio() {
 
       setSendResult({ ok: true, slug, message: result.message })
       refreshBalance?.()
+      if (selectedGift) {
+        consumeGift?.(selectedGift.id || selectedGift.inventoryId || selectedGift.giftId || selectedGift._id)
+      }
       // Card sent successfully — clear the autosave so the next studio visit
       // starts fresh instead of restoring the just-sent card.
       try { localStorage.removeItem(autoSaveKey) } catch { /* ignore */ }
