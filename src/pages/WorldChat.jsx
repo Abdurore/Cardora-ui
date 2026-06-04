@@ -466,9 +466,12 @@ function WorldChat() {
             messages.map((msg) => {
               const isMe = msg.userId === currentUser.id
               // Apply frame from map if not already on the message
-              const frameUrl = resolveMessageFrameUrl(msg) ||
-                (isMe ? userFrameMap.current[currentUser.id] : userFrameMap.current[msg.userId]) ||
-                null
+              const myFrame = userFrameMap.current[currentUser.id]
+              let frameUrl = myFrame && myFrame !== '__frameless__' ? myFrame : null
+              if (!frameUrl) {
+                frameUrl = resolveMessageFrameUrl(msg) || userFrameMap.current[msg.userId] || null
+                if (frameUrl === '__frameless__') frameUrl = null
+              }
               const openProfile = () => setProfileCard({
                 userId: msg.userId,
                 username: msg.username,
@@ -506,11 +509,13 @@ function WorldChat() {
                   <div className="chat-msg-body">
                     <div className={`chat-msg-bubble-wrap ${frameUrl ? 'has-frame' : ''}`}>
                       {frameUrl && (
-                        <img
+                        <div
                           className="chat-msg-frame-overlay"
-                          src={frameUrl}
-                          alt=""
-                          aria-hidden="true"
+                          style={{
+                            borderImageSource: `url(${frameUrl})`,
+                            borderImageSlice: '33% fill',
+                            borderImageWidth: '24px'
+                          }}
                         />
                       )}
                       <div className="chat-msg-bubble">

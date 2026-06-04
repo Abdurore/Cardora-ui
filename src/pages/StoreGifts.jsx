@@ -102,9 +102,7 @@ function StoreGifts() {
   const [revealingGift, setRevealingGift] = useState(null)
   const [returnRefreshing, setReturnRefreshing] = useState(false)
 
-  const baseInventory = appInventory.length ? appInventory : normalizeGiftInventory(currentUser?.giftsInventory || [])
-  const unverifiedGifts = normalizeGiftInventory(currentUser?.giftsInventory || [], true).filter(g => g.status === 'unverified')
-  const inventory = [...baseInventory, ...unverifiedGifts]
+  const inventory = appInventory.length ? appInventory : normalizeGiftInventory(currentUser?.giftsInventory || [], true)
   const walletBalance = currentUser?.giftWalletNgn || 0
 
   useEffect(() => {
@@ -177,7 +175,6 @@ function StoreGifts() {
       setActiveView('inventory')
       if (returnedGift?.name) setRevealingGift(returnedGift)
       setMsg({ text: 'Gift added. Your inventory has been refreshed.', ok: true })
-      clearPendingGift()
       setReturnRefreshing(false)
       navigate('/store/gifts', { replace: true })
     })()

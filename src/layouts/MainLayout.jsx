@@ -200,7 +200,7 @@ function MainLayout() {
       setBalance(normalized.balance)
       setFavorites(meta.favorites || [])
       setLikedTemplates(meta.likedTemplates || [])
-      const mappedGifts = normalizeGiftInventory(normalized.giftsInventory)
+      const mappedGifts = normalizeGiftInventory(normalized.giftsInventory, true)
 
       setInventory(mappedGifts)
       setAvatarUrl(normalized.avatarUrl || '')
@@ -489,17 +489,6 @@ function MainLayout() {
     if (balance < amount) return false
     setBalance((prev) => prev - amount)
     return true
-  }
-
-  const addGift = (gift) => {
-    if (!hydratedUser) {
-      navigate('/login')
-      return { ok: false, reason: 'auth' }
-    }
-    if (balance < gift.cc) return { ok: false, reason: 'balance' }
-    setBalance((prev) => prev - gift.cc)
-    setInventory((prev) => [...prev, { ...gift, id: `gift-${Date.now()}` }])
-    return { ok: true }
   }
 
   const handleLogin = async (email, password) => {
@@ -980,7 +969,6 @@ function MainLayout() {
           },
           updateProfile: handleProfileUpdate,
           deductCC,
-          addGift,
           consumeGift,
           onLogin: handleLogin,
           onSignup: handleSignup,

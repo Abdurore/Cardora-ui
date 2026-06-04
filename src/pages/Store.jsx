@@ -392,11 +392,13 @@ function Store() {
                             <span>now</span>
                           </div>
                           <div className="cf-bubble-wrap">
-                            <img
+                            <div
                               className="cf-frame-overlay"
-                              src={frame.url}
-                              alt=""
-                              aria-hidden="true"
+                              style={{
+                                borderImageSource: `url(${frame.url})`,
+                                borderImageSlice: '33% fill',
+                                borderImageWidth: '24px'
+                              }}
                             />
                             <div className="cf-bubble-text">
                               Hey! This frame looks great 🔥

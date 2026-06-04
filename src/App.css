@@ -13348,30 +13348,36 @@ a {
   display: inline-flex;
   max-width: 100%;
   isolation: isolate;
+  align-self: flex-start;
 }
 
 .chat-msg-frame-overlay {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
+  inset: -8px;
   pointer-events: none;
   z-index: 0;
+  border-style: solid;
+  border-color: transparent;
 }
 
 .chat-msg-bubble-wrap.has-frame {
-  padding: 12px;
-  margin: 4px 4px 4px 0;
+  padding: 5px 6px;
+  margin: 4px 8px;
+  max-width: calc(100% - 16px);
 }
 
 .chat-msg.me .chat-msg-bubble-wrap.has-frame {
-  margin: 4px 0 4px 4px;
+  margin: 4px 8px;
+}
+
+.chat-msg.me .chat-msg-bubble-wrap {
+  align-self: flex-end;
 }
 
 .chat-msg-bubble-wrap.has-frame .chat-msg-bubble {
   position: relative;
   z-index: 1;
+  border-radius: 8px !important;
 }
 
 .chat-msg-time {
@@ -29181,25 +29187,24 @@ a {
 .cf-bubble-wrap {
   position: relative;
   display: inline-flex;
-  width: 100%;
+  max-width: 100%;
   padding: 12px;
   isolation: isolate;
+  align-self: flex-start;
 }
 
 .cf-frame-overlay {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
+  inset: -8px;
   pointer-events: none;
   z-index: 0;
+  border-style: solid;
+  border-color: transparent;
 }
 
 .cf-bubble-text {
   position: relative;
   z-index: 1;
-  width: 100%;
   padding: 10px 14px;
   border-radius: 14px 14px 14px 4px;
   background: linear-gradient(180deg, rgba(16, 30, 38, 0.92), rgba(10, 20, 26, 0.96));

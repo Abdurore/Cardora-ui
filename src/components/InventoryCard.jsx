@@ -29,9 +29,11 @@ function InventoryCard({ title, amount, effectKey, giftName, name, priceNgn, val
   const resolvedName = giftName || name || title || effectKey
   const resolvedEffect = effectKey || GIFT_EFFECT_ALIASES[resolvedName] || resolvedName
   const resolvedAmount = amount || formatAmount(valueNgn ?? priceNgn)
+  const isPending = status === 'unverified' || status === 'pending'
+  const statusLabel = isPending ? 'Pending' : (status || 'Owned')
 
   return (
-    <div className={`inventory-card ${variant || ''}`}>
+    <div className={`inventory-card ${variant || ''} ${isPending ? 'inventory-card-pending' : ''}`}>
       <div className="inventory-icon">
         <GiftIcon effectKey={resolvedEffect} size={36} />
       </div>
@@ -39,7 +41,9 @@ function InventoryCard({ title, amount, effectKey, giftName, name, priceNgn, val
         <p className="inventory-title">{formatGiftName(resolvedName)}</p>
         {resolvedAmount ? <p className="inventory-amount">{resolvedAmount}</p> : null}
       </div>
-      <span className="inventory-owned-badge">{status || 'Owned'}</span>
+      <span className={`inventory-owned-badge ${isPending ? 'inventory-owned-badge-pending' : ''}`}>
+        {statusLabel}
+      </span>
     </div>
   )
 }

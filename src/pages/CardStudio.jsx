@@ -2456,6 +2456,8 @@ function CardStudio() {
     // GIFTS
     if (activeTool === 'gifts') {
       const selectedGiftInstance = c.giftEffect?.giftInstanceId || c.giftEffect?.giftId || 'none'
+      const availableGifts = inventory.filter(gift => !gift.status || gift.status === 'available' || gift.status === 'active')
+      const pendingGifts = inventory.filter(gift => gift.status === 'unverified' || gift.status === 'pending' || gift.isPendingLocal)
       return (
         <>
           <p className="cs-panel-eyebrow">Gifts</p>
@@ -2483,9 +2485,9 @@ function CardStudio() {
               <span className="cs-gift-none-icon">✕</span>
               <span>No Gift</span>
             </button>
-            {inventory.length > 0 ? (
+            {availableGifts.length > 0 ? (
               <div className="cs-gift-grid">
-                {inventory.map((gift, idx) => {
+                {availableGifts.map((gift, idx) => {
                   const instanceId = gift.id || `${gift.inventoryId || gift.giftId || gift.effectKey || gift.title}-${idx}`
                   const backendGiftId = gift.inventoryId || gift.giftId || gift._id || gift.id || ''
                   return (
@@ -2513,8 +2515,33 @@ function CardStudio() {
               </div>
             ) : (
               <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.5 }}>
-                No gifts in your inventory yet. Visit the Store to purchase gifts.
+                {pendingGifts.length > 0
+                  ? 'No verified gifts are ready to attach yet.'
+                  : 'No gifts in your inventory yet. Visit the Store to purchase gifts.'}
               </p>
+            )}
+            {pendingGifts.length > 0 && (
+              <div className="cs-gift-pending-list">
+                <p className="cs-sub-label">Pending Verification</p>
+                <div className="cs-gift-grid">
+                  {pendingGifts.map((gift, idx) => {
+                    const instanceId = gift.id || `${gift.inventoryId || gift.giftId || gift.effectKey || gift.title}-pending-${idx}`
+                    return (
+                      <button
+                        key={instanceId}
+                        type="button"
+                        className="cs-gift-option cs-gift-option-pending"
+                        disabled
+                      >
+                        <GiftIcon effectKey={gift.effectKey} size={36} />
+                        <span>{gift.title}</span>
+                        {gift.amount && <small>{gift.amount}</small>}
+                        <small className="cs-gift-status-note">Pending verification</small>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             )}
           </div>
           {c.giftEffect?.enabled && (
