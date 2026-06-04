@@ -183,7 +183,7 @@ function MainLayout() {
                 {
                   giftName: pending.name,
                   name: pending.name,
-                  status: 'available',
+                  status: 'unverified',
                   inventoryId: `pending-${pending.savedAt}`,
                   _id: `pending-${pending.savedAt}`,
                   amount: 1,
@@ -202,16 +202,7 @@ function MainLayout() {
       setLikedTemplates(meta.likedTemplates || [])
       const mappedGifts = normalizeGiftInventory(normalized.giftsInventory)
 
-      // Merge local storage inventory (if any custom drafts are kept) with backend gifts, avoiding duplicates
-      const localGifts = meta.inventory || []
-      const mergedGifts = [...mappedGifts]
-      localGifts.forEach((lg) => {
-        if (!mergedGifts.some((mg) => mg.id === lg.id)) {
-          mergedGifts.push(lg)
-        }
-      })
-
-      setInventory(mergedGifts)
+      setInventory(mappedGifts)
       setAvatarUrl(normalized.avatarUrl || '')
       setAvatarColor(meta.avatarColor || normalized.avatarColor)
       if (normalized.currency) setUserCurrency(normalized.currency)
@@ -276,7 +267,6 @@ function MainLayout() {
     const payload = {
       favorites,
       likedTemplates,
-      inventory,
       avatarColor,
     }
 
@@ -290,7 +280,6 @@ function MainLayout() {
           JSON.stringify({
             favorites,
             likedTemplates,
-            inventory,
             avatarColor,
           }),
         )

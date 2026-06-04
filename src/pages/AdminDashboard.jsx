@@ -20,6 +20,8 @@ import {
   getAdminReports,
   getModeratorActionLogs,
   disableAdminTemplate,
+  enableAdminTemplate,
+  adminDeleteTemplate,
   approveBroadcastRequest,
   getAdminPackages,
   createAdminPackage,
@@ -73,6 +75,7 @@ import { getChatFrameId, getChatFrameUrl, normalizeChatFrame } from '../lib/chat
 import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
 const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Packages', 'Codes', 'Ads', 'Media', 'Gifts', 'Coupons', 'Logs']
+const TEMPLATE_DISABLE_DAYS = 7
 
 // Persist trim points locally (backend doesn't store startSec/endSec yet).
 // Keyed by track _id OR cloudinary URL so drafts survive before an ID is assigned.
@@ -478,8 +481,22 @@ function AdminDashboard() {
           const params = new URLSearchParams({ page: '1', limit: '100' })
           if (reportFilter.type) params.append('type', reportFilter.type)
           if (reportFilter.status) params.append('status', reportFilter.status)
-          const res = await getAdminReports(params.toString())
-          setReports(res?.data?.reports || res?.reports || [])
+          
+          const [reportsRes, templatesRes] = await Promise.allSettled([
+            getAdminReports(params.toString()),
+            getAdminTemplates('page=1&limit=200').catch(() => getTemplates('page=1&limit=200')),
+          ])
+          
+          if (reportsRes.status === 'fulfilled') {
+            const res = reportsRes.value
+            setReports(res?.data?.reports || res?.reports || [])
+          }
+          if (templatesRes.status === 'fulfilled') {
+            const res = templatesRes.value
+            const d = res?.data ?? res
+            const list = Array.isArray(d?.templates) ? d.templates : (Array.isArray(d?.items) ? d.items : (Array.isArray(d) ? d : []))
+            setAllTemplates(list.map(mapTemplateToCard))
+          }
           break
         }
         case 'Logs': {
@@ -1090,16 +1107,105 @@ const handleBroadcast = async () => {
     }
   }
 
-  const handleAdminDeleteTemplate = async (tpl) => {
-    const id = tpl.templateId || tpl.id
+  const getTemplateAdminId = (tplOrId) => {
+    if (!tplOrId) return ''
+    if (typeof tplOrId === 'string') return tplOrId
+    return (
+      tplOrId.backendTemplate?._id ||
+      tplOrId.backendTemplate?.templateId ||
+      tplOrId.templateId ||
+      tplOrId._id ||
+      tplOrId.id ||
+      ''
+    )
+  }
+
+  const markTemplateDisabled = (id, disabledUntil) => {
+    setAllTemplates(prev => prev.map(t => (
+      String(getTemplateAdminId(t)) === String(id)
+        ? {
+            ...t,
+            status: 'disabled',
+            tag: 'Disabled',
+            disabledUntil,
+            backendTemplate: { ...(t.backendTemplate || {}), status: 'disabled', disabledUntil },
+          }
+        : t
+    )))
+  }
+
+  const markTemplateEnabled = (id) => {
+    setAllTemplates(prev => prev.map(t => (
+      String(getTemplateAdminId(t)) === String(id)
+        ? {
+            ...t,
+            status: 'approved',
+            tag: 'Approved',
+            disabledUntil: null,
+            backendTemplate: { ...(t.backendTemplate || {}), status: 'approved', disabledUntil: null },
+          }
+        : t
+    )))
+  }
+
+  const removeTemplateFromAdminLists = (id) => {
+    setAllTemplates(prev => prev.filter(t => String(getTemplateAdminId(t)) !== String(id)))
+  }
+
+  const handleAdminDisableTemplate = async (tplOrId) => {
+    const id = getTemplateAdminId(tplOrId)
+    const title = typeof tplOrId === 'object' ? (tplOrId.title || tplOrId.name || 'this template') : 'this template'
     if (!id) return
-    if (!await appConfirm('Delete Template', `Delete "${tpl.title}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
-    const res = await deleteMarketplaceTemplate?.(id)
-    if (res?.ok) {
+    if (!await appConfirm(
+      'Disable Template',
+      `Disable "${title}" for ${TEMPLATE_DISABLE_DAYS} day(s)? You can re-enable it manually sooner.`,
+      { variant: 'warning', confirmLabel: 'Disable' },
+    )) return
+    const disabledUntil = new Date(Date.now() + TEMPLATE_DISABLE_DAYS * 24 * 60 * 60 * 1000).toISOString()
+    try {
+      await disableAdminTemplate(id, {
+        durationDays: TEMPLATE_DISABLE_DAYS,
+        disabledUntil,
+        reason: 'Admin moderation action',
+      })
+      showMsg(`Template disabled for ${TEMPLATE_DISABLE_DAYS} day(s).`)
+      markTemplateDisabled(id, disabledUntil)
+    } catch (err) {
+      showMsg(err.message || 'Disable failed.', false)
+    }
+  }
+
+  const handleAdminEnableTemplate = async (tplOrId) => {
+    const id = getTemplateAdminId(tplOrId)
+    const title = typeof tplOrId === 'object' ? (tplOrId.title || tplOrId.name || 'this template') : 'this template'
+    if (!id) return
+    if (!await appConfirm('Enable Template', `Re-enable "${title}"?`, { confirmLabel: 'Enable' })) return
+    try {
+      await enableAdminTemplate(id)
+      showMsg('Template re-enabled.')
+      markTemplateEnabled(id)
+    } catch (err) {
+      showMsg(err.message || 'Enable failed.', false)
+    }
+  }
+
+  const handleAdminDeleteTemplate = async (tplOrId) => {
+    const id = getTemplateAdminId(tplOrId)
+    const title = typeof tplOrId === 'object' ? (tplOrId.title || tplOrId.name || 'this template') : 'this template'
+    if (!id) return
+    if (!await appConfirm('Delete Template', `Delete "${title}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
+    try {
+      await adminDeleteTemplate(id)
       showMsg('Template deleted.')
-      setAllTemplates(prev => prev.filter(t => (t.templateId || t.id) !== id))
-    } else {
-      showMsg(res?.message || 'Delete failed.', false)
+      removeTemplateFromAdminLists(id)
+    } catch (err) {
+      const fallback = await deleteMarketplaceTemplate?.(id)
+      if (fallback?.ok) {
+        showMsg('Template deleted.')
+        removeTemplateFromAdminLists(id)
+        return
+      }
+      showMsg(fallback?.message || err.message || 'Delete failed.', false)
     }
   }
 
@@ -1619,10 +1725,15 @@ const handleBroadcast = async () => {
                     
                     let targetContext = '';
                     let artistName = '';
+                    let matchedTemplate = null;
                     
                     if (isTemplate) {
-                      const tpl = allTemplates.find(t => (t.id || t.templateId) === targetId);
+                      const tpl = allTemplates.find(t => (
+                        [t.id, t.templateId, t.backendTemplate?._id, t.backendTemplate?.id, t.backendTemplate?.templateId]
+                          .some(id => id && targetId && String(id) === String(targetId))
+                      ));
                       if (tpl) {
+                        matchedTemplate = tpl;
                         targetContext = tpl.title || 'Unknown Template';
                         artistName = tpl.ownerId || tpl.artist || tpl.createdBy || 'Unknown Artist';
                         const user = users.find(u => (u.id || u._id) === artistName);
@@ -1655,18 +1766,22 @@ const handleBroadcast = async () => {
                         <td>{rep.createdAt ? new Date(rep.createdAt).toLocaleDateString() : '—'}</td>
                         <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {isTemplate && (
-                            <button 
-                              type="button" 
-                              className="admin-action-btn warn"
-                              onClick={async () => {
-                                const disableId = (typeof tpl !== 'undefined' && tpl ? (tpl.templateId || tpl.id) : null) || targetId;
-                                if (!await appConfirm('Disable Template', `Disable this template?`, { variant: 'warning', confirmLabel: 'Disable' })) return
-                                try { await disableAdminTemplate(disableId); showMsg('Template disabled.'); }
-                                catch (err) { showMsg(err.message || 'Disable failed', false) }
-                              }}
-                            >
-                              Disable
-                            </button>
+                            <>
+                              <button 
+                                type="button" 
+                                className="admin-action-btn warn"
+                                onClick={() => handleAdminDisableTemplate(matchedTemplate || targetId)}
+                              >
+                                Disable
+                              </button>
+                              <button 
+                                type="button" 
+                                className="admin-action-btn reject"
+                                onClick={() => handleAdminDeleteTemplate(matchedTemplate || targetId)}
+                              >
+                                Delete
+                              </button>
+                            </>
                           )}
                           {isUser && (
                             <button 
@@ -1714,7 +1829,11 @@ const handleBroadcast = async () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((tpl) => (
+                  {rows.map((tpl) => {
+                    const templateStatus = String(tpl.status || tpl.backendTemplate?.status || 'approved').toLowerCase()
+                    const isDisabled = ['disabled', 'inactive', 'suspended'].includes(templateStatus) || Boolean(tpl.disabledUntil || tpl.backendTemplate?.disabledUntil)
+                    const disabledUntil = tpl.disabledUntil || tpl.backendTemplate?.disabledUntil
+                    return (
                     <tr key={tpl.id}>
                       <td>
                         {tpl.previewImage ? (
@@ -1732,8 +1851,13 @@ const handleBroadcast = async () => {
                       <td>{tpl.userCount ?? 0}</td>
                       <td>
                         <span className={`admin-template-status ${(tpl.status || 'live').toLowerCase()}`}>
-                          {tpl.tag || 'Live'}
+                          {isDisabled ? 'Disabled' : (tpl.tag || 'Live')}
                         </span>
+                        {isDisabled && disabledUntil && (
+                          <div style={{ fontSize: '0.72rem', opacity: 0.6, marginTop: 4 }}>
+                            until {new Date(disabledUntil).toLocaleDateString()}
+                          </div>
+                        )}
                       </td>
                       <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {(tpl.status === 'pending' || tpl.status === 'review') && (
@@ -1764,19 +1888,23 @@ const handleBroadcast = async () => {
                             </button>
                           </>
                         )}
-                        <button
-                          type="button"
-                          className="admin-action-btn warn"
-                          onClick={async () => {
-                            const id = tpl.templateId || tpl.id
-                            if (!id) return
-                            if (!await appConfirm('Disable Template', `Disable "${tpl.title}"?`, { variant: 'warning', confirmLabel: 'Disable' })) return
-                            try { await disableAdminTemplate(id); showMsg('Template disabled.'); loadTabData('Templates') }
-                            catch (err) { showMsg(err.message || 'Disable failed', false) }
-                          }}
-                        >
-                          Disable
-                        </button>
+                        {isDisabled ? (
+                          <button
+                            type="button"
+                            className="admin-action-btn approve"
+                            onClick={() => handleAdminEnableTemplate(tpl)}
+                          >
+                            Enable
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="admin-action-btn warn"
+                            onClick={() => handleAdminDisableTemplate(tpl)}
+                          >
+                            Disable
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="admin-action-btn reject"
@@ -1786,7 +1914,8 @@ const handleBroadcast = async () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

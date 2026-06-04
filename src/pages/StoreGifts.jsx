@@ -102,7 +102,9 @@ function StoreGifts() {
   const [revealingGift, setRevealingGift] = useState(null)
   const [returnRefreshing, setReturnRefreshing] = useState(false)
 
-  const inventory = appInventory.length ? appInventory : normalizeGiftInventory(currentUser?.giftsInventory || [])
+  const baseInventory = appInventory.length ? appInventory : normalizeGiftInventory(currentUser?.giftsInventory || [])
+  const unverifiedGifts = normalizeGiftInventory(currentUser?.giftsInventory || [], true).filter(g => g.status === 'unverified')
+  const inventory = [...baseInventory, ...unverifiedGifts]
   const walletBalance = currentUser?.giftWalletNgn || 0
 
   useEffect(() => {

@@ -251,8 +251,8 @@ export function mapTemplateToCard(template, index = 0) {
     (createdBy && typeof createdBy === 'object' ? createdBy._id || createdBy.id || createdBy.userId : createdBy) || null
 
   return {
-    id: template.templateId || template._id || `template-${index}`,
-    templateId: template.templateId || template._id || null,
+    id: template.id || template.templateId || template._id || `template-${index}`,
+    templateId: template.id || template.templateId || template._id || null,
     title,
     subtitle: template.description || message,
     message,

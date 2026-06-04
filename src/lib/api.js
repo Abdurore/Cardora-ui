@@ -797,8 +797,28 @@ export async function getModeratorActionLogs(query = 'page=1&limit=100') {
   return request(`/admin/moderator-action-logs?${query}`, { auth: true })
 }
 
-export async function disableAdminTemplate(templateId) {
-  return request(`/admin/templates/${templateId}/disable`, { method: 'PATCH', auth: true })
+export async function disableAdminTemplate(templateId, payload = {}) {
+  const id = encodeURIComponent(templateId)
+  const body = typeof payload === 'number'
+    ? { durationDays: payload }
+    : { ...payload }
+  try {
+    return await request(`/admin/templates/${id}/disable`, { method: 'PATCH', auth: true, body })
+  } catch (err) {
+    if ([400, 422].includes(err.status)) {
+      return request(`/admin/templates/${id}/disable`, { method: 'PATCH', auth: true })
+    }
+    throw err
+  }
+}
+
+export async function enableAdminTemplate(templateId) {
+  const id = encodeURIComponent(templateId)
+  return requestFirstSuccess([
+    `/admin/templates/${id}/enable`,
+    `/admin/templates/${id}/restore`,
+    `/admin/templates/${id}/reenable`,
+  ], { method: 'PATCH', auth: true })
 }
 
 export async function getEnterpriseAdStats() {

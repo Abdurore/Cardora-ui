@@ -80,12 +80,17 @@ function getValueText(item) {
   return formatNgn(item.valueNgn ?? item.priceNgn ?? item.value ?? item.price ?? (Number(item.amount) > 100 ? item.amount : null))
 }
 
-export function normalizeGiftInventory(rawInventory = []) {
+export function normalizeGiftInventory(rawInventory = [], includeUnverified = false) {
   if (!Array.isArray(rawInventory)) return []
 
   const normalized = []
   rawInventory
-    .filter(item => item && (item.status === 'available' || !item.status))
+    .filter(item => {
+      if (!item) return false
+      if (item.status === 'available' || !item.status) return true
+      if (includeUnverified && item.status === 'unverified') return true
+      return false
+    })
     .forEach((item, itemIndex) => {
       const giftName = item.giftName || item.name || effectKeyToGiftName(item.effectKey) || ''
       const effectKey = giftNameToEffectKey(item.effectKey || giftName)
