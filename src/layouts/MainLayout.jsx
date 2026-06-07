@@ -388,13 +388,22 @@ function MainLayout() {
     setCart((prev) => [...prev, pack])
     try {
       let response = null
+      const callbackUrl = `${window.location.origin}/store`
+      const checkoutPayload = {
+        packageId: pack.packageId || pack.id,
+        callbackUrl,
+        callback_url: callbackUrl,
+        redirectUrl: callbackUrl,
+        redirect_url: callbackUrl,
+        returnUrl: callbackUrl
+      }
       try {
-        response = await createPaystackCheckout({ packageId: pack.packageId || pack.id })
+        response = await createPaystackCheckout(checkoutPayload)
       } catch (paystackError) {
         // Only fall back to coupon checkout if the endpoint itself is unsupported (404)
         // — not on network errors or server failures, which could cause double-charges
         if (paystackError.status === 404) {
-          response = await createCouponCheckout({ packageId: pack.packageId || pack.id })
+          response = await createCouponCheckout(checkoutPayload)
         } else {
           throw paystackError
         }
