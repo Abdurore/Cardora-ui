@@ -3,6 +3,75 @@ import { getRewardedAd, completeAd, getAdStats, clickAd, trackAdView } from '../
 
 const AD_COOLDOWN_SECS = 30
 const MIN_WATCH_PCT = 80   // must watch 80% to get full reward
+const AD_STATS_PREFIX = 'cardora:rewardedAds:'
+
+function todayKey() {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+function getLocalAdStats() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(`${AD_STATS_PREFIX}${todayKey()}`) || '{}')
+    return {
+      adsWatchedToday: Number(parsed.adsWatchedToday || 0),
+      ccEarnedToday: Number(parsed.ccEarnedToday || 0),
+    }
+  } catch {
+    return { adsWatchedToday: 0, ccEarnedToday: 0 }
+  }
+}
+
+function saveLocalAdStats(next) {
+  try {
+    localStorage.setItem(`${AD_STATS_PREFIX}${todayKey()}`, JSON.stringify({
+      adsWatchedToday: Number(next.adsWatchedToday || 0),
+      ccEarnedToday: Number(next.ccEarnedToday || 0),
+      updatedAt: new Date().toISOString(),
+    }))
+  } catch { /* ignore */ }
+}
+
+function unwrapAdStats(payload) {
+  const raw = payload?.data || payload || {}
+  return raw?.stats || raw?.data?.stats || raw || {}
+}
+
+function adStatsNumbers(payload) {
+  const raw = payload?.data || payload || {}
+  const stats = unwrapAdStats(payload)
+  const watched = Number(stats?.adsWatchedToday ?? stats?.watched ?? raw?.adsWatchedToday ?? 0) || 0
+  const earned = Number(stats?.ccEarnedToday ?? stats?.earned ?? raw?.ccEarnedToday ?? 0) || 0
+  const explicitLimit = Number(stats?.dailyLimit ?? stats?.limit ?? stats?.maxAdsToday ?? raw?.dailyLimit ?? 0) || 0
+  const explicitRemaining = stats?.remainingAdsToday ?? stats?.remaining ?? raw?.remainingAdsToday
+  const limit = explicitLimit || (explicitRemaining !== undefined ? watched + Number(explicitRemaining || 0) : 10)
+  const remaining = Math.max(0, Number(explicitRemaining ?? (limit - watched)) || 0)
+  return { raw, stats, watched, earned, remaining, limit: limit || 10 }
+}
+
+function mergeLocalAdStats(payload) {
+  const local = getLocalAdStats()
+  const { raw, stats, watched, earned, remaining, limit } = adStatsNumbers(payload)
+  const mergedWatched = Math.max(watched, local.adsWatchedToday)
+  const mergedEarned = Math.max(earned, local.ccEarnedToday)
+  const mergedRemaining = Math.max(0, Math.min(remaining, limit - mergedWatched))
+
+  return {
+    ...raw,
+    adsWatchedToday: mergedWatched,
+    remainingAdsToday: mergedRemaining,
+    ccEarnedToday: mergedEarned,
+    stats: {
+      ...stats,
+      adsWatchedToday: mergedWatched,
+      remainingAdsToday: mergedRemaining,
+      ccEarnedToday: mergedEarned,
+      dailyLimit: limit,
+    },
+  }
+}
 
 function RewardedAds({ onBalanceUpdate }) {
   const [ad, setAd] = useState(null)
@@ -24,7 +93,7 @@ function RewardedAds({ onBalanceUpdate }) {
     ;(async () => {
       try {
         const res = await getAdStats()
-        if (!cancelled) setStats(res?.data || res)
+        if (!cancelled) setStats(mergeLocalAdStats(res))
       } catch { /* ignore */ }
     })()
     return () => { cancelled = true }
@@ -63,22 +132,23 @@ function RewardedAds({ onBalanceUpdate }) {
       setReward({ cc: res?.cc || 0, amount: amountEarned })
       
       setStats(prev => {
-        const pRaw = prev?.data || prev || {}
-        const pStats = pRaw?.stats || pRaw?.data?.stats || pRaw || {}
-        const currentWatched = pStats?.adsWatchedToday ?? pStats?.watched ?? pRaw?.adsWatchedToday ?? 0
-        const currentEarned = pStats?.ccEarnedToday ?? pStats?.earned ?? pRaw?.ccEarnedToday ?? 0
-        const currentRemaining = pStats?.remainingAdsToday ?? pStats?.remaining ?? pRaw?.remainingAdsToday ?? Math.max(0, 10 - currentWatched)
+        const mergedPrev = mergeLocalAdStats(prev)
+        const { raw: pRaw, stats: pStats, watched, earned, remaining } = adStatsNumbers(mergedPrev)
+        const nextWatched = watched + 1
+        const nextEarned = earned + amountEarned
+        const nextRemaining = Math.max(0, remaining - 1)
+        saveLocalAdStats({ adsWatchedToday: nextWatched, ccEarnedToday: nextEarned })
         
         return {
           ...pRaw,
-          adsWatchedToday: currentWatched + 1,
-          remainingAdsToday: Math.max(0, currentRemaining - 1),
-          ccEarnedToday: currentEarned + amountEarned,
+          adsWatchedToday: nextWatched,
+          remainingAdsToday: nextRemaining,
+          ccEarnedToday: nextEarned,
           stats: {
             ...pStats,
-            adsWatchedToday: currentWatched + 1,
-            remainingAdsToday: Math.max(0, currentRemaining - 1),
-            ccEarnedToday: currentEarned + amountEarned
+            adsWatchedToday: nextWatched,
+            remainingAdsToday: nextRemaining,
+            ccEarnedToday: nextEarned
           }
         }
       })
@@ -165,11 +235,8 @@ function RewardedAds({ onBalanceUpdate }) {
   }
 
   // Deeply unwrap the stats response — backend may return nested shapes
-  const _raw = stats?.data || stats
-  const adStats = _raw?.stats || _raw?.data?.stats || _raw || {}
-  const adsWatched = adStats?.adsWatchedToday ?? adStats?.watched ?? _raw?.adsWatchedToday ?? 0
-  const remaining = adStats?.remainingAdsToday ?? adStats?.remaining ?? _raw?.remainingAdsToday ?? Math.max(0, 10 - adsWatched)
-  const earned = adStats?.ccEarnedToday ?? adStats?.earned ?? _raw?.ccEarnedToday ?? 0
+  const displayStats = mergeLocalAdStats(stats)
+  const { watched: adsWatched, remaining, earned } = adStatsNumbers(displayStats)
   const cooldownPct = Math.round(((AD_COOLDOWN_SECS - cooldown) / AD_COOLDOWN_SECS) * 100)
   const ctaUrl = ad?.ctaUrl || ad?.actionUrl || ad?.url || ad?.link || ad?.linkUrl
 

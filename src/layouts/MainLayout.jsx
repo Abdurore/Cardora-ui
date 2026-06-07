@@ -68,17 +68,55 @@ import { normalizeGiftInventory } from '../lib/gifts.js'
 const USER_META_PREFIX = 'cardora:userMeta:'
 
 function readUserMeta(userId) {
-  if (!userId) return { favorites: [], inventory: [], avatarColor: '' }
+  if (!userId) return { favorites: [], likedTemplates: [], inventory: [], avatarColor: '' }
   try {
     const parsed = JSON.parse(localStorage.getItem(`${USER_META_PREFIX}${userId}`) || '{}')
     return {
       favorites: Array.isArray(parsed?.favorites) ? parsed.favorites : [],
+      likedTemplates: Array.isArray(parsed?.likedTemplates) ? parsed.likedTemplates : [],
       inventory: Array.isArray(parsed?.inventory) ? parsed.inventory : [],
       avatarColor: parsed?.avatarColor || '',
     }
   } catch {
-    return { favorites: [], inventory: [], avatarColor: '' }
+    return { favorites: [], likedTemplates: [], inventory: [], avatarColor: '' }
   }
+}
+
+function templateIds(card) {
+  return [
+    card?.id,
+    card?.templateId,
+    card?._id,
+    card?.backendTemplate?.templateId,
+    card?.backendTemplate?._id,
+    card?.backendTemplate?.id,
+  ].filter(Boolean).map(String)
+}
+
+function templateMatches(card, id) {
+  if (!card || !id) return false
+  return templateIds(card).includes(String(id))
+}
+
+function getTemplateBackendId(card, fallbackId = '') {
+  return (
+    card?.backendTemplate?._id ||
+    card?.backendTemplate?.templateId ||
+    card?.backendTemplate?.id ||
+    card?._id ||
+    card?.templateId ||
+    card?.id ||
+    fallbackId
+  )
+}
+
+function getTemplateLikeCount(card) {
+  return Number(card?.likeCount ?? card?.likesCount ?? card?.likes ?? 0) || 0
+}
+
+function applyTemplateLike(card, liked) {
+  const nextLikeCount = Math.max(0, getTemplateLikeCount(card) + (liked ? 1 : -1))
+  return { ...card, likeCount: nextLikeCount, likes: String(nextLikeCount), isLiked: liked, liked }
 }
 
 function MainLayout() {
@@ -199,7 +237,7 @@ function MainLayout() {
       setCurrentUser(normalized)
       setBalance(normalized.balance)
       setFavorites(meta.favorites || [])
-      setLikedTemplates(meta.likedTemplates || [])
+      setLikedTemplates((prev) => Array.from(new Set([...(prev || []), ...(meta.likedTemplates || [])])))
       const mappedGifts = normalizeGiftInventory(normalized.giftsInventory, true)
 
       setInventory(mappedGifts)
@@ -229,6 +267,12 @@ function MainLayout() {
       if (templatePayload.status === 'fulfilled') {
         const normalizedTemplates = normalizeTemplatesResponse(templatePayload.value)
         setMarketplaceTemplates(normalizedTemplates.templates)
+        const backendLikedIds = normalizedTemplates.templates
+          .filter((template) => template.isLiked || template.liked)
+          .flatMap(templateIds)
+        if (backendLikedIds.length) {
+          setLikedTemplates((prev) => Array.from(new Set([...prev, ...backendLikedIds])))
+        }
       }
     } catch (error) {
       console.error('Public data load failed', error)
@@ -296,28 +340,26 @@ function MainLayout() {
       return
     }
 
-    const wasLiked = likedTemplates.includes(cardId)
+    const matchedTemplate = marketplaceTemplates.find((item) => templateMatches(item, cardId)) || selectedCard
+    const aliases = templateIds(matchedTemplate).length ? templateIds(matchedTemplate) : [String(cardId)]
+    const wasLiked = aliases.some((id) => likedTemplates.includes(id))
+    const nextLiked = !wasLiked
 
     setLikedTemplates((prev) => (
-      prev.includes(cardId)
-        ? prev.filter((id) => id !== cardId)
-        : [...prev, cardId]
+      wasLiked
+        ? prev.filter((id) => !aliases.includes(String(id)))
+        : Array.from(new Set([...prev, ...aliases]))
     ))
     setMarketplaceTemplates((prev) => prev.map((item) => {
-      if (item.id !== cardId) return item
-      const nextLikeCount = Math.max(0, Number(item.likeCount ?? item.likes ?? 0) + (wasLiked ? -1 : 1))
-      return { ...item, likeCount: nextLikeCount, likes: String(nextLikeCount) }
+      if (!templateMatches(item, cardId)) return item
+      return applyTemplateLike(item, nextLiked)
     }))
     setSelectedCard((prev) => {
-      if (!prev || prev.id !== cardId) return prev
-      const nextLikeCount = Math.max(0, Number(prev.likeCount ?? prev.likes ?? 0) + (wasLiked ? -1 : 1))
-      return { ...prev, likeCount: nextLikeCount, likes: String(nextLikeCount) }
+      if (!templateMatches(prev, cardId)) return prev
+      return applyTemplateLike(prev, nextLiked)
     })
 
-    // Only call the backend for marketplace templates that have a real backend ID
-    const backendTemplate = marketplaceTemplates.find((item) => item.id === cardId)?.backendTemplate
-    if (!backendTemplate) return
-    const templateId = backendTemplate.templateId || backendTemplate._id
+    const templateId = getTemplateBackendId(matchedTemplate, cardId)
     if (!templateId) return
     try {
       if (wasLiked) {
@@ -327,6 +369,17 @@ function MainLayout() {
       }
     } catch (error) {
       console.error('Like sync failed', error)
+      setLikedTemplates((prev) => (
+        wasLiked
+          ? Array.from(new Set([...prev, ...aliases]))
+          : prev.filter((id) => !aliases.includes(String(id)))
+      ))
+      setMarketplaceTemplates((prev) => prev.map((item) => (
+        templateMatches(item, cardId) ? applyTemplateLike(item, wasLiked) : item
+      )))
+      setSelectedCard((prev) => (
+        templateMatches(prev, cardId) ? applyTemplateLike(prev, wasLiked) : prev
+      ))
     }
   }
 
@@ -345,11 +398,11 @@ function MainLayout() {
       return
     }
     setSelectedCard(card)
-    const templateId = card.templateId || card.backendTemplate?.templateId || card.backendTemplate?._id || card.id
+    const templateId = getTemplateBackendId(card)
     const nextViewCount = Number(card.viewCount || 0) + 1
     setSelectedCard((prev) => prev && prev.id === card.id ? { ...prev, viewCount: nextViewCount } : prev)
     setMarketplaceTemplates((prev) => prev.map((item) => (
-      item.id === card.id ? { ...item, viewCount: Number(item.viewCount || 0) + 1 } : item
+      templateMatches(item, card.id) ? { ...item, viewCount: Number(item.viewCount || 0) + 1 } : item
     )))
     if (!templateId) return
     try {
@@ -361,9 +414,9 @@ function MainLayout() {
 
   const recordTemplateUse = async (card) => {
     if (!card) return
-    const templateId = card.templateId || card.backendTemplate?.templateId || card.backendTemplate?._id || card.id
+    const templateId = getTemplateBackendId(card)
     setMarketplaceTemplates((prev) => prev.map((item) => {
-      if (item.id !== card.id) return item
+      if (!templateMatches(item, card.id)) return item
       const nextUsageCount = Number(item.usageCount ?? item.userCount ?? 0) + 1
       return { ...item, usageCount: nextUsageCount, userCount: nextUsageCount, meta: `${nextUsageCount} Users` }
     }))

@@ -1024,11 +1024,13 @@
 }
 
 .brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
-  min-width: 0;
+  z-index: 10;
 }
 
 .brand-wordmark {
@@ -1089,6 +1091,7 @@
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .header-user-capsule {
@@ -6307,13 +6310,21 @@ a {
 
   .hero-copy h1 {
     max-width: none;
-    font-size: clamp(2.45rem, 10vw, 3.4rem);
-    line-height: 1;
+    font-size: clamp(2rem, 8vw, 2.8rem);
+    line-height: 1.1;
   }
 
   .brand-wordmark {
     font-size: 0.96rem;
     letter-spacing: 0.14em;
+  }
+
+  .header-capsule-info {
+    display: none;
+  }
+
+  .header-user-capsule {
+    padding: 5px;
   }
 
   .screen-header {
@@ -6350,10 +6361,20 @@ a {
 
   .hero-format-chips {
     justify-content: center;
+    gap: 6px;
+    margin: 16px 0 20px;
+  }
+
+  .hero-format-chip {
+    padding: 6px 12px;
+    font-size: 0.75rem;
   }
 
   .hero-copy .cta-row {
     justify-content: center;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .hero-preview {
@@ -6423,6 +6444,7 @@ a {
   .hero-copy .cta-row {
     display: grid;
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .hero-copy .primary,
@@ -25199,7 +25221,6 @@ a {
 [data-theme="light"] .explore-search-bar input::placeholder { color: var(--placeholder); }
 [data-theme="light"] .cs-phone-notch { background: var(--accent-tint) !important; }
 [data-theme="light"] .cs-phone-screen {
-  background: var(--surface) !important;
   border-color: var(--border) !important;
 }
 
@@ -25264,7 +25285,7 @@ a {
 /* ── Store tabs ───────────────────────────────────────── */
 [data-theme="light"] .store-tabs { border-color: var(--accent-tint) !important; background: transparent !important; }
 [data-theme="light"] .store-tabs .tab { color: var(--text-dim) !important; background: transparent !important; border-color: transparent !important; }
-[data-theme="light"] .store-tabs .tab.active { color: var(--primary-strong) !important; border-bottom-color: var(--primary-strong) !important; }
+[data-theme="light"] .store-tabs .tab.active { color: white !important; background: var(--primary-strong) !important; border-color: transparent !important; border-radius: 30px !important; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important; }
 [data-theme="light"] .store-tabs .tab:hover { color: var(--primary) !important; background: var(--accent-soft) !important; }
 
 /* ── WorldChat ───────────────────────────────────────── */
@@ -25586,7 +25607,6 @@ a {
 }
 [data-theme="light"] .cs-phone-notch { background: var(--accent-tint) !important; }
 [data-theme="light"] .cs-phone-screen {
-  background: var(--surface) !important;
   border-color: var(--border) !important;
 }
 /* ── Studio: send modal ─────────────────────────────── */
@@ -25787,8 +25807,8 @@ a {
 /* ── Admin ───────────────────────────────────────────── */
 [data-theme="light"] .admin-page { background: var(--bg); }
 [data-theme="light"] .admin-section {
-  background: var(--surface);
-  border-color: var(--accent-tint);
+  background: transparent;
+  border-color: transparent;
 }
 [data-theme="light"] .admin-section-title,
 [data-theme="light"] .admin-header-title { color: var(--text); }
@@ -27425,6 +27445,10 @@ a {
 [data-theme="light"] .store-pay-hero p  { color: var(--text-muted) !important; }
 [data-theme="light"] .store-pay-amount  { color: var(--text) !important; }
 [data-theme="light"] .store-pay-note    { color: var(--text-dim) !important; }
+[data-theme="light"] .store-pay-summary { 
+  background: var(--surface) !important;
+  border-color: var(--accent-tint) !important;
+}
 [data-theme="light"] .store-pay-breakdown { 
   background: var(--accent-soft) !important;
   border-color: var(--accent-tint) !important;
@@ -27976,7 +28000,7 @@ a {
 
   /* Preview area */
   [data-theme="light"] .cs-mobile-preview {
-    background: transparent !important;
+    /* removed background override to preserve inline style */
   }
   [data-theme="light"] .cs-mobile-tap-hint {
     color: var(--text-dim) !important;
@@ -30315,4 +30339,119 @@ a {
 .admin-frame-tile-delete {
   width: 100%;
   margin-top: auto;
+}
+
+/* Final contrast pass: these must stay after the repeated light-theme blocks. */
+[data-theme="light"] .cs-settings h3,
+[data-theme="light"] .cs-panel h3,
+[data-theme="light"] .cs-panel h4,
+[data-theme="light"] .cs-field,
+[data-theme="light"] .cs-color-field,
+[data-theme="light"] .cs-range-val {
+  color: var(--text) !important;
+}
+
+[data-theme="light"] .cs-panel-eyebrow,
+[data-theme="light"] .cs-field-hint,
+[data-theme="light"] .cs-info-note,
+[data-theme="light"] .cs-sub-label,
+[data-theme="light"] .cs-toolgroup-label {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="light"] .cs-field input,
+[data-theme="light"] .cs-field textarea,
+[data-theme="light"] .cs-field select,
+[data-theme="light"] .cs-color-text {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="light"] .cs-color-wrap {
+  background: var(--bg) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="light"] .cs-preview-poll-option,
+[data-theme="light"] .cs-preview-trivia-opt {
+  border-color: color-mix(in srgb, currentColor 18%, transparent);
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.profile-enhanced--with-bg .profile-enhanced-bg-fade {
+  background:
+    linear-gradient(180deg, rgba(3, 8, 12, 0.58), rgba(3, 8, 12, 0.9)),
+    radial-gradient(circle at 50% 0%, rgba(126, 247, 255, 0.2), transparent 55%) !important;
+}
+
+.profile-enhanced--with-bg h3,
+.profile-enhanced--with-bg .profile-handle,
+.profile-enhanced--with-bg .profile-role-desc,
+.profile-enhanced--with-bg .profile-bio,
+.profile-enhanced--with-bg .profile-stat strong,
+.profile-enhanced--with-bg .profile-stat span,
+[data-theme="light"] .profile-enhanced.profile-enhanced--with-bg h3,
+[data-theme="light"] .profile-enhanced.profile-enhanced--with-bg .profile-handle,
+[data-theme="light"] .profile-enhanced.profile-enhanced--with-bg .profile-role-desc,
+[data-theme="light"] .profile-enhanced.profile-enhanced--with-bg .profile-bio,
+[data-theme="light"] .profile-enhanced.profile-enhanced--with-bg .profile-stat strong,
+[data-theme="light"] .profile-enhanced.profile-enhanced--with-bg .profile-stat span {
+  color: #f4fbff !important;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.78);
+}
+
+.profile-enhanced--with-bg .profile-handle,
+.profile-enhanced--with-bg .profile-role-desc,
+.profile-enhanced--with-bg .profile-bio,
+.profile-enhanced--with-bg .profile-stat span {
+  color: rgba(244, 251, 255, 0.84) !important;
+}
+
+.profile-enhanced--with-bg .profile-stats,
+.profile-enhanced--with-bg .profile-referral {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: rgba(5, 12, 16, 0.48) !important;
+  backdrop-filter: blur(8px);
+}
+
+[data-theme="light"] .profile-enhanced.profile-enhanced--with-bg {
+  background: #071017 !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 24px 60px rgba(1, 8, 12, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+}
+
+[data-theme="light"] .profile-enhanced.profile-enhanced--with-bg .profile-referral-label,
+[data-theme="light"] .profile-enhanced.profile-enhanced--with-bg .profile-referral-code {
+  color: #f4fbff !important;
+}
+
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) {
+  background: #071017 !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-bg-fade {
+  background: linear-gradient(
+    180deg,
+    rgba(3, 8, 12, 0.5) 0%,
+    rgba(3, 8, 12, 0.72) 40%,
+    rgba(3, 8, 12, 0.92) 100%
+  ) !important;
+}
+
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-fullname,
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-name,
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-bio,
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-meta-item,
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-stat strong,
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-stat span {
+  color: #f4fbff !important;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.72);
+}
+
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-bio,
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-meta-item,
+[data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-stat span {
+  color: rgba(244, 251, 255, 0.78) !important;
 }

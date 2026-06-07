@@ -224,9 +224,13 @@ export function mapTemplateToCard(template, index = 0) {
   const likeCount =
     template.likesCount ??
     template.likeCount ??
+    template.likedCount ??
     template.likes_count ??
     (Array.isArray(template.likes) ? template.likes.length : undefined) ??
+    (Number.isFinite(Number(template.likes)) ? Number(template.likes) : undefined) ??
     template.analytics?.likes ??
+    template.analytics?.likeCount ??
+    template.stats?.likeCount ??
     template.stats?.likes ??
     template.popularityScore ??
     0
@@ -260,6 +264,7 @@ export function mapTemplateToCard(template, index = 0) {
     meta: `${usageCount} Users`,
     likes: String(likeCount),
     likeCount,
+    isLiked: !!(template.isLiked || template.liked || template.viewerHasLiked || template.hasLiked),
     userCount: usageCount,
     usageCount,
     viewCount,

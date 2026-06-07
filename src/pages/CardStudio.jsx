@@ -2862,6 +2862,10 @@ function CardStudio() {
                 className="cs-editable"
                 style={{ outline: 'none', flex: 1, cursor: 'text' }}
                 onClick={e => { e.stopPropagation(); setActiveEditEl({ type: 'chainPrompt', index: 0 }) }}
+                onInput={e => {
+                  const nextPrompt = editableText(e.currentTarget, { trim: true })
+                  setChainData(prev => prev.prompt === nextPrompt ? prev : { ...prev, prompt: nextPrompt })
+                }}
                 onBlur={e => {
                   setChainData(prev => ({ ...prev, prompt: editableText(e.currentTarget, { trim: true }) }))
                   setActiveEditEl(null)
