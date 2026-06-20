@@ -8,6 +8,7 @@ import { defaultCardObject } from '../data/cardDefaults.js'
 import { attachGiftToCard } from '../lib/api.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import { GiftIcon } from '../components/GiftCard.jsx'
+import { uploadToCloudinary } from '../lib/cloudinary.js'
 
 const QUICK_FONTS = [
   { label: 'Poppins',          value: 'Poppins',          sample: 'Modern & Clean',   tier: 'classic' },
@@ -163,12 +164,14 @@ function QuickCreate() {
   }
 
   const addImageFile = (file) => {
-    if (!file || !file.type.startsWith('image/')) return
+    if (!file) return
+    const isImage = file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i)
+    if (!isImage) return
     if (images.length >= MAX_IMAGES) return
     const blobUrl = URL.createObjectURL(file)
     const reader = new FileReader()
     reader.onload = (e) => {
-      setImages(prev => prev.length < MAX_IMAGES ? [...prev, { blobUrl, dataUrl: e.target.result }] : prev)
+      setImages(prev => prev.length < MAX_IMAGES ? [...prev, { blobUrl, dataUrl: e.target.result, file }] : prev)
     }
     reader.readAsDataURL(file)
   }
@@ -255,6 +258,31 @@ function QuickCreate() {
     setIsSending(true)
     try {
       const cardObject = buildCardObject()
+
+      const cloudImages = []
+      for (let i = 0; i < images.length; i++) {
+        if (images[i].file) {
+          try {
+            const cloudUrl = await uploadToCloudinary(images[i].file, 'image')
+            cloudImages.push(cloudUrl)
+          } catch (err) {
+            setSendResult({ ok: false, message: 'Failed to upload images. Please try again.' })
+            setIsSending(false)
+            return
+          }
+        } else {
+          cloudImages.push(null)
+        }
+      }
+
+      if (cardObject.media?.images) {
+        cardObject.media.images.forEach((img, idx) => {
+          if (cloudImages[idx]) {
+            img.url = cloudImages[idx]
+          }
+        })
+      }
+
       const pollData = cardType === 'poll'
         ? { question: pollQuestion.trim(), options: pollOptions.filter(o => o.trim()) }
         : undefined

@@ -30455,3 +30455,72 @@ a {
 [data-theme="light"] .chat-profile-card:has(.chat-profile-bg-banner) .chat-profile-stat span {
   color: rgba(244, 251, 255, 0.78) !important;
 }
+/* Responsive end actions for mobile */
+.cp-end-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .cp-end-actions {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  .cp-end-btn {
+    width: 100%;
+    margin: 0 !important;
+  }
+}
+
+/* Fix narrow elongated personal cards in profile */
+.card.personal-card {
+  min-height: 160px !important;
+  padding: 12px;
+  justify-content: flex-end;
+}
+.card.personal-card .card-thumb {
+  min-height: 80px !important;
+  height: 80px;
+  flex: none;
+  aspect-ratio: auto;
+}
+.card.personal-card .card-info h4 {
+  font-size: 1.05rem;
+  margin-top: 8px;
+}
+
+@media (max-width: 600px) {
+  .card-grid.compact:has(.profile-card-wrap) {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+}
+
+/* Provide breathing room around fullscreen cards on mobile */
+@media (max-width: 600px) {
+  .cp-overlay.cp-device-fullscreen {
+    padding: 32px 24px !important;
+    align-items: center !important;
+  }
+  
+  .cp-overlay.cp-device-fullscreen .cp-card-full {
+    min-height: 75dvh !important;
+    height: auto !important;
+    max-height: 88dvh !important;
+    border-radius: 28px !important;
+    width: 100% !important;
+  }
+
+  .cp-overlay.cp-device-fullscreen .cp-card-wrap-full {
+    width: 100% !important;
+    margin: 0 auto !important;
+  }
+
+  .cp-card-full.cp-question-card,
+  .cp-card-full.cp-end-card,
+  .cp-card-full.cp-gift-intro,
+  .cp-card-full.cp-gift-receive {
+    min-height: 75dvh !important;
+    padding: 40px 20px 24px !important;
+  }
+}

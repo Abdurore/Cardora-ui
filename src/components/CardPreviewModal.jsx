@@ -1440,7 +1440,7 @@ function CardPreviewModal({
                         type="button"
                         className="cp-continue-btn visible"
                         style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
-                        onClick={() => navigate('/studio', { state: { isNew: true } })}
+                        onClick={() => navigate('/')}
                       >
                         Create yours
                       </button>
@@ -1546,14 +1546,14 @@ function CardPreviewModal({
                           type="button"
                           className="cp-end-btn ghost"
                           style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                          onClick={() => navigate('/studio', { state: { isNew: true } })}
+                          onClick={() => navigate('/')}
                         >
                           Create yours
                         </button>
                         <button
                           type="button"
                           className="cp-end-btn ghost"
-                          style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)', marginLeft: '12px' }}
+                          style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)',  }}
                           onClick={() => navigate('/')}
                         >
                           Done
@@ -1777,14 +1777,14 @@ function CardPreviewModal({
                     type="button"
                     className="cp-end-btn ghost"
                     style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                    onClick={() => navigate('/studio', { state: { isNew: true } })}
+                    onClick={() => navigate('/')}
                   >
                     Create yours
                   </button>
                   <button
                     type="button"
                     className="cp-end-btn ghost"
-                    style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)', marginLeft: '12px' }}
+                    style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)',  }}
                     onClick={() => navigate('/')}
                   >
                     Done
@@ -1928,14 +1928,14 @@ function CardPreviewModal({
                   type="button"
                   className="cp-end-btn ghost"
                   style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                  onClick={() => navigate('/studio', { state: { isNew: true } })}
+                  onClick={() => navigate('/')}
                 >
                   Create yours
                 </button>
                 <button
                   type="button"
                   className="cp-end-btn ghost"
-                  style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)', marginLeft: '12px' }}
+                  style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)',  }}
                   onClick={() => navigate('/')}
                 >
                   Done

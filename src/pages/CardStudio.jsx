@@ -1246,7 +1246,7 @@ function CardStudio() {
     const remaining = Math.max(0, cap - c.media.images.length)
     if (remaining <= 0) return
     const accepted = Array.from(files)
-      .filter(f => f && f.type?.startsWith('image/'))
+      .filter(f => f && (f.type?.startsWith('image/') || f.name.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i)))
       .slice(0, remaining)
     if (!accepted.length) return
     const newEntries = accepted.map(file => {

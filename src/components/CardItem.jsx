@@ -54,7 +54,7 @@ function CardItem({
     <div
       role="button"
       tabIndex={0}
-      className={`card ${variant}`}
+      className={`card ${variant} ${!isTemplate ? 'personal-card' : ''}`}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter') onClick?.() }}
     >
