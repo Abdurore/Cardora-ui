@@ -53,6 +53,13 @@ export function formatGiftName(name) {
     .trim()
 }
 
+export function formatGiftAmount(value) {
+  if (typeof value === 'string' && value.trim() && !/^\d+(\.\d+)?$/.test(value.trim())) return value.trim()
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return ''
+  return `₦${num.toLocaleString()}`
+}
+
 function formatNgn(value) {
   const num = Number(value)
   if (!Number.isFinite(num) || num <= 0) return ''

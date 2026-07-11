@@ -50,6 +50,7 @@ import {
   deleteAccount,
   updateCurrency,
   createFlutterwaveGiftCheckout,
+  verifyGiftPayment,
 } from '../lib/api.js'
 import {
   getPrimaryUser,
@@ -203,21 +204,28 @@ function MainLayout() {
         if (pendingRaw) {
           const pending = JSON.parse(pendingRaw)
           if (pending && pending.name && Date.now() - pending.savedAt < 300000) { // 5 minutes
-            const beforeCount = Array.isArray(hydratedUser?.giftsInventory) ? hydratedUser.giftsInventory.length : 0
-            const afterCount = Array.isArray(normalized.giftsInventory) ? normalized.giftsInventory.length : 0
-            const hasExactPending = Array.isArray(normalized.giftsInventory) && normalized.giftsInventory.some(
-              item => (
-                (pending.reference && (item.reference === pending.reference || item.txRef === pending.reference || item.transactionRef === pending.reference)) ||
-                item.inventoryId === `pending-${pending.savedAt}` ||
-                item._id === `pending-${pending.savedAt}`
-              )
+            const backendGifts = Array.isArray(normalized.giftsInventory) ? normalized.giftsInventory : []
+
+            // Check if the backend has already credited a gift matching this purchase.
+            // Match by giftName (the field the backend actually returns), by reference/txRef,
+            // or by detecting a new inventory item added since the purchase was initiated.
+            const hasMatchByName = backendGifts.some(item => {
+              const itemName = item.giftName || item.name || ''
+              return itemName === pending.name && (item.status === 'available' || item.status === 'active')
+            })
+            const hasMatchByRef = pending.reference && backendGifts.some(item =>
+              item.reference === pending.reference ||
+              item.txRef === pending.reference ||
+              item.transactionRef === pending.reference
             )
-            const hasGained = hasExactPending || afterCount > beforeCount
-            if (hasGained) {
+
+            if (hasMatchByName || hasMatchByRef) {
+              // Gift was credited — clear the pending placeholder
               sessionStorage.removeItem('cardora:pendingGiftCheckout')
             } else {
+              // Gift not yet visible in backend — inject unverified placeholder
               normalized.giftsInventory = [
-                ...(Array.isArray(normalized.giftsInventory) ? normalized.giftsInventory : []),
+                ...backendGifts,
                 {
                   giftName: pending.name,
                   name: pending.name,
@@ -230,6 +238,9 @@ function MainLayout() {
                 }
               ]
             }
+          } else if (pending) {
+            // Expired (> 5 min) — clean up stale pending entry
+            sessionStorage.removeItem('cardora:pendingGiftCheckout')
           }
         }
       } catch (e) { /* ignore */ }
@@ -1051,6 +1062,7 @@ function MainLayout() {
           onResetPassword: handleResetPassword,
           onDeleteAccount: handleDeleteAccount,
           refreshBalance,
+          verifyGiftPayment,
           userCurrency,
           onCurrencyChange: handleCurrencyChange,
           openCardTypeModal: (preselect = null) => {

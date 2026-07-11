@@ -7,7 +7,7 @@ import GiftPreviewModal from '../components/GiftPreviewModal.jsx'
 import { GiftIcon } from '../components/GiftCard.jsx'
 import { MdCardGiftcard, MdInventory } from 'react-icons/md'
 import { storeGifts } from '../data/catalog.js'
-import { getGiftCatalog, createFlutterwaveGiftCheckout } from '../lib/api.js'
+import { getGiftCatalog, createFlutterwaveGiftCheckout, verifyGiftPayment } from '../lib/api.js'
 import { normalizeCheckoutSession } from '../lib/backendMappers.js'
 import { formatGiftName as formatGiftLabel, normalizeGiftInventory } from '../lib/gifts.js'
 
@@ -165,8 +165,27 @@ function StoreGifts() {
 
     ;(async () => {
       setReturnRefreshing(true)
-      setMsg({ text: 'Payment received. Refreshing your gift inventory...', ok: true })
-      for (const delay of [500, 1000, 1800, 2800, 4000, 5500]) {
+      setMsg({ text: 'Payment received. Verifying your gift purchase...', ok: true })
+
+      // Call verify-payment to immediately credit the gift to inventory.
+      // The webhook is just a delayed fallback — this is the primary path.
+      const txRef = params.get('tx_ref') || params.get('txRef') || ''
+      const transactionId = params.get('transaction_id') || params.get('transactionId') || ''
+      if (transactionId || txRef) {
+        try {
+          await verifyGiftPayment({ transaction_id: transactionId, tx_ref: txRef })
+          // Payment verified — clear the pending placeholder so hydrateSession
+          // doesn't keep injecting an 'unverified' ghost item.
+          clearPendingGift()
+          setMsg({ text: 'Payment verified! Refreshing your inventory...', ok: true })
+        } catch (verifyErr) {
+          console.warn('[StoreGifts] verify-payment failed, falling back to webhook:', verifyErr.message)
+          setMsg({ text: 'Verifying payment... this may take a moment.', ok: true })
+        }
+      }
+
+      // Refresh session to pick up the newly credited gift
+      for (const delay of [500, 1500, 3000]) {
         await new Promise(resolve => setTimeout(resolve, delay))
         if (cancelled) return
         await refreshBalance?.()

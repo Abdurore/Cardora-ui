@@ -1,5 +1,5 @@
 import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
-import { formatGiftName, giftNameToEffectKey } from './gifts.js'
+import { formatGiftName, giftNameToEffectKey, formatGiftAmount } from './gifts.js'
 
 import { getChatFrameId, getChatFrameUrl } from './chatFrames.js'
 
@@ -942,7 +942,7 @@ export function backendCardToCardObject(card) {
       enabled: attachedGift.enabled !== false,
       effectKey: giftNameToEffectKey(attachedGift.effectKey || attachedGift.giftName || attachedGift.name || storedGiftEffect.effectKey || 'none'),
       giftTitle: attachedGift.giftTitle || attachedGift.title || formatGiftName(attachedGift.giftName || attachedGift.name || attachedGift.effectKey || storedGiftEffect.giftName || storedGiftEffect.effectKey),
-      giftAmount: attachedGift.giftAmount || attachedGift.amount || storedGiftEffect.giftAmount || '',
+      giftAmount: attachedGift.giftAmount || formatGiftAmount(attachedGift.amount) || storedGiftEffect.giftAmount || '',
       giftId: attachedGift.giftId || attachedGift.inventoryId || attachedGift.id || storedGiftEffect.giftId || '',
       giftName: attachedGift.giftName || attachedGift.name || storedGiftEffect.giftName || '',
       status: attachedGift.status || storedGiftEffect.status || 'available',

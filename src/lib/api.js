@@ -509,6 +509,10 @@ export async function createFlutterwaveGiftCheckout(payload) {
   ], { method: 'POST', auth: true, body: payload })
 }
 
+export async function verifyGiftPayment(payload) {
+  return request('/gifts/verify-payment', { method: 'POST', auth: true, body: payload })
+}
+
 export async function attachGiftToCard(payload) {
   try {
     return await request('/cards/attach-gift', { method: 'POST', auth: true, body: payload })
