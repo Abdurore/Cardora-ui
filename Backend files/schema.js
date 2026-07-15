@@ -252,6 +252,7 @@ export const cardSchemas = {
     body: Joi.object({
       response: Joi.string().trim().min(1).max(1000),
       message: Joi.string().trim().min(1).max(1000),
+      name: Joi.string().trim().min(1).max(50),
       password: Joi.string().trim().max(120),
     }).or("response", "message"),
   },
@@ -267,6 +268,7 @@ export const cardSchemas = {
     params: Joi.object({ slug: slug.required() }),
     body: Joi.object({
       answers: Joi.array().items(Joi.number().integer().min(0)).min(1).required(),
+      name: Joi.string().trim().min(1).max(50),
       password: Joi.string().trim().max(120),
     }),
   },

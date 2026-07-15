@@ -117,6 +117,10 @@ function CardPreviewModal({
   // Device-frame preview. Fullscreen by default; lets the sender see how the
   // card scales on phone / tablet / desktop without leaving the modal.
   const [previewDevice, setPreviewDevice] = useState('fullscreen')
+  const lowPowerViewer = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia?.('(prefers-reduced-motion: reduce), (max-width: 768px), (max-height: 600px)')?.matches || false
+  }, [])
 
   const [claimingGift, setClaimingGift] = useState(false)
   const [giftClaimMessage, setGiftClaimMessage] = useState('')
@@ -371,10 +375,11 @@ function CardPreviewModal({
 
   // Open effect dispatcher — gated by tier cap
   const triggerOpenEffect = useCallback(() => {
+    if (lowPowerViewer) return
     if (!toolAllowed('animation') || !limit('allowOpenEffects')) return
     if (!c.animation.openEffect || c.animation.openEffect === 'none') return
     fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
-  }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits])
+  }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits, lowPowerViewer])
 
   // Seed localChainReplies from chainState prop when it becomes available
   useEffect(() => {
@@ -576,6 +581,7 @@ function CardPreviewModal({
 
   // Background effect — gated by the `animation` tool AND tier ambient cap
   const renderBgEffect = () => {
+    if (pageMode && lowPowerViewer) return null
     if (!toolAllowed('animation') || !limit('allowAmbientEffects')) return null
     const eff = c.animation.backgroundEffect
     if (!eff || eff.type === 'none') return null
@@ -786,8 +792,8 @@ function CardPreviewModal({
           ))}
         </div>
       )}
-      <div className={`cp-backdrop${c.background.type === 'animated' ? ' animated' : ''}`} style={bgStyle}>
-        {c.background.type === 'video' && c.background.videoUrl && limit('allowVideoBackground') ? (
+      <div className={`cp-backdrop${c.background.type === 'animated' && !lowPowerViewer ? ' animated' : ''}`} style={bgStyle}>
+        {c.background.type === 'video' && c.background.videoUrl && !lowPowerViewer && limit('allowVideoBackground') ? (
           <video className="cp-backdrop-video" src={c.background.videoUrl} autoPlay muted loop playsInline />
         ) : null}
       </div>

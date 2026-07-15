@@ -341,9 +341,9 @@ export async function submitPollVote(req, res) {
 export async function submitChainReply(req, res) {
   try {
     const userId = req.user.id;
-    const username = req.user.username || "User";
     const { slug } = req.params;
-    const { response, message, password } = req.body;
+    const { response, message, name, password } = req.body;
+    const displayName = String(name || req.user.username || 'User').trim().slice(0, 50) || 'User';
     const text = sanitizeWorldChatMessage(String(response || message || "").trim());
 
     if (!text) {
@@ -371,7 +371,7 @@ export async function submitChainReply(req, res) {
         $push: {
           "state.responses": {
             userId,
-            name: username,
+            name: displayName,
             response: text,
             timestamp: new Date(),
           },
@@ -440,7 +440,8 @@ export async function submitTriviaAttempt(req, res) {
     const userId = req.user.id;
     const username = req.user.username || "User";
     const { slug } = req.params;
-    const { answers, password } = req.body;
+    const { answers, name, password } = req.body;
+    const displayName = String(name || req.user.username || 'User').trim().slice(0, 50) || 'User';
 
     const card = await client.db(DB_NAME).collection("cards").findOne({ slug });
     if (!card) return res.status(404).json({ message: "Card not found" });
@@ -476,7 +477,7 @@ export async function submitTriviaAttempt(req, res) {
       { slug, "state.players.userId": userId },
       {
         $set: {
-          "state.players.$.name": username,
+          "state.players.$.name": displayName,
           "state.players.$.score": score,
         },
       },
@@ -489,7 +490,7 @@ export async function submitTriviaAttempt(req, res) {
           $push: {
             "state.players": {
               userId,
-              name: username,
+              name: displayName,
               score,
             },
           },
@@ -499,7 +500,7 @@ export async function submitTriviaAttempt(req, res) {
       if (pushNew.matchedCount === 0) {
         await client.db(DB_NAME).collection("cards").updateOne(
           { slug, "state.players.userId": userId },
-          { $set: { "state.players.$.score": score, "state.players.$.name": username } },
+          { $set: { "state.players.$.score": score, "state.players.$.name": displayName } },
         );
       }
     }

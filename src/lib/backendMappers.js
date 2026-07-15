@@ -444,32 +444,21 @@ function isLightColor(hex) {
  * cardObjectToLayoutData — returns the layoutdata branch.
  * Per the API handbook, layoutdata only carries paperTexture metadata.
  * The backend forces layoutdata.tier to match the card's tier automatically.
- * We also embed giftEffect here so the gift data survives the roundtrip
- * and is available when recipients view the card via GET /cards/:slug.
+ *
+ * NOTE: Gift data does NOT go here — the backend strips unknown fields
+ * (stripUnknown: true). Gift attachment data travels via the separate
+ * giftAttachment field created by POST /cards/attach-gift.
  */
 export function cardObjectToLayoutData(cardObject = null) {
-  const ld = {
+  const layoutdata = {
     paperTexture: {
       type: 'none',
       opacity: 0,
       blendMode: 'normal',
     },
   }
-
-  // Embed gift effect in layoutdata so it persists with the card
-  const gift = cardObject?.giftEffect
-  if (gift && gift.enabled && gift.effectKey && gift.effectKey !== 'none') {
-    ld.giftEffect = {
-      enabled: true,
-      effectKey: gift.effectKey,
-      giftTitle: gift.giftTitle || '',
-      giftAmount: gift.giftAmount || '',
-      giftId: gift.giftId || '',
-      giftName: gift.giftName || gift.effectKey || '',
-    }
-  }
-
-  return ld
+  if (cardObject?.closedState) layoutdata.closedState = structuredClone(cardObject.closedState)
+  return layoutdata
 }
 
 /**
@@ -670,21 +659,29 @@ export function cardObjectToBackendPayload(cardObject, {
       : Number(cardObject.card?.textBodyAnimation?.fadeInDuration) > 0 ? 'fade'
       : 'fade'
 
-    enhancements = {
-      background: {
+    const bgObj = {
         type: bgType,
         value: bgValue,
-        videoSettings: {
+      }
+      // videoSettings: only relevant for video backgrounds (handbook §7)
+      if (bgType === 'video') {
+        bgObj.videoSettings = {
           blur: 0,
-          darkTint: bgType === 'video' ? 0.15 : 0,
+          darkTint: 0.15,
           tintLevel: 0,
           tintColor: '',
-        },
-        gradientAnimation: {
-          enabled: bgType === 'animated',
+        }
+      }
+      // gradientAnimation: only relevant for animated backgrounds
+      if (bgType === 'animated') {
+        bgObj.gradientAnimation = {
+          enabled: true,
           duration: Number(cardObject.background?.animationDuration) || 8,
-        },
-      },
+        }
+      }
+
+    enhancements = {
+      background: bgObj,
       // lock.type: FE uses 'time', backend requires 'timer' (handbook Common AI Mistakes #3)
       // lock.value: per handbook samples, type 'none' uses value '' (empty string).
       // Active lock types (password/timer) require a non-empty value.
@@ -763,8 +760,8 @@ export function cardObjectToBackendPayload(cardObject, {
     }
   }
 
-  // Include layoutdata so gift effect and paper texture data survive the roundtrip.
-  // The backend stores this as-is and returns it with GET /cards/:slug.
+  // Include layoutdata for paper texture metadata.
+  // The backend stores layoutdata and returns it with GET /cards/:slug.
   const layoutdata = cardObjectToLayoutData(cardObject)
 
   const payload = {
@@ -891,6 +888,7 @@ export function backendCardToCardObject(card) {
       },
     },
     closedState: {
+      ...(layoutdata.closedState || {}),
       backgroundColor: bgColor,
       borderColor: primaryAccent,
       textColor: baseTextColor,

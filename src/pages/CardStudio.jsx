@@ -1066,7 +1066,7 @@ function CardStudio() {
       const resolvedGift = refreshedUser?.giftsInventory?.find(g => {
         const gName = g.giftName || g.name || effectKeyToGiftName(g.effectKey) || ''
         const sName = selectedGift.giftName || selectedGift.name || effectKeyToGiftName(selectedGift.effectKey) || ''
-        const statusOk = !g.status || g.status === 'available' || g.status === 'active'
+        const statusOk = !g.status || ['available', 'active', 'verified', 'owned', 'complete', 'completed'].includes(String(g.status).toLowerCase())
         return gName === sName && !g.isPendingLocal && statusOk
       })
       
@@ -1138,7 +1138,7 @@ function CardStudio() {
         console.log('[GiftAttach] Attempting to attach gift with candidates:', uniqueCardIds, 'selectedGift:', selectedGift)
         for (const cardId of uniqueCardIds) {
           try {
-            console.log(`[GiftAttach] Trying cardId=${cardId}, slug=${slug}`)
+            console.log(`[GiftAttach] Trying cardId=${cardId}`)
             await attachGiftToCard({
               cardId,
               id: cardId,
@@ -1149,6 +1149,7 @@ function CardStudio() {
               giftInventoryId: selectedGift.giftId,
               giftName: selectedGift.giftName || effectKeyToGiftName(selectedGift.effectKey),
               effectKey: selectedGift.effectKey,
+              amount: selectedGift.giftAmount || '',
             })
             attached = true
             console.log(`[GiftAttach] Successfully attached gift to cardId=${cardId}`)

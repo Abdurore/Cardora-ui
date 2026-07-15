@@ -9,7 +9,7 @@ import { MdCardGiftcard, MdInventory } from 'react-icons/md'
 import { storeGifts } from '../data/catalog.js'
 import { getGiftCatalog, createFlutterwaveGiftCheckout, verifyGiftPayment } from '../lib/api.js'
 import { normalizeCheckoutSession } from '../lib/backendMappers.js'
-import { formatGiftName as formatGiftLabel, normalizeGiftInventory } from '../lib/gifts.js'
+import { formatGiftName as formatGiftLabel, normalizeGiftInventory, rememberConfirmedGift } from '../lib/gifts.js'
 
 const PENDING_GIFT_KEY = 'cardora:pendingGiftCheckout'
 
@@ -177,6 +177,7 @@ function StoreGifts() {
           // Payment verified — clear the pending placeholder so hydrateSession
           // doesn't keep injecting an 'unverified' ghost item.
           clearPendingGift()
+          rememberConfirmedGift(currentUser?.id || currentUser?._id || currentUser?.email, returnedGift)
           setMsg({ text: 'Payment verified! Refreshing your inventory...', ok: true })
         } catch (verifyErr) {
           console.warn('[StoreGifts] verify-payment failed, falling back to webhook:', verifyErr.message)
@@ -235,6 +236,7 @@ function StoreGifts() {
         storePendingGift(gift, checkout)
         window.location.href = checkout.checkoutUrl
       } else {
+        rememberConfirmedGift(currentUser?.id || currentUser?._id || currentUser?.email, gift)
         setMsg({ text: checkout.message || 'Gift added to inventory!', ok: true })
         await refreshBalance?.()
         setActiveView('inventory')

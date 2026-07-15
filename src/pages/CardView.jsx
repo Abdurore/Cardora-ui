@@ -227,7 +227,7 @@ function CardView() {
     }
   }
   const handleChainReply = async (message, name) => {
-    const payload = { response: message }
+    const payload = { response: message, name: name || currentUser?.username || 'Anonymous' }
     try {
       await submitChainReply(card.slug || id, payload)
     } catch (e) {
@@ -248,7 +248,7 @@ function CardView() {
         tier={card.tier || 'classic'}
         studioType={studioType}
         cardTitle={card.title || ''}
-        recipientEmail={card.recipient || card.recipientEmail || ''}
+        recipientEmail={card.recipient || card.recipientEmail || card.recipientEmailAddress || card.to || ''}
         pollData={pollData}
         triviaData={triviaData}
         pageMode={true}

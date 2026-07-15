@@ -64,7 +64,7 @@ import {
   cardObjectToBackendPayload,
   mapBackendCard,
 } from '../lib/backendMappers.js'
-import { normalizeGiftInventory } from '../lib/gifts.js'
+import { forgetConfirmedGift, getConfirmedGiftInventory, normalizeGiftInventory } from '../lib/gifts.js'
 
 const USER_META_PREFIX = 'cardora:userMeta:'
 
@@ -197,6 +197,25 @@ function MainLayout() {
       const meta = readUserMeta(rawUser?._id || rawUser?.id || rawUser?.userId || rawUser?.email)
       const session = normalizeUserSession(userData, couponsData, meta)
       const normalized = session.normalized
+      const userKey = normalized.id || rawUser?._id || rawUser?.id || rawUser?.email
+      const locallyConfirmedGifts = getConfirmedGiftInventory(userKey)
+      if (locallyConfirmedGifts.length) {
+        const currentGifts = Array.isArray(normalized.giftsInventory) ? normalized.giftsInventory : []
+        const backendReferences = new Set(currentGifts.flatMap(item => [item.reference, item.txRef, item.transactionRef].filter(Boolean)))
+        normalized.giftsInventory = [
+          ...currentGifts,
+          ...locallyConfirmedGifts.filter(item => {
+            if (item.reference) return !backendReferences.has(item.reference)
+            const itemName = item.giftName || item.name || ''
+            const itemValue = item.valueNgn || item.priceNgn || item.value || item.price || ''
+            return !currentGifts.some(backendItem => {
+              const backendName = backendItem.giftName || backendItem.name || ''
+              const backendValue = backendItem.valueNgn || backendItem.priceNgn || backendItem.value || backendItem.price || ''
+              return backendName === itemName && (!itemValue || !backendValue || String(backendValue) === String(itemValue))
+            })
+          }),
+        ]
+      }
 
       // Blend pending purchased gift from session storage if not already credited in backend
       try {
@@ -211,7 +230,7 @@ function MainLayout() {
             // or by detecting a new inventory item added since the purchase was initiated.
             const hasMatchByName = backendGifts.some(item => {
               const itemName = item.giftName || item.name || ''
-              return itemName === pending.name && (item.status === 'available' || item.status === 'active')
+              return itemName === pending.name && ['available', 'active', 'verified', 'owned', 'complete', 'completed'].includes(String(item.status || 'available').toLowerCase())
             })
             const hasMatchByRef = pending.reference && backendGifts.some(item =>
               item.reference === pending.reference ||
@@ -543,6 +562,14 @@ function MainLayout() {
       if (!response && lastGiftError) throw lastGiftError
       const checkout = normalizeCheckoutSession(response)
       if (checkout.checkoutUrl) {
+        try {
+          sessionStorage.setItem('cardora:pendingGiftCheckout', JSON.stringify({
+            name: gift.giftName || gift.name || gift.effectKey,
+            price: gift.priceNgn || gift.price || gift.valueNgn || gift.value || 0,
+            reference: checkout.reference || checkout.txRef || '',
+            savedAt: Date.now(),
+          }))
+        } catch { /* ignore storage failures */ }
         window.location.href = checkout.checkoutUrl
         return { ok: true, checkout: true }
       }
@@ -1013,6 +1040,7 @@ function MainLayout() {
   }
 
   const consumeGift = (giftId) => {
+    forgetConfirmedGift(hydratedUser?.id || hydratedUser?._id || hydratedUser?.email, giftId)
     setInventory((prev) => prev.filter((g) => g.id !== giftId && g.inventoryId !== giftId && g.giftId !== giftId))
   }
 

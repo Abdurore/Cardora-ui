@@ -87,6 +87,62 @@ function getValueText(item) {
   return formatNgn(item.valueNgn ?? item.priceNgn ?? item.value ?? item.price ?? (Number(item.amount) > 100 ? item.amount : null))
 }
 
+export function rememberConfirmedGift(userId, gift) {
+  const resolvedName = gift?.giftName || gift?.name || gift?.effectKey
+  if (!userId || !resolvedName) return
+  const key = `cardora:confirmedGiftInventory:${userId}`
+  try {
+    const existing = JSON.parse(localStorage.getItem(key) || '[]')
+    const reference = gift.reference || gift.txRef || gift.transactionRef || ''
+    const entry = {
+      giftName: resolvedName,
+      name: resolvedName,
+      status: 'available',
+      inventoryId: gift.inventoryId || gift.giftInventoryId || gift.giftId || gift._id || gift.id || `local-${reference || Date.now()}`,
+      reference,
+      priceNgn: gift.priceNgn || gift.price || 0,
+      valueNgn: gift.valueNgn || gift.priceNgn || gift.price || 0,
+      isLocalConfirmed: true,
+      confirmedAt: Date.now(),
+    }
+    const dedupe = reference
+      ? existing.some(item => item.reference === reference)
+      : existing.some(item => item.inventoryId === entry.inventoryId)
+    if (!dedupe) localStorage.setItem(key, JSON.stringify([...existing, entry].slice(-25)))
+  } catch { /* ignore storage failures */ }
+}
+
+export function getConfirmedGiftInventory(userId) {
+  if (!userId) return []
+  try {
+    const raw = JSON.parse(localStorage.getItem(`cardora:confirmedGiftInventory:${userId}`) || '[]')
+    return Array.isArray(raw) ? raw.filter(item => item?.name && item.status === 'available') : []
+  } catch {
+    return []
+  }
+}
+
+export function forgetConfirmedGift(userId, giftId) {
+  if (!userId || !giftId) return
+  const key = `cardora:confirmedGiftInventory:${userId}`
+  try {
+    const existing = JSON.parse(localStorage.getItem(key) || '[]')
+    if (!Array.isArray(existing)) return
+    const needle = String(giftId)
+    const next = existing.filter(item => ![
+      item.inventoryId,
+      item.giftInventoryId,
+      item.giftId,
+      item._id,
+      item.id,
+      item.reference,
+      item.txRef,
+      item.transactionRef,
+    ].filter(Boolean).some(value => String(value) === needle))
+    localStorage.setItem(key, JSON.stringify(next))
+  } catch { /* ignore storage failures */ }
+}
+
 export function normalizeGiftInventory(rawInventory = [], includeUnverified = false) {
   if (!Array.isArray(rawInventory)) return []
 
@@ -94,8 +150,9 @@ export function normalizeGiftInventory(rawInventory = [], includeUnverified = fa
   rawInventory
     .filter(item => {
       if (!item) return false
-      if (item.status === 'available' || !item.status) return true
-      if (includeUnverified && item.status === 'unverified') return true
+      const status = String(item.status || '').toLowerCase()
+      if (!status || ['available', 'active', 'verified', 'owned', 'complete', 'completed'].includes(status)) return true
+      if (includeUnverified && ['unverified', 'pending'].includes(status)) return true
       return false
     })
     .forEach((item, itemIndex) => {
@@ -117,7 +174,12 @@ export function normalizeGiftInventory(rawInventory = [], includeUnverified = fa
           effectKey,
           title,
           amount: valueText,
-          status: item.status || 'available',
+          status: (() => {
+            const normalizedStatus = String(item.status || '').toLowerCase()
+            if (item.isPendingLocal) return item.status || 'unverified'
+            if (['unverified', 'active', 'verified', 'owned', 'complete', 'completed'].includes(normalizedStatus)) return 'available'
+            return item.status || 'available'
+          })(),
           unitIndex,
         })
       }

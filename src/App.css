@@ -30524,3 +30524,77 @@ a {
     padding: 40px 20px 24px !important;
   }
 }
+
+/* Final tablet Studio layout: portrait uses a deliberate two-column workbench;
+   landscape keeps the settings rail beside the preview. */
+@media (min-width: 641px) and (max-width: 900px) {
+  .cs-shell { padding: 8px; }
+  .cs-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 9px 11px;
+  }
+  .cs-top-left { flex: 1 1 100%; min-width: 0; }
+  .cs-top-actions { flex: 1 1 100%; justify-content: flex-end; min-width: 0; }
+  .cs-top-actions .cs-cc-pill,
+  .cs-top-actions .cs-status,
+  .cs-top-actions .cs-icon-btn { display: none; }
+  .cs-top-card-title { max-width: 52vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cs-layout {
+    grid-template-columns: 142px minmax(0, 1fr);
+    grid-template-areas:
+      "rail canvas"
+      "rail settings";
+    gap: 8px;
+    align-items: start;
+  }
+  .cs-toolrail {
+    grid-area: rail;
+    display: grid;
+    position: sticky;
+    top: 8px;
+    max-height: calc(100vh - 16px);
+    padding: 6px;
+    gap: 7px;
+  }
+  .cs-toolgroup-label { margin-left: 5px; font-size: .53rem; }
+  .cs-tool { padding: 7px 5px; gap: 6px; }
+  .cs-tool-icon { width: 25px; height: 25px; }
+  .cs-tool-label { font-size: .64rem; }
+  .cs-tool-hint { display: none; }
+  .cs-canvas-wrap { grid-area: canvas; min-width: 0; }
+  .cs-canvas { min-height: 620px; padding: 13px; border-radius: 18px; }
+  .cs-settings {
+    grid-area: settings;
+    position: static;
+    max-height: none;
+    min-height: 0;
+    padding: 14px;
+    border-radius: 18px;
+  }
+  .cs-canvas-head { margin-bottom: 8px; }
+  .cs-step-timeline { gap: 5px; max-width: calc(100% - 92px); overflow-x: auto; }
+  .cs-step-name { font-size: .62rem; }
+  .cs-preview-toggle { padding: 7px 10px; font-size: .68rem; }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .cs-layout {
+    grid-template-columns: 154px minmax(0, 1fr) 266px;
+    grid-template-areas: "rail canvas settings";
+    gap: 9px;
+  }
+  .cs-toolrail { grid-area: rail; }
+  .cs-canvas-wrap { grid-area: canvas; }
+  .cs-settings {
+    grid-area: settings;
+    position: sticky;
+    top: 76px;
+    max-height: calc(100vh - 88px);
+    padding: 15px;
+  }
+  .cs-canvas { min-height: 700px; padding: 15px; }
+  .cs-top-actions .cs-cc-pill-stack { display: none; }
+  .cs-top-actions { gap: 6px; }
+}
