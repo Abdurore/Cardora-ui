@@ -2205,13 +2205,14 @@
   position: absolute;
   top: 10px;
   left: 10px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   z-index: 3;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -2240,12 +2241,14 @@
 .card-gift-badge-claimed { background: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.55); }
 
 .tier-badge {
+  display: inline-block;
   position: static;
-  padding: 4px 10px;
+  padding: 4px 14px;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
   background: rgba(92, 231, 242, 0.2);
   color: #bdf7ff;
 }
@@ -2272,6 +2275,46 @@
 .tier-badge.tier-elite {
   background: rgba(109, 255, 175, 0.2);
   color: #b6ffdd;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  animation: tierShimmer 3s ease infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.tier-badge.tier-signature::after,
+.tier-badge.tier-elite::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.15) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: tierSweep 3s ease-in-out infinite;
+}
+
+@keyframes tierShimmer {
+
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.15);
+  }
+
+  50% {
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.3);
+  }
+}
+
+@keyframes tierSweep {
+  0% {
+    transform: translateX(-150%);
+  }
+
+  50% {
+    transform: translateX(150%);
+  }
+
+  100% {
+    transform: translateX(150%);
+  }
 }
 
 .card-cost {
@@ -2300,6 +2343,13 @@
   border-radius: 20px;
   background: linear-gradient(135deg, rgba(103, 247, 255, 0.25), rgba(21, 32, 40, 0.8));
   box-shadow: inset 0 0 20px rgba(92, 231, 242, 0.2);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.card:hover .card-thumb {
+  transform: scale(1.06);
 }
 
 .card-thumb-glow,
@@ -2307,6 +2357,7 @@
   position: absolute;
   inset: auto;
   pointer-events: none;
+  z-index: 1;
 }
 
 .card-thumb-glow {
@@ -2325,6 +2376,22 @@
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.04);
+}
+
+.card-thumb::after {
+  content: '';
+  position: absolute;
+  inset: auto -20% 10% -20%;
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  transform: translateX(-120%);
+  transition: transform 0.5s ease;
+  z-index: 1;
+}
+
+.card:hover .card-thumb::after {
+  transform: translateX(120%);
 }
 
 .v1 .card-thumb {
@@ -2441,6 +2508,7 @@
   pointer-events: none;
   transition: opacity 0.28s ease, backdrop-filter 0.28s ease;
   z-index: 1;
+  backdrop-filter: blur(3px);
 }
 
 .card:hover .card-overlay,
@@ -6268,35 +6336,6 @@ a {
 
 .card:hover::before {
   opacity: 1;
-}
-
-.card:hover .card-thumb {
-  transform: scale(1.06);
-}
-
-.card-thumb {
-  transition: transform 0.3s ease, filter 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.card-thumb::after {
-  content: '';
-  position: absolute;
-  inset: auto -20% 10% -20%;
-  height: 34px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
-  transform: translateX(-120%);
-  transition: transform 0.5s ease;
-}
-
-.card:hover .card-thumb::after {
-  transform: translateX(120%);
-}
-
-.card-overlay {
-  backdrop-filter: blur(3px);
 }
 
 @keyframes driftParticle {
@@ -11474,77 +11513,9 @@ a {
 }
 
 /* ═══════════════════════════════════════════════
-   TIER BADGE DISTINCTION
+   TIER BADGE DISTINCTION — consolidated up near
+   .card-type-badge (search ".tier-badge {" near top)
    ═══════════════════════════════════════════════ */
-.tier-badge {
-  display: inline-block;
-  padding: 4px 14px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.tier-simple,
-.tier-classic {
-  background: rgba(160, 170, 180, 0.12);
-  color: #8899a6;
-  border: 1px solid rgba(160, 170, 180, 0.2);
-}
-
-.tier-special,
-.tier-premium {
-  background: linear-gradient(135deg, rgba(118, 239, 255, 0.12), rgba(98, 255, 162, 0.08));
-  color: #76efff;
-  border: 1px solid rgba(118, 239, 255, 0.25);
-}
-
-.tier-signature,
-.tier-elite {
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 168, 0, 0.10));
-  color: #ffd700;
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  animation: tierShimmer 3s ease infinite;
-  position: relative;
-  overflow: hidden;
-}
-
-.tier-signature::after,
-.tier-elite::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.15) 50%, transparent 100%);
-  transform: translateX(-100%);
-  animation: tierSweep 3s ease-in-out infinite;
-}
-
-@keyframes tierShimmer {
-
-  0%,
-  100% {
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.15);
-  }
-
-  50% {
-    box-shadow: 0 0 16px rgba(255, 215, 0, 0.3);
-  }
-}
-
-@keyframes tierSweep {
-  0% {
-    transform: translateX(-150%);
-  }
-
-  50% {
-    transform: translateX(150%);
-  }
-
-  100% {
-    transform: translateX(150%);
-  }
-}
 
 /* Tier Features in Detail Modal */
 .tier-features {
@@ -15102,12 +15073,6 @@ a {
   filter: saturate(1.02) contrast(1.02);
 }
 
-.card-thumb-glow,
-.card-thumb-aura,
-.card-thumb::after {
-  z-index: 1;
-}
-
 .detail-thumb-image {
   position: absolute;
   inset: 0;
@@ -15123,22 +15088,9 @@ a {
 }
 
 /* ═══════════════════════════════════════════════════
-   CARD TYPE BADGES (CardItem)
+   CARD TYPE BADGES (CardItem) — base .card-type-badge rule
+   consolidated up near .card-thumb (search for "Card type badge")
    ═══════════════════════════════════════════════════ */
-.card-type-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 3;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  border-radius: 999px;
-  pointer-events: none;
-}
-
 .type-badge-poll      { background: rgba(59,130,246,0.85); color: #fff; }
 .type-badge-trivia    { background: rgba(245,158,11,0.85);  color: #fff; }
 .type-badge-chain     { background: rgba(20,184,166,0.85);  color: #fff; }
