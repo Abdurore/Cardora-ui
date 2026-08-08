@@ -227,24 +227,40 @@ function CardPreviewModal({
     if (lockSpec.type === 'time' && unlockAt && now >= unlockAt) setUnlocked(true)
   }, [lockSpec.type, unlockAt, now])
 
-  // Scratch canvas: fill with overlay color when gate mounts
+  // Scratch canvas: fill with overlay color when gate mounts. The bitmap is
+  // sized to match its actual rendered box (rather than a fixed 360×640) so
+  // the "SCRATCH TO REVEAL" fill doesn't stretch/distort in the tablet and
+  // desktop device-preview frames, which use very different aspect ratios.
   useEffect(() => {
     if (lockSpec.type !== 'scratch' || unlocked) return
     const canvas = scratchCanvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.globalCompositeOperation = 'source-over'
-    const bg = c?.card?.backgroundColor || '#0b0f14'
-    ctx.fillStyle = bg
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    // Decorative overlay text
-    ctx.font = 'bold 15px system-ui'
-    ctx.fillStyle = 'rgba(255,255,255,0.18)'
-    ctx.textAlign = 'center'
-    const rows = ['SCRATCH', 'TO', 'REVEAL']
-    rows.forEach((t, i) => ctx.fillText(t, canvas.width / 2, canvas.height / 2 - 18 + i * 22))
-    setScratchPct(0)
+
+    const draw = () => {
+      const rect = canvas.getBoundingClientRect()
+      const w = Math.max(1, Math.round(rect.width))
+      const h = Math.max(1, Math.round(rect.height))
+      if (canvas.width !== w) canvas.width = w
+      if (canvas.height !== h) canvas.height = h
+      const ctx = canvas.getContext('2d')
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.globalCompositeOperation = 'source-over'
+      const bg = c?.card?.backgroundColor || '#0b0f14'
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      // Decorative overlay text
+      ctx.font = 'bold 15px system-ui'
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'
+      ctx.textAlign = 'center'
+      const rows = ['SCRATCH', 'TO', 'REVEAL']
+      rows.forEach((t, i) => ctx.fillText(t, canvas.width / 2, canvas.height / 2 - 18 + i * 22))
+      setScratchPct(0)
+    }
+
+    draw()
+    const observer = new ResizeObserver(draw)
+    observer.observe(canvas)
+    return () => observer.disconnect()
   }, [lockSpec.type, unlocked, c?.card?.backgroundColor])
 
   const handleScratch = useCallback((e) => {
