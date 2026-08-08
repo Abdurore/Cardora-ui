@@ -7339,23 +7339,33 @@ a {
   overflow-x: auto;
 }
 
-.cs-preview-toggle {
+.cs-view-mode-toggle {
   grid-column: 2;
   justify-self: end;
-  padding: 9px 16px;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
   border-radius: 999px;
   border: 1px solid rgba(118, 239, 255, 0.18);
   background: rgba(118, 239, 255, 0.06);
-  color: #b8f6ff;
+}
+
+.cs-view-mode-btn {
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: rgba(184, 246, 255, 0.6);
   font-size: 0.78rem;
   transition: all 0.25s ease;
 }
 
-.cs-preview-toggle:hover {
-  background: rgba(118, 239, 255, 0.12);
-  border-color: rgba(118, 239, 255, 0.35);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(118, 239, 255, 0.1);
+.cs-view-mode-btn:hover {
+  color: #b8f6ff;
+}
+
+.cs-view-mode-btn.active {
+  background: rgba(118, 239, 255, 0.16);
+  color: #b8f6ff;
+  box-shadow: 0 4px 14px rgba(118, 239, 255, 0.1);
 }
 
 /* ─── CANVAS STEP TIMELINE (desktop) ─── */
@@ -9700,6 +9710,69 @@ a {
   height: min(82vh, 700px);
   aspect-ratio: 16 / 10;
 }
+
+/* Embedded mode (Studio "Play it through") — contained within the parent
+   frame instead of a fixed full-viewport takeover, so device sizing is
+   relative to that frame (%) rather than the browser viewport (vw/vh). */
+.cp-overlay.cp-embedded {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+}
+
+.cp-overlay.cp-embedded .cp-device-toolbar {
+  position: absolute;
+  top: auto;
+  bottom: 10px;
+}
+
+.cp-overlay.cp-embedded.cp-device-phone .cp-card-wrap-full,
+.cp-overlay.cp-embedded.cp-device-phone .envelope-scene {
+  width: min(92%, 380px);
+  height: min(92%, 740px);
+  aspect-ratio: 9 / 19;
+}
+
+.cp-overlay.cp-embedded.cp-device-tablet .cp-card-wrap-full,
+.cp-overlay.cp-embedded.cp-device-tablet .envelope-scene {
+  width: min(96%, 720px);
+  height: min(92%, 980px);
+  aspect-ratio: 4 / 5.5;
+}
+
+.cp-overlay.cp-embedded.cp-device-desktop .cp-card-wrap-full,
+.cp-overlay.cp-embedded.cp-device-desktop .envelope-scene {
+  width: min(98%, 1100px);
+  height: min(90%, 700px);
+  aspect-ratio: 16 / 10;
+}
+
+.cs-canvas-play-stage {
+  position: relative;
+  width: 100%;
+  height: 680px;
+  max-height: 70vh;
+  margin-top: 8px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(4, 8, 12, 0.4);
+}
+
+/* These are position:fixed for the viewport-covering modal/pageMode cases —
+   contain them to the stage itself when embedded, or they float over
+   whatever sits above/around the canvas in the rest of the page. */
+.cp-overlay.cp-embedded .cp-close-btn,
+.cp-overlay.cp-embedded .cp-reset-btn,
+.cp-overlay.cp-embedded .cp-lock-gate,
+.cp-overlay.cp-embedded .cp-ambient-overlay,
+.cp-overlay.cp-embedded .cp-identity-sheet {
+  position: absolute;
+}
+.cp-overlay.cp-embedded .cp-close-btn { top: 10px; right: 10px; width: 32px; height: 32px; z-index: 6; }
+.cp-overlay.cp-embedded .cp-reset-btn { top: 10px; left: 10px; padding: 6px 12px; font-size: 0.7rem; z-index: 6; }
+.cp-overlay.cp-embedded .cp-lock-gate { z-index: 6; }
+.cp-overlay.cp-embedded .cp-ambient-overlay { z-index: 3; }
+.cp-overlay.cp-embedded .cp-identity-sheet { left: 50%; bottom: 16px; width: min(90%, 420px); z-index: 4; }
 
 .cp-backdrop {
   position: absolute;
@@ -24145,12 +24218,13 @@ a {
   border-bottom-color: var(--border) !important;
 }
 [data-theme="light"] .cs-canvas-head-label { color: var(--text-dim); }
-[data-theme="light"] .cs-preview-toggle {
+[data-theme="light"] .cs-view-mode-toggle {
   background: var(--accent-soft);
   border-color: var(--accent-border);
-  color: var(--primary);
 }
-[data-theme="light"] .cs-preview-toggle:hover { background: var(--accent-mid); }
+[data-theme="light"] .cs-view-mode-btn { color: var(--text-dim); }
+[data-theme="light"] .cs-view-mode-btn:hover { color: var(--primary); }
+[data-theme="light"] .cs-view-mode-btn.active { background: var(--accent-mid); color: var(--primary); }
 [data-theme="light"] .cs-top-action-group {
   background: var(--surface) !important;
   border-color: var(--accent-border) !important;
@@ -29020,7 +29094,7 @@ a {
   .cs-canvas-head { margin-bottom: 8px; }
   .cs-step-timeline { gap: 5px; max-width: calc(100% - 92px); overflow-x: auto; }
   .cs-step-name { font-size: .62rem; }
-  .cs-preview-toggle { padding: 7px 10px; font-size: .68rem; }
+  .cs-view-mode-btn { padding: 7px 10px; font-size: .68rem; }
 }
 
 @media (min-width: 901px) and (max-width: 1180px) {

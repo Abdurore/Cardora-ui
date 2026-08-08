@@ -51,6 +51,11 @@ function CardPreviewModal({
   anonTemplate = null,
   allowAnonMedia = false,
   pageMode = false,
+  // Mounts inline within a parent-provided frame (e.g. the Studio canvas)
+  // instead of portaling to a fixed full-viewport overlay — same component,
+  // same device switcher, just contained. Never combined with pageMode
+  // (the real /card/:slug route), which already renders inline itself.
+  embedded = false,
   cardTitle = '',
   onPollSubmit = null,
   onTriviaComplete = null,
@@ -141,7 +146,7 @@ function CardPreviewModal({
 
   // Device-frame preview. Fullscreen by default; lets the sender see how the
   // card scales on phone / tablet / desktop without leaving the modal.
-  const [previewDevice, setPreviewDevice] = useState('fullscreen')
+  const [previewDevice, setPreviewDevice] = useState(embedded ? 'phone' : 'fullscreen')
   // Only an explicit accessibility signal fully disables ambient/video
   // effects. A narrow/short viewport — i.e. virtually every phone, which is
   // how most recipients actually open a shared card — used to hit this same
@@ -981,11 +986,11 @@ function CardPreviewModal({
     : 'Done'
 
   const inner = (
-    <section className={`cp-overlay cp-device-${pageMode ? 'fullscreen' : previewDevice}`} ref={containerRef}>
+    <section className={`cp-overlay cp-device-${pageMode ? 'fullscreen' : previewDevice}${embedded ? ' cp-embedded' : ''}`} ref={containerRef}>
       {!pageMode && (
         <div className="cp-device-toolbar" role="tablist" aria-label="Preview device">
           {[
-            { id: 'fullscreen', label: 'Full' },
+            ...(embedded ? [] : [{ id: 'fullscreen', label: 'Full' }]),
             { id: 'phone', label: 'Phone' },
             { id: 'tablet', label: 'Tablet' },
             { id: 'desktop', label: 'Desktop' },
@@ -2379,7 +2384,7 @@ function CardPreviewModal({
     </section>
   )
 
-  return pageMode ? inner : createPortal(inner, document.body)
+  return (pageMode || embedded) ? inner : createPortal(inner, document.body)
 }
 
 export default CardPreviewModal

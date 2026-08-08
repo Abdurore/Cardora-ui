@@ -456,6 +456,10 @@ function CardStudio() {
   const [activeTool, setActiveTool] = useState(defaultToolId)
   const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'envelope' : 'card')
   const [showPreview, setShowPreview] = useState(false)
+  // Desktop canvas view mode — 'play' mounts CardPreviewModal embedded inline
+  // in the same frame Design mode uses (see .cs-canvas-play-stage), instead
+  // of the full-screen modal takeover `showPreview` still drives for mobile.
+  const [studioViewMode, setStudioViewMode] = useState('design')
   const [savedState, setSavedState] = useState(initialAutoSaved ? 'Restored from last session' : 'Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
   const [publishForm, setPublishForm] = useState({
@@ -3426,13 +3430,52 @@ function CardStudio() {
                   Live Preview
                 </p>
               )}
-              <button type="button" className="cs-preview-toggle" onClick={enterPreview}>
-                ▶ Play it through
-              </button>
+              <div className="cs-view-mode-toggle" role="tablist" aria-label="Studio view mode">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={studioViewMode === 'design'}
+                  className={`cs-view-mode-btn ${studioViewMode === 'design' ? 'active' : ''}`}
+                  onClick={() => setStudioViewMode('design')}
+                >
+                  Design
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={studioViewMode === 'play'}
+                  className={`cs-view-mode-btn ${studioViewMode === 'play' ? 'active' : ''}`}
+                  onClick={() => setStudioViewMode('play')}
+                >
+                  ▶ Play it through
+                </button>
+              </div>
             </div>
 
-            {/* Phone frame */}
-            <div className="cs-phone-frame">
+            {/* Play mode — same CardPreviewModal the recipient gets, mounted
+                inline in this frame instead of a full-screen takeover. */}
+            {studioViewMode === 'play' && (
+              <div className="cs-canvas-play-stage">
+                <CardPreviewModal
+                  cardObject={previewCardObject}
+                  studioType={studioType}
+                  tier={studioTier}
+                  allowedTools={allowedToolIds}
+                  tierLimits={previewTierLimits}
+                  pollData={pollData}
+                  triviaData={triviaData}
+                  anonTemplate={anonTemplate}
+                  allowAnonMedia={!!anonTemplate.allowMedia}
+                  embedded
+                  onClose={() => setStudioViewMode('design')}
+                />
+              </div>
+            )}
+
+            {/* Phone frame — Design mode. Kept mounted (display:none rather
+                than unmounted) while Play mode is active so its edit state
+                (scroll position, in-progress inline edits) isn't lost. */}
+            <div className="cs-phone-frame" style={{ display: studioViewMode === 'play' ? 'none' : undefined }}>
               <div className="cs-phone-notch" />
               <div className={`cs-phone-screen${previewBgAnimated ? ' cs-bg-anim' : ''}`} style={{ background: previewBg, backgroundSize: previewBgAnimated ? '300% 300%' : undefined }}>
                 {c.background.type === 'image' && c.background.imageUrl ? (
