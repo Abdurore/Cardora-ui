@@ -156,9 +156,9 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     premiumUntil: couponPayload?.premiumUntil || user.premiumUntil || null,
     giftsInventory: Array.isArray(giftsInventory) ? giftsInventory : [],
     giftWalletNgn: user.giftWalletNgn ?? user.giftWallet ?? user.giftBalanceNgn ?? 0,
-    profileBackground: user.profileBackground || user.equippedBackground || user.selectedProfileBackground || user.background || null,
-    equippedBackground: user.equippedBackground || user.profileBackground || user.selectedProfileBackground || null,
-    profileBackgroundUrl: user.profileBackgroundUrl || user.backgroundUrl || user.selectedProfileBackgroundUrl || user.profileBackground?.url || user.equippedBackground?.url || user.selectedProfileBackground?.url || '',
+    profileBackground: user.equippedProfileBackground || user.profileBackground || user.equippedBackground || user.selectedProfileBackground || user.background || null,
+    equippedBackground: user.equippedProfileBackground || user.equippedBackground || user.profileBackground || user.selectedProfileBackground || null,
+    profileBackgroundUrl: user.profileBackgroundUrl || user.equippedProfileBackground?.url || user.backgroundUrl || user.selectedProfileBackgroundUrl || user.profileBackground?.url || user.equippedBackground?.url || user.selectedProfileBackground?.url || '',
     chatFrameId: user.chatFrameId || user.equippedChatFrameId || user.equippedFrameId || getChatFrameId(user.chatFrame) || getChatFrameId(user.equippedChatFrame) || getChatFrameId(user.equippedFrame) || '',
     chatFrameUrl: getChatFrameUrl(user),
     equippedChatFrame: user.equippedChatFrame || user.chatFrame || user.equippedFrame || null,
@@ -253,6 +253,8 @@ export function mapTemplateToCard(template, index = 0) {
   const createdBy = template.createdBy || template.artist || template.author || template.owner || template.userId || null
   const ownerId =
     (createdBy && typeof createdBy === 'object' ? createdBy._id || createdBy.id || createdBy.userId : createdBy) || null
+  const artistName = template.artistName || template.ownerName || (createdBy && typeof createdBy === 'object' ? createdBy.username || createdBy.name : '') || ''
+  const artistAvatar = template.artistAvatar || template.ownerAvatar || (createdBy && typeof createdBy === 'object' ? createdBy.profilePictureUrl || createdBy.avatarUrl : '') || ''
 
   return {
     id: template.id || template.templateId || template._id || `template-${index}`,
@@ -275,6 +277,8 @@ export function mapTemplateToCard(template, index = 0) {
     status: (template.status || 'approved').toLowerCase(),
     tag: template.status ? capitalize(template.status) : '',
     ownerId,
+    artistName,
+    artistAvatar,
     poll: template.poll || layout.poll || null,
     trivia: template.trivia || layout.trivia || null,
     chain: template.chain || layout.chain || null,
@@ -449,7 +453,7 @@ function isLightColor(hex) {
  * (stripUnknown: true). Gift attachment data travels via the separate
  * giftAttachment field created by POST /cards/attach-gift.
  */
-export function cardObjectToLayoutData(cardObject = null) {
+export function cardObjectToLayoutData(cardObject = null, { allowAnonMedia = false } = {}) {
   const layoutdata = {
     paperTexture: {
       type: 'none',
@@ -458,6 +462,33 @@ export function cardObjectToLayoutData(cardObject = null) {
     },
   }
   if (cardObject?.closedState) layoutdata.closedState = structuredClone(cardObject.closedState)
+  // `enhancements.background/animation` only round-trip through a lossy,
+  // tier-degrading path on the way back (cardBorder isn't sent at all;
+  // elite-only ambients like aurora/lanterns are rewritten to a backend-safe
+  // enum before send — see AMBIENT_EFFECT_MAP/OPEN_EFFECT_MAP below). Since
+  // `layoutdata` is stored and echoed back verbatim (schema.js's
+  // layoutDataSchema is `.unknown(true)`), persist the true values here so
+  // backendCardToCardObject can prefer them over the degraded derivation —
+  // frontend-only fix, no backend change needed.
+  if (cardObject) {
+    layoutdata.styleExtras = {
+      cardBorder: cardObject.card?.cardBorder ? structuredClone(cardObject.card.cardBorder) : undefined,
+      ambientType: cardObject.animation?.backgroundEffect?.type,
+      openEffectType: cardObject.animation?.openEffect,
+      textBodyAnimation: cardObject.card?.textBodyAnimation ? structuredClone(cardObject.card.textBodyAnimation) : undefined,
+      // The Surface Transparency slider — same "persist the true value in
+      // layoutdata" fix as cardBorder/textBodyAnimation above.
+      // backgroundOpacity was previously never written here at all, so
+      // backendCardToCardObject had nothing to read back and hardcoded it
+      // to 0 on every reload/send — the slider reset to fully opaque no
+      // matter what the sender picked.
+      backgroundOpacity: cardObject.card?.backgroundOpacity,
+      // Elite-only opt-in: lets an anonymous card's responders attach a
+      // voice note or photo/video. Read server-side by
+      // submitAnonymousMessage to gate whether those fields are kept.
+      allowAnonMedia: allowAnonMedia || undefined,
+    }
+  }
   return layoutdata
 }
 
@@ -491,6 +522,7 @@ export function cardObjectToBackendPayload(cardObject, {
   poll = null,
   trivia = null,
   chain = null,
+  allowAnonMedia = false,
 } = {}) {
   const FB = { background: '#0b0f12', gradient: ['#76efff', '#62ffa2'], accent: '#76efff' }
 
@@ -648,6 +680,9 @@ export function cardObjectToBackendPayload(cardObject, {
       aurora: 'starfield',
       lanterns: 'floating',
       petals: 'floating',
+      embers: 'fireflies',
+      rain: 'snow',
+      meteors: 'starfield',
     }
 
     // ambientEffect.type: whitelist to backend-allowed values only
@@ -738,6 +773,7 @@ export function cardObjectToBackendPayload(cardObject, {
         fireworks: 'fireworks',
         balloons: 'balloons',
         emojiRain: 'emojiRain',
+        sparkleRain: 'starShower',
         none: 'none',
       }
       const rawOpenEffect = cardObject.animation?.openEffect || 'none'
@@ -762,7 +798,7 @@ export function cardObjectToBackendPayload(cardObject, {
 
   // Include layoutdata for paper texture metadata.
   // The backend stores layoutdata and returns it with GET /cards/:slug.
-  const layoutdata = cardObjectToLayoutData(cardObject)
+  const layoutdata = cardObjectToLayoutData(cardObject, { allowAnonMedia: type === 'anonymous' && tier === 'elite' && allowAnonMedia })
 
   const payload = {
     config: { colors, font, content },
@@ -776,16 +812,11 @@ export function cardObjectToBackendPayload(cardObject, {
 
   const giftInventoryId = cardObject.giftEffect?.giftInventoryId || cardObject.giftEffect?.inventoryId || cardObject.giftEffect?.giftId
   if (normalType === 'personal' && giftInventoryId) {
+    // Backend schema uses .oxor("giftInventoryId", "inventoryId") — send only one.
     payload.giftInventoryId = giftInventoryId
-    payload.inventoryId = giftInventoryId
   }
 
   return payload
-}
-
-// Back-compat shim.
-export function cardObjectToBackendConfig(cardObject) {
-  return cardObjectToBackendPayload(cardObject).config
 }
 
 /**
@@ -800,6 +831,13 @@ export function backendCardToCardObject(card) {
   const colors = config.colors || {}
   const content = config.content || {}
   const layoutdata = card.layoutdata || {}
+  // Sender-persisted true values for fields that only round-trip through a
+  // lossy path via `enhancements` (cardBorder isn't sent to the backend at
+  // all; elite-only ambients/openEffects get rewritten to a backend-safe
+  // enum before send — see cardObjectToBackendPayload's AMBIENT_EFFECT_MAP /
+  // OPEN_EFFECT_MAP). Prefer these when present so the recipient sees what
+  // the sender actually built, not the degraded backend-safe version.
+  const styleExtras = layoutdata.styleExtras || {}
 
   const attachedGift = normalizeAttachedGift(card)
   const storedGiftEffect = card.cardObject?.giftEffect || card.layoutdata?.giftEffect || card.layoutConfig?.giftEffect || card.giftEffect || {}
@@ -876,40 +914,48 @@ export function backendCardToCardObject(card) {
     },
     card: {
       backgroundColor: bgColor,
-      backgroundOpacity: 0,
+      backgroundOpacity: styleExtras.backgroundOpacity ?? 0,
       textColor: baseTextColor,
       headingColor: baseHeadingColor,
       // primaryAccent = palette.primary (the card's main emphasis/border colour)
-      cardBorder: { type: 'solid', colors: [primaryAccent], width: 2, animationDuration: 2 },
+      cardBorder: styleExtras.cardBorder || { type: 'solid', colors: [primaryAccent], width: 2, animationDuration: 2 },
       scrollbarColor: primaryAccent,
-      textBodyAnimation: {
+      textBodyAnimation: styleExtras.textBodyAnimation || {
         fadeInDuration: entryAnim === 'fade' ? entrySpeed : 0,
         selfTypeSpeed: entryAnim === 'slide' ? entrySpeed : 0,
       },
     },
-    closedState: {
-      ...(layoutdata.closedState || {}),
-      backgroundColor: bgColor,
-      borderColor: primaryAccent,
-      textColor: baseTextColor,
-      headingColor: baseHeadingColor,
-      headingFont: fontFamily,
-      headingText: content.header || 'You have a surprise',
-      bodyText: 'Someone special sent you something beautiful.',
-      button: {
+    // Sender-configured envelope/closed-state values (persisted in layoutdata.closedState)
+    // take priority; derived-from-palette values are only a fallback for cards that
+    // never set them (e.g. templates, or cards created before this was configurable).
+    closedState: (() => {
+      const persisted = layoutdata.closedState || {}
+      const defaultButton = {
         text: 'Open',
         backgroundColor: primaryAccent,
         textColor: onLight ? '#ffffff' : bgColor,
         borderColor: primaryAccent,
         shape: 'pill',
-      },
-      envelope: structuredClone(defaultCardObject.closedState.envelope),
-    },
+      }
+      const defaultEnvelope = structuredClone(defaultCardObject.closedState.envelope)
+      return {
+        backgroundColor: bgColor,
+        borderColor: primaryAccent,
+        textColor: baseTextColor,
+        headingColor: baseHeadingColor,
+        headingFont: fontFamily,
+        headingText: content.header || 'You have a surprise',
+        bodyText: 'Someone special sent you something beautiful.',
+        ...persisted,
+        button: { ...defaultButton, ...(persisted.button || {}) },
+        envelope: { ...defaultEnvelope, ...(persisted.envelope || {}) },
+      }
+    })(),
     animation: {
-      openEffect: enhancements.openEffect?.type || 'none',
+      openEffect: styleExtras.openEffectType || enhancements.openEffect?.type || 'none',
       confettiColors: (enhancements.openEffect?.colors || []).filter(Boolean),
       backgroundEffect: {
-        type: enhancements.ambientEffect?.type || 'none',
+        type: styleExtras.ambientType || enhancements.ambientEffect?.type || 'none',
         emojis: enhancements.ambientEffect?.emojis || [],
       },
     },
@@ -927,7 +973,7 @@ export function backendCardToCardObject(card) {
       reveal: { type: 'tap', hint: '' },
     },
     content: {
-      heading: content.header || content.message || content.challenge || content.question || '',
+      heading: content.header || content.message || content.challenge || content.question || content.name || content.questions?.[0]?.question || '',
       body: content.body || content.message || '',
       extendedBody: '',
     },
@@ -946,49 +992,6 @@ export function backendCardToCardObject(card) {
       status: attachedGift.status || storedGiftEffect.status || 'available',
     } : (storedGiftEffect.enabled ? storedGiftEffect : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '', status: 'available' }),
   })
-}
-
-/**
- * Transform backend layoutdata → frontend cardObject
- * Backend sends media.images as string[], frontend expects object[]
- * Also reconstructs palette/theme from config.colors so the Studio
- * theme panel shows the correct colors when editing a saved card.
- */
-export function layoutDataToCardObject(layoutdata) {
-  if (!layoutdata) return {}
-  const obj = structuredClone(layoutdata)
-
-  if (obj.media?.images && Array.isArray(obj.media.images)) {
-    obj.media.images = obj.media.images.map(img =>
-      typeof img === 'string'
-        ? { url: img, caption: '', fit: 'cover', positionX: 50, positionY: 50 }
-        : img
-    )
-  }
-
-  // Reconstruct palette, theme and background.colors from backend config.colors
-  // so the Studio colour pickers are pre-filled when a card is re-opened.
-  if (obj.config?.colors) {
-    const c = obj.config.colors
-    if (!obj.palette) obj.palette = {}
-    if (!obj.palette.surface && c.background)   obj.palette.surface = c.background
-    if (!obj.palette.primary && c.accent)        obj.palette.primary = c.accent
-    if (!obj.palette.accent  && c.gradient?.[1]) obj.palette.accent  = c.gradient[1]
-    if (!obj.theme) obj.theme = {}
-    if (!obj.theme.accentColor && c.accent)         obj.theme.accentColor  = c.accent
-    if (!obj.theme.fontFamily  && obj.config?.font) obj.theme.fontFamily   = obj.config.font
-    if (!obj.background) obj.background = {}
-    if ((!obj.background.colors || !obj.background.colors.length) && c.gradient?.length) {
-      obj.background.colors = [...c.gradient]
-    }
-    if (!obj.background.primaryColor && c.background) {
-      obj.background.primaryColor = c.background
-    }
-  }
-
-  backfillEnvelope(obj)
-
-  return obj
 }
 
 /**
@@ -1093,21 +1096,13 @@ export function mapChatMessage(msg) {
     createdAt: msg.createdAt || new Date().toISOString(),
     chatFrameUrl: getChatFrameUrl(msg) || getChatFrameUrl(user) || null,
     chatFrameId: msg.chatFrameId || msg.equippedChatFrameId || msg.equippedFrameId || getChatFrameId(msg.chatFrame) || getChatFrameId(msg.equippedChatFrame) || user.chatFrameId || user.equippedChatFrameId || user.equippedFrameId || getChatFrameId(user.chatFrame) || getChatFrameId(user.equippedChatFrame) || null,
+    ...(msg.type === 'template_share' ? {
+      type: 'template_share',
+      templateId: msg.templateId || '',
+      templateName: msg.templateName || '',
+      templatePreviewImage: msg.templatePreviewImage || '',
+      templateCategory: msg.templateCategory || '',
+    } : {}),
   }
 }
 
-/**
- * Map an admin user row
- */
-export function mapAdminUser(user) {
-  return {
-    id: user._id || user.id || user.userId,
-    username: user.username || user.name || 'Unknown',
-    email: user.email || '',
-    role: capitalize(user.role || 'user'),
-    cc: user.cc ?? user.balance ?? 0,
-    isVerified: user.isVerified ?? false,
-    isBanned: user.isBanned ?? false,
-    createdAt: user.createdAt || '',
-  }
-}

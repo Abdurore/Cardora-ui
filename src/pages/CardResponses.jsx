@@ -96,10 +96,16 @@ function EmptyState({ icon, message }) {
 }
 
 // ── Anonymous inbox ───────────────────────────────────────────────────
-function AnonInboxView({ state }) {
+function AnonInboxView({ state, content }) {
   const responses = state?.responses || []
   return (
     <div className="cr-section">
+      {content?.message && (
+        <div className="cr-chain-challenge">
+          <p className="cr-chain-challenge-label">Your prompt</p>
+          <p className="cr-chain-challenge-text">{content.message}</p>
+        </div>
+      )}
       <div className="cr-section-header">
         <h2 className="cr-section-title">Anonymous Messages</h2>
         <span className="cr-count-badge">{responses.length}</span>
@@ -113,6 +119,14 @@ function AnonInboxView({ state }) {
               <div className="cr-anon-avatar">A</div>
               <div className="cr-anon-content">
                 <p className="cr-anon-text">{r.text || r.message || '—'}</p>
+                {r.voice?.url && (
+                  <audio className="cr-anon-voice" src={r.voice.url} controls preload="none" />
+                )}
+                {r.media?.url && (
+                  r.media.type === 'video'
+                    ? <video className="cr-anon-media" src={r.media.url} controls preload="none" />
+                    : <img className="cr-anon-media" src={r.media.url} alt="" onClick={() => window.open(r.media.url, '_blank')} />
+                )}
                 <span className="cr-anon-time">{timeSince(r.timestamp || r.createdAt)}</span>
               </div>
             </div>
@@ -186,6 +200,7 @@ function getPlayerName(player) {
 
 function TriviaLeaderboardView({ state, content }) {
   const players = state?.players || []
+  const [expanded, setExpanded] = useState(null)
 
   // Find questions from all possible backend locations (mirrors mapBackendCard logic)
   const triviaContent = content?.trivia || content
@@ -213,22 +228,54 @@ function TriviaLeaderboardView({ state, content }) {
             const playerTotal = player.totalQuestions || total
             const pct = playerTotal > 0 ? Math.round((playerScore / playerTotal) * 100) : 0
             const displayName = getPlayerName(player) || 'Anonymous'
+            const rowKey = player.userId || player.id || i
+            const hasAnswers = Array.isArray(player.answers) && questions.length > 0
+            const isOpen = expanded === rowKey
             return (
-              <div key={player.userId || player.id || i} className={`cr-trivia-row ${i === 0 ? 'cr-trivia-row-top' : ''}`}>
-                <div className="cr-trivia-rank">
-                  {medals[i] || <span className="cr-trivia-rank-num">{i + 1}</span>}
+              <div key={rowKey} className="cr-trivia-row-wrap">
+                <div
+                  className={`cr-trivia-row ${i === 0 ? 'cr-trivia-row-top' : ''} ${hasAnswers ? 'cr-trivia-row-clickable' : ''}`}
+                  onClick={hasAnswers ? () => setExpanded(isOpen ? null : rowKey) : undefined}
+                  role={hasAnswers ? 'button' : undefined}
+                  tabIndex={hasAnswers ? 0 : undefined}
+                >
+                  <div className="cr-trivia-rank">
+                    {medals[i] || <span className="cr-trivia-rank-num">{i + 1}</span>}
+                  </div>
+                  <div className="cr-trivia-player-info">
+                    <div className="cr-trivia-avatar">{displayName[0].toUpperCase()}</div>
+                    <span className="cr-trivia-name">{displayName}</span>
+                  </div>
+                  <div className="cr-trivia-score-col">
+                    <span className="cr-trivia-score-num">{playerScore}<span className="cr-trivia-score-total">/{playerTotal}</span></span>
+                    <span className={`cr-trivia-pct ${pct === 100 ? 'perfect' : ''}`}>{pct}%</span>
+                  </div>
+                  <div className="cr-trivia-bar-mini">
+                    <div className="cr-trivia-bar-mini-fill" style={{ width: `${pct}%` }} />
+                  </div>
                 </div>
-                <div className="cr-trivia-player-info">
-                  <div className="cr-trivia-avatar">{displayName[0].toUpperCase()}</div>
-                  <span className="cr-trivia-name">{displayName}</span>
-                </div>
-                <div className="cr-trivia-score-col">
-                  <span className="cr-trivia-score-num">{playerScore}<span className="cr-trivia-score-total">/{playerTotal}</span></span>
-                  <span className={`cr-trivia-pct ${pct === 100 ? 'perfect' : ''}`}>{pct}%</span>
-                </div>
-                <div className="cr-trivia-bar-mini">
-                  <div className="cr-trivia-bar-mini-fill" style={{ width: `${pct}%` }} />
-                </div>
+                {hasAnswers && isOpen && (
+                  <div className="cr-trivia-answers">
+                    {questions.map((q, qi) => {
+                      const picked = player.answers[qi]
+                      const correct = Number.isInteger(q.correctIndex) ? q.correctIndex : null
+                      const isRight = picked === correct
+                      const options = Array.isArray(q.options) ? q.options : []
+                      return (
+                        <div key={qi} className={`cr-trivia-answer-row ${isRight ? 'right' : 'wrong'}`}>
+                          <p className="cr-trivia-answer-q">{qi + 1}. {q.question}</p>
+                          <p className="cr-trivia-answer-picked">
+                            {displayName} picked: {Number.isInteger(picked) ? (options[picked] ?? `Option ${picked + 1}`) : 'No answer'}
+                            {isRight ? ' ✓' : ''}
+                          </p>
+                          {!isRight && correct !== null && (
+                            <p className="cr-trivia-answer-correct">Correct answer: {options[correct] ?? `Option ${correct + 1}`}</p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -248,6 +295,14 @@ function ChainRepliesView({ state, content }) {
         <div className="cr-chain-challenge">
           <p className="cr-chain-challenge-label">Challenge</p>
           <p className="cr-chain-challenge-text">{content.challenge || content.prompt || content.heading}</p>
+        </div>
+      )}
+      {Array.isArray(content?.rules) && content.rules.filter(Boolean).length > 0 && (
+        <div className="cr-chain-rules">
+          <p className="cr-chain-challenge-label">Rules</p>
+          <ul className="cr-chain-rules-list">
+            {content.rules.filter(Boolean).map((rule, i) => <li key={i}>{rule}</li>)}
+          </ul>
         </div>
       )}
       <div className="cr-section-header">
@@ -278,14 +333,55 @@ function ChainRepliesView({ state, content }) {
   )
 }
 
+// ── Gift status (personal cards only) ───────────────────────────────
+function GiftStatusBlock({ giftAttachment }) {
+  if (!giftAttachment?.inventoryId) return null
+  const claimed = giftAttachment.status === 'claimed'
+  return (
+    <div className={`cr-gift-status ${claimed ? 'cr-gift-status-claimed' : 'cr-gift-status-pending'}`}>
+      <span className="cr-gift-status-icon">🎁</span>
+      <div className="cr-gift-status-body">
+        <p className="cr-gift-status-title">
+          {claimed ? 'Gift claimed by the recipient' : 'Gift attached — waiting to be claimed'}
+        </p>
+        {giftAttachment.priceNgn ? (
+          <p className="cr-gift-status-sub">Value: NGN {Number(giftAttachment.priceNgn).toLocaleString()}</p>
+        ) : null}
+        {claimed && giftAttachment.claimedAt && (
+          <p className="cr-gift-status-sub">Claimed {timeSince(giftAttachment.claimedAt)}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Personal responses ────────────────────────────────────────────────
-function PersonalResponsesView({ state, content }) {
+function ViewsStatBlock({ views }) {
+  const count = Number(views) || 0
+  return (
+    <div className="cr-views-stat">
+      <span className="cr-views-stat-num">{count}</span>
+      <span className="cr-views-stat-label">{count === 1 ? 'person has' : 'people have'} opened this card's link</span>
+    </div>
+  )
+}
+
+function PersonalResponsesView({ state, content, giftAttachment, views }) {
   const answers = state?.answers || []
   const hasQuestion = content?.questionBlock?.enabled && content?.questionBlock?.question
+  const message = content?.body || content?.message || ''
 
   if (!hasQuestion) {
     return (
       <div className="cr-section">
+        <ViewsStatBlock views={views} />
+        <GiftStatusBlock giftAttachment={giftAttachment} />
+        {message && (
+          <div className="cr-chain-challenge">
+            {content?.header && <p className="cr-chain-challenge-label">{content.header}</p>}
+            <p className="cr-chain-challenge-text">{message}</p>
+          </div>
+        )}
         <EmptyState
           icon="✉"
           message="This is a personal card. Viewers can open and experience it via the shared link."
@@ -300,6 +396,14 @@ function PersonalResponsesView({ state, content }) {
 
   return (
     <div className="cr-section">
+      <ViewsStatBlock views={views} />
+      <GiftStatusBlock giftAttachment={giftAttachment} />
+      {message && (
+        <div className="cr-chain-challenge">
+          {content?.header && <p className="cr-chain-challenge-label">{content.header}</p>}
+          <p className="cr-chain-challenge-text">{message}</p>
+        </div>
+      )}
       <div className="cr-section-header">
         <h2 className="cr-section-title">Question Responses</h2>
         <span className="cr-count-badge">{total}</span>
@@ -483,12 +587,24 @@ function CardResponses() {
           )}
         </div>
 
+        {state?.reactions?.length > 0 && (
+          <div className="cr-reactions-summary">
+            {Object.entries(
+              state.reactions.reduce((acc, r) => { acc[r.emoji] = (acc[r.emoji] || 0) + 1; return acc }, {})
+            )
+              .sort((a, b) => b[1] - a[1])
+              .map(([emoji, count]) => (
+                <span key={emoji} className="cr-reaction-chip">{emoji} {count}</span>
+              ))}
+          </div>
+        )}
+
         {/* Type-specific content */}
-        {(type === 'anonymous' || type === 'anon') && <AnonInboxView state={state} />}
+        {(type === 'anonymous' || type === 'anon') && <AnonInboxView state={state} content={content} />}
         {type === 'poll' && <PollResultsView state={state} content={content} />}
         {type === 'trivia' && <TriviaLeaderboardView state={state} content={triviaContent} />}
         {type === 'chain' && <ChainRepliesView state={state} content={content} />}
-        {type === 'personal' && <PersonalResponsesView state={state} content={content} />}
+        {type === 'personal' && <PersonalResponsesView state={state} content={content} giftAttachment={rawCard.giftAttachment} views={rawCard.views} />}
 
         {/* Slashed Cardora signature animation at the bottom left */}
         <div className="cp-personal-signature" style={{ 

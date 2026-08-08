@@ -16,10 +16,18 @@ import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
-import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground } from '../lib/api.js'
+import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground, getWalletSummary, getBanks, resolveBankAccount, saveBankDetails, withdrawGiftWallet, updateTemplate, getEnterpriseAdStats } from '../lib/api.js'
 import { mapTemplateToCard, normalizeCheckoutSession } from '../lib/backendMappers.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
+
+// The gift wallet/withdrawal system is NGN-only (same scope as StoreGifts.jsx's
+// Flutterwave gift pricing) — matches that page's ₦-symbol formatting rather
+// than the multi-currency "NGN 5,000" style used for CC packages in Store.jsx,
+// which genuinely needs a currency code since it also renders USD/EUR/etc.
+function formatNgn(amount) {
+  return '₦' + Number(amount || 0).toLocaleString()
+}
 
 const ROLE_CONFIG = {
   Artist: { badge: 'role-artist', icon: <MdPalette size={16} />, desc: 'Create and publish templates to the marketplace' },
@@ -56,7 +64,6 @@ function Profile() {
   const {
     openCardDetails,
     favorites,
-    toggleFavorite,
     likedTemplates,
     toggleLike,
     balance,
@@ -96,7 +103,26 @@ function Profile() {
   const [editForm, setEditForm] = useState({ name: '', username: '', bio: '' })
   const [editMsg, setEditMsg] = useState({ text: '', ok: false })
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+
+  const [showWallet, setShowWallet] = useState(false)
+  const [walletSummary, setWalletSummary] = useState(null)
+  const [loadingWallet, setLoadingWallet] = useState(false)
+  const [walletMsg, setWalletMsg] = useState({ text: '', ok: false })
+  const [banks, setBanks] = useState([])
+  const [bankForm, setBankForm] = useState({ bankCode: '', accountNumber: '' })
+  const [resolvedAccountName, setResolvedAccountName] = useState('')
+  const [resolvingBank, setResolvingBank] = useState(false)
+  const [savingBank, setSavingBank] = useState(false)
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [withdrawing, setWithdrawing] = useState(false)
+
+  const [editingTemplate, setEditingTemplate] = useState(null)
+  const [templateEditForm, setTemplateEditForm] = useState({ name: '', category: '', previewImage: '' })
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [uploadingTemplateImage, setUploadingTemplateImage] = useState(false)
+  const [templateEditMsg, setTemplateEditMsg] = useState({ text: '', ok: false })
   const [analytics, setAnalytics] = useState(null)
+  const [enterpriseStats, setEnterpriseStats] = useState(null)
   const [currencies, setCurrencies] = useState([])
   const [userCurrency, setUserCurrency] = useState('')
   const [isSavingCurrency, setIsSavingCurrency] = useState(false)
@@ -169,7 +195,10 @@ function Profile() {
       const res = await getCardAnalytics(slug)
       setCardAnalytics(prev => ({ ...prev, [slug]: res?.analytics || res?.data || res || null }))
     } catch {
-      setCardAnalytics(prev => ({ ...prev, [slug]: null }))
+      // Don't cache the failure as `null` — that satisfies the `!== undefined`
+      // guard above forever, so a single transient error (e.g. a rate limit)
+      // would permanently blank this card's analytics until a full reload.
+      // Leaving the key unset lets the next call to fetchCardAnalytics retry.
     } finally {
       setLoadingCardAnalytics(prev => ({ ...prev, [slug]: false }))
     }
@@ -196,6 +225,21 @@ function Profile() {
         if (!currentUser?.id) return false
         return t.ownerId && String(t.ownerId) === String(currentUser.id)
       })
+
+  // Artists design/publish templates rather than send/receive cards or
+  // gifts, so their stats row is template-performance-centric instead.
+  const artistTemplateCount = publishedTemplates.length
+  const artistTotalLikes = publishedTemplates.reduce((sum, t) => sum + (Number(t.likeCount) || 0), 0)
+  const artistTotalViews = publishedTemplates.reduce((sum, t) => sum + (Number(t.viewCount) || 0), 0)
+  const artistTotalUses = publishedTemplates.reduce((sum, t) => sum + (Number(t.usageCount) || 0), 0)
+
+  // Enterprise accounts run ads, not personal cards — surface ad performance instead.
+  const enterpriseAds = enterpriseStats?.ads || enterpriseStats?.data?.ads || []
+  const enterpriseTotals = enterpriseAds.reduce((acc, ad) => ({
+    views: acc.views + (Number(ad.currentViews ?? ad.views) || 0),
+    clicks: acc.clicks + (Number(ad.clicks ?? ad.clickCount) || 0),
+    completions: acc.completions + (Number(ad.completions ?? ad.completed) || 0),
+  }), { views: 0, clicks: 0, completions: 0 })
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -242,6 +286,21 @@ function Profile() {
     })()
     return () => { cancelled = true }
   }, [currentUser])
+
+  // Enterprise accounts see ad performance instead of card/gift stats.
+  useEffect(() => {
+    setEnterpriseStats(null)
+    if (!currentUser?.id || String(currentUser?.role || '').toLowerCase() !== 'enterprise') return
+    let cancelled = false
+    getEnterpriseAdStats()
+      .then(res => {
+        if (cancelled) return
+        const payload = res?.data || res
+        setEnterpriseStats(payload)
+      })
+      .catch(() => { if (!cancelled) setEnterpriseStats(null) })
+    return () => { cancelled = true }
+  }, [currentUser?.id])
 
   // Load profile backgrounds for premium users
   useEffect(() => {
@@ -292,6 +351,141 @@ function Profile() {
       setEditMsg({ text: err?.message || 'Could not update profile.', ok: false })
     } finally {
       setIsSavingProfile(false)
+    }
+  }
+
+  const loadWalletSummary = async () => {
+    setLoadingWallet(true)
+    try {
+      const [summary, bankList] = await Promise.all([
+        getWalletSummary(),
+        banks.length ? Promise.resolve({ banks }) : getBanks().catch(() => ({ banks: [] })),
+      ])
+      setWalletSummary(summary)
+      if (bankList?.banks?.length) setBanks(bankList.banks)
+    } catch (err) {
+      setWalletMsg({ text: err?.message || 'Could not load your wallet.', ok: false })
+    } finally {
+      setLoadingWallet(false)
+    }
+  }
+
+  const openWallet = () => {
+    setShowWallet(true)
+    setWalletMsg({ text: '', ok: false })
+    loadWalletSummary()
+  }
+
+  const handleResolveBank = async () => {
+    if (!bankForm.bankCode || !bankForm.accountNumber.trim()) {
+      setWalletMsg({ text: 'Choose a bank and enter your account number.', ok: false })
+      return
+    }
+    setResolvingBank(true)
+    setWalletMsg({ text: '', ok: false })
+    try {
+      const res = await resolveBankAccount({ bankCode: bankForm.bankCode, accountNumber: bankForm.accountNumber.trim() })
+      setResolvedAccountName(res?.accountName || '')
+    } catch (err) {
+      setResolvedAccountName('')
+      setWalletMsg({ text: err?.message || 'Could not verify that account.', ok: false })
+    } finally {
+      setResolvingBank(false)
+    }
+  }
+
+  const handleSaveBank = async () => {
+    setSavingBank(true)
+    setWalletMsg({ text: '', ok: false })
+    try {
+      await saveBankDetails({ bankCode: bankForm.bankCode, accountNumber: bankForm.accountNumber.trim() })
+      setWalletMsg({ text: 'Bank account saved.', ok: true })
+      setResolvedAccountName('')
+      setBankForm({ bankCode: '', accountNumber: '' })
+      await loadWalletSummary()
+    } catch (err) {
+      setWalletMsg({ text: err?.message || 'Could not save bank details.', ok: false })
+    } finally {
+      setSavingBank(false)
+    }
+  }
+
+  const handleWithdraw = async () => {
+    const amount = Number(withdrawAmount)
+    const minWithdrawal = walletSummary?.minWithdrawalNgn || 500
+    if (!Number.isFinite(amount) || amount < minWithdrawal) {
+      setWalletMsg({ text: `Minimum withdrawal is ${formatNgn(minWithdrawal)}.`, ok: false })
+      return
+    }
+    if (amount > (walletSummary?.giftWalletNgn || 0)) {
+      setWalletMsg({ text: 'That amount is more than your gift wallet balance.', ok: false })
+      return
+    }
+    setWithdrawing(true)
+    setWalletMsg({ text: '', ok: false })
+    try {
+      const res = await withdrawGiftWallet({ amountNgn: amount })
+      setWalletMsg({ text: res?.message || 'Withdrawal initiated.', ok: true })
+      setWithdrawAmount('')
+      await Promise.all([loadWalletSummary(), refreshBalance?.()])
+    } catch (err) {
+      setWalletMsg({ text: err?.message || 'Withdrawal failed.', ok: false })
+    } finally {
+      setWithdrawing(false)
+    }
+  }
+
+  const openTemplateEdit = (card) => {
+    setEditingTemplate(card)
+    setTemplateEditForm({
+      name: card.title || '',
+      category: card.category || 'birthday',
+      previewImage: card.previewImage || '',
+    })
+    setTemplateEditMsg({ text: '', ok: false })
+  }
+
+  const handleTemplateImageChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingTemplateImage(true)
+    setTemplateEditMsg({ text: '', ok: false })
+    try {
+      const cloudUrl = await uploadToCloudinary(file, 'image')
+      setTemplateEditForm((prev) => ({ ...prev, previewImage: cloudUrl }))
+    } catch (err) {
+      setTemplateEditMsg({ text: err?.message || 'Image upload failed.', ok: false })
+    } finally {
+      setUploadingTemplateImage(false)
+    }
+  }
+
+  const handleSaveTemplateEdit = async () => {
+    if (!editingTemplate || !templateEditForm.name.trim()) {
+      setTemplateEditMsg({ text: 'Template name is required.', ok: false })
+      return
+    }
+    const templateId = editingTemplate.templateId || editingTemplate.id
+    setSavingTemplate(true)
+    setTemplateEditMsg({ text: '', ok: false })
+    try {
+      await updateTemplate({
+        templateId,
+        name: templateEditForm.name.trim(),
+        category: templateEditForm.category,
+        previewImage: templateEditForm.previewImage,
+      })
+      setMyTemplates((prev) => (prev !== null ? prev.map((t) => (
+        (t.templateId || t.id) === templateId
+          ? { ...t, title: templateEditForm.name.trim(), category: templateEditForm.category, previewImage: templateEditForm.previewImage }
+          : t
+      )) : null))
+      setTemplateEditMsg({ text: 'Template updated!', ok: true })
+      setTimeout(() => { setEditingTemplate(null); setTemplateEditMsg({ text: '', ok: false }) }, 900)
+    } catch (err) {
+      setTemplateEditMsg({ text: err?.message || 'Could not update template.', ok: false })
+    } finally {
+      setSavingTemplate(false)
     }
   }
 
@@ -484,44 +678,106 @@ function Profile() {
             </div>
           )}
 
-          {/* Stats Row — primary stats always visible, secondary behind toggle */}
+          {/* Stats Row — primary stats always visible, secondary behind toggle.
+              Tile set differs by role: artists design templates (not gifts/cards),
+              enterprise accounts run ads (not personal cards), admins/moderators
+              mostly work from their dedicated dashboards. */}
           <div className="profile-stats">
-            <div className="profile-stat">
-              <strong>{balance}</strong>
-              <span>CC Balance</span>
-            </div>
-            <div className="profile-stat">
-              <strong>{totalCardCount}</strong>
-              <span>Cards</span>
-            </div>
-            <div className="profile-stat">
-              <strong>{analytics?.totalViews ?? analytics?.views ?? 0}</strong>
-              <span>Views</span>
-            </div>
-            <div className="profile-stat">
-              <strong>{analytics?.totalLikes ?? analytics?.likes ?? 0}</strong>
-              <span>Likes</span>
-            </div>
+            {isArtist ? (
+              <>
+                <div className="profile-stat">
+                  <strong>{artistTemplateCount}</strong>
+                  <span>Templates Published</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{artistTotalLikes}</strong>
+                  <span>Total Likes</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{artistTotalViews}</strong>
+                  <span>Total Views</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{artistTotalUses}</strong>
+                  <span>Total Uses</span>
+                </div>
+              </>
+            ) : isEnterprise ? (
+              <>
+                <div className="profile-stat">
+                  <strong>{enterpriseAds.length}</strong>
+                  <span>Active Ads</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{enterpriseTotals.views}</strong>
+                  <span>Ad Views</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{enterpriseTotals.clicks}</strong>
+                  <span>Ad Clicks</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{enterpriseTotals.completions}</strong>
+                  <span>Completions</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="profile-stat">
+                  <strong>{balance}</strong>
+                  <span>CC Balance</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{totalCardCount}</strong>
+                  <span>Cards</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{analytics?.totalViews ?? analytics?.views ?? 0}</strong>
+                  <span>Views</span>
+                </div>
+                <div className="profile-stat">
+                  <strong>{analytics?.totalLikes ?? analytics?.likes ?? 0}</strong>
+                  <span>Likes</span>
+                </div>
+              </>
+            )}
 
             {showAllStats && (
               <>
-                <div className="profile-stat">
-                  <strong>{analytics?.totalEarned ?? analytics?.ccEarned ?? 0}</strong>
-                  <span>CC Earned</span>
-                </div>
-                <div className="profile-stat">
-                  <strong>{favoriteCards.length}</strong>
-                  <span>Saved</span>
-                </div>
-                <div className="profile-stat">
-                  <strong>{giftInventory.length}</strong>
-                  <span>Gifts</span>
-                </div>
-                <div className="profile-stat">
-                  <strong>NGN {Number(giftWalletNgn || 0).toLocaleString()}</strong>
-                  <span>Gift Wallet</span>
-                </div>
-                {currentUser?.referralsCount > 0 && (
+                {isArtist ? (
+                  <div className="profile-stat">
+                    <strong>{analytics?.totalEarned ?? analytics?.ccEarned ?? 0}</strong>
+                    <span>CC Earned</span>
+                  </div>
+                ) : isEnterprise ? (
+                  <div className="profile-stat">
+                    <strong>{balance}</strong>
+                    <span>CC Balance</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="profile-stat">
+                      <strong>{analytics?.totalEarned ?? analytics?.ccEarned ?? 0}</strong>
+                      <span>CC Earned</span>
+                    </div>
+                    <div className="profile-stat">
+                      <strong>{favoriteCards.length}</strong>
+                      <span>Saved</span>
+                    </div>
+                    <div className="profile-stat">
+                      <strong>{giftInventory.length}</strong>
+                      <span>Gifts</span>
+                    </div>
+                    <div className="profile-stat profile-stat-clickable" role="button" tabIndex={0}
+                      onClick={openWallet}
+                      onKeyDown={(e) => { if (e.key === 'Enter') openWallet() }}
+                    >
+                      <strong>{formatNgn(giftWalletNgn)}</strong>
+                      <span>Gift Wallet — Withdraw</span>
+                    </div>
+                  </>
+                )}
+                {!isEnterprise && currentUser?.referralsCount > 0 && (
                   <div className="profile-stat">
                     <strong>{currentUser.referralsCount}</strong>
                     <span>Referrals</span>
@@ -573,6 +829,11 @@ function Profile() {
               <span><MdDomain size={18} /></span> Open Enterprise Dashboard
             </Link>
           )}
+          {isArtist && (
+            <Link to="/artist" className="profile-admin-link">
+              <span><MdPalette size={18} /></span> Open Artist Dashboard
+            </Link>
+          )}
 
           {/* Artist Apply */}
           {!isArtist && !isAdmin && !isModerator && !isEnterprise && currentUser && (
@@ -585,6 +846,18 @@ function Profile() {
             </button>
           )}
         </div>
+
+        {/* Moderator and Enterprise are invite-only, admin-assigned roles —
+            no self-serve form exists for either. Without this note a
+            curious user has no way to learn that, and the absence read as
+            a dead end rather than a deliberate gate. */}
+        {!isArtist && !isAdmin && !isModerator && !isEnterprise && currentUser && (
+          <p className="profile-role-note">
+            Looking to run brand campaigns or help moderate the community? Moderator and Enterprise
+            accounts are set up by our team — reach out at{' '}
+            <a href="mailto:support@cardora.app">support@cardora.app</a> and we'll get you set up.
+          </p>
+        )}
 
         {!currentUser ? (
           <p className="empty-state">Sign in to personalize your profile.</p>
@@ -826,6 +1099,36 @@ function Profile() {
                     <div className="profile-card-actions profile-template-actions">
                       <button
                         type="button"
+                        className="profile-card-action-btn design"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const type = card.type || 'personal'
+                          const tier = card.tier || 'classic'
+                          navigate(`/studio?type=${type}&tier=${tier}`, {
+                            state: { cardData: card, editTemplateId: card.templateId || card.id },
+                          })
+                        }}
+                        title="Edit design"
+                        aria-label="Edit design"
+                      >
+                        <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="14" height="14" rx="2" />
+                          <path d="M3 13l3.5-3.5a1.5 1.5 0 0 1 2 0L11 12l2-2a1.5 1.5 0 0 1 2 0L17 12" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        className="profile-card-action-btn edit"
+                        onClick={(e) => { e.stopPropagation(); openTemplateEdit(card) }}
+                        title="Edit info"
+                        aria-label="Edit info"
+                      >
+                        <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14.85 2.85a1.5 1.5 0 0 1 2.12 2.12L6.5 15.44l-3.2.71.7-3.2z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
                         className="profile-card-action-btn delete"
                         onClick={async (e) => {
                           e.stopPropagation()
@@ -936,23 +1239,27 @@ function Profile() {
           </div>
         ) : null}
 
-        {/* Gift Inventory — display only */}
-        <div>
-          <h4 className="section-title">Gift Inventory</h4>
-          {giftInventory.length ? (
-            <div className="inventory inventory-clean">
-              {giftInventory.map((gift, index) => (
-                <InventoryCard
-                  key={gift.id || gift.inventoryId || gift._id || `${gift.giftName || gift.name || 'gift'}-${index}`}
-                  {...gift}
-                  variant={`v${(index % 4) + 1}`}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="empty-state">No gifts in your inventory yet.</p>
-          )}
-        </div>
+        {/* Gift Inventory — display only. Artists design/publish templates
+            rather than send or receive real gifts, so this section (and the
+            "Buy a gift" flow in the Store) doesn't apply to their account type. */}
+        {!isArtist && (
+          <div>
+            <h4 className="section-title">Gift Inventory</h4>
+            {giftInventory.length ? (
+              <div className="inventory inventory-clean">
+                {giftInventory.map((gift, index) => (
+                  <InventoryCard
+                    key={gift.id || gift.inventoryId || gift._id || `${gift.giftName || gift.name || 'gift'}-${index}`}
+                    {...gift}
+                    variant={`v${(index % 4) + 1}`}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="empty-state">No gifts in your inventory yet.</p>
+            )}
+          </div>
+        )}
 
         {/* CC Income History */}
         {currentUser?.ccIncomeHistory?.length > 0 && (
@@ -1063,6 +1370,163 @@ function Profile() {
                 {isSavingProfile ? 'Saving...' : 'Save Changes'}
               </button>
               <button className="ghost" type="button" onClick={() => setShowEditProfile(false)}>Cancel</button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Gift Wallet Modal */}
+      {showWallet && (
+        <section className="detail-modal" role="dialog" aria-modal="true">
+          <div className="detail-backdrop" onClick={() => setShowWallet(false)} />
+          <div className="detail-card artist-apply-modal wallet-modal">
+            <p className="eyebrow">Gift Wallet</p>
+            <h3>Withdraw your balance</h3>
+            {loadingWallet && !walletSummary ? (
+              <p className="detail-subtitle">Loading your wallet...</p>
+            ) : (
+              <>
+                <div className="wallet-balance-row">
+                  <span>Available balance</span>
+                  <strong>{formatNgn(walletSummary?.giftWalletNgn ?? giftWalletNgn)}</strong>
+                </div>
+
+                {walletSummary?.bankDetails ? (
+                  <>
+                    <div className="wallet-bank-row">
+                      <span>{walletSummary.bankDetails.bankName || 'Bank account'}</span>
+                      <strong>{walletSummary.bankDetails.accountName} · {walletSummary.bankDetails.accountNumberMasked}</strong>
+                    </div>
+                    <label className="detail-field">
+                      Amount to withdraw (NGN)
+                      <input
+                        type="number"
+                        min={walletSummary?.minWithdrawalNgn || 500}
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                        placeholder={`Minimum ${formatNgn(walletSummary?.minWithdrawalNgn || 500)}`}
+                      />
+                    </label>
+                    {walletMsg.text && <p className={`store-earn-msg artist-apply-msg ${walletMsg.ok ? 'success' : 'error'}`}>{walletMsg.text}</p>}
+                    <div className="detail-actions artist-apply-actions">
+                      <button className="primary" type="button" onClick={handleWithdraw} disabled={withdrawing}>
+                        {withdrawing ? 'Processing...' : 'Withdraw'}
+                      </button>
+                      <button className="ghost" type="button" onClick={() => setShowWallet(false)}>Close</button>
+                    </div>
+
+                    {walletSummary?.withdrawals?.length > 0 && (
+                      <div className="wallet-history">
+                        <p className="wallet-history-title">Recent withdrawals</p>
+                        {walletSummary.withdrawals.slice(0, 5).map((w) => (
+                          <div key={w.id || w.reference} className="wallet-history-row">
+                            <span>{formatNgn(w.amountNgn)}</span>
+                            <span className={`wallet-status wallet-status-${w.status}`}>{w.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="detail-subtitle">Add and verify a bank account to withdraw your gift wallet balance.</p>
+                    <label className="detail-field">
+                      Bank
+                      <Dropdown
+                        value={bankForm.bankCode}
+                        onChange={(val) => { setBankForm((prev) => ({ ...prev, bankCode: val })); setResolvedAccountName('') }}
+                        options={banks.map((bank) => ({ value: bank.code, label: bank.name }))}
+                        placeholder="Select your bank"
+                        searchable
+                        searchPlaceholder="Search banks…"
+                      />
+                    </label>
+                    <label className="detail-field">
+                      Account number
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={bankForm.accountNumber}
+                        onChange={(e) => { setBankForm((prev) => ({ ...prev, accountNumber: e.target.value.replace(/\D/g, '') })); setResolvedAccountName('') }}
+                        placeholder="0123456789"
+                      />
+                    </label>
+                    {resolvedAccountName ? (
+                      <p className="wallet-resolved-name">Account name: <strong>{resolvedAccountName}</strong></p>
+                    ) : null}
+                    {walletMsg.text && <p className={`store-earn-msg artist-apply-msg ${walletMsg.ok ? 'success' : 'error'}`}>{walletMsg.text}</p>}
+                    <div className="detail-actions artist-apply-actions">
+                      {resolvedAccountName ? (
+                        <button className="primary" type="button" onClick={handleSaveBank} disabled={savingBank}>
+                          {savingBank ? 'Saving...' : 'Confirm & Save'}
+                        </button>
+                      ) : (
+                        <button className="primary" type="button" onClick={handleResolveBank} disabled={resolvingBank}>
+                          {resolvingBank ? 'Verifying...' : 'Verify Account'}
+                        </button>
+                      )}
+                      <button className="ghost" type="button" onClick={() => setShowWallet(false)}>Cancel</button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Edit Template Modal */}
+      {editingTemplate && (
+        <section className="detail-modal" role="dialog" aria-modal="true">
+          <div className="detail-backdrop" onClick={() => !savingTemplate && setEditingTemplate(null)} />
+          <div className="detail-card artist-apply-modal">
+            <p className="eyebrow">Template</p>
+            <h3>Edit template</h3>
+            <label className="detail-field">
+              Name
+              <input
+                type="text"
+                value={templateEditForm.name}
+                onChange={(e) => setTemplateEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Template name"
+              />
+            </label>
+            <label className="detail-field">
+              Category
+              <select
+                value={templateEditForm.category}
+                onChange={(e) => setTemplateEditForm((prev) => ({ ...prev, category: e.target.value }))}
+              >
+                <option value="birthday">Birthday</option>
+                <option value="anniversary">Anniversary</option>
+                <option value="wedding">Wedding</option>
+                <option value="proposal">Proposal</option>
+                <option value="graduation">Graduation</option>
+                <option value="holiday">Holiday</option>
+                <option value="thank-you">Thank You</option>
+                <option value="apology">Apology</option>
+                <option value="celebration">Celebration</option>
+                <option value="just-because">Just Because</option>
+                <option value="get-well">Get Well</option>
+                <option value="sympathy">Sympathy</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label className="detail-field">
+              Preview image
+              {templateEditForm.previewImage && (
+                <img src={templateEditForm.previewImage} alt="" className="template-edit-preview-thumb" />
+              )}
+              <input type="file" accept="image/*" onChange={handleTemplateImageChange} disabled={uploadingTemplateImage} />
+              {uploadingTemplateImage && <span className="template-edit-uploading">Uploading…</span>}
+            </label>
+            {templateEditMsg.text && <p className={`store-earn-msg artist-apply-msg ${templateEditMsg.ok ? 'success' : 'error'}`}>{templateEditMsg.text}</p>}
+            <div className="detail-actions artist-apply-actions">
+              <button className="primary" type="button" onClick={handleSaveTemplateEdit} disabled={savingTemplate || uploadingTemplateImage}>
+                {savingTemplate ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button className="ghost" type="button" onClick={() => setEditingTemplate(null)} disabled={savingTemplate}>Cancel</button>
             </div>
           </div>
         </section>

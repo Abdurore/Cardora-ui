@@ -5,7 +5,7 @@ import { getAmbientPreset } from '../lib/studioEffects.js'
 
 let enginePromise = null
 
-function AmbientParticles({ type, colors, zIndex = 1 }) {
+function AmbientParticles({ type, colors, zIndex = 1, intensity = 1 }) {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -17,7 +17,7 @@ function AmbientParticles({ type, colors, zIndex = 1 }) {
     enginePromise.then(() => setReady(true))
   }, [])
 
-  const options = useMemo(() => getAmbientPreset(type, colors), [type, colors])
+  const options = useMemo(() => getAmbientPreset(type, colors, intensity), [type, colors, intensity])
 
   if (!ready || !options) return null
 

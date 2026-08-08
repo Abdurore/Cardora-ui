@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MdBolt, MdPalette } from 'react-icons/md'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
+import { TIER_COST_BY_TYPE } from '../lib/tierRequirements.js'
 
 const CARD_TYPES = [
   {
@@ -11,7 +12,6 @@ const CARD_TYPES = [
     tagline: 'The full cinematic experience',
     description: 'Envelope reveals, background music, animations, images, gifts, questions — everything.',
     accent: 'warm',
-    tiers: ['classic', 'premium', 'elite'],
   },
   {
     id: 'poll',
@@ -20,7 +20,6 @@ const CARD_TYPES = [
     tagline: 'Ask and see who answers',
     description: 'Embed a live poll. Recipients vote and see real-time results.',
     accent: 'cool',
-    tiers: ['classic', 'elite'],
   },
   {
     id: 'trivia',
@@ -29,7 +28,6 @@ const CARD_TYPES = [
     tagline: 'Quiz your people',
     description: 'Create a scored quiz. Recipients see their score and correct answers at the end.',
     accent: 'rose',
-    tiers: ['classic', 'elite'],
   },
   {
     id: 'chain',
@@ -38,7 +36,6 @@ const CARD_TYPES = [
     tagline: 'Send and receive back',
     description: 'Send a card that invites the recipient to reply with their own card back.',
     accent: 'emerald',
-    tiers: ['classic', 'elite'],
   },
   {
     id: 'anonymous',
@@ -47,20 +44,21 @@ const CARD_TYPES = [
     tagline: 'Receive honest messages',
     description: 'Share a link and let anyone send you a message — anonymously, beautifully wrapped.',
     accent: 'mint',
-    tiers: ['classic', 'elite'],
   },
 ]
 
-const TIER_INFO = {
-  classic: { label: 'Classic', note: 'Free · Clean animated reveal' },
-  premium: { label: 'Premium', note: 'Music + richer visuals · Costs CC' },
-  elite: { label: 'Elite', note: 'Full cinematic experience · Costs CC' },
+// Honest pricing hint for the type tiles — under the computed-tier model
+// there's no upfront tier to pick, so this just tells the sender the studio
+// is free to design in and names the ceiling if they use every paid touch.
+function pricingHint(typeId) {
+  const costs = TIER_COST_BY_TYPE[typeId] || TIER_COST_BY_TYPE.personal
+  const max = Math.max(...Object.values(costs).filter((v) => typeof v === 'number'))
+  return max > 0 ? `Free to start · premium touches up to ${max} CC` : 'Free to start'
 }
 
 function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
   const navigate = useNavigate()
   const [selectedType, setSelectedType] = useState(null)
-  const [selectedTier, setSelectedTier] = useState(null)
   const [modeStep, setModeStep] = useState(false)
   const isArtist = String(currentUser?.role || '').toLowerCase() === 'artist'
 
@@ -69,12 +67,9 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
     setModeStep(false)
     if (open && preselectedType) {
       setSelectedType(preselectedType)
-      const type = CARD_TYPES.find((t) => t.id === preselectedType)
-      // Artists default to Elite — they're building signature work
-      setSelectedTier(isArtist ? (type?.tiers.includes('elite') ? 'elite' : type?.tiers[type.tiers.length - 1]) : (type?.tiers[0] || 'classic'))
+      if (!isArtist) setModeStep(true)
     } else if (open) {
       setSelectedType(null)
-      setSelectedTier(null)
     }
   }, [open, preselectedType, isArtist])
 
@@ -82,29 +77,22 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
 
   const activeType = CARD_TYPES.find((t) => t.id === selectedType)
 
-  const handleStart = () => {
-    if (!selectedType || !selectedTier) return
-    if (isArtist) {
-      onClose()
-      navigate(`/studio?type=${selectedType}&tier=${selectedTier}`, { state: { isNew: true } })
-    } else {
-      setModeStep(true)
-    }
-  }
-
   const handleSelectType = (typeId) => {
+    if (isArtist) {
+      // Artists are unlocked for everything regardless — no tier or mode
+      // screen for them, straight into the Studio.
+      onClose()
+      navigate(`/studio?type=${typeId}`, { state: { isNew: true } })
+      return
+    }
     setSelectedType(typeId)
-    const type = CARD_TYPES.find((t) => t.id === typeId)
-    // Auto-select the first tier
-    setSelectedTier(type?.tiers[0] || 'classic')
+    setModeStep(true)
   }
 
   const handleBack = () => {
     if (modeStep) {
       setModeStep(false)
-    } else if (selectedType) {
       setSelectedType(null)
-      setSelectedTier(null)
     } else {
       onClose()
     }
@@ -124,15 +112,10 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
             <h2>
               {modeStep
                 ? 'How do you want to build?'
-                : selectedType
-                  ? (isArtist ? 'Pick a tier to design for' : 'Choose your tier')
-                  : (isArtist ? 'What signature piece are you designing?' : 'What are you creating?')}
+                : (isArtist ? 'What signature piece are you designing?' : 'What are you creating?')}
             </h2>
             {isArtist && !selectedType && (
-              <p className="ctm-artist-sub">You're building for the marketplace — every tier is open to you, no CC cost. Design something people will save.</p>
-            )}
-            {isArtist && selectedType && (
-              <p className="ctm-artist-sub">Pick the tier of experience you want this template to showcase. Your studio won't be capped either way.</p>
+              <p className="ctm-artist-sub">You're building for the marketplace — every tool is open to you, no CC cost. Design something people will save.</p>
             )}
           </div>
         </div>
@@ -155,78 +138,32 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
                   <h3>{type.label}</h3>
                   <p className="ctm-card-tagline">{type.tagline}</p>
                   <p className="ctm-card-desc">{type.description}</p>
-                  <span className="ctm-card-tiers-hint">
-                    {type.tiers.map((t) => TIER_INFO[t].label).join(' · ')}
-                  </span>
+                  {!isArtist && (
+                    <span className="ctm-card-tiers-hint">{pricingHint(type.id)}</span>
+                  )}
                 </button>
               )
             })}
           </div>
         )}
 
-        {/* Tier Selection */}
-        {selectedType && activeType && !modeStep && (() => {
-          const Icon = activeType.icon
-          return (
-          <div className="ctm-tier-section">
+        {/* Mode Selection — non-artist only */}
+        {selectedType && activeType && modeStep && !isArtist && (
+          <div className="ctm-mode-section">
             <div className={`ctm-type-summary ctm-${activeType.accent}`}>
               <div className="ctm-type-summary-icon">
-                <Icon size={28} className="ctm-card-icon" />
+                <activeType.icon size={28} className="ctm-card-icon" />
               </div>
               <div>
                 <h3>{activeType.label}</h3>
                 <p>{activeType.description}</p>
               </div>
             </div>
-
-            <div className="ctm-tier-grid">
-              {activeType.tiers.map((tier) => {
-                const info = { ...TIER_INFO[tier] }
-                if (tier === 'elite' && activeType.id === 'personal') {
-                  info.note = 'Full effects + gifts · Costs CC'
-                } else if (tier === 'elite') {
-                  info.note = 'Full cinematic experience · Costs CC'
-                }
-                const artistNote = tier === 'classic'
-                  ? 'Free tier feel · Minimal reveal'
-                  : tier === 'premium'
-                  ? 'Music + richer visuals'
-                  : (activeType.id === 'personal' ? 'Full effects + gifts' : 'Full cinematic experience')
-                return (
-                  <button
-                    key={tier}
-                    type="button"
-                    className={`ctm-tier ${selectedTier === tier ? 'active' : ''} ctm-tier-${tier}`}
-                    onClick={() => setSelectedTier(tier)}
-                  >
-                    <span className="ctm-tier-name">{info.label}</span>
-                    <span className="ctm-tier-note">{isArtist ? artistNote : info.note}</span>
-                    {selectedTier === tier && <span className="ctm-tier-check">✓</span>}
-                  </button>
-                )
-              })}
-            </div>
-
-            <button
-              type="button"
-              className={`ctm-start ctm-start-${activeType.accent}`}
-              disabled={!selectedTier}
-              onClick={handleStart}
-            >
-              {isArtist ? 'Open the Artist Studio →' : 'Continue →'}
-            </button>
-          </div>
-          )
-        })()}
-
-        {/* Mode Selection — non-artist only */}
-        {selectedType && activeType && modeStep && !isArtist && (
-          <div className="ctm-mode-section">
             <div className="ctm-mode-grid">
               <button
                 type="button"
                 className="ctm-mode-card ctm-mode-quick"
-                onClick={() => { onClose(); navigate(`/quick?type=${selectedType}&tier=${selectedTier}`) }}
+                onClick={() => { onClose(); navigate(`/quick?type=${selectedType}`) }}
               >
                 <div className="ctm-mode-icon"><MdBolt size={24} /></div>
                 <h3>Quick Start</h3>
@@ -236,7 +173,7 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
               <button
                 type="button"
                 className="ctm-mode-card ctm-mode-studio"
-                onClick={() => { onClose(); navigate(`/studio?type=${selectedType}&tier=${selectedTier}`, { state: { isNew: true } }) }}
+                onClick={() => { onClose(); navigate(`/studio?type=${selectedType}`, { state: { isNew: true } }) }}
               >
                 <div className="ctm-mode-icon"><MdPalette size={24} /></div>
                 <h3>Full Studio</h3>
@@ -252,4 +189,4 @@ function CardTypeModal({ open, onClose, preselectedType, currentUser = null }) {
 }
 
 export default CardTypeModal
-export { CARD_TYPES, TIER_INFO }
+export { CARD_TYPES }

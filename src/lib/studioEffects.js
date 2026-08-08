@@ -17,6 +17,7 @@ export const OPEN_EFFECTS = [
   { value: 'balloons', label: 'Balloons', tier: 'elite' },
   { value: 'emojiRain', label: 'Emoji Rain', tier: 'elite' },
   { value: 'goldenBloom', label: 'Golden Bloom', tier: 'elite' },
+  { value: 'sparkleRain', label: 'Sparkle Rain', tier: 'elite' },
 ]
 
 export const AMBIENT_EFFECTS = [
@@ -31,23 +32,10 @@ export const AMBIENT_EFFECTS = [
   { value: 'lanterns', label: 'Lanterns', tier: 'elite' },
   { value: 'petals', label: 'Petals', tier: 'elite' },
   { value: 'floating', label: 'Floating', tier: 'elite' },
+  { value: 'embers', label: 'Embers', tier: 'elite' },
+  { value: 'rain', label: 'Rain', tier: 'elite' },
+  { value: 'meteors', label: 'Meteors', tier: 'elite' },
 ]
-
-const TIER_RANK = { classic: 0, premium: 1, elite: 2 }
-
-function effectAllowed(effect, tier, { isArtist = false } = {}) {
-  if (isArtist) return true
-  if (!effect.tier || effect.tier === 'none') return true
-  return (TIER_RANK[tier] || 0) >= (TIER_RANK[effect.tier] || 0)
-}
-
-export function getOpenEffectsForTier(tier, opts) {
-  return OPEN_EFFECTS.filter((e) => effectAllowed(e, tier, opts))
-}
-
-export function getAmbientEffectsForTier(tier, opts) {
-  return AMBIENT_EFFECTS.filter((e) => effectAllowed(e, tier, opts))
-}
 
 function resolveColors(colors) {
   return Array.isArray(colors) && colors.length ? colors : DEFAULT_COLORS
@@ -78,6 +66,8 @@ export function fireOpenEffect(type, colors) {
       return fireShapeBurst('●', palette, { spread: 62, startVelocity: 56, gravity: 0.26 })
     case 'emojiRain':
       return fireEmojiRain(['✦', '✧', '★', '•'])
+    case 'sparkleRain':
+      return fireSparkleRain(palette)
     default:
       return null
   }
@@ -194,6 +184,28 @@ function fireStarShower(colors) {
   frame()
 }
 
+function fireSparkleRain(colors) {
+  if (typeof confetti.shapeFromText !== 'function') return fireGlitterBurst(colors)
+  const shape = confetti.shapeFromText({ text: '✦', scalar: 1.3 })
+  const end = Date.now() + 2000
+  const frame = () => {
+    confetti({
+      particleCount: 5,
+      spread: 0,
+      startVelocity: 8,
+      ticks: 200,
+      gravity: 0.5,
+      scalar: 1.1,
+      shapes: [shape],
+      colors,
+      origin: { x: Math.random(), y: -0.05 },
+      zIndex: 100001,
+    })
+    if (Date.now() < end) requestAnimationFrame(frame)
+  }
+  frame()
+}
+
 function fireCometTrail(colors) {
   if (typeof confetti.shapeFromText !== 'function') return fireStarShower(colors)
   const shape = confetti.shapeFromText({ text: '✦', scalar: 1.7 })
@@ -247,8 +259,34 @@ const BASE_FULLSCREEN = {
   background: { color: 'transparent' },
 }
 
-export function getAmbientPreset(type, colors = DEFAULT_COLORS) {
+// `intensity` scales particle/emitter counts down (never fully to zero for a
+// non-zero base) so small viewports get a lighter version of an effect
+// instead of it being switched off outright — see CardPreviewModal's
+// `ambientIntensity`.
+function scalePreset(preset, intensity) {
+  if (!preset || intensity >= 1) return preset
+  const scaled = { ...preset }
+  if (scaled.particles?.number?.value > 0) {
+    scaled.particles = {
+      ...scaled.particles,
+      number: { ...scaled.particles.number, value: Math.max(1, Math.round(scaled.particles.number.value * intensity)) },
+    }
+  }
+  if (scaled.emitters?.rate?.quantity > 0) {
+    scaled.emitters = {
+      ...scaled.emitters,
+      rate: { ...scaled.emitters.rate, quantity: Math.max(1, Math.round(scaled.emitters.rate.quantity * intensity)) },
+    }
+  }
+  return scaled
+}
+
+export function getAmbientPreset(type, colors = DEFAULT_COLORS, intensity = 1) {
   const palette = resolveColors(colors)
+  return scalePreset(getAmbientPresetRaw(type, palette), intensity)
+}
+
+function getAmbientPresetRaw(type, palette) {
   switch (type) {
     case 'sparkle':
     case 'shimmer':
@@ -375,6 +413,61 @@ export function getAmbientPreset(type, colors = DEFAULT_COLORS) {
             straight: false,
             outModes: 'bounce',
           },
+        },
+      }
+    case 'embers':
+      // Rising, cooling sparks — an emitter near the bottom pushes warm
+      // particles up and fading, unlike fireflies' idle random drift.
+      return {
+        ...BASE_FULLSCREEN,
+        particles: {
+          number: { value: 55, density: { enable: true, area: 900 } },
+          color: { value: ['#ff9f1c', '#ff6b35', '#ffd166', '#ffb703'] },
+          shape: { type: 'circle' },
+          opacity: {
+            value: { min: 0.15, max: 0.9 },
+            animation: { enable: true, speed: 1.4, sync: false, startValue: 'random' },
+          },
+          size: { value: { min: 1, max: 3.2 } },
+          move: {
+            enable: true,
+            speed: { min: 0.6, max: 1.8 },
+            direction: 'top',
+            random: true,
+            straight: false,
+            outModes: 'destroy',
+            drift: { min: -0.4, max: 0.4 },
+          },
+          wobble: { enable: true, distance: 6, speed: 8 },
+        },
+      }
+    case 'rain':
+      // Thin, fast, low-opacity streaks — visually distinct from snow's
+      // round, slow, high-opacity dots.
+      return {
+        ...BASE_FULLSCREEN,
+        particles: {
+          number: { value: 140, density: { enable: true, area: 700 } },
+          color: { value: palette },
+          shape: { type: 'line' },
+          opacity: { value: { min: 0.12, max: 0.4 } },
+          size: { value: { min: 8, max: 18 } },
+          rotate: { value: 12 },
+          move: { enable: true, speed: { min: 9, max: 15 }, direction: 'bottom', straight: true, outModes: 'out' },
+        },
+      }
+    case 'meteors':
+      // Sparse, high-speed angled streaks with a fading trail — an
+      // occasional event, not a constant field like starfield/rain.
+      return {
+        ...BASE_FULLSCREEN,
+        particles: {
+          number: { value: 8, density: { enable: true, area: 1400 } },
+          color: { value: palette },
+          shape: { type: 'star' },
+          opacity: { value: { min: 0.3, max: 0.9 } },
+          size: { value: { min: 1.5, max: 3.5 } },
+          move: { enable: true, speed: { min: 14, max: 22 }, direction: 'bottom-left', straight: true, trail: { enable: true, length: 12, fill: { color: 'transparent' } }, outModes: 'destroy' },
         },
       }
     default:

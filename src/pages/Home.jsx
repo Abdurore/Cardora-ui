@@ -114,7 +114,6 @@ function Home() {
   const {
     openCardDetails,
     favorites,
-    toggleFavorite,
     likedTemplates,
     toggleLike,
     currentUser,
@@ -122,9 +121,11 @@ function Home() {
     balance,
     marketplaceTemplates,
     openCardTypeModal,
+    authReady,
   } = useOutletContext()
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [signupBonus, setSignupBonus] = useState(null)
+  const isArtist = String(currentUser?.role || '').toLowerCase() === 'artist'
 
   // Surface the "first 200 users get free CC" offer for logged-out visitors
   // so they see it before bouncing off the hero. Logged-in users have already
@@ -170,11 +171,16 @@ function Home() {
           ))}
         </div>
         <div className="hero-copy">
-          <p className="eyebrow hero-eyebrow">Cardora Platform</p>
-          <h1>Create interactive<br />card experiences.</h1>
+          <p className="eyebrow hero-eyebrow">{isArtist ? 'Cardora Artist Studio' : 'Cardora Platform'}</p>
+          {isArtist ? (
+            <h1>Design templates<br />people save and send.</h1>
+          ) : (
+            <h1>Create interactive<br />card experiences.</h1>
+          )}
           <p className="subtext">
-            Cardora turns simple messages into interactive digital card experiences
-            that people can engage with, not just read.
+            {isArtist
+              ? 'Publish signature card designs to the marketplace — every tier and effect is unlocked for you, no CC cost.'
+              : 'Cardora turns simple messages into interactive digital card experiences that people can engage with, not just read.'}
           </p>
           <div className="hero-format-chips" aria-hidden="true">
             {FORMAT_CHIPS.map((chip, i) => (
@@ -189,11 +195,17 @@ function Home() {
           </div>
           <div className="cta-row">
             <button className="primary" type="button" onClick={() => openCardTypeModal?.()}>
-              Create a Card
+              {isArtist ? 'Design a Template' : 'Create a Card'}
             </button>
-            <Link className="ghost" to="/explore">
-              Explore Templates
-            </Link>
+            {isArtist ? (
+              <Link className="ghost" to="/artist">
+                My Artist Dashboard
+              </Link>
+            ) : (
+              <Link className="ghost" to="/explore">
+                Explore Templates
+              </Link>
+            )}
           </div>
           {signupBonus && !currentUser && (
             <Link to="/signup" className="hero-bonus-banner" aria-label="Claim free Cardora Credits">
@@ -321,7 +333,13 @@ function Home() {
               </svg>
             </button>
           </div>
-          {visibleCards.length ? (
+          {!authReady && visibleCards.length === 0 ? (
+            <div className="card-grid home-template-rail" aria-hidden="true">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="card-grid-skeleton-item" />
+              ))}
+            </div>
+          ) : visibleCards.length ? (
             <div className="card-grid home-template-rail">
               {visibleCards.map((card, index) => (
                 <CardItem
@@ -336,7 +354,9 @@ function Home() {
               ))}
             </div>
           ) : (
-            <p className="empty-state">No favorites saved yet.</p>
+            <p className="empty-state">
+              {showFavoritesOnly ? 'No favorites saved yet.' : 'The marketplace is waiting for its first templates. Check back soon.'}
+            </p>
           )}
         </div>
         <ScreenNav />

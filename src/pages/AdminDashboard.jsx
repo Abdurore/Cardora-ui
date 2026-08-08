@@ -18,17 +18,21 @@ import {
   unbanUser,
   setUserRole,
   getAdminReports,
+  updateAdminReportStatus,
   getModeratorActionLogs,
   disableAdminTemplate,
   enableAdminTemplate,
   adminDeleteTemplate,
   approveBroadcastRequest,
+  rejectBroadcastRequest,
+  getBroadcastRequests,
   getAdminPackages,
   createAdminPackage,
   deleteAdminPackage,
   getAdminRedeemCodes,
   createAdminRedeemCode,
   disableAdminRedeemCode,
+  enableAdminRedeemCode,
   deleteAdminRedeemCode,
   getAdminAds,
   createAdminAd,
@@ -61,6 +65,8 @@ import {
   deleteChatFrame,
   forgetCachedChatFrame,
   approveChatFrameRequest,
+  rejectChatFrameRequest,
+  getChatFrameRequests,
   rememberChatFrame,
   createAdminGift,
   getAdminGifts,
@@ -76,6 +82,23 @@ import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
 const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Packages', 'Codes', 'Ads', 'Media', 'Gifts', 'Coupons', 'Logs']
 const TEMPLATE_DISABLE_DAYS = 7
+
+// The 10 built-in gift "types" — each is a hand-designed heart color/reveal
+// animation (see PremiumGiftReveal.jsx's EFFECTS). A new custom gift picks
+// one of these to inherit its visuals rather than needing new animation assets.
+const GIFT_EFFECT_OPTIONS = [
+  { value: 'tiny', label: 'Tiny Heart — Gray', color: 'Gray' },
+  { value: 'sweet', label: 'Sweet Heart — Pink', color: 'Pink' },
+  { value: 'purple', label: 'Purple Love — Purple', color: 'Purple' },
+  { value: 'ocean', label: 'Ocean Heart — Blue', color: 'Blue' },
+  { value: 'emerald', label: 'Emerald Heart — Green', color: 'Green' },
+  { value: 'passion', label: 'Passion Heart — Red', color: 'Red' },
+  { value: 'golden', label: 'Golden Heart — Gold', color: 'Gold' },
+  { value: 'crystal', label: 'Crystal Heart — Cyan', color: 'Cyan' },
+  { value: 'diamond', label: 'Diamond Heart — Silver', color: 'Silver' },
+  { value: 'legendary', label: 'Legendary Heart — Rainbow', color: 'Rainbow' },
+]
+const GIFT_TIER_OPTIONS = ['common', 'rare', 'epic', 'legendary', 'mythic']
 
 // Persist trim points locally (backend doesn't store startSec/endSec yet).
 // Keyed by track _id OR cloudinary URL so drafts survive before an ID is assigned.
@@ -242,9 +265,11 @@ function AdminDashboard() {
   const [newChatFrame, setNewChatFrame] = useState({ id: '', name: '', url: '', price: 5 })
   const [chatFrameUploading, setChatFrameUploading] = useState(false)
   const [adminGifts, setAdminGifts] = useState([])
-  const [newGift, setNewGift] = useState({ name: '', priceNgn: 500 })
+  const [newGift, setNewGift] = useState({ name: '', priceNgn: 500, effectKey: 'tiny', tier: 'common' })
   const [deliveryLogs, setDeliveryLogs] = useState([])
   const [deliveryBroadcastId, setDeliveryBroadcastId] = useState('')
+  const [pendingBroadcastRequests, setPendingBroadcastRequests] = useState([])
+  const [pendingChatFrameRequests, setPendingChatFrameRequests] = useState([])
 
   // New package form
   const [newPkg, setNewPkg] = useState({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false })
@@ -371,6 +396,10 @@ function AdminDashboard() {
             const bonusRes = await getSignupBonusStatus()
             setSignupBonus(bonusRes?.data || bonusRes || null)
           } catch { setSignupBonus(null) }
+          try {
+            const reqRes = await getBroadcastRequests()
+            setPendingBroadcastRequests(reqRes?.data?.requests || reqRes?.requests || [])
+          } catch { setPendingBroadcastRequests([]) }
           break
         }
         case 'Coupons': {
@@ -530,6 +559,10 @@ function AdminDashboard() {
           } else {
             setAdminChatFrames(getCachedChatFrames().map(normalizeChatFrame).filter(Boolean))
           }
+          try {
+            const reqRes = await getChatFrameRequests()
+            setPendingChatFrameRequests(reqRes?.data?.requests || reqRes?.requests || [])
+          } catch { setPendingChatFrameRequests([]) }
           break
         }
       }
@@ -539,10 +572,41 @@ function AdminDashboard() {
     setLoading(false)
   }
 
+  // Reset every tab-scoped state slice on an actual identity change (not on
+  // every plain tab switch, which already re-fetches its own tab's data) so
+  // a previous admin account's data never lingers on screen under a new
+  // session — covers every tab, not just whichever was active at the moment
+  // of switching, since the admin could land back on any of them.
+  const adminIdentityRef = useRef(currentUser?.id)
+  useEffect(() => {
+    if (adminIdentityRef.current === currentUser?.id) return
+    adminIdentityRef.current = currentUser?.id
+    setStats(null)
+    setReferralStats(null)
+    setSignupBonus(null)
+    setPendingBroadcastRequests([])
+    setCoupons([])
+    setUsers([])
+    setAllTemplates([])
+    setPackages([])
+    setRedeemCodes([])
+    setAds([])
+    setAdsAnalytics(null)
+    setMediaVideos([])
+    setMediaMusic([])
+    setProfileBackgrounds([])
+    setReports([])
+    setLogs([])
+    setModLogs([])
+    setAdminGifts([])
+    setAdminChatFrames([])
+    setPendingChatFrameRequests([])
+  }, [currentUser?.id])
+
   useEffect(() => {
     if (!isAdminGate) return
     loadTabData(activeTab)
-  }, [activeTab, isAdminGate])
+  }, [activeTab, isAdminGate, currentUser?.id])
 
   const openBanConfirm = () => {
     const id = banForm.identifier.trim()
@@ -637,6 +701,18 @@ function AdminDashboard() {
     setLoading(false)
   }
 
+  const handleUpdateReportStatus = async (report, status) => {
+    const reportId = report.reportId || report._id
+    if (!reportId) return
+    try {
+      await updateAdminReportStatus(reportId, status)
+      setReports(prev => prev.map(r => ((r.reportId || r._id) === reportId ? { ...r, status } : r)))
+      showMsg(`Report marked ${status}.`)
+    } catch (err) {
+      showMsg(err.message || 'Failed to update report.', false)
+    }
+  }
+
   const handleDeleteAd = async (ad) => {
     if (!await appConfirm('Delete Ad', `Delete "${ad.name || 'this ad'}"? This cannot be undone.`, { variant: 'danger', confirmLabel: 'Delete' })) return
     const id = ad._id || ad.id
@@ -657,6 +733,16 @@ function AdminDashboard() {
       loadTabData('Codes')
     } catch (err) {
       showMsg(err.message || 'Disable failed.', false)
+    }
+  }
+
+  const handleEnableCode = async (code) => {
+    try {
+      await enableAdminRedeemCode(code.code)
+      showMsg('Code enabled.')
+      loadTabData('Codes')
+    } catch (err) {
+      showMsg(err.message || 'Enable failed.', false)
     }
   }
 
@@ -837,9 +923,15 @@ const handleBroadcast = async () => {
   const handleCreateAdminGift = async () => {
     if (!newGift.name.trim()) { showMsg('Gift name required.', false); return }
     try {
-      await createAdminGift({ name: newGift.name.trim(), priceNgn: Number(newGift.priceNgn) || 500 })
+      await createAdminGift({
+        name: newGift.name.trim(),
+        priceNgn: Number(newGift.priceNgn) || 500,
+        effectKey: newGift.effectKey,
+        tier: newGift.tier,
+        color: GIFT_EFFECT_OPTIONS.find(o => o.value === newGift.effectKey)?.color,
+      })
       showMsg('Gift created!')
-      setNewGift({ name: '', priceNgn: 500 })
+      setNewGift({ name: '', priceNgn: 500, effectKey: 'tiny', tier: 'common' })
       loadTabData('Gifts')
     } catch (err) { showMsg(err.message || 'Failed.', false) }
   }
@@ -863,7 +955,44 @@ const handleBroadcast = async () => {
 
   const handleApproveBroadcast = async (broadcastId) => {
     if (!await appConfirm('Approve Broadcast', 'Send this broadcast to all users?', { confirmLabel: 'Approve' })) return
-    try { await approveBroadcastRequest(broadcastId); showMsg('Broadcast approved!') }
+    try {
+      await approveBroadcastRequest(broadcastId)
+      showMsg('Broadcast approved!')
+      setPendingBroadcastRequests(prev => prev.filter(r => r.requestId !== broadcastId))
+    }
+    catch (err) { showMsg(err.message || 'Failed.', false) }
+  }
+
+  const handleRejectBroadcast = async (broadcastId) => {
+    if (!await appConfirm('Reject Broadcast', 'Reject this broadcast request?', { variant: 'danger', confirmLabel: 'Reject' })) return
+    try {
+      await rejectBroadcastRequest(broadcastId)
+      showMsg('Broadcast request rejected.')
+      setPendingBroadcastRequests(prev => prev.filter(r => r.requestId !== broadcastId))
+    }
+    catch (err) { showMsg(err.message || 'Failed.', false) }
+  }
+
+  const handleApproveChatFrameRequest = async (requestId) => {
+    if (!await appConfirm('Approve Chat Frame', 'Approve this chat frame request and add it to the store?', { confirmLabel: 'Approve' })) return
+    try {
+      const res = await approveChatFrameRequest(requestId)
+      const frame = res?.data?.frame || res?.frame
+      if (frame) rememberChatFrame(frame)
+      showMsg('Chat frame request approved!')
+      setPendingChatFrameRequests(prev => prev.filter(r => r.requestId !== requestId))
+      loadTabData('Gifts')
+    }
+    catch (err) { showMsg(err.message || 'Failed.', false) }
+  }
+
+  const handleRejectChatFrameRequest = async (requestId) => {
+    if (!await appConfirm('Reject Chat Frame', 'Reject this chat frame request?', { variant: 'danger', confirmLabel: 'Reject' })) return
+    try {
+      await rejectChatFrameRequest(requestId)
+      showMsg('Chat frame request rejected.')
+      setPendingChatFrameRequests(prev => prev.filter(r => r.requestId !== requestId))
+    }
     catch (err) { showMsg(err.message || 'Failed.', false) }
   }
 
@@ -1381,6 +1510,36 @@ const handleBroadcast = async () => {
                 </div>
               </div>
             </div>
+
+            {/* Pending Broadcast Requests (submitted by moderators) */}
+            <div className="admin-sub-section">
+              <h4>Pending Broadcast Requests ({pendingBroadcastRequests.length})</h4>
+              {pendingBroadcastRequests.length === 0 ? (
+                <p style={{ color: 'rgba(220,240,247,0.4)' }}>No pending requests.</p>
+              ) : (
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr><th>Subject</th><th>Message</th><th>Requested by</th><th>Date</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                      {pendingBroadcastRequests.map((req) => (
+                        <tr key={req.requestId}>
+                          <td>{req.subject}</td>
+                          <td className="admin-cell-details">{req.message}</td>
+                          <td>{req.requestedByUsername || req.requestedById || '—'}</td>
+                          <td>{req.createdAt ? new Date(req.createdAt).toLocaleDateString() : '—'}</td>
+                          <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button type="button" className="admin-action-btn approve" onClick={() => handleApproveBroadcast(req.requestId)}>Approve</button>
+                            <button type="button" className="admin-action-btn reject" onClick={() => handleRejectBroadcast(req.requestId)}>Reject</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1409,6 +1568,18 @@ const handleBroadcast = async () => {
               <div className="admin-inline-form">
                 <label className="admin-field"><span>Gift Name</span><input placeholder="e.g. spark" value={newGift.name} onChange={e => setNewGift(p => ({ ...p, name: e.target.value }))} /></label>
                 <label className="admin-field"><span>Price (NGN)</span><input type="number" placeholder="500" value={newGift.priceNgn} onChange={e => setNewGift(p => ({ ...p, priceNgn: Number(e.target.value) }))} /></label>
+                <label className="admin-field">
+                  <span>Type (heart color)</span>
+                  <select value={newGift.effectKey} onChange={e => setNewGift(p => ({ ...p, effectKey: e.target.value }))}>
+                    {GIFT_EFFECT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </label>
+                <label className="admin-field">
+                  <span>Tier</span>
+                  <select value={newGift.tier} onChange={e => setNewGift(p => ({ ...p, tier: e.target.value }))}>
+                    {GIFT_TIER_OPTIONS.map(t => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
+                  </select>
+                </label>
                 <button className="primary" type="button" onClick={handleCreateAdminGift}>Create Gift</button>
               </div>
             </div>
@@ -1419,12 +1590,14 @@ const handleBroadcast = async () => {
                 <h4>Existing Gifts ({adminGifts.length})</h4>
                 <div className="admin-table-wrap">
                   <table className="admin-table">
-                    <thead><tr><th>Name</th><th>Price (NGN)</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Name</th><th>Price (NGN)</th><th>Type</th><th>Tier</th><th>Actions</th></tr></thead>
                     <tbody>
                       {adminGifts.map((g, i) => (
                         <tr key={g.giftId || g._id || g.name || i}>
                           <td>{g.name}</td>
                           <td>{g.priceNgn ?? '—'}</td>
+                          <td>{g.color || GIFT_EFFECT_OPTIONS.find(o => o.value === g.effectKey)?.color || '—'}</td>
+                          <td>{g.tier || '—'}</td>
                           <td><button type="button" className="admin-action-btn danger" onClick={() => handleDeleteAdminGift(g)}>Delete</button></td>
                         </tr>
                       ))}
@@ -1465,7 +1638,48 @@ const handleBroadcast = async () => {
                 <button className="primary" type="button" onClick={handleCreateChatFrame} disabled={chatFrameUploading || !newChatFrame.url}>Create Frame</button>
               </div>
               {newChatFrame.url && (
-                <p className="admin-media-hint">Uploaded to Cloudinary. The returned URL will be saved with this frame.</p>
+                <>
+                  <p className="admin-media-hint">This is exactly how the frame will wrap a World Chat bubble — the border art should sit in the outer ~25% of the image with a transparent center, since it's stretched around the bubble's edges (not shown as a circular avatar ring).</p>
+                  <div className="cf-bubble-wrap" style={{ marginTop: 8 }}>
+                    <div className="cf-frame-overlay" style={{ borderImageSource: `url(${newChatFrame.url})`, borderImageSlice: '33% fill', borderImageWidth: '24px' }} />
+                    <div className="cf-bubble-text">Hey! This frame looks great 🔥</div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Pending Chat Frame Requests (submitted by moderators) */}
+            <div className="admin-sub-section">
+              <h4>Pending Chat Frame Requests ({pendingChatFrameRequests.length})</h4>
+              {pendingChatFrameRequests.length === 0 ? (
+                <p style={{ color: 'rgba(220,240,247,0.4)' }}>No pending requests.</p>
+              ) : (
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr><th>Preview</th><th>Name</th><th>Price</th><th>Requested by</th><th>Date</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                      {pendingChatFrameRequests.map((req) => (
+                        <tr key={req.requestId}>
+                          <td>
+                            {req.url
+                              ? <img src={req.url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+                              : '—'}
+                          </td>
+                          <td>{req.name}</td>
+                          <td>{req.price ?? '—'}</td>
+                          <td>{req.requestedByUsername || req.requestedById || '—'}</td>
+                          <td>{req.createdAt ? new Date(req.createdAt).toLocaleDateString() : '—'}</td>
+                          <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button type="button" className="admin-action-btn approve" onClick={() => handleApproveChatFrameRequest(req.requestId)}>Approve</button>
+                            <button type="button" className="admin-action-btn reject" onClick={() => handleRejectChatFrameRequest(req.requestId)}>Reject</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
@@ -1577,7 +1791,7 @@ const handleBroadcast = async () => {
             {/* Set Role Form */}
             <div className="admin-sub-section">
               <h4>Assign Role</h4>
-              <p className="admin-sub-hint">Change any user's role. Use the table below to assign roles directly from a row.</p>
+              <p className="admin-sub-hint">Change any user's role by entering their ID or username below.</p>
               <div className="admin-inline-form">
                 <label className="admin-field">
                   <span>User ID or Username</span>
@@ -1793,6 +2007,24 @@ const handleBroadcast = async () => {
                               }}
                             >
                               Ban User
+                            </button>
+                          )}
+                          {rep.status !== 'resolved' && (
+                            <button
+                              type="button"
+                              className="admin-action-btn approve"
+                              onClick={() => handleUpdateReportStatus(rep, 'resolved')}
+                            >
+                              Resolve
+                            </button>
+                          )}
+                          {rep.status !== 'dismissed' && (
+                            <button
+                              type="button"
+                              className="admin-action-btn warn"
+                              onClick={() => handleUpdateReportStatus(rep, 'dismissed')}
+                            >
+                              Dismiss
                             </button>
                           )}
                         </td>
@@ -2035,13 +2267,17 @@ const handleBroadcast = async () => {
                           </button>
                         </span>
                       </td>
-                      <td>{code.numberOfCC}</td>
-                      <td>{code.usedCount ?? 0}/{code.maxUses ?? '∞'}</td>
+                      <td>{code.ccAmount ?? code.numberOfCC}</td>
+                      <td>{code.uses ?? code.usedCount ?? 0}/{code.maxUses ?? '∞'}</td>
                       <td>{code.isActive !== false ? 'Active' : 'Inactive'}</td>
                       <td style={{ display: 'flex', gap: 4 }}>
-                        {code.isActive !== false && (
+                        {code.isActive !== false ? (
                           <button type="button" className="admin-action-btn warn" onClick={() => handleDisableCode(code)}>
                             Disable
+                          </button>
+                        ) : (
+                          <button type="button" className="admin-action-btn approve" onClick={() => handleEnableCode(code)}>
+                            Enable
                           </button>
                         )}
                         <button type="button" className="admin-action-btn reject" onClick={() => handleDeleteCode(code)}>

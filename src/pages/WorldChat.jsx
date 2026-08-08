@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useOutletContext, useNavigate, Link } from 'react-router-dom'
+import { useOutletContext, useNavigate, useLocation, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import ScreenNav from '../components/ScreenNav.jsx'
-import { getWorldChat, getPublicProfile, API_BASE, getChatFrames, getCachedChatFrames } from '../lib/api.js'
+import { getWorldChat, getPublicProfile, API_BASE, getChatFrames, getCachedChatFrames, getStoredToken, getTemplateById } from '../lib/api.js'
 import { MdBolt, MdPalette, MdDomain } from 'react-icons/md'
 import { BiShield } from 'react-icons/bi'
 import { IoPersonOutline, IoSparkles } from 'react-icons/io5'
 import { FaCrown } from 'react-icons/fa'
-import { mapChatMessage } from '../lib/backendMappers.js'
+import { mapChatMessage, mapTemplateToCard } from '../lib/backendMappers.js'
 import { getChatFrameId, getChatFrameUrl, getLocalEquippedChatFrameId, normalizeChatFrame } from '../lib/chatFrames.js'
 
 function pickFrameList(payload) {
@@ -45,10 +45,12 @@ function formatAge(isoStr) {
 }
 
 function WorldChat() {
-  const { currentUser, balance, openAuthModal } = useOutletContext()
+  const { currentUser, balance, openAuthModal, openCardDetails } = useOutletContext()
   const navigate = useNavigate()
+  const location = useLocation()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
+  const [pendingShareTemplate, setPendingShareTemplate] = useState(null)
   const [error, setError] = useState('')
   const [cooldown, setCooldown] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -88,6 +90,16 @@ function WorldChat() {
   } else if (currentUser?.id) {
     delete userFrameIdMap.current[currentUser.id]
   }
+
+  // Arrives here via CardDetailModal's "Share to World Chat" action, which
+  // navigates here with the template attached in route state.
+  useEffect(() => {
+    if (location.state?.shareTemplate) {
+      setPendingShareTemplate(location.state.shareTemplate)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state])
 
   const MSG_CAP = 150
 
@@ -172,9 +184,10 @@ function WorldChat() {
     if (!currentUser) return
 
     const socket = io(API_BASE, {
+      // The server verifies this token and looks up the user itself — it no
+      // longer trusts a client-supplied userId/username (that was spoofable).
       auth: {
-        userId: currentUser.id,
-        username: currentUser.username,
+        token: getStoredToken(),
       },
       transports: ['websocket', 'polling'],
     })
@@ -334,8 +347,13 @@ function WorldChat() {
   const SEND_COOLDOWN = 15 // seconds between messages
 
   const sendMessage = () => {
-    if (!input.trim() || cooldown > 0 || !isOnline || !connected) return
-    socketRef.current?.emit('send_message', { content: input.trim() })
+    if ((!input.trim() && !pendingShareTemplate) || cooldown > 0 || !isOnline || !connected) return
+    if (pendingShareTemplate) {
+      socketRef.current?.emit('share_template', { templateId: pendingShareTemplate.id, caption: input.trim() })
+      setPendingShareTemplate(null)
+    } else {
+      socketRef.current?.emit('send_message', { content: input.trim() })
+    }
     setInput('')
     setError('')
     // Client-side cooldown so button is visually locked immediately
@@ -350,6 +368,17 @@ function WorldChat() {
         return prev - 1
       })
     }, 1000)
+  }
+
+  const handleOpenSharedTemplate = async (templateId) => {
+    if (!templateId) return
+    try {
+      const res = await getTemplateById(templateId)
+      const template = res?.template || res?.data?.template || res
+      openCardDetails?.(mapTemplateToCard(template))
+    } catch (err) {
+      setError(err?.message || 'This template is no longer available.')
+    }
   }
 
   const handleKeyDown = (e) => {
@@ -518,9 +547,27 @@ function WorldChat() {
                           }}
                         />
                       )}
-                      <div className="chat-msg-bubble">
-                        {msg.content}
-                      </div>
+                      {msg.type === 'template_share' ? (
+                        <button
+                          type="button"
+                          className="chat-shared-template"
+                          onClick={() => handleOpenSharedTemplate(msg.templateId)}
+                        >
+                          {msg.templatePreviewImage && (
+                            <img src={msg.templatePreviewImage} alt="" className="chat-shared-template-thumb" />
+                          )}
+                          <div className="chat-shared-template-info">
+                            <span className="chat-shared-template-title">{msg.templateName || 'Template'}</span>
+                            {msg.templateCategory && <span className="chat-shared-template-category">{msg.templateCategory}</span>}
+                            {msg.content && <span className="chat-shared-template-caption">{msg.content}</span>}
+                            <span className="chat-shared-template-cta">Open template →</span>
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="chat-msg-bubble">
+                          {msg.content}
+                        </div>
+                      )}
                     </div>
                     {isMe && <span className="chat-msg-time">{formatAge(msg.createdAt)}</span>}
                   </div>
@@ -541,7 +588,24 @@ function WorldChat() {
             <button className="primary" type="button" onClick={() => navigate('/login')}>Sign In</button>
           </div>
         ) : (
-          <div className="chat-input-bar">
+          <div className="chat-input-wrap">
+            {pendingShareTemplate && (
+              <div className="chat-pending-share">
+                {pendingShareTemplate.previewImage && (
+                  <img src={pendingShareTemplate.previewImage} alt="" className="chat-pending-share-thumb" />
+                )}
+                <span className="chat-pending-share-title">Sharing "{pendingShareTemplate.title}"</span>
+                <button
+                  type="button"
+                  className="chat-pending-share-remove"
+                  onClick={() => setPendingShareTemplate(null)}
+                  aria-label="Cancel sharing this template"
+                >
+                  &#10005;
+                </button>
+              </div>
+            )}
+            <div className="chat-input-bar">
             <input
               type="text"
               value={input}
@@ -551,6 +615,7 @@ function WorldChat() {
                 !isOnline ? 'You\'re offline…'
                 : !connected ? 'Reconnecting…'
                 : cooldown > 0 ? `Ready in ${cooldown}s — type now`
+                : pendingShareTemplate ? 'Add a caption (optional)…'
                 : 'Type a message…'
               }
               disabled={!canType}
@@ -560,7 +625,7 @@ function WorldChat() {
               type="button"
               className="chat-send-btn"
               onClick={sendMessage}
-              disabled={!canSend || !input.trim()}
+              disabled={!canSend || (!input.trim() && !pendingShareTemplate)}
               aria-label="Send message"
             >
               {cooldown > 0 ? (
@@ -575,6 +640,7 @@ function WorldChat() {
                 </svg>
               )}
             </button>
+            </div>
           </div>
         )}
       </div>

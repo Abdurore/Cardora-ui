@@ -1,44 +1,33 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
-import { MdOutlineDiamond } from 'react-icons/md'
-import { PALETTES, applyPalette, getPalettesForTier } from '../lib/palettes.js'
+import { PALETTES, applyPalette } from '../lib/palettes.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
-import { attachGiftToCard } from '../lib/api.js'
+import { attachGiftToCard, getCardPrices } from '../lib/api.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import { GiftIcon } from '../components/GiftCard.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
+import { computeCardTier, trimCardToTier, getTierCost, normalizeCardPrices, fontTier } from '../lib/tierRequirements.js'
+import TierPip from '../components/TierPip.jsx'
+import TierMeter from '../components/TierMeter.jsx'
+import SendReceipt from '../components/SendReceipt.jsx'
 
+// Labels/sample copy only now — pip tier is derived live via the shared
+// `fontTier()` (tierRequirements.js), not a hardcoded tag here. That list
+// used to disagree with the Studio's own font tiers (e.g. it tagged Cinzel,
+// the platform's default classic font, as Elite).
 const QUICK_FONTS = [
-  { label: 'Poppins',          value: 'Poppins',          sample: 'Modern & Clean',   tier: 'classic' },
-  { label: 'Lora',             value: 'Lora',             sample: 'Literary Charm',   tier: 'classic' },
-  { label: 'Nunito',           value: 'Nunito',           sample: 'Friendly Round',   tier: 'classic' },
-  { label: 'Playfair Display', value: 'Playfair Display', sample: 'Elegant Serif',    tier: 'premium' },
-  { label: 'Montserrat',       value: 'Montserrat',       sample: 'Bold Geometric',   tier: 'premium' },
-  { label: 'Dancing Script',   value: 'Dancing Script',   sample: 'Handwritten',      tier: 'elite' },
-  { label: 'Raleway',          value: 'Raleway',          sample: 'Sleek & Thin',     tier: 'elite' },
-  { label: 'Cinzel',           value: 'Cinzel',           sample: 'Classic Roman',    tier: 'elite' },
+  { label: 'Poppins',          value: 'Poppins',          sample: 'Modern & Clean' },
+  { label: 'Lora',             value: 'Lora',             sample: 'Literary Charm' },
+  { label: 'Nunito',           value: 'Nunito',           sample: 'Friendly Round' },
+  { label: 'Playfair Display', value: 'Playfair Display', sample: 'Elegant Serif' },
+  { label: 'Montserrat',       value: 'Montserrat',       sample: 'Bold Geometric' },
+  { label: 'Dancing Script',   value: 'Dancing Script',   sample: 'Handwritten' },
+  { label: 'Raleway',          value: 'Raleway',          sample: 'Sleek & Thin' },
+  { label: 'Cinzel',           value: 'Cinzel',           sample: 'Classic Roman' },
 ]
 
-const TIER_RANK   = { classic: 0, premium: 1, elite: 2 }
-const TIER_LABELS = { classic: 'Free', premium: 'Premium', elite: 'Elite' }
-const TIER_COLORS = { classic: null, premium: '#f4c28a', elite: '#c9a3ff' }
-
-const TIER_COST_BY_TYPE = {
-  personal:  { classic: 0, premium: 25, elite: 35 },
-  poll:      { classic: 0, premium: null, elite: 35 },
-  trivia:    { classic: 0, premium: null, elite: 50 },
-  chain:     { classic: 0, premium: null, elite: 40 },
-  anonymous: { classic: 0, premium: null, elite: 45 },
-}
-
-// Premium is personal-only — fall back to elite for non-personal types
-// so a stray `?tier=premium` doesn't read cost as 0 and confuse the user.
-function resolveTier(type, tier) {
-  if (type !== 'personal' && tier === 'premium') return 'elite'
-  return tier
-}
 
 const TYPE_LABEL = {
   personal:  'Personal Card',
@@ -93,27 +82,30 @@ const SHARE_PLATFORMS = [
 ]
 
 const MAX_IMAGES = 3
-const PALETTE_INITIAL_COUNT = 5
+// Was 5 — hid most of the ~24 themes behind an easy-to-miss text link below
+// the grid, with a jarring reflow when expanded. 10 shows two full rows up
+// front so the "more" affordance is a genuine expansion, not the default way
+// most people ever see the collection.
+const PALETTE_INITIAL_COUNT = 10
 
 function QuickCreate() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const cardType = params.get('type') || 'personal'
-  const cardTierRaw = (params.get('tier') || 'classic').toLowerCase()
-  const cardTier = resolveTier(cardType, cardTierRaw)
 
   const { createCardOnBackend, currentUser, openAuthModal, balance, inventory = [] } = useOutletContext()
 
-  const tierRank = TIER_RANK[cardTier] ?? 0
-  const tierCost = (TIER_COST_BY_TYPE[cardType] || TIER_COST_BY_TYPE.personal)[cardTier] ?? 0
-  const allowedPaletteIds = new Set(getPalettesForTier(cardTier).map(p => p.id))
-  const allowedFontValues = new Set(
-    QUICK_FONTS.filter(f => (TIER_RANK[f.tier] ?? 0) <= tierRank).map(f => f.value)
-  )
+  // Live pricing, same source CardStudio uses — Quick mode used to rely on
+  // the hardcoded fallback table only, so a backend price change would
+  // silently desync between the two creation flows.
+  const [cardPrices, setCardPrices] = useState(null)
+  useEffect(() => {
+    let mounted = true
+    getCardPrices().then((payload) => { if (mounted) setCardPrices(normalizeCardPrices(payload)) }).catch(() => {})
+    return () => { mounted = false }
+  }, [])
 
-  const [selectedPalette, setSelectedPalette] = useState(
-    getPalettesForTier(cardTier)[0] || PALETTES[0]
-  )
+  const [selectedPalette, setSelectedPalette] = useState(PALETTES[0])
   const [selectedFont, setSelectedFont] = useState('Poppins')
   const [showAllPalettes, setShowAllPalettes] = useState(false)
 
@@ -135,6 +127,7 @@ function QuickCreate() {
 
   // Anonymous
   const [anonMessage, setAnonMessage] = useState('')
+  const [anonAllowMedia, setAnonAllowMedia] = useState(false)
 
   const [images, setImages] = useState([])
   const [isDragOver, setIsDragOver] = useState(false)
@@ -149,19 +142,6 @@ function QuickCreate() {
   const [selectedGiftId, setSelectedGiftId] = useState('none')
 
   const fileInputRef = useRef(null)
-
-  if (!currentUser) {
-    return (
-      <div className="qc-gate">
-        <div className="qc-gate-inner">
-          <span className="qc-gate-icon">✦</span>
-          <h2>Sign in to create a card</h2>
-          <p>Your creations are saved to your profile and ready to share.</p>
-          <button className="qc-gate-btn" type="button" onClick={openAuthModal}>Sign In</button>
-        </div>
-      </div>
-    )
-  }
 
   const addImageFile = (file) => {
     if (!file) return
@@ -219,7 +199,49 @@ function QuickCreate() {
           height: 180,
         })),
       },
+      // Fed into computeCardTier below — gift selection lives in its own
+      // `selectedGiftId` state here (attach happens post-create), so it has
+      // to be mirrored onto the built object for the shared tier rules to see it.
+      giftEffect: {
+        ...(baseCard.giftEffect || {}),
+        enabled: !!selectedGiftId && selectedGiftId !== 'none',
+      },
     }
+  }
+
+  // The card's tier and CC cost, computed live from what's actually
+  // selected — same model as the Studio (src/lib/tierRequirements.js).
+  const builtCardObject = useMemo(
+    buildCardObject,
+    [selectedPalette, selectedFont, cardType, heading, body, anonMessage, images, selectedGiftId],
+  )
+  const pollDataForTier = useMemo(() => ({ options: pollOptions }), [pollOptions])
+  const triviaDataForTier = useMemo(() => ({ questions: [{ options: triviaOptions }] }), [triviaOptions])
+  const tierRequirement = useMemo(
+    () => computeCardTier(builtCardObject, { type: cardType, pollData: pollDataForTier, triviaData: triviaDataForTier, chainData: null, allowAnonMedia: anonAllowMedia }),
+    [builtCardObject, cardType, pollDataForTier, triviaDataForTier, anonAllowMedia],
+  )
+  const cardTier = tierRequirement.tier
+  const tierCost = getTierCost(cardTier, cardType, cardPrices)
+  const trimPreview = useMemo(
+    () => (tierCost > 0 ? trimCardToTier(builtCardObject, 'classic', { type: cardType, pollData: pollDataForTier, triviaData: triviaDataForTier, chainData: null }) : null),
+    [tierCost, builtCardObject, cardType, pollDataForTier, triviaDataForTier],
+  )
+
+  // All hooks must run above this line — the gate below is a conditional
+  // return, and every render (logged in or not) has to call the exact same
+  // hooks in the exact same order.
+  if (!currentUser) {
+    return (
+      <div className="qc-gate">
+        <div className="qc-gate-inner">
+          <span className="qc-gate-icon">✦</span>
+          <h2>Sign in to create a card</h2>
+          <p>Your creations are saved to your profile and ready to share.</p>
+          <button className="qc-gate-btn" type="button" onClick={openAuthModal}>Sign In</button>
+        </div>
+      </div>
+    )
   }
 
   const validate = () => {
@@ -246,18 +268,20 @@ function QuickCreate() {
     const err = validate()
     if (err) { setError(err); return }
     setSendResult(null)
+    // Always show the receipt first, even for free sends — same as the
+    // Studio, so the tier/cost breakdown is never skipped silently.
     setShowSendModal(true)
-    // If free tier, fire immediately
-    if (tierCost === 0) {
-      handleSend()
-    }
-    // If paid tier, modal shows CC confirmation first; user clicks "Confirm & Send"
   }
 
-  const handleSend = async () => {
+  // `overrides` lets "Trim extras & send free" pass freshly-trimmed content
+  // straight through instead of waiting on setState to flush.
+  const handleSend = async (overrides = {}) => {
     setIsSending(true)
     try {
-      const cardObject = buildCardObject()
+      const cardObject = overrides.cardObject || buildCardObject()
+      const sourcePollOptions = overrides.pollOptions || pollOptions
+      const sourceTriviaOptions = overrides.triviaOptions || triviaOptions
+      const sourceTier = overrides.tier || cardTier
 
       const cloudImages = []
       for (let i = 0; i < images.length; i++) {
@@ -284,7 +308,7 @@ function QuickCreate() {
       }
 
       const pollData = cardType === 'poll'
-        ? { question: pollQuestion.trim(), options: pollOptions.filter(o => o.trim()) }
+        ? { question: pollQuestion.trim(), options: sourcePollOptions.filter(o => o.trim()) }
         : undefined
       const chainData = cardType === 'chain'
         ? { prompt: chainChallenge.trim() }
@@ -294,7 +318,7 @@ function QuickCreate() {
             questions: [{
               question: triviaQuestion.trim(),
               text: triviaQuestion.trim(),
-              options: triviaOptions.filter(o => o.trim()),
+              options: sourceTriviaOptions.filter(o => o.trim()),
               correctIndex: triviaCorrect,
             }],
           }
@@ -302,10 +326,11 @@ function QuickCreate() {
 
       const result = await createCardOnBackend(cardObject, {
         type: cardType,
-        tier: cardTier,
+        tier: sourceTier,
         poll: pollData,
         chain: chainData,
         trivia: triviaData,
+        anonTemplate: cardType === 'anonymous' ? { allowMedia: anonAllowMedia } : undefined,
       })
 
       if (!result.ok) {
@@ -333,7 +358,6 @@ function QuickCreate() {
             const backendGiftId = gift.inventoryId || gift.giftId || gift._id || gift.id || ''
             await attachGiftToCard({
               cardId: cardId,
-              inventoryId: backendGiftId,
               giftId: backendGiftId,
               giftInventoryId: backendGiftId,
               giftName: gift.giftName || gift.name || effectKeyToGiftName(gift.effectKey),
@@ -360,15 +384,29 @@ function QuickCreate() {
     setSendResult(null)
   }
 
+  // "Trim extras & send free" — strips every reason keeping the card above
+  // Classic, applies it to Quick-mode state, and sends that exact content.
+  const handleTrimAndSend = async () => {
+    const trimmed = trimCardToTier(builtCardObject, 'classic', { type: cardType, pollData: pollDataForTier, triviaData: triviaDataForTier, chainData: null })
+    if (cardType === 'poll' && trimmed.pollData?.options) setPollOptions(trimmed.pollData.options)
+    if (cardType === 'trivia' && trimmed.triviaData?.questions?.[0]?.options) setTriviaOptions(trimmed.triviaData.questions[0].options)
+    if (trimmed.cardObject.giftEffect?.enabled === false) setSelectedGiftId('none')
+    await handleSend({
+      cardObject: trimmed.cardObject,
+      tier: 'classic',
+      pollOptions: trimmed.pollData?.options,
+      triviaOptions: trimmed.triviaData?.questions?.[0]?.options,
+    })
+  }
+
   const openInStudio = () => {
     const cardObject = buildCardObject()
-    navigate(`/studio?type=${cardType}&tier=${cardTier}`, {
+    navigate(`/studio?type=${cardType}`, {
       state: { draftCardObject: cardObject },
     })
   }
 
   const cardLink = sendResult?.slug ? `${window.location.origin}/card/${sendResult.slug}` : null
-  const tierColor = TIER_COLORS[cardTier] || 'rgba(126,239,255,0.8)'
   const s3 = STEP3_CONFIG[cardType] || STEP3_CONFIG.personal
   const bal = balance ?? 0
 
@@ -401,19 +439,12 @@ function QuickCreate() {
           <span className="qc-topbar-title">Quick Create</span>
           <div className="qc-topbar-badges">
             <span className="qc-badge-type">{TYPE_LABEL[cardType] || cardType}</span>
-            <span className="qc-badge-tier" style={{ color: tierColor, borderColor: `${tierColor}55` }}>
-              {cardTier.charAt(0).toUpperCase() + cardTier.slice(1)}
-            </span>
           </div>
         </div>
 
         <div className="qc-topbar-right">
-          {/* CC balance chip */}
-          <div className={`qc-cc-pill${isLowBalance ? ' short' : ''}`} title={`Your balance: ${bal} CC`}>
-            <span className="qc-cc-icon">◈</span>
-            <span className="qc-cc-balance">{bal} CC</span>
-            <span className="qc-cc-cost">· {tierCost === 0 ? 'Free to send' : `${tierCost} CC to send`}</span>
-          </div>
+          <span className="qc-cc-balance-chip" title="Your CC balance">◈ {bal} CC</span>
+          <TierMeter tier={cardTier} cost={tierCost} reasons={tierRequirement.reasons} compact />
           <button type="button" className="qc-studio-link-btn" onClick={openInStudio}>
             <span className="qc-studio-text">Full Studio</span>
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -447,51 +478,45 @@ function QuickCreate() {
                 <span className="qc-step-num">1</span>
                 <div>
                   <h3 className="qc-step-title">Choose a Theme</h3>
-                  <p className="qc-step-sub">
-                    {getPalettesForTier(cardTier).length} unlocked
-                    {PALETTES.length - getPalettesForTier(cardTier).length > 0
-                      ? ` · ${PALETTES.length - getPalettesForTier(cardTier).length} locked`
-                      : ''}
-                  </p>
+                  <p className="qc-step-sub">{PALETTES.length} themes — some raise the card's tier, shown with a pip.</p>
                 </div>
               </div>
               <div className="qc-palette-grid">
-                {visiblePalettes.map((p) => {
-                  const locked = !allowedPaletteIds.has(p.id)
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={`qc-palette-swatch${selectedPalette.id === p.id && !locked ? ' active' : ''}${locked ? ' locked' : ''}`}
-                      onClick={() => locked ? navigate('/store') : setSelectedPalette(p)}
-                      title={locked ? `Unlock with ${TIER_LABELS[p.tier]} tier` : p.label}
-                    >
-                      <div
-                        className="qc-swatch-bg"
-                        style={{ background: `linear-gradient(145deg, ${p.surface} 30%, ${p.primary}55 100%)` }}
-                      />
-                      {locked && <div className="qc-swatch-lock">🔒</div>}
-                      <div className="qc-swatch-dots">
-                        <span style={{ background: p.primary }} />
-                        <span style={{ background: p.accent }} />
-                        <span style={{ background: p.ink, opacity: 0.7 }} />
-                      </div>
-                      {p.tier !== 'classic' && (
-                        <span className="qc-swatch-tier" style={{ color: TIER_COLORS[p.tier] }}>
-                          {TIER_LABELS[p.tier]}
-                        </span>
-                      )}
-                      <span className="qc-swatch-name">{p.label}</span>
-                      {selectedPalette.id === p.id && !locked && <span className="qc-swatch-check">✓</span>}
-                    </button>
-                  )
-                })}
+                {visiblePalettes.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`qc-palette-swatch${selectedPalette.id === p.id ? ' active' : ''}`}
+                    onClick={() => setSelectedPalette(p)}
+                    title={p.label}
+                  >
+                    <div
+                      className="qc-swatch-bg"
+                      style={{ background: `linear-gradient(145deg, ${p.surface} 30%, ${p.primary}55 100%)` }}
+                    />
+                    <div className="qc-swatch-dots">
+                      <span style={{ background: p.primary }} />
+                      <span style={{ background: p.accent }} />
+                      <span style={{ background: p.ink, opacity: 0.7 }} />
+                    </div>
+                    {p.tier !== 'classic' && (
+                      <span className="qc-swatch-tier"><TierPip tier={p.tier} compact /></span>
+                    )}
+                    <span className="qc-swatch-name">{p.label}</span>
+                    {selectedPalette.id === p.id && <span className="qc-swatch-check">✓</span>}
+                  </button>
+                ))}
+                {/* Lives as its own grid cell — matching the swatches' size
+                    and visual weight — instead of a plain text link floating
+                    below the grid, which was easy to miss and read as an
+                    afterthought rather than a real "there's more" affordance. */}
+                {!showAllPalettes && hiddenCount > 0 && (
+                  <button type="button" className="qc-palette-swatch qc-palette-more" onClick={() => setShowAllPalettes(true)}>
+                    <span className="qc-palette-more-num">+{hiddenCount}</span>
+                    <span className="qc-swatch-name">More themes</span>
+                  </button>
+                )}
               </div>
-              {!showAllPalettes && hiddenCount > 0 && (
-                <button type="button" className="qc-show-more-btn" onClick={() => setShowAllPalettes(true)}>
-                  Show {hiddenCount} more themes ↓
-                </button>
-              )}
               {showAllPalettes && (
                 <button type="button" className="qc-show-more-btn" onClick={() => setShowAllPalettes(false)}>
                   Show less ↑
@@ -510,23 +535,20 @@ function QuickCreate() {
               </div>
               <div className="qc-font-strip">
                 {QUICK_FONTS.map((f) => {
-                  const locked = !allowedFontValues.has(f.value)
+                  const ft = fontTier(f.value)
                   return (
                     <button
                       key={f.value}
                       type="button"
-                      className={`qc-font-chip${selectedFont === f.value && !locked ? ' active' : ''}${locked ? ' locked' : ''}`}
-                      onClick={() => locked ? navigate('/store') : setSelectedFont(f.value)}
-                      title={locked ? `Unlock with ${TIER_LABELS[f.tier]} tier` : f.label}
+                      className={`qc-font-chip${selectedFont === f.value ? ' active' : ''}`}
+                      onClick={() => setSelectedFont(f.value)}
+                      title={f.label}
                     >
-                      {locked && <span className="qc-font-lock">🔒</span>}
                       <span className="qc-font-chip-sample" style={{ fontFamily: `'${f.value}', serif` }}>Aa</span>
                       <span className="qc-font-chip-label">{f.label}</span>
                       <span className="qc-font-chip-sub">{f.sample}</span>
-                      {locked && (
-                        <span className="qc-font-tier-badge" style={{ color: TIER_COLORS[f.tier] }}>
-                          {TIER_LABELS[f.tier]}
-                        </span>
+                      {ft !== 'classic' && (
+                        <span className="qc-font-tier-badge"><TierPip tier={ft} compact /></span>
                       )}
                     </button>
                   )
@@ -693,6 +715,15 @@ function QuickCreate() {
                     />
                   </div>
                   <p className="qc-type-hint">Replies are completely anonymous — no names, no tracking.</p>
+                  <label className="qc-toggle-field">
+                    <span>Allow voice &amp; photo replies <TierPip tier="elite" compact /></span>
+                    <input
+                      type="checkbox"
+                      checked={anonAllowMedia}
+                      onChange={e => setAnonAllowMedia(e.target.checked)}
+                    />
+                  </label>
+                  <p className="qc-type-hint">Whoever replies can record a short voice note or attach a photo/video.</p>
                 </div>
               )}
             </section>
@@ -877,34 +908,19 @@ function QuickCreate() {
               >×</button>
             </div>
 
-            {/* CC confirmation (paid tier, before send) */}
-            {!isSending && !sendResult && tierCost > 0 && (
-              <div className="cs-send-confirm">
-                <div className="cs-send-confirm-icon"><MdOutlineDiamond size={32} style={{ color: '#a78bfa' }} /></div>
-                <p className="cs-send-confirm-text">
-                  Sending this <strong>{TIER_LABELS[cardTier]}</strong> card will cost
-                </p>
-                <div className="cs-send-confirm-cost">
-                  <span className="cs-send-confirm-amount">{tierCost} CC</span>
-                </div>
-                <p className="cs-send-confirm-balance">
-                  Your balance: <strong>{bal} CC</strong>
-                  {bal < tierCost && (
-                    <span className="cs-send-confirm-short"> — You need {tierCost - bal} more CC</span>
-                  )}
-                </p>
-                <div className="cs-send-confirm-actions">
-                  <button type="button" className="cs-send-confirm-cancel" onClick={closeSendModal}>Cancel</button>
-                  <button
-                    type="button"
-                    className="cs-send-confirm-btn"
-                    disabled={bal < tierCost}
-                    onClick={handleSend}
-                  >
-                    Confirm & Create
-                  </button>
-                </div>
-              </div>
+            {/* Send receipt: what's on this card, what it costs, why */}
+            {!isSending && !sendResult && (
+              <SendReceipt
+                reasons={tierRequirement.reasons}
+                tier={cardTier}
+                cost={tierCost}
+                balance={bal}
+                sending={isSending}
+                onSend={handleSend}
+                onTrim={handleTrimAndSend}
+                trimPreview={trimPreview}
+                onCancel={closeSendModal}
+              />
             )}
 
             {/* Loading */}

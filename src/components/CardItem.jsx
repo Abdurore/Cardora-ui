@@ -43,12 +43,16 @@ function CardItem({
   onToggleLike,
   hoverLabel = 'Open Template',
   isTemplate = true,
+  giftEffect,
+  artistName,
 }) {
   const tierInfo = getTierInfo(tier)
   const displayLikes = Number(likeCount ?? likes ?? 0) || 0
   const displayUsers = Number(usageCount ?? userCount ?? String(meta || '').replace(/users?|views?/i, '').trim() ?? 0) || 0
   const displayViews = Number(viewCount ?? 0) || 0
   const [showReport, setShowReport] = useState(false)
+  const giftEnabled = !isTemplate && giftEffect?.enabled && giftEffect?.effectKey && giftEffect.effectKey !== 'none'
+  const giftClaimed = giftEnabled && giftEffect?.status === 'claimed'
 
   return (
     <div
@@ -110,9 +114,16 @@ function CardItem({
         )
       )}
 
+      {giftEnabled && (
+        <span className={`card-gift-badge ${giftClaimed ? 'card-gift-badge-claimed' : 'card-gift-badge-pending'}`}>
+          {giftClaimed ? 'Gift claimed' : 'Gift attached'}
+        </span>
+      )}
+
       <div className="card-info">
         {showOccasion && occasion ? <p className="card-eyebrow">{occasion}</p> : null}
         <h4>{title}</h4>
+        {isTemplate && artistName ? <p className="card-artist-credit">by {artistName}</p> : null}
         {subtitle ? <p className="card-subtitle">{truncateText(subtitle, 10)}</p> : null}
         {isTemplate && (
           <div className="card-stats">

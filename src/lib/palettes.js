@@ -314,9 +314,22 @@ export function applyPalette(cardObject, palette) {
   return next
 }
 
+// The exact envelope colors applyPalette cascades for a given palette. Used by
+// tierRequirements to tell "colors set by picking a palette" (free) apart from
+// "colors the user hand-tuned afterwards" (an elite touch) — without this,
+// every palette selection would read as custom envelope colors.
+export function expectedEnvelopeColors(palette) {
+  if (!palette) return null
+  return {
+    bodyColor: palette.surface,
+    flapColor: mix(palette.surface, palette.primary, 0.12),
+    sealColor: palette.accent,
+  }
+}
+
 // Mix two hex colors by `weight` (0..1 → fully `a`..fully `b`). Used to derive
 // the envelope flap color as a gentle step off the surface toward the primary.
-function mix(a, b, weight) {
+export function mix(a, b, weight) {
   const pa = parseHex(a)
   const pb = parseHex(b)
   if (!pa || !pb) return a

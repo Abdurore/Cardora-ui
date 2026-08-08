@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-function Dropdown({ value, onChange, options, placeholder = 'Select…', disabled = false, className = '', usePortal = false }) {
+function Dropdown({ value, onChange, options, placeholder = 'Select…', disabled = false, className = '', usePortal = false, searchable = false, searchPlaceholder = 'Search…' }) {
   const [open, setOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0, minWidth: 0 })
+  const [query, setQuery] = useState('')
   const wrapRef = useRef(null)
   const triggerRef = useRef(null)
+  const searchRef = useRef(null)
 
   // Close on outside click / Escape
   useEffect(() => {
@@ -50,13 +52,24 @@ function Dropdown({ value, onChange, options, placeholder = 'Select…', disable
 
   const handleSelect = (val) => {
     setOpen(false)
+    setQuery('')
     onChange(val)
   }
+
+  // Focus the search box the moment the menu mounts so typing works immediately.
+  useEffect(() => {
+    if (open && searchable) searchRef.current?.focus()
+    if (!open) setQuery('')
+  }, [open, searchable])
+
+  const filteredOptions = searchable && query.trim()
+    ? options.filter((opt) => opt.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : options
 
   const menu = open ? (
     <ul
       id="dropdown-portal-menu"
-      className={`dropdown-menu${usePortal ? ' cs-dropdown-portal-menu' : ''}`}
+      className={`dropdown-menu${usePortal ? ' cs-dropdown-portal-menu' : ''}${searchable ? ' searchable' : ''}`}
       role="listbox"
       style={usePortal ? {
         position: 'fixed',
@@ -66,7 +79,20 @@ function Dropdown({ value, onChange, options, placeholder = 'Select…', disable
         zIndex: 999999,
       } : undefined}
     >
-      {options.map((opt) => (
+      {searchable && (
+        <li className="dropdown-search-row" onMouseDown={(e) => e.stopPropagation()}>
+          <input
+            ref={searchRef}
+            type="text"
+            className="dropdown-search-input"
+            placeholder={searchPlaceholder}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+        </li>
+      )}
+      {filteredOptions.map((opt) => (
         <li
           key={opt.value}
           role="option"
@@ -78,6 +104,9 @@ function Dropdown({ value, onChange, options, placeholder = 'Select…', disable
           {opt.label}
         </li>
       ))}
+      {searchable && filteredOptions.length === 0 && (
+        <li className="dropdown-empty">No matches</li>
+      )}
     </ul>
   ) : null
 

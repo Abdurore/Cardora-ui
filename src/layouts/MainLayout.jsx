@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CardDetailModal from '../components/CardDetailModal.jsx'
 import CardTypeModal from '../components/CardTypeModal.jsx'
 import AuthModal from '../components/AuthModal.jsx'
@@ -10,6 +10,7 @@ import {
   createCouponCheckout,
   createPaystackCheckout,
   createTemplate,
+  updateTemplate,
   deleteTemplate,
   adminDeleteTemplate,
   getCouponPackages,
@@ -100,13 +101,16 @@ function templateMatches(card, id) {
 }
 
 function getTemplateBackendId(card, fallbackId = '') {
+  // Templates are stored (and looked up server-side) by their custom `id`
+  // field (e.g. "CDT-xxxxx"), never by Mongo's `_id` — that must be tried
+  // last, or every like/unlike 404s with "Template not found".
   return (
-    card?.backendTemplate?._id ||
     card?.backendTemplate?.templateId ||
     card?.backendTemplate?.id ||
-    card?._id ||
     card?.templateId ||
     card?.id ||
+    card?.backendTemplate?._id ||
+    card?._id ||
     fallbackId
   )
 }
@@ -131,6 +135,9 @@ function MainLayout() {
   const [avatarUrl, setAvatarUrl] = useState('')
   const [avatarColor, setAvatarColor] = useState('linear-gradient(135deg, #7ef7ff, #62ffa2)')
   const [showAuth, setShowAuth] = useState(false)
+  const [authModalContext, setAuthModalContext] = useState(null)
+  const pendingAuthActionRef = useRef(null)
+  const pendingLikesRef = useRef(new Set())
   const [showCardTypeModal, setShowCardTypeModal] = useState(false)
   const [cardTypePreselect, setCardTypePreselect] = useState(null)
   const [couponPackages, setCouponPackages] = useState([])
@@ -370,6 +377,14 @@ function MainLayout() {
       return
     }
 
+    // Guard against a second click landing before the first request resolves —
+    // without this, a rapid double-click reads the optimistic "liked" state
+    // from the first click and immediately fires the opposite (unlike) call,
+    // producing a like-then-instant-unlike flicker with no net effect.
+    const pendingKey = String(cardId)
+    if (pendingLikesRef.current.has(pendingKey)) return
+    pendingLikesRef.current.add(pendingKey)
+
     const matchedTemplate = marketplaceTemplates.find((item) => templateMatches(item, cardId)) || selectedCard
     const aliases = templateIds(matchedTemplate).length ? templateIds(matchedTemplate) : [String(cardId)]
     const wasLiked = aliases.some((id) => likedTemplates.includes(id))
@@ -390,7 +405,10 @@ function MainLayout() {
     })
 
     const templateId = getTemplateBackendId(matchedTemplate, cardId)
-    if (!templateId) return
+    if (!templateId) {
+      pendingLikesRef.current.delete(pendingKey)
+      return
+    }
     try {
       if (wasLiked) {
         await unlikeTemplate(templateId)
@@ -410,6 +428,8 @@ function MainLayout() {
       setSelectedCard((prev) => (
         templateMatches(prev, cardId) ? applyTemplateLike(prev, wasLiked) : prev
       ))
+    } finally {
+      pendingLikesRef.current.delete(pendingKey)
     }
   }
 
@@ -591,6 +611,19 @@ function MainLayout() {
     return true
   }
 
+  const runPendingAuthAction = () => {
+    const pending = pendingAuthActionRef.current
+    pendingAuthActionRef.current = null
+    setShowAuth(false)
+    setAuthModalContext(null)
+    if (!pending) return
+    if (pending.expiresAt && Date.now() > pending.expiresAt) return
+    if (typeof pending.action === 'function') pending.action()
+    if (pending.returnTo && pending.returnTo !== `${location.pathname}${location.search}`) {
+      navigate(pending.returnTo)
+    }
+  }
+
   const handleLogin = async (email, password) => {
     try {
       const response = await login({ email, password })
@@ -607,6 +640,7 @@ function MainLayout() {
       if (!localStorage.getItem('cardora:lastActive')) {
         localStorage.setItem('cardora:lastActive', String(Date.now()))
       }
+      runPendingAuthAction()
       return { ok: true }
     } catch (error) {
       return {
@@ -645,6 +679,7 @@ function MainLayout() {
       if (auth.token) {
         setStoredToken(auth.token)
         await hydrateSession()
+        runPendingAuthAction()
         return { ok: true, verified: true }
       }
       return {
@@ -669,6 +704,7 @@ function MainLayout() {
       if (auth.token) {
         setStoredToken(auth.token)
         await hydrateSession()
+        runPendingAuthAction()
         return { ok: true, session: true, message: auth.message || 'Email verified successfully.' }
       }
       return {
@@ -715,6 +751,7 @@ function MainLayout() {
       setAvatarUrl('')
       setAvatarColor('linear-gradient(135deg, #7ef7ff, #62ffa2)')
       setCart([])
+      pendingAuthActionRef.current = null
     }
   }
 
@@ -785,6 +822,52 @@ function MainLayout() {
     }
   }
 
+  // Re-saves an EXISTING template's design (used by CardStudio's edit-mode,
+  // reached from Profile's "Edit Design" action) — same shape as publishTemplate
+  // but calls the update endpoint with the template's id instead of creating a new one.
+  const updateMarketplaceTemplate = async ({ templateId, name, type, tier, category, previewImage, layoutConfig, poll, trivia, chain }) => {
+    try {
+      const resolvedCategory = category || layoutConfig?.category || 'birthday'
+      const resolvedPreviewImage = previewImage || layoutConfig?.previewImage || layoutConfig?.previewUrl || ''
+      const normalizedLayoutConfig = structuredClone({
+        ...layoutConfig,
+        type: type || layoutConfig?.type || 'personal',
+        tier: tier || layoutConfig?.tier || 'classic',
+        category: resolvedCategory,
+        previewImage: resolvedPreviewImage,
+        previewUrl: resolvedPreviewImage,
+        poll,
+        trivia,
+        chain,
+      })
+      const response = await updateTemplate({
+        templateId,
+        name,
+        category: resolvedCategory,
+        previewImage: resolvedPreviewImage,
+        layoutConfig: normalizedLayoutConfig,
+      })
+
+      setMarketplaceTemplates((prev) => prev.map((t) => (
+        (t.templateId || t.id) === templateId
+          ? mapTemplateToCard({
+              ...(t.backendTemplate || {}),
+              id: templateId,
+              name,
+              category: resolvedCategory,
+              previewImage: resolvedPreviewImage,
+              layoutConfig: normalizedLayoutConfig,
+            })
+          : t
+      )))
+
+      return { ok: true, message: getResponseMessage(response, 'Template updated successfully.') }
+    } catch (error) {
+      console.error('Template update failed', error)
+      return { ok: false, message: error.message || 'Could not update template.' }
+    }
+  }
+
   const deleteMarketplaceTemplate = async (templateId) => {
     if (!templateId) return { ok: false, message: 'Missing template id.' }
     try {
@@ -826,6 +909,7 @@ function MainLayout() {
         poll,
         trivia,
         chain,
+        allowAnonMedia: !!anonTemplate?.allowMedia,
       })
 
       // Client-side validation matching backend Joi rules. Catching here surfaces
@@ -1061,12 +1145,12 @@ function MainLayout() {
           couponPackages,
           marketplaceTemplates,
           refreshMarketplaceTemplates: loadPublicData,
-          openAuthModal: () => {
-            if (hydratedUser) {
-              setShowAuth(true)
-            } else {
-              navigate('/login')
-            }
+          openAuthModal: (onAuthenticated, returnTo, context) => {
+            pendingAuthActionRef.current = typeof onAuthenticated === 'function'
+              ? { action: onAuthenticated, returnTo: returnTo || null, expiresAt: Date.now() + 10 * 60 * 1000 }
+              : null
+            setAuthModalContext(context || null)
+            setShowAuth(true)
           },
           updateProfile: handleProfileUpdate,
           deductCC,
@@ -1078,6 +1162,7 @@ function MainLayout() {
           onLogout: handleLogout,
           inventory,
           publishTemplate,
+          updateMarketplaceTemplate,
           deleteMarketplaceTemplate,
           createCardOnBackend: handleCreateCard,
           purchaseGift,
@@ -1111,15 +1196,6 @@ function MainLayout() {
       <CardDetailModal
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
-        balance={balance}
-        currentUser={hydratedUser}
-        onRequireAuth={() => navigate('/login')}
-        onDeductCC={deductCC}
-        inventory={inventory}
-        openCardTypeModal={(preselect) => {
-          setCardTypePreselect(preselect || null)
-          setShowCardTypeModal(true)
-        }}
         isFavorited={selectedCard ? favorites.includes(selectedCard.id) : false}
         onToggleFavorite={toggleFavorite}
         isLiked={selectedCard ? likedTemplates.includes(selectedCard.id) : false}
@@ -1128,11 +1204,13 @@ function MainLayout() {
       />
       <AuthModal
         open={showAuth}
-        onClose={() => setShowAuth(false)}
+        onClose={() => { pendingAuthActionRef.current = null; setAuthModalContext(null); setShowAuth(false) }}
         onLogin={handleLogin}
         onSignup={handleSignup}
         currentUser={hydratedUser}
         onLogout={handleLogout}
+        title={authModalContext?.title}
+        message={authModalContext?.message}
       />
       <CardTypeModal
         open={showCardTypeModal}

@@ -13,18 +13,18 @@ import { formatGiftName as formatGiftLabel, normalizeGiftInventory, rememberConf
 
 const PENDING_GIFT_KEY = 'cardora:pendingGiftCheckout'
 
-const GIFT_META = {
-  spark:          { emoji: '💫', gradient: 'linear-gradient(135deg, #fbbf24, #f59e0b)' },
-  sweetHeart:     { emoji: '💝', gradient: 'linear-gradient(135deg, #f472b6, #ec4899)' },
-  purpleLove:     { emoji: '💜', gradient: 'linear-gradient(135deg, #1dd1a1, #0d9488)' },
-  oceanHeart:     { emoji: '🌊', gradient: 'linear-gradient(135deg, #38bdf8, #0284c7)' },
-  emeraldHeart:   { emoji: '💚', gradient: 'linear-gradient(135deg, #34d399, #059669)' },
-  passionHeart:   { emoji: '❤️‍🔥', gradient: 'linear-gradient(135deg, #fb7185, #e11d48)' },
-  goldenHeart:    { emoji: '✨', gradient: 'linear-gradient(135deg, #fde68a, #d97706)' },
-  crystalHeart:   { emoji: '💎', gradient: 'linear-gradient(135deg, #67e8f9, #06b6d4)' },
-  diamondHeart:   { emoji: '💠', gradient: 'linear-gradient(135deg, #c4b5fd, #7c3aed)' },
-  legendaryHeart: { emoji: '🏆', gradient: 'linear-gradient(135deg, #fcd34d, #b45309)' },
-}
+const FALLBACK_CATALOG = [
+  { name: 'spark', price: 500 },
+  { name: 'sweetHeart', price: 1000 },
+  { name: 'purpleLove', price: 2000 },
+  { name: 'oceanHeart', price: 3000 },
+  { name: 'emeraldHeart', price: 5000 },
+  { name: 'passionHeart', price: 10000 },
+  { name: 'goldenHeart', price: 20000 },
+  { name: 'crystalHeart', price: 50000 },
+  { name: 'diamondHeart', price: 100000 },
+  { name: 'legendaryHeart', price: 200000 },
+]
 
 const GIFT_NAME_ALIASES = {
   spark: ['spark', 'tiny', 'tinyHeart', 'Tiny Heart'],
@@ -47,17 +47,30 @@ function catalogItemsFromResponse(res) {
   const raw = res?.gifts || res?.data?.gifts || res?.prices || res?.catalog || res?.data?.prices || res?.data || []
   if (Array.isArray(raw)) {
     return raw
-      .map(item => ({
-        name: item.name || item.giftName || item.id,
-        price: item.priceNgn ?? item.price ?? item.amount ?? item.valueNgn,
-      }))
+      .map(item => {
+        const price = item.priceNgn ?? item.price ?? item.amount ?? item.valueNgn
+        return {
+          name: item.name || item.giftName || item.id,
+          price,
+          // Backend computes the marked-up charge amount; fall back to the same
+          // 10% math client-side only if the field is missing (older backend).
+          chargeAmount: item.chargeAmountNgn ?? Math.round(Number(price || 0) * 1.1),
+          effectKey: item.effectKey || '',
+          color: item.color || '',
+          tier: item.tier || '',
+        }
+      })
       .filter(item => item.name)
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([name, price]) => ({
-      name,
-      price: typeof price === 'object' ? price.priceNgn || price.price || price.amount : price,
-    }))
+    return Object.entries(raw).map(([name, price]) => {
+      const resolvedPrice = typeof price === 'object' ? (price.priceNgn || price.price || price.amount) : price
+      return {
+        name,
+        price: resolvedPrice,
+        chargeAmount: (typeof price === 'object' && price.chargeAmountNgn) || Math.round(Number(resolvedPrice || 0) * 1.1),
+      }
+    })
   }
   return []
 }
@@ -104,6 +117,9 @@ function StoreGifts() {
 
   const inventory = appInventory.length ? appInventory : normalizeGiftInventory(currentUser?.giftsInventory || [], true)
   const walletBalance = currentUser?.giftWalletNgn || 0
+  // Artists design/publish templates rather than send real gifts — the
+  // consumer purchase flow here doesn't apply to their account type.
+  const isArtist = String(currentUser?.role || '').toLowerCase() === 'artist'
 
   useEffect(() => {
     let cancelled = false
@@ -111,37 +127,9 @@ function StoreGifts() {
       try {
         const res = await getGiftCatalog()
         const items = catalogItemsFromResponse(res)
-        if (!cancelled && items.length > 0) setCatalog(items)
-        else if (!cancelled) {
-          // Fallback to static defaults
-          setCatalog([
-            { name: 'spark', price: 500 },
-            { name: 'sweetHeart', price: 1000 },
-            { name: 'purpleLove', price: 2000 },
-            { name: 'oceanHeart', price: 3000 },
-            { name: 'emeraldHeart', price: 5000 },
-            { name: 'passionHeart', price: 10000 },
-            { name: 'goldenHeart', price: 20000 },
-            { name: 'crystalHeart', price: 50000 },
-            { name: 'diamondHeart', price: 100000 },
-            { name: 'legendaryHeart', price: 200000 },
-          ])
-        }
+        if (!cancelled) setCatalog(items.length > 0 ? items : FALLBACK_CATALOG)
       } catch {
-        if (!cancelled) {
-          setCatalog([
-            { name: 'spark', price: 500 },
-            { name: 'sweetHeart', price: 1000 },
-            { name: 'purpleLove', price: 2000 },
-            { name: 'oceanHeart', price: 3000 },
-            { name: 'emeraldHeart', price: 5000 },
-            { name: 'passionHeart', price: 10000 },
-            { name: 'goldenHeart', price: 20000 },
-            { name: 'crystalHeart', price: 50000 },
-            { name: 'diamondHeart', price: 100000 },
-            { name: 'legendaryHeart', price: 200000 },
-          ])
-        }
+        if (!cancelled) setCatalog(FALLBACK_CATALOG)
       } finally {
         if (!cancelled) setLoadingCatalog(false)
       }
@@ -171,9 +159,11 @@ function StoreGifts() {
       // The webhook is just a delayed fallback — this is the primary path.
       const txRef = params.get('tx_ref') || params.get('txRef') || ''
       const transactionId = params.get('transaction_id') || params.get('transactionId') || ''
+      let verified = false
       if (transactionId || txRef) {
         try {
           await verifyGiftPayment({ transaction_id: transactionId, tx_ref: txRef })
+          verified = true
           // Payment verified — clear the pending placeholder so hydrateSession
           // doesn't keep injecting an 'unverified' ghost item.
           clearPendingGift()
@@ -185,16 +175,32 @@ function StoreGifts() {
         }
       }
 
-      // Refresh session to pick up the newly credited gift
+      // Refresh session to pick up the newly credited gift — and actually
+      // check it landed before declaring success. This used to show "Gift
+      // added" unconditionally after the retry loop regardless of whether
+      // verifyGiftPayment succeeded or the gift ever appeared in inventory.
+      let landedGift = false
+      const giftKey = (returnedGift?.name || '').trim().toLowerCase()
       for (const delay of [500, 1500, 3000]) {
         await new Promise(resolve => setTimeout(resolve, delay))
         if (cancelled) return
-        await refreshBalance?.()
+        const updatedUser = await refreshBalance?.()
+        const inv = Array.isArray(updatedUser?.giftsInventory) ? updatedUser.giftsInventory : []
+        if (giftKey && inv.some(g => (g.giftName || g.name || '').trim().toLowerCase() === giftKey)) {
+          landedGift = true
+          break
+        }
       }
       if (cancelled) return
       setActiveView('inventory')
-      if (returnedGift?.name) setRevealingGift(returnedGift)
-      setMsg({ text: 'Gift added. Your inventory has been refreshed.', ok: true })
+      if (landedGift) {
+        if (returnedGift?.name) setRevealingGift(returnedGift)
+        setMsg({ text: 'Gift added. Your inventory has been refreshed.', ok: true })
+      } else if (verified) {
+        setMsg({ text: 'Payment verified, but your inventory hasn\'t updated yet — check back in a moment or refresh.', ok: true })
+      } else {
+        setMsg({ text: 'We couldn\'t confirm your gift purchase yet. If you were charged, it will appear here shortly once the payment is verified.', ok: false })
+      }
       setReturnRefreshing(false)
       navigate('/store/gifts', { replace: true })
     })()
@@ -204,6 +210,7 @@ function StoreGifts() {
 
   const handleBuyGift = async (gift) => {
     if (!currentUser) { openAuthModal(); return }
+    if (isArtist) { setMsg({ text: 'Artist accounts publish templates to the marketplace and can\'t purchase gifts.', ok: false }); return }
     setBuying(gift.name)
     setMsg({ text: '', ok: false })
     try {
@@ -241,13 +248,16 @@ function StoreGifts() {
         await refreshBalance?.()
         setActiveView('inventory')
         setRevealingGift(gift)
+        setConfirmGift(null)
+        setTimeout(() => setMsg({ text: '', ok: false }), 3500)
       }
     } catch (err) {
+      // Keep the confirm modal open on failure — the error is rendered inside
+      // it — instead of closing it and leaving the message to flash
+      // somewhere on the page body behind nothing the user is looking at.
       setMsg({ text: err?.message || 'Purchase failed. Please try again.', ok: false })
     } finally {
       setBuying(null)
-      setConfirmGift(null)
-      setTimeout(() => setMsg({ text: '', ok: false }), 3500)
     }
   }
 
@@ -343,9 +353,19 @@ function StoreGifts() {
             <div style={{ marginBottom: 16 }}>
               <h4 style={{ color: 'var(--text)', margin: '0 0 4px', fontSize: 16 }}>Send a Gift with Your Card</h4>
               <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 13 }}>
-                Buy a gift, attach it to your personal card in Studio. Recipients receive 90% of the gift value.
+                Buy a gift, attach it to your personal card in Studio. Recipients receive 100% of the gift value — a 10% platform fee is added at checkout.
               </p>
             </div>
+
+            {isArtist && (
+              <p style={{
+                margin: '0 0 16px', padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(217, 119, 6, 0.08)', border: '1px solid rgba(217, 119, 6, 0.15)',
+                color: 'var(--warning)', fontSize: 13,
+              }}>
+                Artist accounts design and publish templates to the marketplace and can't purchase gifts from the Store.
+              </p>
+            )}
 
             {loadingCatalog ? (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)' }}>
@@ -358,19 +378,31 @@ function StoreGifts() {
                 gap: 14,
               }}>
                 {catalog.map((gift) => {
-                  const legacyKey = GIFT_NAME_ALIASES[gift.name]?.[1] || gift.name
+                  const legacyKey = gift.effectKey || GIFT_NAME_ALIASES[gift.name]?.[1] || gift.name
                   const staticItem = storeGifts.find(sg => sg.effectKey === legacyKey) || {}
                   const resolvedGift = {
                     name: gift.name,
                     price: gift.price,
+                    chargeAmount: gift.chargeAmount,
                     title: formatGiftName(gift.name),
                     effectKey: legacyKey,
+                    color: gift.color || staticItem.color || '',
+                    tier: gift.tier || staticItem.tier || '',
                     note: staticItem.note || `A premium ${formatGiftName(gift.name)} gift.`,
                   }
                   return (
                     <div
                       key={gift.name}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Preview ${resolvedGift.title}`}
                       onClick={() => setActiveGift(resolvedGift)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setActiveGift(resolvedGift)
+                        }
+                      }}
                       style={{
                         background: 'var(--surface)',
                         borderRadius: 14, padding: 16,
@@ -520,7 +552,7 @@ function StoreGifts() {
 
       {confirmGift && (
         <section className="detail-modal" role="dialog" aria-modal="true">
-          <div className="detail-backdrop" onClick={() => buying ? null : setConfirmGift(null)} />
+          <div className="detail-backdrop" onClick={() => { if (buying) return; setConfirmGift(null); setMsg({ text: '', ok: false }) }} />
           <div className="detail-card store-pay-modal">
             <div className="store-pay-hero">
               <p className="eyebrow">Gift checkout</p>
@@ -535,10 +567,24 @@ function StoreGifts() {
                 <strong>{formatGiftName(confirmGift.name)}</strong>
               </div>
               <div className="store-pay-row">
-                <span>Price</span>
+                <span>Gift value</span>
                 <strong>{formatNgn(confirmGift.price)}</strong>
               </div>
+              <div className="store-pay-row store-pay-row-fee">
+                <span>Platform fee (10%)</span>
+                <strong>+{formatNgn(Math.max(0, (confirmGift.chargeAmount ?? confirmGift.price) - confirmGift.price))}</strong>
+              </div>
+              <div className="store-pay-row store-pay-row-total">
+                <span>You'll be charged</span>
+                <strong>{formatNgn(confirmGift.chargeAmount ?? confirmGift.price)}</strong>
+              </div>
             </div>
+            <p className="store-pay-fee-note">
+              Recipients always receive the full gift value — the 10% platform fee is added here at checkout.
+            </p>
+            {msg.text && !msg.ok && (
+              <p className="form-error">{msg.text}</p>
+            )}
             <div className="detail-actions">
               <button
                 className="primary"
@@ -548,7 +594,7 @@ function StoreGifts() {
               >
                 {buying === confirmGift.name ? 'Redirecting...' : 'Continue to Flutterwave'}
               </button>
-              <button className="ghost" type="button" onClick={() => setConfirmGift(null)} disabled={buying === confirmGift.name}>
+              <button className="ghost" type="button" onClick={() => { setConfirmGift(null); setMsg({ text: '', ok: false }) }} disabled={buying === confirmGift.name}>
                 Cancel
               </button>
             </div>

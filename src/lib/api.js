@@ -4,6 +4,25 @@ const DEFAULT_API_BASE = 'https://cardora-uss3.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, '')
 const TOKEN_KEY = 'cardora:authToken'
 const CHAT_FRAME_CACHE_KEY = 'cardora:adminChatFrames'
+const GUEST_ID_KEY = 'cardora:guestId'
+
+// A stable per-browser id for unauthenticated visitors (e.g. recipients answering
+// a card without an account). Without this, guests are only distinguishable by IP,
+// which collides everyone on the same network/NAT into a single "user".
+function getGuestId() {
+  try {
+    let id = localStorage.getItem(GUEST_ID_KEY)
+    if (!id) {
+      id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `g-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      localStorage.setItem(GUEST_ID_KEY, id)
+    }
+    return id
+  } catch {
+    return ''
+  }
+}
 
 function readStorageJson(key, fallback) {
   try {
@@ -93,30 +112,34 @@ function sanitizeBody(body) {
   return clone
 }
 
+// Tab-scoped on purpose: localStorage is shared across every tab of the same
+// origin, so logging into a second account in another tab silently overwrote
+// the first tab's session (and, via the same shared token, its World Chat
+// socket auth) with whichever account logged in most recently. sessionStorage
+// isolates the token per tab while still surviving reloads within that tab.
 export function getStoredToken() {
-  return localStorage.getItem(TOKEN_KEY)
+  const sessionToken = sessionStorage.getItem(TOKEN_KEY)
+  if (sessionToken) return sessionToken
+  // One-time migration: carry over a pre-existing localStorage session (from
+  // before this change) into this tab's sessionStorage, then stop reading it.
+  const legacyToken = localStorage.getItem(TOKEN_KEY)
+  if (legacyToken) {
+    sessionStorage.setItem(TOKEN_KEY, legacyToken)
+    localStorage.removeItem(TOKEN_KEY)
+    return legacyToken
+  }
+  return null
 }
 
 export function setStoredToken(token) {
   if (!token) return
-  localStorage.setItem(TOKEN_KEY, token)
-}
-
-export function clearStoredToken() {
+  sessionStorage.setItem(TOKEN_KEY, token)
   localStorage.removeItem(TOKEN_KEY)
 }
 
-export function extractToken(payload) {
-  return (
-    payload?.token ||
-    payload?.accessToken ||
-    payload?.jwt ||
-    payload?.data?.token ||
-    payload?.data?.accessToken ||
-    payload?.user?.token ||
-    payload?.result?.token ||
-    null
-  )
+export function clearStoredToken() {
+  sessionStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(TOKEN_KEY)
 }
 
 async function request(path, { method = 'GET', body, auth = false, headers = {}, timeout = 30000 } = {}) {
@@ -131,6 +154,7 @@ async function request(path, { method = 'GET', body, auth = false, headers = {},
       method,
       headers: {
         'Content-Type': 'application/json',
+        'X-Guest-Id': getGuestId(),
         ...(auth && token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
@@ -192,53 +216,6 @@ async function requestFirstSuccess(paths, options = {}) {
   throw lastError || new Error('Request failed.')
 }
 
-function pickChatFrameList(payload) {
-  if (Array.isArray(payload)) return payload
-  const root = payload?.data && typeof payload.data === 'object' ? payload.data : payload
-  if (Array.isArray(root)) return root
-  if (Array.isArray(root?.chatFrames)) return root.chatFrames
-  if (Array.isArray(root?.frames)) return root.frames
-  if (Array.isArray(root?.items)) return root.items
-  if (Array.isArray(root?.data)) return root.data
-  if (Array.isArray(root?.chatFrames?.docs)) return root.chatFrames.docs
-  if (Array.isArray(root?.chatFrames?.items)) return root.chatFrames.items
-  if (Array.isArray(root?.frames?.docs)) return root.frames.docs
-  if (Array.isArray(root?.frames?.items)) return root.frames.items
-  if (Array.isArray(root?.result?.chatFrames)) return root.result.chatFrames
-  if (Array.isArray(root?.result?.frames)) return root.result.frames
-  if (Array.isArray(root?.results)) return root.results
-  if (root && typeof root === 'object') {
-    for (const value of Object.values(root)) {
-      if (!value || typeof value !== 'object') continue
-      const nested = pickChatFrameList(value)
-      if (nested.length) return nested
-    }
-  }
-  return []
-}
-
-function chatFrameHasAsset(frame) {
-  return Boolean(getChatFrameUrl(frame))
-}
-
-async function requestFirstChatFrames(paths, options = {}) {
-  let lastError = null
-  let firstSuccess = null
-  for (const path of paths) {
-    try {
-      const payload = await request(path, options)
-      if (!firstSuccess) firstSuccess = payload
-      if (pickChatFrameList(payload).some(chatFrameHasAsset)) return payload
-    } catch (error) {
-      lastError = error
-      if (!error.status) throw error
-      if (![401, 403, 404, 405].includes(error.status)) throw error
-    }
-  }
-  if (firstSuccess) return firstSuccess
-  throw lastError || new Error('Request failed.')
-}
-
 /* ═══════════════════════════════════════════════
    AUTH
    ═══════════════════════════════════════════════ */
@@ -277,9 +254,8 @@ export async function getSignupBonusAvailability() {
 /* ═══════════════════════════════════════════════
    USERS
    ═══════════════════════════════════════════════ */
-export async function getCurrentUser(identifier) {
-  const qs = identifier ? `?identifier=${encodeURIComponent(identifier)}` : ''
-  return request(`/current-user${qs}`, { auth: true })
+export async function getCurrentUser() {
+  return request('/current-user', { auth: true })
 }
 
 export async function updateProfile(payload) {
@@ -294,35 +270,17 @@ export async function getUserCards(query = 'page=1&limit=20') {
   return request(`/usercards?${query}`, { auth: true })
 }
 
-export async function completeFirstTimeUser() {
-  return request('/users/first-time/complete', { method: 'PATCH', auth: true })
-}
-
 export async function equipProfileBackground(backgroundId, blur = false) {
   return request('/users/equip-profile-background', { method: 'PATCH', auth: true, body: { backgroundId, blur } })
 }
 
+// Passing an empty/falsy frameId unequips — the backend treats an empty
+// frameId on this same endpoint as "clear the equipped frame" (see
+// equipChatFrame in userController.js). This used to try three separate
+// unequip endpoints that don't exist (404) and silently fall back to a
+// client-only "removed on this device" state that never reached the server.
 export async function equipChatFrame(frameId) {
-  if (typeof frameId === 'string' && frameId) {
-    return request('/users/equip-chat-frame', { method: 'PATCH', auth: true, body: { frameId } })
-  }
-  const acceptedMissingRouteStatuses = [404, 405]
-  try {
-    return await request('/users/unequip-chat-frame', { method: 'PATCH', auth: true })
-  } catch (firstError) {
-    if (!acceptedMissingRouteStatuses.includes(firstError.status)) throw firstError
-    try {
-      return await request('/users/remove-chat-frame', { method: 'PATCH', auth: true })
-    } catch (secondError) {
-      if (!acceptedMissingRouteStatuses.includes(secondError.status)) throw secondError
-      try {
-        return await request('/users/chat-frame', { method: 'DELETE', auth: true })
-      } catch (thirdError) {
-        if (!acceptedMissingRouteStatuses.includes(thirdError.status)) throw thirdError
-        return { ok: true, localOnly: true, message: 'Frame removed on this device.' }
-      }
-    }
-  }
+  return request('/users/equip-chat-frame', { method: 'PATCH', auth: true, body: { frameId: frameId || '' } })
 }
 
 export async function buyChatFrame(frameId) {
@@ -346,41 +304,16 @@ export async function deleteProfileBackground(backgroundId) {
 }
 
 export async function getChatFrames() {
-  return requestFirstChatFrames([
-    '/admin/chat-frames?page=1&limit=500',
-    '/admin/chat-frames',
-    '/chat-frames?page=1&limit=500',
-    '/chat-frames',
-  ], { auth: true })
+  return request('/chat-frames', { auth: true })
 }
 
 export async function getAdminChatFrames() {
-  return requestFirstChatFrames([
-    '/admin/chat-frames?page=1&limit=500',
-    '/admin/chat-frames',
-    '/chat-frames?page=1&limit=500',
-    '/chat-frames',
-  ], { auth: true })
-}
-
-export async function getOwnedChatFrames() {
-  return requestFirstChatFrames([
-    '/users/chat-frames',
-  ], { auth: true }).catch(() => [])
+  return request('/chat-frames', { auth: true })
 }
 
 /* ═══════════════════════════════════════════════
    CARDS
    ═══════════════════════════════════════════════ */
-export async function createCard(payload) {
-  // payload may include: type, poll, trivia, chain, anonTemplate fields
-  return request('/create-card', { method: 'POST', auth: true, body: payload })
-}
-
-export async function updateCard(payload) {
-  return request('/update-card', { method: 'PUT', auth: true, body: payload })
-}
-
 export async function deleteCard(payload) {
   const cardId = payload?.cardId || payload?.id
   try {
@@ -501,12 +434,7 @@ export async function getGiftCatalog() {
 }
 
 export async function createFlutterwaveGiftCheckout(payload) {
-  return requestFirstSuccess([
-    '/gifts/flutterwave/checkout',
-    '/gifts/checkout',
-    '/create-gift-checkout',
-    '/create-flutterwave-gift-checkout',
-  ], { method: 'POST', auth: true, body: payload })
+  return request('/gifts/flutterwave/checkout', { method: 'POST', auth: true, body: payload })
 }
 
 export async function verifyGiftPayment(payload) {
@@ -514,20 +442,34 @@ export async function verifyGiftPayment(payload) {
 }
 
 export async function attachGiftToCard(payload) {
-  try {
-    return await request('/cards/attach-gift', { method: 'POST', auth: true, body: payload })
-  } catch (err) {
-    const cardId = payload.cardId || payload.id || payload.slug
-    if (cardId && (err.message?.includes('Card not found') || err.status === 404)) {
-      console.log(`[api] Body-based attach failed, trying fallback URL route: /cards/${cardId}/attach-gift`)
-      return await request(`/cards/${cardId}/attach-gift`, { method: 'POST', auth: true, body: payload })
-    }
-    throw err
-  }
+  return request('/cards/attach-gift', { method: 'POST', auth: true, body: payload })
 }
 
 export async function claimGiftFromCard(slug) {
   return request(`/cards/${slug}/claim-gift`, { method: 'POST', auth: true })
+}
+
+/* ═══════════════════════════════════════════════
+   GIFT WALLET / WITHDRAWAL
+   ═══════════════════════════════════════════════ */
+export async function getWalletSummary() {
+  return request('/wallet', { auth: true })
+}
+
+export async function getBanks() {
+  return request('/wallet/banks', { auth: true })
+}
+
+export async function resolveBankAccount(payload) {
+  return request('/wallet/resolve-bank-account', { method: 'POST', auth: true, body: payload })
+}
+
+export async function saveBankDetails(payload) {
+  return request('/wallet/bank-details', { method: 'POST', auth: true, body: payload })
+}
+
+export async function withdrawGiftWallet(payload) {
+  return request('/wallet/withdraw', { method: 'POST', auth: true, body: payload })
 }
 
 /* ═══════════════════════════════════════════════
@@ -576,26 +518,22 @@ export async function getWorldChat(query = 'page=1&limit=50') {
    TEMPLATES
    ═══════════════════════════════════════════════ */
 export async function getTemplates(query = 'page=1&limit=24') {
-  return request(`/templates?${query}`)
+  // auth:true (not required=true) — request() only attaches the token if one
+  // exists, so guests still hit this as a public route. Logged-in users need
+  // it so the backend can resolve per-viewer isLiked state.
+  return request(`/templates?${query}`, { auth: true })
 }
 
-export async function getMyTemplates(userId) {
-  try {
-    return await request('/my-templates', { auth: true })
-  } catch (err) {
-    if (userId && (err.status === 404 || err.message?.includes('not found') || String(err.status) === '404')) {
-      return await request(`/templates?artist=${encodeURIComponent(userId)}`, { auth: true })
-    }
-    throw err
-  }
+export async function getMyTemplates() {
+  return request('/my-templates', { auth: true })
 }
 
 export async function getPopularTemplates(query = 'days=7&page=1&limit=10') {
-  return request(`/templates/popular?${query}`)
+  return request(`/templates/popular?${query}`, { auth: true })
 }
 
 export async function getTemplateById(id) {
-  return request(`/templates/${id}`)
+  return request(`/templates/${id}`, { auth: true })
 }
 
 export async function likeTemplate(templateId) {
@@ -607,19 +545,11 @@ export async function unlikeTemplate(templateId) {
 }
 
 export async function trackTemplateView(templateId) {
-  return requestFirstSuccess([
-    `/templates/${templateId}/view`,
-    `/templates/${templateId}/views`,
-    `/templates/${templateId}/track-view`,
-  ], { method: 'POST', auth: true })
+  return request(`/templates/${templateId}/view`, { method: 'POST', auth: true })
 }
 
 export async function trackTemplateUse(templateId) {
-  return requestFirstSuccess([
-    `/templates/${templateId}/use`,
-    `/templates/${templateId}/uses`,
-    `/templates/${templateId}/track-use`,
-  ], { method: 'POST', auth: true })
+  return request(`/templates/${templateId}/use`, { method: 'POST', auth: true })
 }
 
 export async function createTemplate(payload) {
@@ -635,26 +565,7 @@ export async function deleteTemplate(payload) {
   if (!templateId) {
     throw new Error('Template ID is required for deletion.')
   }
-
-  const candidates = [
-    { path: `/templates/${templateId}`, options: { method: 'DELETE', auth: true } },
-    { path: `/delete-template/${encodeURIComponent(templateId)}`, options: { method: 'DELETE', auth: true } },
-    { path: '/delete-template', options: { method: 'DELETE', auth: true, body: { templateId } } },
-    { path: '/delete-template', options: { method: 'POST', auth: true, body: { id: templateId } } },
-    { path: `/my-templates/${templateId}`, options: { method: 'DELETE', auth: true } },
-    { path: `/artist/templates/${templateId}`, options: { method: 'DELETE', auth: true } },
-  ]
-
-  let lastError = null
-  for (const item of candidates) {
-    try {
-      return await request(item.path, item.options)
-    } catch (error) {
-      lastError = error
-      if (![404, 405, 400].includes(error.status)) throw error
-    }
-  }
-  throw lastError || new Error('Could not delete template.')
+  return request(`/delete-template/${encodeURIComponent(templateId)}`, { method: 'DELETE', auth: true })
 }
 
 // Admin-only template delete. Backend enforces role === 'admin' here so the
@@ -689,16 +600,14 @@ export async function rejectTemplate(templateId, reason = '') {
 
 
 /* ═══════════════════════════════════════════════
-   ANONYMOUS INBOX
+   ARTISTS
    ═══════════════════════════════════════════════ */
-export async function getAnonMessages() {
-  // Not in the current backend handbook — returns empty until backend adds this route
-  return Promise.resolve({ messages: [] })
+export async function getArtists(query = 'page=1&limit=20') {
+  return request(`/artists?${query}`)
 }
 
-export async function deleteAnonMessage() {
-  // Not in the current backend handbook
-  return Promise.resolve({ ok: false })
+export async function getArtistById(id) {
+  return request(`/artists/${id}`)
 }
 
 /* ═══════════════════════════════════════════════
@@ -726,14 +635,6 @@ export async function getCurrencies() {
   return request('/api/currencies')
 }
 
-export async function getCurrencyRates(from, to) {
-  return request(`/api/currency/rates/${from}/${to}`)
-}
-
-export async function getPrices(currency) {
-  return request(`/api/prices/${currency}`)
-}
-
 export async function updateCurrency(payload) {
   return request('/update-currency', { method: 'PUT', auth: true, body: payload })
 }
@@ -751,14 +652,6 @@ export async function getAdminDashboard() {
 
 export async function getAdminUsers(query = 'page=1&limit=100') {
   return request(`/admin/users?${query}`, { auth: true })
-}
-
-export async function getAdminArtistApplications(query = 'page=1&limit=50') {
-  return request(`/admin/artist-applications?${query}`, { auth: true })
-}
-
-export async function acceptArtistApplication(applicationId) {
-  return request(`/admin/artist-applications/${applicationId}/accept`, { method: 'POST', auth: true })
 }
 
 export async function getAdminCoupons(query = 'page=1&limit=20') {
@@ -785,6 +678,10 @@ export async function getAdminReports(query = 'page=1&limit=50') {
   return request(`/admin/reports?${query}`, { auth: true })
 }
 
+export async function updateAdminReportStatus(reportId, status) {
+  return request(`/admin/reports/${reportId}/status`, { method: 'PATCH', auth: true, body: { status } })
+}
+
 export async function getPublicProfile(identifier) {
   return request(`/users/${identifier}/profile`, { auth: true })
 }
@@ -795,6 +692,14 @@ export async function submitBroadcastRequest(payload) {
 
 export async function approveBroadcastRequest(requestId) {
   return request(`/admin/broadcast-requests/${requestId}/approve`, { method: 'POST', auth: true })
+}
+
+export async function rejectBroadcastRequest(requestId) {
+  return request(`/admin/broadcast-requests/${requestId}/reject`, { method: 'POST', auth: true })
+}
+
+export async function getBroadcastRequests(query = 'status=pending&page=1&limit=100') {
+  return request(`/admin/broadcast-requests?${query}`, { auth: true })
 }
 
 export async function getModeratorActionLogs(query = 'page=1&limit=100') {
@@ -833,10 +738,6 @@ export async function getEnterpriseAdStats() {
     '/enterprise/ads',
     '/ads/my-stats',
   ], { auth: true })
-}
-
-export async function getAdminTemplatesLookup(query = '') {
-  return request(`/admin/templates/lookup?${query}`, { auth: true })
 }
 
 export async function reportUser(targetId, reason, details = '') {
@@ -935,14 +836,6 @@ export async function deleteAdminAd(adId) {
   return request(`/admin/ads/${adId}`, { method: 'DELETE', auth: true })
 }
 
-export async function getAdminAdsGlobalStats() {
-  return request('/admin/ads/global-stats', { auth: true })
-}
-
-export async function getAdminAdsEnterpriseStats() {
-  return request('/admin/ads/enterprise-stats', { auth: true })
-}
-
 /* ═══════════════════════════════════════════════
    TIER-SPECIFIC CARD CREATION
    ═══════════════════════════════════════════════ */
@@ -994,15 +887,19 @@ export async function createCardAnonElite(payload) {
   return request('/create-card/anonymous/elite', { method: 'POST', auth: true, body: payload })
 }
 
-export async function useCouponCreateCard(payload) {
-  return request('/use-coupon-create-card', { method: 'POST', auth: true, body: payload })
-}
-
 /* ═══════════════════════════════════════════════
    CARD ANONYMOUS MESSAGES
    ═══════════════════════════════════════════════ */
 export async function sendCardAnonymousMessage(slug, body) {
   return request(`/cards/${slug}/anonymous-message`, { method: 'POST', body })
+}
+
+/* ═══════════════════════════════════════════════
+   CARD REACTIONS
+   ═══════════════════════════════════════════════ */
+export async function reactToCard(slug, emoji, password) {
+  const hasAuth = !!getStoredToken()
+  return request(`/cards/${slug}/react`, { method: 'POST', auth: hasAuth, body: { emoji, password } })
 }
 
 /* ═══════════════════════════════════════════════
@@ -1086,6 +983,14 @@ export async function requestChatFrame(payload) {
 
 export async function approveChatFrameRequest(requestId) {
   return request(`/admin/chat-frame-requests/${requestId}/approve`, { method: 'POST', auth: true })
+}
+
+export async function rejectChatFrameRequest(requestId) {
+  return request(`/admin/chat-frame-requests/${requestId}/reject`, { method: 'POST', auth: true })
+}
+
+export async function getChatFrameRequests(query = 'status=pending&page=1&limit=100') {
+  return request(`/admin/chat-frame-requests?${query}`, { auth: true })
 }
 
 /* ═══════════════════════════════════════════════

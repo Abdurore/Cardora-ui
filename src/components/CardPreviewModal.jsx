@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import PremiumGiftReveal from './PremiumGiftReveal.jsx'
 import Envelope from './Envelope.jsx'
 import AmbientParticles from './AmbientParticles.jsx'
 import { fireOpenEffect } from '../lib/studioEffects.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
 import { claimGiftFromCard } from '../lib/api.js'
+import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
+import VoiceRecorder from './VoiceRecorder.jsx'
 
 const LEGACY_EMOJI_AMBIENTS = new Set(['floating', 'reverse'])
 
@@ -47,6 +49,7 @@ function CardPreviewModal({
   pollData = null,
   triviaData = null,
   anonTemplate = null,
+  allowAnonMedia = false,
   pageMode = false,
   cardTitle = '',
   onPollSubmit = null,
@@ -55,6 +58,9 @@ function CardPreviewModal({
   onQuestionResponse = null,
   onAnonSubmit = null,
   chainState = null,
+  interaction = null,
+  reactions = null,
+  onReact = null,
   cardId = '',
   senderName = '',
   currentUser = null,
@@ -62,24 +68,31 @@ function CardPreviewModal({
   refreshBalance = null,
 }) {
   const navigate = useNavigate()
-  const isLightTheme = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light'
+  const location = useLocation()
+  // A card's own colors are the sender's/artist's actual design choice and
+  // must render as configured, always — never silently swapped based on the
+  // *viewer's own* site theme. This modal previews real cards (including a
+  // recipient claiming a real gift), so a card intentionally using white
+  // text on a dark background must never get "corrected" into unreadable
+  // dark-on-dark just because the viewer's own browser happens to be in
+  // light mode.
   const c = {
     ...cardObject,
     background: {
       ...cardObject?.background,
-      colors: cardObject?.background?.colors?.map(col => (isLightTheme && col === '#0a0a0a') ? '#ffffff' : col) || (isLightTheme ? ['#ffffff'] : ['#0a0a0a']),
+      colors: cardObject?.background?.colors || ['#0a0a0a'],
     },
     card: {
       ...cardObject?.card,
-      backgroundColor: (isLightTheme && cardObject?.card?.backgroundColor === '#111111') ? '#ffffff' : (cardObject?.card?.backgroundColor || '#111111'),
-      textColor: (isLightTheme && cardObject?.card?.textColor === '#ffffff') ? '#0c1929' : (cardObject?.card?.textColor || '#ffffff'),
-      headingColor: (isLightTheme && cardObject?.card?.headingColor === '#ffffff') ? '#0c1929' : (cardObject?.card?.headingColor || '#ffffff'),
+      backgroundColor: cardObject?.card?.backgroundColor || '#111111',
+      textColor: cardObject?.card?.textColor || '#ffffff',
+      headingColor: cardObject?.card?.headingColor || '#ffffff',
     },
     closedState: {
       ...cardObject?.closedState,
-      backgroundColor: (isLightTheme && cardObject?.closedState?.backgroundColor === '#111111') ? '#ffffff' : (cardObject?.closedState?.backgroundColor || '#111111'),
-      textColor: (isLightTheme && cardObject?.closedState?.textColor === '#cccccc') ? '#4b6577' : (cardObject?.closedState?.textColor || '#cccccc'),
-      headingColor: (isLightTheme && cardObject?.closedState?.headingColor === '#ffffff') ? '#0c1929' : (cardObject?.closedState?.headingColor || '#ffffff'),
+      backgroundColor: cardObject?.closedState?.backgroundColor || '#111111',
+      textColor: cardObject?.closedState?.textColor || '#cccccc',
+      headingColor: cardObject?.closedState?.headingColor || '#ffffff',
     }
   }
   // `allowedTools` gates tool visibility; `tierLimits` caps the content a
@@ -90,13 +103,25 @@ function CardPreviewModal({
   const maxImages = tierLimits ? (tierLimits.maxImages ?? Infinity) : Infinity
   const envelopeEnabled = shouldShowEnvelope(studioType)
   const isPersonalType = studioType === 'personal'
-  const needsTitleBuffer = pageMode && (studioType === 'trivia' || studioType === 'chain')
+  // Poll and anonymous used to skip straight from asset-loading to content
+  // with no arrival moment — trivia/chain already had one. Giving every
+  // interactive type the same beat keeps the recipient experience
+  // consistent regardless of what kind of card they were sent.
+  const needsTitleBuffer = pageMode && (studioType === 'trivia' || studioType === 'chain' || studioType === 'poll' || studioType === 'anonymous')
   const [stage, setStage] = useState(
     pageMode
       ? 'assetLoading'
       : (envelopeEnabled ? 'closed' : 'open')
   )
   const [questionIdx, setQuestionIdx] = useState(0)
+  // Seeded from server truth (renderModel.interaction) so a recipient who
+  // already answered sees their answer instead of being re-prompted, even if
+  // their local draft/session state reset.
+  const [questionAnswer, setQuestionAnswer] = useState(
+    () => (interaction?.kind === 'yes_no' ? (interaction.viewerAnswer || null) : null)
+  )
+  const [questionSubmitting, setQuestionSubmitting] = useState(false)
+  const [questionSubmitError, setQuestionSubmitError] = useState('')
   const [fadeBody, setFadeBody] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
   const [bodyVisible, setBodyVisible] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
   const [revealStep, setRevealStep] = useState(0)
@@ -117,14 +142,45 @@ function CardPreviewModal({
   // Device-frame preview. Fullscreen by default; lets the sender see how the
   // card scales on phone / tablet / desktop without leaving the modal.
   const [previewDevice, setPreviewDevice] = useState('fullscreen')
+  // Only an explicit accessibility signal fully disables ambient/video
+  // effects. A narrow/short viewport — i.e. virtually every phone, which is
+  // how most recipients actually open a shared card — used to hit this same
+  // gate and silently lose elite-tier ambient effects entirely; it now only
+  // scales particle density down via `ambientIntensity` below.
   const lowPowerViewer = useMemo(() => {
     if (typeof window === 'undefined') return false
-    return window.matchMedia?.('(prefers-reduced-motion: reduce), (max-width: 768px), (max-height: 600px)')?.matches || false
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false
   }, [])
+  const smallViewport = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia?.('(max-width: 768px), (max-height: 600px)')?.matches || false
+  }, [])
+  const ambientIntensity = smallViewport ? 0.45 : 1
 
   const [claimingGift, setClaimingGift] = useState(false)
   const [giftClaimMessage, setGiftClaimMessage] = useState('')
   const [localClaimed, setLocalClaimed] = useState(false)
+
+  const performClaim = useCallback(async () => {
+    if (!cardId) {
+      setGiftClaimMessage('Cannot claim gift: no card ID.')
+      return
+    }
+    setClaimingGift(true)
+    setGiftClaimMessage('')
+    try {
+      const res = await claimGiftFromCard(cardId)
+      setGiftClaimMessage(res?.message || 'Gift claimed successfully! The payout has been added to your Gift Wallet.')
+      setLocalClaimed(true)
+      if (refreshBalance) {
+        await refreshBalance()
+      }
+    } catch (err) {
+      setGiftClaimMessage(err.message || 'Failed to claim gift.')
+    } finally {
+      setClaimingGift(false)
+    }
+  }, [cardId, refreshBalance])
 
   // Card surface style. The colored layer is rendered as a `::before` pseudo
   // so adjusting opacity reveals the page background without dimming the card
@@ -140,8 +196,17 @@ function CardPreviewModal({
   // matches what the recipient will actually experience.
   const lockSpec = cardObject?.interaction?.lock || { type: 'none', value: '' }
   const revealSpec = cardObject?.interaction?.reveal || { type: 'tap', hint: '' }
+  // In pageMode the recipient already cleared a password gate upstream in
+  // CardView (which fetches the card from the backend and only succeeds once
+  // the correct password was supplied) — the backend's sanitizer strips
+  // `lock.value` from that response regardless, so re-checking password here
+  // would either double-prompt or (since the stripped value is empty) let a
+  // blank submission through. Password locks are only ever re-evaluated here
+  // outside pageMode, where this modal is previewing the sender's own draft.
   const [unlocked, setUnlocked] = useState(
-    lockSpec.type === 'none' || (lockSpec.type !== 'password' && lockSpec.type !== 'time' && lockSpec.type !== 'tap' && lockSpec.type !== 'scratch')
+    lockSpec.type === 'none' ||
+    (pageMode && lockSpec.type === 'password') ||
+    (lockSpec.type !== 'password' && lockSpec.type !== 'time' && lockSpec.type !== 'tap' && lockSpec.type !== 'scratch')
   )
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState('')
@@ -210,11 +275,10 @@ function CardPreviewModal({
 
   const handlePasswordSubmit = (e) => {
     e?.preventDefault?.()
-    if (!lockSpec.value) {
-      setUnlocked(true)
-      return
-    }
-    if (pwInput.trim() === String(lockSpec.value).trim()) {
+    // Only reached in the sender's own (non-pageMode) preview now — a real
+    // recipient's password gate lives entirely in CardView. An empty
+    // configured value here is a data problem, not a valid unlock.
+    if (lockSpec.value && pwInput.trim() === String(lockSpec.value).trim()) {
       setUnlocked(true)
       setPwError('')
     } else {
@@ -235,9 +299,28 @@ function CardPreviewModal({
     return `${secs}s`
   }
 
-  // Poll preview state
-  const [previewPollVotes, setPreviewPollVotes] = useState([])
-  const [previewPollSubmitted, setPreviewPollSubmitted] = useState(false)
+  // Poll preview state — seeded from the backend's render-model `interaction`
+  // (real server truth, keyed by the recipient's account or guest id) when
+  // present, rather than only the per-browser localStorage flag, so a
+  // recipient's actual prior vote is honoured even if localStorage was
+  // cleared, and so opening the link in the *same* guest session twice
+  // doesn't re-prompt.
+  const [previewPollVotes, setPreviewPollVotes] = useState(() => {
+    if (interaction?.kind === 'poll' && interaction.viewerVote && Array.isArray(pollData?.options)) {
+      const idx = pollData.options.findIndex(opt => (typeof opt === 'object' ? opt.id : opt) === interaction.viewerVote)
+      if (idx >= 0) return [idx]
+    }
+    return []
+  })
+  const [previewPollSubmitted, setPreviewPollSubmitted] = useState(
+    () => interaction?.kind === 'poll' && !!interaction.viewerVote
+  )
+  // Live results snapshot — the copy on the vote screen promises "see live
+  // results after voting"; this is what actually makes that true, instead of
+  // the post-vote screen only ever showing the voter's own pick.
+  const [pollTallies, setPollTallies] = useState(
+    () => (interaction?.kind === 'poll' && Array.isArray(interaction.options) ? interaction.options : null)
+  )
   const [previewPollSubmitting, setPreviewPollSubmitting] = useState(false)
   const [previewPollError, setPreviewPollError] = useState('')
 
@@ -247,11 +330,44 @@ function CardPreviewModal({
   const [triviaLocked, setTriviaLocked] = useState(false)
   const [previewTriviaSubmitting, setPreviewTriviaSubmitting] = useState(false)
   const [previewTriviaError, setPreviewTriviaError] = useState('')
+  const [triviaScoreDisplay, setTriviaScoreDisplay] = useState(0)
+  const triviaCelebrationFiredRef = useRef(false)
 
   // Anonymous reply state (pageMode only)
   const [anonMessage, setAnonMessage] = useState('')
   const [anonSubmitting, setAnonSubmitting] = useState(false)
   const [anonSubmitted, setAnonSubmitted] = useState(false)
+  const [reactionCounts, setReactionCounts] = useState(reactions?.counts || {})
+  const [viewerReaction, setViewerReaction] = useState(reactions?.viewerReaction || null)
+  const [reactionPending, setReactionPending] = useState(false)
+  const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🎉', '👏']
+  const handleReact = async (emoji) => {
+    if (!onReact || reactionPending) return
+    setReactionPending(true)
+    const wasSame = viewerReaction === emoji
+    // Optimistic update — mirrors the toggle-off/swap logic the backend does.
+    setReactionCounts(prev => {
+      const next = { ...prev }
+      if (viewerReaction) next[viewerReaction] = Math.max(0, (next[viewerReaction] || 1) - 1)
+      if (!wasSame) next[emoji] = (next[emoji] || 0) + 1
+      return next
+    })
+    setViewerReaction(wasSame ? null : emoji)
+    try {
+      const result = await onReact(emoji)
+      if (result?.counts) setReactionCounts(result.counts)
+      if ('viewerReaction' in (result || {})) setViewerReaction(result.viewerReaction)
+    } catch {
+      // Revert on failure
+      setReactionCounts(reactions?.counts || {})
+      setViewerReaction(reactions?.viewerReaction || null)
+    }
+    setReactionPending(false)
+  }
+  const [anonVoice, setAnonVoice] = useState(null) // { blob, duration } | null
+  const [anonMediaFile, setAnonMediaFile] = useState(null) // File | null
+  const [anonMediaPreviewUrl, setAnonMediaPreviewUrl] = useState('')
+  const [anonUploadError, setAnonUploadError] = useState('')
 
   // Chain reply state (pageMode only)
   const [chainName, setChainName] = useState('')
@@ -265,14 +381,23 @@ function CardPreviewModal({
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const giftAllowed = pageMode ? true : limit('allowGifts')
-  const hasGift = toolAllowed('gifts') && giftAllowed && c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none'
+  const giftAlreadyClaimed = c.giftEffect?.status === 'claimed'
+  // Once a gift has been claimed, later visitors (or the recipient revisiting)
+  // shouldn't be walked through the reveal/claim flow again — there's nothing left to claim.
+  const hasGift = toolAllowed('gifts') && giftAllowed && c.giftEffect?.enabled && c.giftEffect?.effectKey && c.giftEffect.effectKey !== 'none' && !giftAlreadyClaimed
   const hasFadeIn = toolAllowed('cardStyle') && limit('allowFadeIn') && Number(c.card.textBodyAnimation.fadeInDuration) > 0
   const hasTypewriter = toolAllowed('cardStyle') && limit('allowTypewriter') && Number(c.card.textBodyAnimation.selfTypeSpeed) > 0
   const typeSpeed = hasTypewriter ? parseFloat(c.card.textBodyAnimation.selfTypeSpeed) || 2 : 2
   const fadeSpeed = hasFadeIn ? parseFloat(c.card.textBodyAnimation.fadeInDuration) || 2 : 0
   const mediaAllowed = toolAllowed('media') && maxImages > 0
   const primaryImage = mediaAllowed ? (c.media.images[0] || null) : null
-  const isTextOnlyCard = !primaryImage && !c.media.images.length
+  // Was `!primaryImage && !c.media.images.length` — redundant when
+  // mediaAllowed is true (primaryImage is already truthy whenever images
+  // exist), and actively wrong when mediaAllowed is false: a card with
+  // images that aren't allowed to render (e.g. downgraded tier) has
+  // `images.length > 0` but no image actually shows, yet this still
+  // reported it as "not text-only".
+  const isTextOnlyCard = !primaryImage
 
   const typedBody = useTypewriter(c.content.body, typeSpeed, stage === 'open' && hasTypewriter)
   const typedExtended = useTypewriter(c.content.extendedBody, typeSpeed, stage === 'open' && hasTypewriter && typedBody === c.content.body)
@@ -339,7 +464,7 @@ function CardPreviewModal({
 
     audioRef.current.volume = c.background.music.volume
 
-    if (stage === 'open' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply' || stage === 'chainReplies') {
+    if (stage === 'open' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply' || stage === 'chainReplies' || stage === 'question') {
       // Honour trim window: jump to start point if we're outside the segment.
       if (musicTrimmed) {
         const t = audioRef.current.currentTime
@@ -380,6 +505,35 @@ function CardPreviewModal({
     if (!c.animation.openEffect || c.animation.openEffect === 'none') return
     fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
   }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits, lowPowerViewer])
+
+  // Trivia score reveal — count the number up instead of just printing the
+  // final tally, and fire a one-time celebration burst at a strong score.
+  // This is an app-level "well done" moment, independent of whatever open
+  // effect the sender configured for the card itself.
+  useEffect(() => {
+    if (stage !== 'triviaResults' || !triviaData) return
+    const correct = triviaData.questions.filter((q, i) => Number(previewTriviaAnswers[i]) === Number(q.correctIndex)).length
+    const total = triviaData.questions.length
+    if (lowPowerViewer) {
+      setTriviaScoreDisplay(correct)
+      return
+    }
+    setTriviaScoreDisplay(0)
+    const duration = 900
+    const start = performance.now()
+    let raf
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration)
+      setTriviaScoreDisplay(Math.round(correct * (1 - Math.pow(1 - t, 3))))
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    if (!triviaCelebrationFiredRef.current && total > 0 && correct / total >= 0.7) {
+      triviaCelebrationFiredRef.current = true
+      window.setTimeout(() => fireOpenEffect('confetti', c.animation.confettiColors), duration)
+    }
+    return () => cancelAnimationFrame(raf)
+  }, [stage, triviaData, previewTriviaAnswers, lowPowerViewer, c.animation.confettiColors])
 
   // Seed localChainReplies from chainState prop when it becomes available
   useEffect(() => {
@@ -480,7 +634,39 @@ function CardPreviewModal({
       setStage('chainReplies')
       return
     }
+    if (isPersonalType && c.questions.items.length > 0) {
+      setStage('question')
+      return
+    }
     setStage('end')
+  }
+
+  // The first question item is the actual yes/no question; any remaining
+  // items are the sender's "suspense" follow-up lines, shown one at a time
+  // after an answer is submitted, before landing on the closing screen.
+  const handleAnswerQuestion = async (answer) => {
+    if (questionSubmitting) return
+    setQuestionAnswer(answer)
+    setQuestionSubmitting(true)
+    setQuestionSubmitError('')
+    try {
+      if (onQuestionResponse) await onQuestionResponse(answer)
+      // Most senders don't add suspense lines — only advance into that
+      // stage if there's actually one to show, otherwise land on the
+      // closing screen directly (matches handleNextQ's own end-of-list
+      // behavior). Unconditionally jumping to index 1 crashed here whenever
+      // `items.length === 1` (items[1] undefined).
+      if (c.questions.items.length > 1) {
+        setQuestionIdx(1)
+      } else {
+        setStage('end')
+      }
+    } catch (err) {
+      setQuestionAnswer(null)
+      setQuestionSubmitError(err?.message || 'Could not submit your answer. Please try again.')
+    } finally {
+      setQuestionSubmitting(false)
+    }
   }
 
   const handleNextQ = () => {
@@ -504,6 +690,8 @@ function CardPreviewModal({
     }
     setStage(envelopeEnabled ? 'closed' : 'open')
     setQuestionIdx(0)
+    setQuestionAnswer(null)
+    setQuestionSubmitError('')
     setFadeBody(!envelopeEnabled)
     setBodyVisible(!envelopeEnabled)
     setRevealStep(0)
@@ -520,10 +708,16 @@ function CardPreviewModal({
     setAnonMessage('')
     setAnonSubmitting(false)
     setAnonSubmitted(false)
+    setAnonVoice(null)
+    setAnonMediaFile(null)
+    setAnonMediaPreviewUrl(url => { if (url) URL.revokeObjectURL(url); return '' })
+    setAnonUploadError('')
     setChainMessage('')
     setChainSubmitting(false)
     setChainSubmitted(false)
     setChainSubmitError('')
+    setTriviaScoreDisplay(0)
+    triviaCelebrationFiredRef.current = false
   }
 
   const handleEndDone = () => {
@@ -581,7 +775,7 @@ function CardPreviewModal({
 
   // Background effect — gated by the `animation` tool AND tier ambient cap
   const renderBgEffect = () => {
-    if (pageMode && lowPowerViewer) return null
+    if (lowPowerViewer) return null
     if (!toolAllowed('animation') || !limit('allowAmbientEffects')) return null
     const eff = c.animation.backgroundEffect
     if (!eff || eff.type === 'none') return null
@@ -606,7 +800,7 @@ function CardPreviewModal({
         </div>
       )
     }
-    return <AmbientParticles type={eff.type} colors={c.animation.confettiColors} />
+    return <AmbientParticles type={eff.type} colors={c.animation.confettiColors} intensity={ambientIntensity} />
   }
 
   const renderGradientBorder = (children, className = '') => {
@@ -767,6 +961,7 @@ function CardPreviewModal({
     : studioType === 'trivia' ? 'Start Quiz'
     : studioType === 'chain' ? 'Read Chain'
     : studioType === 'anonymous' ? (pageMode ? 'Send Message' : 'Preview Inbox')
+    : (isPersonalType && c.questions.items.length > 0) ? 'Answer'
     : 'Done'
 
   const inner = (
@@ -985,7 +1180,10 @@ function CardPreviewModal({
       {stage === 'typeEntry' && needsTitleBuffer && (() => {
         const entryMeta = ENTRY_DEFAULTS[studioType] || ENTRY_DEFAULTS.trivia
         const EntryIcon = entryMeta.Icon
-        const title = studioType === 'chain' ? 'Join the Chain' : 'Ready to Play?'
+        const title = studioType === 'chain' ? 'Join the Chain'
+          : studioType === 'poll' ? 'Ready to Vote?'
+          : studioType === 'anonymous' ? 'Send Anonymously'
+          : 'Ready to Play?'
         const prompt = studioType === 'chain' ? 'Sign your addition' : 'Who is playing?'
         return (
           <div
@@ -1137,6 +1335,39 @@ function CardPreviewModal({
                   </div>
                 )}
 
+                {/* Type info strip — gives poll/trivia/chain/anonymous cards something
+                    concrete to show even when the sender didn't write a heading/body
+                    (most senders of these types skip straight to the interactive part). */}
+                {!isPersonalType && (
+                  <div className={`cp-type-info-strip cp-reveal-element ${revealStep >= 3 ? 'visible' : ''}`} style={{ '--strip-accent': c.theme.accentColor, color: c.card.textColor }}>
+                    {studioType === 'trivia' && (
+                      <>
+                        <span className="cp-type-info-icon">🧠</span>
+                        <p>{(triviaData?.questions?.length) || 0} question{(triviaData?.questions?.length) === 1 ? '' : 's'} · test what you know</p>
+                      </>
+                    )}
+                    {studioType === 'poll' && (
+                      <>
+                        <span className="cp-type-info-icon">📊</span>
+                        <p>{(pollData?.options?.length) || 0} options · see live results after voting</p>
+                      </>
+                    )}
+                    {studioType === 'chain' && (
+                      <>
+                        <span className="cp-type-info-icon">🔗</span>
+                        <p>Reply with your own card and keep the chain going</p>
+                      </>
+                    )}
+                    {studioType === 'anonymous' && (
+                      <>
+                        <span className="cp-type-info-icon">🤫</span>
+                        <p>100% anonymous — nobody will know it was you</p>
+                      </>
+                    )}
+                    {senderName && <span className="cp-type-info-sender">from {senderName}</span>}
+                  </div>
+                )}
+
                 {/* Continue */}
                 <div className={`cp-card-action-row cp-reveal-element ${revealStep >= 4 ? 'visible' : ''}`}>
                   <button
@@ -1208,15 +1439,28 @@ function CardPreviewModal({
                           setPreviewPollSubmitting(true)
                           setPreviewPollError('')
                           try {
+                            const opts = pollData?.options || []
+                            const optId = previewPollVotes.map(i => {
+                              const o = opts[i]
+                              return typeof o === 'object' ? o.id : `opt_${i}`
+                            })[0]
                             if (onPollSubmit) {
-                              const opts = pollData?.options || []
-                              const optId = previewPollVotes.map(i => {
-                                const o = opts[i]
-                                return typeof o === 'object' ? o.id : `opt_${i}`
-                              })[0]
                               await onPollSubmit(optId)
                             }
                             setPreviewPollSubmitted(true)
+                            // Was already-voted (interaction snapshot), so don't
+                            // double-count; otherwise bump the just-cast vote
+                            // optimistically until the next real fetch.
+                            if (!(interaction?.kind === 'poll' && interaction.viewerVote)) {
+                              setPollTallies(prev => {
+                                const base = prev || opts.map(o => ({
+                                  id: typeof o === 'object' ? o.id : `opt_${opts.indexOf(o)}`,
+                                  text: typeof o === 'object' ? o.text : o,
+                                  votes: 0,
+                                }))
+                                return base.map(o => o.id === optId ? { ...o, votes: (o.votes || 0) + 1 } : o)
+                              })
+                            }
                             try {
                               localStorage.setItem(`${receiverStorageKey}:poll`, JSON.stringify({ submitted: true, votes: previewPollVotes }))
                             } catch {
@@ -1251,6 +1495,27 @@ function CardPreviewModal({
                           ) : null
                         ))}
                       </div>
+                      {pollTallies && (
+                        <div className="cp-poll-results">
+                          {(() => {
+                            const total = pollTallies.reduce((sum, o) => sum + (o.votes || 0), 0) || 1
+                            return pollTallies.map((o) => {
+                              const pct = Math.round(((o.votes || 0) / total) * 100)
+                              return (
+                                <div key={o.id} className="cp-poll-result-row" style={{ color: c.card.textColor }}>
+                                  <div className="cp-poll-result-label">
+                                    <span>{o.text}</span>
+                                    <span>{pct}% · {o.votes || 0} vote{(o.votes || 0) === 1 ? '' : 's'}</span>
+                                  </div>
+                                  <div className="cp-poll-result-bar" style={{ background: `${c.card.textColor}1a` }}>
+                                    <div className="cp-poll-result-fill" style={{ width: `${pct}%`, background: c.theme.accentColor }} />
+                                  </div>
+                                </div>
+                              )
+                            })
+                          })()}
+                        </div>
+                      )}
                       <button
                         type="button"
                         className="cp-continue-btn visible"
@@ -1260,6 +1525,83 @@ function CardPreviewModal({
                         Continue
                       </button>
                     </div>
+                  )}
+                </div>
+              </div>
+            </article>,
+            'cp-gradient-border-full'
+          )}
+        </div>
+      )}
+
+      {/* PERSONAL CARD QUESTION STAGE — the sender's yes/no prompt, followed by
+          any "suspense" follow-up lines before the closing screen. */}
+      {stage === 'question' && c.questions.items.length > 0 && (
+        <div className="cp-card-wrap cp-card-wrap-full">
+          {renderGradientBorder(
+            <article className="cp-card cp-card-full" style={cardSurfaceStyle(borderStyle)}>
+              <div className="cp-card-inner cp-card-inner-full">
+                <div className="cp-question-stage">
+                  {questionIdx === 0 ? (
+                    <>
+                      <p className="cp-question-eyebrow" style={{ color: c.theme.accentColor }}>{senderName ? `${senderName} asks` : 'A question for you'}</p>
+                      <h2
+                        className="cp-question-text"
+                        style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}
+                      >
+                        {c.questions.items[0].text}
+                      </h2>
+                      {questionAnswer === null ? (
+                        <div className="cp-question-actions">
+                          <button
+                            type="button"
+                            className="cp-question-yes"
+                            style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                            disabled={questionSubmitting}
+                            onClick={() => handleAnswerQuestion('yes')}
+                          >
+                            {questionSubmitting ? 'Submitting…' : 'Yes'}
+                          </button>
+                          <button
+                            type="button"
+                            className="cp-question-no"
+                            style={{ color: c.card.textColor }}
+                            disabled={questionSubmitting}
+                            onClick={() => handleAnswerQuestion('no')}
+                          >
+                            <span>No</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="cp-question-answered">
+                          <div className="cp-question-answered-icon" style={{ color: c.theme.accentColor }}>✓</div>
+                          <p className="cp-question-answered-msg" style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}>
+                            You answered "{questionAnswer === 'yes' ? 'Yes' : 'No'}"
+                          </p>
+                        </div>
+                      )}
+                      {questionSubmitError && (
+                        <p className="cp-submit-error" style={{ color: c.card.textColor }}>{questionSubmitError}</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="cp-question-eyebrow" style={{ color: c.theme.accentColor }}>{senderName || 'Cardora'}</p>
+                      <h2
+                        className="cp-question-text"
+                        style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif` }}
+                      >
+                        {c.questions.items[questionIdx].text}
+                      </h2>
+                      <button
+                        type="button"
+                        className="cp-continue-btn visible"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        onClick={handleNextQ}
+                      >
+                        {questionIdx < c.questions.items.length - 1 ? 'Continue' : 'Done'}
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1396,7 +1738,7 @@ function CardPreviewModal({
                         style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1)', transformOrigin: 'center', transform: 'rotate(-90deg)' }}
                       />
                       <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fill={c.card.headingColor} fontSize="20" fontWeight="800" fontFamily="inherit">
-                        {correct}/{total}
+                        {triviaScoreDisplay}/{total}
                       </text>
                     </svg>
                     <h3 style={{ color: c.card.headingColor, fontFamily: `'${c.theme.fontFamily}', serif`, margin: 0 }}>
@@ -1595,6 +1937,48 @@ function CardPreviewModal({
                   <div className="cp-anon-char-count" style={{ color: c.card.textColor, opacity: 0.45 }}>
                     {anonMessage.length} / 500
                   </div>
+
+                  {allowAnonMedia && (
+                    <div className="cp-anon-media-attach">
+                      <VoiceRecorder
+                        accentColor={c.theme.accentColor}
+                        disabled={anonSubmitting}
+                        onChange={setAnonVoice}
+                      />
+                      {anonMediaPreviewUrl ? (
+                        <div className="cp-anon-media-preview">
+                          {anonMediaFile?.type?.startsWith('video/')
+                            ? <video src={anonMediaPreviewUrl} muted controls style={{ maxHeight: 120 }} />
+                            : <img src={anonMediaPreviewUrl} alt="" style={{ maxHeight: 120 }} />}
+                          <button
+                            type="button"
+                            className="cp-anon-media-remove"
+                            onClick={() => { setAnonMediaFile(null); setAnonMediaPreviewUrl(url => { URL.revokeObjectURL(url); return '' }) }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="cp-anon-media-picker" style={{ borderColor: `${c.theme.accentColor}40`, color: c.card.textColor }}>
+                          + Attach a photo or video
+                          <input
+                            type="file"
+                            accept="image/*,video/*"
+                            hidden
+                            disabled={anonSubmitting}
+                            onChange={e => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              setAnonMediaFile(file)
+                              setAnonMediaPreviewUrl(URL.createObjectURL(file))
+                            }}
+                          />
+                        </label>
+                      )}
+                      {anonUploadError && <p className="cp-submit-error" style={{ color: c.card.textColor }}>{anonUploadError}</p>}
+                    </div>
+                  )}
+
                   <button
                     className="cp-continue-btn visible"
                     style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor, opacity: anonSubmitting ? 0.6 : 1 }}
@@ -1602,11 +1986,24 @@ function CardPreviewModal({
                     onClick={async () => {
                       if (!anonMessage.trim()) return
                       setAnonSubmitting(true)
+                      setAnonUploadError('')
                       try {
-                        if (onAnonSubmit) await onAnonSubmit(anonMessage.trim())
-                      } catch { /* swallow */ }
+                        const extras = {}
+                        if (anonVoice?.blob) {
+                          // Audio uploads as Cloudinary's 'video' resource type —
+                          // it streams audio-only files more efficiently than 'raw'.
+                          extras.voice = { url: await uploadToCloudinary(anonVoice.blob, 'video'), duration: anonVoice.duration }
+                        }
+                        if (anonMediaFile) {
+                          const url = await uploadToCloudinary(anonMediaFile, anonMediaFile.type.startsWith('video/') ? 'video' : 'image')
+                          extras.media = { type: anonMediaFile.type.startsWith('video/') ? 'video' : 'image', url }
+                        }
+                        if (onAnonSubmit) await onAnonSubmit(anonMessage.trim(), extras)
+                        setAnonSubmitted(true)
+                      } catch (err) {
+                        setAnonUploadError(err?.message || 'Could not send your attachment. Try again, or send without it.')
+                      }
                       setAnonSubmitting(false)
-                      setAnonSubmitted(true)
                     }}
                   >
                     {anonSubmitting ? 'Sending…' : 'Send Anonymously'}
@@ -1764,6 +2161,24 @@ function CardPreviewModal({
                   Hope it made your day
                 </p>
 
+                {onReact && (
+                  <div className="cp-reaction-bar" role="group" aria-label="React to this card">
+                    {REACTION_EMOJIS.map(emoji => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className={`cp-reaction-btn${viewerReaction === emoji ? ' active' : ''}`}
+                        style={{ '--reaction-accent': c.theme.accentColor }}
+                        disabled={reactionPending}
+                        onClick={() => handleReact(emoji)}
+                      >
+                        <span>{emoji}</span>
+                        {reactionCounts[emoji] > 0 && <span className="cp-reaction-count">{reactionCounts[emoji]}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {/* Cardora branding */}
                 <div className="cp-end-brand">
                   <img src="/cardora-logo.png?v=4" alt="" className="cp-end-brand-logo" />
@@ -1886,34 +2301,20 @@ function CardPreviewModal({
                       cursor: isClaimed ? 'not-allowed' : 'pointer',
                     }}
                     disabled={claimingGift || isClaimed}
-                    onClick={async () => {
+                    onClick={() => {
                       if (!currentUser) {
-                        setGiftClaimMessage('Please log in or sign up to claim this gift.')
+                        setGiftClaimMessage('Please sign in to claim this gift — you\'ll come right back here.')
                         if (openAuthModal) {
-                          openAuthModal()
+                          openAuthModal(performClaim, location.pathname + location.search, {
+                            title: 'Sign in to claim your gift',
+                            message: `${c.giftEffect?.giftTitle || 'This gift'} is waiting for you. Sign in or create a free account and you'll land right back here to finish claiming it.`,
+                          })
                         } else {
                           navigate('/login')
                         }
                         return
                       }
-                      if (!cardId) {
-                        setGiftClaimMessage('Cannot claim gift: no card ID.')
-                        return
-                      }
-                      setClaimingGift(true)
-                      setGiftClaimMessage('')
-                      try {
-                        const res = await claimGiftFromCard(cardId)
-                        setGiftClaimMessage(res?.message || 'Gift claimed successfully! The payout has been added to your Gift Wallet.')
-                        setLocalClaimed(true)
-                        if (refreshBalance) {
-                          await refreshBalance()
-                        }
-                      } catch (err) {
-                        setGiftClaimMessage(err.message || 'Failed to claim gift.')
-                      } finally {
-                        setClaimingGift(false)
-                      }
+                      performClaim()
                     }}
                   >
                     {claimingGift ? 'Claiming...' : isClaimed ? 'Claimed' : 'Claim Gift'}
@@ -1925,28 +2326,31 @@ function CardPreviewModal({
                   {giftClaimMessage}
                 </p>
               )}
-              <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={handleReset}>
-                Replay
-              </button>
               {pageMode ? (
-                <>
-                <button
-                  type="button"
-                  className="cp-end-btn ghost"
-                  style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                  onClick={() => navigate('/')}
-                >
-                  Create yours
-                </button>
-                <button
-                  type="button"
-                  className="cp-end-btn ghost"
-                  style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)',  }}
-                  onClick={() => navigate('/')}
-                >
-                  Done
-                </button>
-                </>
+                // Below the primary Claim action: two clearly distinct,
+                // de-emphasized secondary actions instead of the previous
+                // three-button stack where "Create yours" and "Done" both
+                // navigated home (identical, redundant) and "Replay" read as
+                // if it might re-run the claim rather than just the opening
+                // animation.
+                <div className="cp-gift-secondary-actions">
+                  <button
+                    type="button"
+                    className="cp-end-btn ghost small"
+                    style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                    onClick={handleReset}
+                  >
+                    Replay animation
+                  </button>
+                  <button
+                    type="button"
+                    className="cp-end-btn small"
+                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                    onClick={() => navigate('/')}
+                  >
+                    Done
+                  </button>
+                </div>
               ) : (
                 <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={onClose}>
                   Back to Editor

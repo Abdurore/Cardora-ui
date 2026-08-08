@@ -1,23 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { getEnvelopeTierProfile, getPacingMultiplier } from '../lib/envelopeTiers.js'
-
-const SEAL_ICONS = {
-  heart: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 21s-7.5-4.8-7.5-11a4.5 4.5 0 0 1 8.25-2.5A4.5 4.5 0 0 1 21 10c0 6.2-9 11-9 11z" fill="currentColor" />
-    </svg>
-  ),
-  star: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 2l2.9 6.6 7.1.7-5.4 4.9 1.6 7L12 17.8 5.8 21.2l1.6-7L2 9.3l7.1-.7z" fill="currentColor" />
-    </svg>
-  ),
-  wax: (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="8" fill="currentColor" />
-    </svg>
-  ),
-}
+import { SEAL_ICONS } from '../lib/sealIcons.jsx'
 
 function deriveRecipientName(explicit, email) {
   if (explicit) return explicit

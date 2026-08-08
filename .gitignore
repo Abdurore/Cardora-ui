@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Nested independent repo (its own git history/remote) — reference-only for
+# schema lookups per CLAUDE.md, never tracked from the frontend repo.
+Backend/

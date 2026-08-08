@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { sendCardAnonymousMessage, getPublicProfile } from '../lib/api.js'
+import { getPublicProfile } from '../lib/api.js'
 
-const MAX_CHARS = 500
+const bg = '#07111a'
+const accent = '#7ef7ff'
 
+// There is no backend concept of "a user's anonymous inbox card" — an
+// anonymous card is just a card like any other, identified by its own slug
+// (/card/:slug), not by the creator's username. This route used to render a
+// message form that always failed at send time because it had no slug to
+// post to. Rather than keep that dead end, this page now says so plainly
+// and points the visitor at the one thing that actually works: asking the
+// person for their card link directly.
 function AnonSend() {
   const { username } = useParams()
   const [recipient, setRecipient] = useState(null)
-  const [cardStyle] = useState(null)
-  const [message, setMessage] = useState('')
-  const [isSending, setIsSending] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [recipientNotFound, setRecipientNotFound] = useState(false)
-  const [cardStyleMissing] = useState(true)
 
   useEffect(() => {
     if (!username) return
@@ -23,7 +25,10 @@ function AnonSend() {
       try {
         const res = await getPublicProfile(username)
         if (cancelled) return
-        const u = res?.data?.user || res?.user || res?.data || res
+        // Actual response shape is { profile, profileBackgrounds } —
+        // res.user/res.data were never right, so a valid username always
+        // fell through to "not found" here.
+        const u = res?.profile || res?.data?.profile || res?.data?.user || res?.user || res?.data || res
         if (!u || !u.username) {
           setRecipientNotFound(true)
           setLoading(false)
@@ -43,69 +48,17 @@ function AnonSend() {
     return () => { cancelled = true }
   }, [username])
 
-  const bg = cardStyle?.backgroundColor || '#07111a'
-  const accent = cardStyle?.accentColor || '#7ef7ff'
-  const heading = cardStyle?.heading || `Send @${recipient?.name || username} a message`
-  const body = cardStyle?.body || ''
-
-  const handleSend = async () => {
-    if (!message.trim()) { setError('Write something before sending.'); return }
-    // The anonymous card slug is needed to post to /cards/:slug/anonymous-message.
-    // It comes from either the cardStyle (if the recipient's anon card was loaded)
-    // or from the URL slug param when accessed via /card/:slug directly.
-    const slug = cardStyle?.cardSlug || cardStyle?.slug
-    if (!slug) {
-      setError('This user hasn\'t created an anonymous inbox card yet, or their card link is unavailable. Ask them to share their Cardora card link directly.')
-      return
-    }
-    setError('')
-    setIsSending(true)
-    try {
-      // Backend expects { message } per handbook §7 (Anonymous Cards)
-      await sendCardAnonymousMessage(slug, { message: message.trim() })
-      setSent(true)
-    } catch (err) {
-      setError(err?.message || 'Something went wrong. Please try again.')
-    } finally {
-      setIsSending(false)
-    }
-  }
-
   if (!loading && recipientNotFound) {
     return (
-      <div className="anon-page" style={{ '--anon-bg': '#07111a', '--anon-accent': '#7ef7ff' }}>
+      <div className="anon-page" style={{ '--anon-bg': bg, '--anon-accent': accent }}>
         <div className="anon-page-bg" />
         <div className="anon-sent-card" style={{ borderColor: '#7ef7ff22' }}>
-          <div className="anon-sent-glyph" style={{ color: '#7ef7ff' }}>?</div>
+          <div className="anon-sent-glyph" style={{ color: accent }}>?</div>
           <h2 style={{ color: '#e9fbff' }}>User not found</h2>
           <p style={{ color: 'rgba(201,247,255,0.7)' }}>
             The inbox link you followed doesn't belong to an active Cardora account.
           </p>
           <Link className="anon-footer-link" to="/">Go to Cardora</Link>
-        </div>
-      </div>
-    )
-  }
-
-  if (sent) {
-    return (
-      <div className="anon-page" style={{ '--anon-bg': bg, '--anon-accent': accent }}>
-        <div className="anon-page-bg" style={{ background: `radial-gradient(ellipse 80% 50% at 50% 0%, ${accent}18, transparent 70%), ${bg}` }} />
-        <div className="anon-sent-card" style={{ borderColor: `${accent}22` }}>
-          <div className="anon-sent-glyph" style={{ color: accent }}>✦</div>
-          <h2 style={{ color: cardStyle?.headingColor || '#e9fbff' }}>Sent.</h2>
-          <p style={{ color: cardStyle?.textColor || 'rgba(201,247,255,0.7)' }}>
-            Your message is on its way to <strong style={{ color: cardStyle?.headingColor || '#e9fbff' }}>@{recipient?.name || username}</strong>. You remain completely anonymous.
-          </p>
-          <button
-            type="button"
-            className="anon-send-btn"
-            style={{ background: accent, color: bg }}
-            onClick={() => { setMessage(''); setSent(false) }}
-          >
-            Send another
-          </button>
-          <Link className="anon-footer-link" to="/">Back to Cardora</Link>
         </div>
       </div>
     )
@@ -127,72 +80,32 @@ function AnonSend() {
               : <span style={{ color: accent }}>{loading ? '…' : (recipient?.avatarLetter || '?')}</span>}
           </div>
           <div>
-            <p className="anon-recipient-label">Anonymous message for</p>
-            <h2 className="anon-recipient-name" style={{ color: cardStyle?.headingColor || '#e9fbff' }}>
+            <p className="anon-recipient-label">Looking for</p>
+            <h2 className="anon-recipient-name" style={{ color: '#e9fbff' }}>
               @{recipient?.name || username}
             </h2>
           </div>
         </div>
 
         <div className="anon-card-frame" style={{ background: bg, borderColor: `${accent}1a` }}>
-          {cardStyleMissing && (
-            <p className="anon-style-note" style={{ color: `${accent}80` }}>
-              @{recipient?.name || username} hasn't set up a custom inbox card yet — using default styling.
+          <div className="anon-card-frame-copy">
+            <h3 className="anon-card-frame-heading" style={{ color: '#e9fbff' }}>
+              No inbox link connected yet
+            </h3>
+            <p className="anon-card-frame-body" style={{ color: 'rgba(201,247,255,0.7)' }}>
+              @{recipient?.name || username} hasn't linked an anonymous card to their profile.
+              Anonymous messages go through a card's own link, not a username — ask them to
+              send you their Cardora card link directly, or create your own anonymous card to
+              share.
             </p>
-          )}
-          {(heading || body) && (
-            <div className="anon-card-frame-copy">
-              {heading && (
-                <h3
-                  className="anon-card-frame-heading"
-                  style={{ color: cardStyle?.headingColor || '#e9fbff', fontFamily: `'${cardStyle?.fontFamily || 'Playfair Display'}', serif` }}
-                >
-                  {heading}
-                </h3>
-              )}
-              {body && (
-                <p className="anon-card-frame-body" style={{ color: cardStyle?.textColor || 'rgba(201,247,255,0.7)' }}>
-                  {body}
-                </p>
-              )}
-            </div>
-          )}
-
-          <textarea
-            className="anon-card-textarea"
-            rows={6}
-            maxLength={MAX_CHARS}
-            value={message}
-            onChange={e => { setMessage(e.target.value); if (error) setError('') }}
-            placeholder="Write something honest, kind, or surprising…"
-            style={{ borderColor: `${accent}28`, caretColor: accent }}
-          />
-
-          <div className="anon-card-meta-row">
-            <span className={`anon-card-char ${message.length >= MAX_CHARS - 30 ? 'warn' : ''}`}>
-              {message.length}/{MAX_CHARS}
-            </span>
-            <span className="anon-privacy-badge" style={{ color: accent }}>
-              &#x1F441;&#xFE0F; Anonymous
-            </span>
           </div>
-
-          {error && <p className="anon-error">{error}</p>}
-
-          <button
-            type="button"
-            className="anon-send-btn"
-            onClick={handleSend}
-            disabled={isSending || !message.trim()}
-            style={{ background: accent, color: bg }}
-          >
-            {isSending ? 'Sending…' : 'Send Anonymously'}
-          </button>
+          <Link to="/create" className="anon-send-btn" style={{ background: accent, color: bg, textDecoration: 'none', display: 'inline-block', textAlign: 'center' }}>
+            Create an anonymous card
+          </Link>
         </div>
 
         <p className="anon-footer-note">
-          Your identity stays hidden forever.{' '}
-          <Link to="/signup" style={{ color: accent }}>Get your own inbox</Link>
+          Already have a card link? <Link to="/" style={{ color: accent }}>Open it directly</Link>
         </p>
       </div>
     </div>

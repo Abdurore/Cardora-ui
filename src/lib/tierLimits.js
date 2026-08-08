@@ -6,7 +6,13 @@
 // - Classic is heavily capped because it's the free tier.
 // - Only Personal + Chain cards render an envelope; other types skip straight to the card.
 
+// Mirrors Backend/Cardora/src/cards/constants.js RESPONSE_LIMITS and
+// Backend/Cardora/src/cards/schema.js CONTENT_LIMITS — keep in sync.
 const CLASSIC = {
+  maxResponses: 15,
+  maxPollOptions: 5,
+  maxChainRules: 5,
+  maxTriviaQuestions: 10,
   maxImages: 1,
   allowMusic: false,
   allowVideoBackground: false,
@@ -23,13 +29,22 @@ const CLASSIC = {
   envelopeProfile: 'basic',
 }
 
+// The backend engine (Backend/Cardora/src/cards/engine.js
+// `assertNoInvalidEnhancements`) hard-rejects premium cards that carry a
+// video background, music, an openEffect, or any media — these four must
+// stay false/0 here or the Studio UI offers controls the send will 400 on
+// (or, before this was caught, silently drop with no warning at all).
 const PREMIUM = {
-  maxImages: 3,
-  allowMusic: true,
-  allowVideoBackground: true,
+  maxResponses: 30,
+  maxPollOptions: 25,
+  maxChainRules: 25,
+  maxTriviaQuestions: 50,
+  maxImages: 0,
+  allowMusic: false,
+  allowVideoBackground: false,
   allowGradientBorder: true,
   allowAnimatedBorder: false,
-  allowOpenEffects: true,
+  allowOpenEffects: false,
   allowAmbientEffects: true,
   allowCustomFonts: true,
   allowGifts: false,
@@ -41,6 +56,10 @@ const PREMIUM = {
 }
 
 const ELITE = {
+  maxResponses: 50,
+  maxPollOptions: 25,
+  maxChainRules: 25,
+  maxTriviaQuestions: 50,
   maxImages: 8,
   allowMusic: true,
   allowVideoBackground: true,
@@ -58,6 +77,10 @@ const ELITE = {
 }
 
 const ARTIST = {
+  maxResponses: Infinity,
+  maxPollOptions: Infinity,
+  maxChainRules: Infinity,
+  maxTriviaQuestions: Infinity,
   maxImages: Infinity,
   allowMusic: true,
   allowVideoBackground: true,

@@ -8,11 +8,8 @@ import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import PackCard from '../components/PackCard.jsx'
 import RewardedAds from '../components/RewardedAds.jsx'
-import { storePacks, storeGifts } from '../data/catalog.js'
-import GiftCard from '../components/GiftCard.jsx'
-import GiftPreviewModal from '../components/GiftPreviewModal.jsx'
-import { buyChatFrame, equipChatFrame, getUserCoupons, getChatFrames, getOwnedChatFrames, getCachedChatFrames } from '../lib/api.js'
-import { getChatFrameId, getEquippedChatFrameId, getLocalEquippedChatFrameId, getOwnedChatFrameIds, normalizeChatFrame, setLocalEquippedChatFrameId } from '../lib/chatFrames.js'
+import { buyChatFrame, equipChatFrame, getUserCoupons, getChatFrames, getCachedChatFrames } from '../lib/api.js'
+import { getEquippedChatFrameId, getLocalEquippedChatFrameId, getOwnedChatFrameIds, normalizeChatFrame, setLocalEquippedChatFrameId } from '../lib/chatFrames.js'
 
 const REWARD_TABS = ['earn', 'redeem', 'referral']
 
@@ -62,16 +59,10 @@ function Store() {
     redeemCodeAction,
     refreshBalance,
     userCurrency,
-    purchaseGift,
     authReady,
   } = useOutletContext()
 
   const navigate = useNavigate()
-
-  const [activeGift, setActiveGift] = useState(null)
-  const [confirmGift, setConfirmGift] = useState(null)
-  const [isPurchasingGift, setIsPurchasingGift] = useState(false)
-  const [giftMessage, setGiftMessage] = useState('')
 
   const [checkoutMessage, setCheckoutMessage] = useState('')
   const [activePack, setActivePack] = useState(null)
@@ -107,22 +98,18 @@ function Store() {
   const optimisticOwnedIds = useRef(new Set())
   const [chatFramesLoading, setChatFramesLoading] = useState(true)
 
+  // Ownership itself comes from `currentUser.ownedChatFrames` via
+  // getOwnedChatFrameIds below (the `useEffect` on [currentUser]) — there's
+  // no separate "my owned frames" endpoint on the backend
+  // (`/users/chat-frames` doesn't exist), so a prior version of this call
+  // always 404'd and contributed nothing.
   const loadChatFrames = useCallback(async () => {
     setChatFramesLoading(true)
     const cachedFrames = getCachedChatFrames()
     try {
-      const [res, ownedRes] = await Promise.allSettled([
-        getChatFrames(),
-        getOwnedChatFrames()
-      ])
-      const frames = res.status === 'fulfilled' ? pickList(res.value, 'chatFrames', 'frames', 'items') : []
-      const owned = ownedRes.status === 'fulfilled' ? pickList(ownedRes.value, 'chatFrames', 'frames', 'items') : []
-      // Merge backend owned IDs with any optimistic ones the user triggered this session
-      owned.forEach(f => {
-        const id = getChatFrameId(f)
-        if (id) optimisticOwnedIds.current.add(id)
-      })
-      setChatFrames(mergeFrameSources(frames, owned, cachedFrames))
+      const res = await getChatFrames()
+      const frames = pickList(res, 'chatFrames', 'frames', 'items')
+      setChatFrames(mergeFrameSources(frames, [], cachedFrames))
       setOwnedFrameIds([...optimisticOwnedIds.current])
     } catch {
       setChatFrames(mergeFrameSources(cachedFrames))
@@ -145,7 +132,7 @@ function Store() {
   }, [currentUser])
 
   const validPacks = (couponPackages || []).filter(p => (p.cc || 0) > 0)
-  const packs = validPacks.length ? validPacks : storePacks
+  const packs = validPacks
   const referralRewards = (currentUser?.ccIncomeHistory || []).filter(
     (entry) => (entry.type || entry.source) === 'referral_milestone',
   )
@@ -161,18 +148,17 @@ function Store() {
   )
 
   const handleSelect = (pack) => {
+    setCheckoutMessage('')
     setActivePack(pack)
   }
 
   const handleCheckoutStart = async () => {
     if (!activePack) return
     setIsLaunchingCheckout(true)
+    setCheckoutMessage('')
     const result = await addToCart(activePack)
-    if (!result?.ok && result?.reason) {
-      setCheckoutMessage(result.reason === 'auth' ? 'Please sign in to continue.' : result.reason)
-      setTimeout(() => setCheckoutMessage(''), 2200)
-    }
     if (!result?.ok) {
+      setCheckoutMessage(result?.reason === 'auth' ? 'Please sign in to continue.' : (result?.reason || 'Could not start checkout. Please try again.'))
       setIsLaunchingCheckout(false)
       return
     }
@@ -321,6 +307,8 @@ function Store() {
             )}
             {!authReady ? (
               <div className="store-frame-empty">Loading store packages...</div>
+            ) : packs.length === 0 ? (
+              <div className="store-frame-empty">No CC packages are available right now. Please check back shortly.</div>
             ) : (
               packs.map((pack, index) => (
                 <PackCard
@@ -701,31 +689,6 @@ function Store() {
           </div>
         )}
 
-        {activeSection === 'gifts' && (
-          <div className="store-gifts-shell">
-            <div className="store-gifts-intro">
-              <h4>Send a gift with your card</h4>
-              <p>
-                Each gift plays a unique particle animation in its own colour palette before
-                the recipient receives it. Buy once, attach from Studio.
-              </p>
-            </div>
-            {giftMessage && <p className="store-gift-status">{giftMessage}</p>}
-            <div className="gift-grid">
-              {storeGifts.map((gift) => (
-                <GiftCard
-                  key={gift.effectKey}
-                  title={gift.title}
-                  amount={gift.amount}
-                  note={gift.note}
-                  effectKey={gift.effectKey}
-                  actionLabel="Preview"
-                  onAction={() => setActiveGift(gift)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
       <ScreenNav />
 
@@ -762,11 +725,13 @@ function Store() {
               ) : null}
             </div>
 
+            {checkoutMessage ? <p className="form-error">{checkoutMessage}</p> : null}
+
             <div className="detail-actions">
               <button className="primary" type="button" onClick={handleCheckoutStart} disabled={isLaunchingCheckout}>
                 {isLaunchingCheckout ? 'Redirecting...' : 'Continue to Paystack'}
               </button>
-              <button className="ghost" type="button" onClick={() => setActivePack(null)} disabled={isLaunchingCheckout}>
+              <button className="ghost" type="button" onClick={() => { setActivePack(null); setCheckoutMessage('') }} disabled={isLaunchingCheckout}>
                 Cancel
               </button>
             </div>
@@ -774,80 +739,6 @@ function Store() {
         </section>
       ) : null}
 
-      {activeGift ? (
-        <GiftPreviewModal
-          gift={activeGift}
-          disabled={isPurchasingGift}
-          onClose={() => setActiveGift(null)}
-          onBuy={() => {
-            if (!currentUser) {
-              openAuthModal()
-              return
-            }
-            setConfirmGift(activeGift)
-            setActiveGift(null)
-          }}
-        />
-      ) : null}
-
-      {confirmGift ? (
-        <section className="detail-modal" role="dialog" aria-modal="true">
-          <div className="detail-backdrop" onClick={() => !isPurchasingGift && setConfirmGift(null)} />
-          <div className="detail-card store-pay-modal">
-            <div className="store-pay-hero">
-              <p className="eyebrow">Gift checkout</p>
-              <h3>Confirm gift purchase</h3>
-              <p className="detail-subtitle">
-                You will be redirected to Flutterwave to pay securely. The reveal animation appears after payment is completed.
-              </p>
-            </div>
-            <div className="store-pay-summary">
-              <div className="store-pay-row">
-                <span>Gift</span>
-                <strong>{confirmGift.title}</strong>
-              </div>
-              <div className="store-pay-row">
-                <span>Value</span>
-                <strong>{confirmGift.amount}</strong>
-              </div>
-            </div>
-            <div className="detail-actions">
-              <button
-                className="primary"
-                type="button"
-                onClick={async () => {
-                  setIsPurchasingGift(true)
-                  setGiftMessage('')
-                  const result = await purchaseGift(confirmGift)
-                  if (!result?.ok) {
-                    setGiftMessage(result?.reason === 'auth'
-                      ? 'Please sign in to continue.'
-                      : result?.reason || 'Could not start gift checkout. Please try again.')
-                    setIsPurchasingGift(false)
-                    setConfirmGift(null)
-                    setTimeout(() => setGiftMessage(''), 2800)
-                    return
-                  }
-                  if (!result.checkout) {
-                    setGiftMessage('Gift added to your inventory!')
-                    setActiveGift(null)
-                    setConfirmGift(null)
-                    await refreshBalance?.()
-                    setTimeout(() => setGiftMessage(''), 2800)
-                  }
-                  setIsPurchasingGift(false)
-                }}
-                disabled={isPurchasingGift}
-              >
-                {isPurchasingGift ? 'Redirecting...' : 'Continue to Flutterwave'}
-              </button>
-              <button className="ghost" type="button" onClick={() => setConfirmGift(null)} disabled={isPurchasingGift}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : null}
     </div>
   )
 }

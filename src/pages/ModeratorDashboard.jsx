@@ -1,11 +1,13 @@
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import StatusModal from '../components/StatusModal.jsx'
 import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
+import { uploadToCloudinary } from '../lib/cloudinary.js'
 import {
   getAdminReports,
+  updateAdminReportStatus,
   banUser,
   unbanUser,
   disableAdminTemplate,
@@ -48,6 +50,9 @@ function ModeratorDashboard() {
   // Chat frame request
   const [chatFrameForm, setChatFrameForm] = useState({ name: '', url: '', reason: '' })
   const [chatFrameSubmitting, setChatFrameSubmitting] = useState(false)
+  const [chatFrameUploading, setChatFrameUploading] = useState(false)
+  const [chatFrameDragOver, setChatFrameDragOver] = useState(false)
+  const chatFrameInputRef = useRef(null)
 
   const isModerator = String(currentUser?.role || '').toLowerCase() === 'moderator'
 
@@ -125,6 +130,18 @@ function ModeratorDashboard() {
     }
   }
 
+  const handleUpdateReportStatus = async (report, status) => {
+    const reportId = report.reportId || report._id
+    if (!reportId) return
+    try {
+      await updateAdminReportStatus(reportId, status)
+      setReports(prev => prev.map(r => ((r.reportId || r._id) === reportId ? { ...r, status } : r)))
+      showMsg(`Report marked ${status}.`)
+    } catch (err) {
+      showMsg(err.message || 'Failed to update report.', false)
+    }
+  }
+
   const handleDisableTemplate = async (tpl) => {
     const id = tpl.templateId || tpl._id || tpl.id
     if (!id) return
@@ -151,6 +168,25 @@ function ModeratorDashboard() {
       showMsg(err.message || 'Submission failed.', false)
     } finally {
       setBroadcastSubmitting(false)
+    }
+  }
+
+  const handleChatFrameFile = async (file) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      showMsg(`Please select an image file. Got "${file.type || 'unknown'}".`, false)
+      return
+    }
+    setChatFrameUploading(true)
+    try {
+      const url = await uploadToCloudinary(file, 'image')
+      const fallbackName = file.name.replace(/\.[^.]+$/, '').slice(0, 80)
+      setChatFrameForm(p => ({ ...p, name: p.name || fallbackName, url }))
+      showMsg('Frame image uploaded.')
+    } catch (err) {
+      showMsg(err.message || 'Frame upload failed.', false)
+    } finally {
+      setChatFrameUploading(false)
     }
   }
 
@@ -255,7 +291,7 @@ function ModeratorDashboard() {
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Type</th><th>Target ID</th><th>Reason</th><th>Details</th><th>Reported by</th><th>Status</th><th>Date</th>
+                    <th>Type</th><th>Target ID</th><th>Reason</th><th>Details</th><th>Reported by</th><th>Status</th><th>Date</th><th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -268,10 +304,18 @@ function ModeratorDashboard() {
                       <td>{rep.reportedByUsername || rep.reportedById || '—'}</td>
                       <td><span className={`admin-status-chip ${rep.status || 'open'}`}>{rep.status || 'open'}</span></td>
                       <td>{rep.createdAt ? new Date(rep.createdAt).toLocaleDateString() : '—'}</td>
+                      <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {rep.status !== 'resolved' && (
+                          <button type="button" className="admin-action-btn approve" onClick={() => handleUpdateReportStatus(rep, 'resolved')}>Resolve</button>
+                        )}
+                        {rep.status !== 'dismissed' && (
+                          <button type="button" className="admin-action-btn warn" onClick={() => handleUpdateReportStatus(rep, 'dismissed')}>Dismiss</button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {reports.length === 0 && (
-                    <tr><td colSpan={7} style={{ textAlign: 'center', opacity: 0.5 }}>No reports found.</td></tr>
+                    <tr><td colSpan={8} style={{ textAlign: 'center', opacity: 0.5 }}>No reports found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -447,13 +491,62 @@ function ModeratorDashboard() {
                   />
                 </label>
                 <label className="admin-field" style={{ width: '100%' }}>
-                  <span>Frame Image URL</span>
+                  <span>Frame Image</span>
                   <input
-                    placeholder="https://res.cloudinary.com/..."
-                    value={chatFrameForm.url}
-                    onChange={e => setChatFrameForm(p => ({ ...p, url: e.target.value }))}
+                    ref={chatFrameInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={e => handleChatFrameFile(e.target.files?.[0])}
                   />
+                  <div
+                    onClick={() => !chatFrameUploading && chatFrameInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setChatFrameDragOver(true) }}
+                    onDragLeave={() => setChatFrameDragOver(false)}
+                    onDrop={e => {
+                      e.preventDefault()
+                      setChatFrameDragOver(false)
+                      const file = e.dataTransfer.files?.[0]
+                      if (file) handleChatFrameFile(file)
+                    }}
+                    style={{
+                      width: '100%',
+                      minHeight: 100,
+                      borderRadius: 12,
+                      border: `2px dashed ${chatFrameDragOver ? 'rgba(139, 92, 246, 0.6)' : 'rgba(255,255,255,0.15)'}`,
+                      background: chatFrameDragOver ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255,255,255,0.03)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                      cursor: chatFrameUploading ? 'wait' : 'pointer',
+                      transition: 'border-color 0.15s, background 0.15s',
+                      padding: 12,
+                    }}
+                  >
+                    {chatFrameUploading ? (
+                      <span style={{ color: 'rgba(255,255,255,0.6)' }}>Uploading…</span>
+                    ) : chatFrameForm.url ? (
+                      <>
+                        <img src={chatFrameForm.url} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} />
+                        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Uploaded — drag a new image or click to replace</span>
+                      </>
+                    ) : (
+                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center' }}>
+                        Drag & drop an image here, or click to choose a file
+                      </span>
+                    )}
+                  </div>
                 </label>
+                {chatFrameForm.url && (
+                  <div style={{ width: '100%' }}>
+                    <p className="admin-section-note">This is exactly how the frame will wrap a World Chat bubble — art should sit in the outer ~25% of the image with a transparent center.</p>
+                    <div className="cf-bubble-wrap">
+                      <div className="cf-frame-overlay" style={{ borderImageSource: `url(${chatFrameForm.url})`, borderImageSlice: '33% fill', borderImageWidth: '24px' }} />
+                      <div className="cf-bubble-text">Hey! This frame looks great 🔥</div>
+                    </div>
+                  </div>
+                )}
                 <label className="admin-field" style={{ width: '100%' }}>
                   <span>Reason / Notes (optional)</span>
                   <textarea
@@ -465,21 +558,6 @@ function ModeratorDashboard() {
                     style={{ width: '100%', resize: 'vertical' }}
                   />
                 </label>
-                {chatFrameForm.url && (
-                  <div style={{
-                    background: 'rgba(255,255,255,0.04)', borderRadius: 12,
-                    padding: 16, display: 'flex', alignItems: 'center', gap: 14,
-                    border: '1px solid rgba(255,255,255,0.08)',
-                  }}>
-                    <img
-                      src={chatFrameForm.url}
-                      alt="Preview"
-                      style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(139, 92, 246, 0.4)' }}
-                      onError={e => { e.target.style.display = 'none' }}
-                    />
-                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Frame preview</span>
-                  </div>
-                )}
                 <button
                   className="primary"
                   type="button"

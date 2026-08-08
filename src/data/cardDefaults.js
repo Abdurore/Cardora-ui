@@ -81,10 +81,14 @@ export const defaultCardObject = {
   },
 
   animation: {
-    openEffect: 'confetti',
+    // A blank draft must start at Classic/free — these used to default to an
+    // elite open effect + ambient, which every classic/premium send silently
+    // dropped (and, under computed tiering, would show every fresh card as
+    // "Elite" before the user touched anything).
+    openEffect: 'none',
     confettiColors: ['#76efff', '#62ffa2', '#ff9bd2'],
     backgroundEffect: {
-      type: 'fireflies',
+      type: 'none',
       emojis: ['✨', '💫'],
     },
   },

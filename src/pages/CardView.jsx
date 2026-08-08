@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
-import { getCardBySlug, submitCardResponse, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage } from '../lib/api.js'
+import { getCardBySlug, submitCardResponse, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage, reactToCard } from '../lib/api.js'
 import { mapBackendCard } from '../lib/backendMappers.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import ReportModal from '../components/ReportModal.jsx'
@@ -17,6 +17,12 @@ function CardView() {
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [showReport, setShowReport] = useState(false)
+  // The backend's render-model `interaction` block — real server-side vote
+  // tallies / already-voted / already-answered state, keyed to this viewer's
+  // account or guest id. Kept separate from `card` since it lives on
+  // `res.renderModel`, not `res.card`.
+  const [interaction, setInteraction] = useState(null)
+  const [reactions, setReactions] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +58,8 @@ function CardView() {
           // Preserve raw state for chain replies feed
           mapped._chainState = backendCard.state || res?.state || null
           setCard(mapped)
+          setInteraction(res?.renderModel?.interaction || res?.data?.renderModel?.interaction || null)
+          setReactions(res?.renderModel?.reactions || res?.data?.renderModel?.reactions || null)
           if (mapped.locked && mapped.lockType === 'password') setNeedsPassword(true)
           setLoading(false)
           return
@@ -81,9 +89,21 @@ function CardView() {
   }, [id])
 
   useEffect(() => {
-    const title = card?.title ? `${card.title} | Cardora` : 'You have a surprise... | Cardora'
-    const description = card ? 'Someone sent you something made to be opened, not just viewed.' : 'You have a surprise waiting on Cardora.'
-    const image = `${window.location.origin}/cardora-logo.png?v=4`
+    // Kept as an in-app fallback for any link-preview generator that does
+    // render JS (some do), but the meaningful fix for the standard
+    // non-JS scrapers (Facebook/WhatsApp/Twitter/Discord/Slack) is
+    // api/card-meta.js — see vercel.json's bot-only rewrite for /card/:slug.
+    const typeCopy = {
+      personal: { title: card?.title || 'You have a surprise', description: 'Someone sent you something made to be opened, not just viewed.' },
+      poll: { title: card?.title || 'Cast your vote', description: 'Someone wants to know what you think — tap in to vote.' },
+      trivia: { title: 'You have been challenged to a quiz', description: 'Think you know the answers? Open the card to find out.' },
+      chain: { title: card?.title || 'A chain was started for you', description: 'Keep it going — read the challenge and add your reply.' },
+      anonymous: { title: 'Send an anonymous message', description: '100% anonymous — nobody will know it was you.' },
+    }
+    const copy = typeCopy[card?.type] || typeCopy.personal
+    const title = card ? `${copy.title} | Cardora` : 'You have a surprise... | Cardora'
+    const description = card ? copy.description : 'You have a surprise waiting on Cardora.'
+    const image = card?.layoutdata?.styleExtras?.ogImage || `${window.location.origin}/cardora-logo.png?v=4`
     const meta = [
       ['property', 'og:title', title],
       ['property', 'og:description', description],
@@ -122,6 +142,8 @@ function CardView() {
           gift: backendCard.gift || backendCard.gift_data || res?.gift || res?.gift_data || res?.data?.gift || res?.data?.gift_data || res?.payload?.gift || res?.payload?.gift_data,
           attachedGift: backendCard.attachedGift || backendCard.attached_gift || res?.attachedGift || res?.attached_gift || res?.data?.attachedGift || res?.data?.attached_gift || res?.payload?.attachedGift || res?.payload?.attached_gift,
         }))
+        setInteraction(res?.renderModel?.interaction || res?.data?.renderModel?.interaction || null)
+        setReactions(res?.renderModel?.reactions || res?.data?.renderModel?.reactions || null)
         setNeedsPassword(false)
       }
     } catch (err) {
@@ -236,8 +258,15 @@ function CardView() {
       await submitCardResponse(card.slug || id, payload)
     }
   }
-  const handleAnonSubmit = async (message) => {
-    await sendCardAnonymousMessage(card.slug || id, { message })
+  const handleAnonSubmit = async (message, extras = {}) => {
+    await sendCardAnonymousMessage(card.slug || id, { message, voice: extras.voice, media: extras.media })
+  }
+  const handleQuestionResponse = async (answer) => {
+    await submitCardResponse(card.slug || id, { answer })
+  }
+  const handleReact = async (emoji) => {
+    const res = await reactToCard(card.slug || id, emoji)
+    return { counts: res?.counts || res?.data?.counts, viewerReaction: res?.viewerReaction ?? res?.data?.viewerReaction ?? null }
   }
 
   return (
@@ -256,6 +285,11 @@ function CardView() {
         onTriviaComplete={handleTriviaComplete}
         onChainReply={handleChainReply}
         onAnonSubmit={handleAnonSubmit}
+        allowAnonMedia={!!card.layoutdata?.styleExtras?.allowAnonMedia}
+        reactions={reactions}
+        onReact={handleReact}
+        onQuestionResponse={handleQuestionResponse}
+        interaction={interaction}
         chainState={card._chainState}
         cardId={card.slug || card.id || id}
         senderName={card.senderName || card.sender || card.creatorName || ''}

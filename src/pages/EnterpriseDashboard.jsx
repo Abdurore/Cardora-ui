@@ -16,7 +16,12 @@ function EnterpriseDashboard() {
   const isEnterprise = String(currentUser?.role || '').toLowerCase() === 'enterprise'
 
   useEffect(() => {
-    if (!isEnterprise) return
+    // Reset immediately on identity change so a previous account's numbers
+    // never render under a new session while the fresh fetch is in flight.
+    setStats(null)
+    setAds([])
+    setError('')
+    if (!isEnterprise || !currentUser?.id) return
     setLoading(true)
     getEnterpriseAdStats()
       .then(res => {
@@ -28,7 +33,7 @@ function EnterpriseDashboard() {
       })
       .catch(err => setError(err?.message || 'Failed to load stats.'))
       .finally(() => setLoading(false))
-  }, [isEnterprise])
+  }, [isEnterprise, currentUser?.id])
 
   const handleToggleAd = async (ad) => {
     const adId = ad._id || ad.id || ad.adId

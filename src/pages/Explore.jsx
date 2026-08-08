@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useOutletContext, useSearchParams, Link } from 'react-router-dom'
 import { HiOutlineMagnifyingGlass, HiOutlineFire } from 'react-icons/hi2'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -11,13 +11,13 @@ function Explore() {
   const {
     openCardDetails,
     favorites,
-    toggleFavorite,
     likedTemplates,
     toggleLike,
     currentUser,
     openAuthModal,
     balance,
     marketplaceTemplates,
+    authReady,
   } = useOutletContext()
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') || '')
@@ -40,6 +40,42 @@ function Explore() {
       })
       .catch(() => {})
   }, [])
+
+  // `toggleLike` (in MainLayout) only patches `marketplaceTemplates` and
+  // `selectedCard` — it has no way to reach this component's own
+  // `trendingTemplates` list. Rather than duplicate its optimistic-update /
+  // error-rollback logic here, mirror off the canonical `likedTemplates`
+  // array itself: it already reflects both the optimistic flip and any
+  // revert-on-failure, so reacting to its transitions keeps the trending
+  // rail's counts correct without a second source of truth.
+  const prevLikedRef = useRef(likedTemplates)
+  // `likedTemplates` starts as [] and is populated asynchronously once session
+  // hydration resolves (MainLayout.jsx) — that first population is not a user
+  // action and must not be diffed as one, or every already-liked trending card
+  // gets its already-correct, freshly-fetched count bumped by +1 on mount/reload.
+  // Wait for `authReady` (hydration complete) before establishing the baseline.
+  const baselineSetRef = useRef(false)
+  useEffect(() => {
+    if (!authReady) return
+    if (!baselineSetRef.current) {
+      baselineSetRef.current = true
+      prevLikedRef.current = likedTemplates
+      return
+    }
+    const prevLiked = prevLikedRef.current
+    if (prevLiked !== likedTemplates) {
+      setTrendingTemplates((list) => list.map((card) => {
+        const cardIds = [card.id, card._id].filter(Boolean).map(String)
+        const wasLiked = cardIds.some((id) => prevLiked.includes(id))
+        const isLiked = cardIds.some((id) => likedTemplates.includes(id))
+        if (wasLiked === isLiked) return card
+        const current = Number(card.likeCount ?? card.likesCount ?? card.likes ?? 0) || 0
+        const next = Math.max(0, current + (isLiked ? 1 : -1))
+        return { ...card, likeCount: next, likes: String(next) }
+      }))
+      prevLikedRef.current = likedTemplates
+    }
+  }, [likedTemplates, authReady])
 
   useEffect(() => {
     const params = {}
@@ -106,6 +142,7 @@ function Explore() {
             <p className="eyebrow">Marketplace</p>
             <h2 className="marketplace-title">Find a card that already feels like a memory.</h2>
           </div>
+          <Link to="/artists" className="marketplace-artists-link">Meet the Artists →</Link>
         </div>
 
         <div className="search">
@@ -188,12 +225,18 @@ function Explore() {
           </button>
         </div>
 
-        {filteredCards.length ? (
+        {!authReady && cardSource.length === 0 ? (
+          <div className="card-grid compact marketplace-grid" aria-hidden="true">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="card-grid-skeleton-item" />
+            ))}
+          </div>
+        ) : filteredCards.length ? (
           <>
             <div className="card-grid compact marketplace-grid">
               {pagedCards.map((card, index) => (
                 <CardItem
-                  key={`${card.title}-${index}`}
+                  key={card.id || card.templateId || `${card.title}-${index}`}
                   {...card}
                   variant={`v${(index % 4) + 1}`}
                   isLiked={likedTemplates.includes(card.id)}

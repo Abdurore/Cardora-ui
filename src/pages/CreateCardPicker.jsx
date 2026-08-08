@@ -1,9 +1,11 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
+import { TIER_COST_BY_TYPE } from '../lib/tierRequirements.js'
 
-// Tier matrix mirrors backend CARD_COSTS (CLAUDE.md: single source of truth).
-// Premium is personal-only; non-personal types only support classic + elite.
+// No tier step anymore — "design free, pay at send": the studio is fully
+// open from the start, and the card's tier/cost is computed live from what
+// actually gets used (see src/lib/tierRequirements.js), shown in the studio's
+// own tier meter. This page is just type selection now.
 const CARD_TYPES = [
   {
     id: 'personal',
@@ -11,11 +13,6 @@ const CARD_TYPES = [
     Icon: PersonalCardIcon,
     desc: 'A cinematic card with envelope reveal, music, media, and effects.',
     accent: '#f0c060',
-    tiers: [
-      { id: 'classic', label: 'Classic', desc: 'Clean design, no effects', cost: '0 CC' },
-      { id: 'premium', label: 'Premium', desc: 'Music, animations, full effects', cost: '25 CC' },
-      { id: 'elite', label: 'Elite', desc: 'Everything + exclusive envelope styles', cost: '35 CC' },
-    ],
   },
   {
     id: 'chain',
@@ -23,10 +20,6 @@ const CARD_TYPES = [
     Icon: ChainCardIcon,
     desc: 'Send a card that invites the recipient to reply with their own card back.',
     accent: '#f97316',
-    tiers: [
-      { id: 'classic', label: 'Classic', desc: 'Simple card with chain prompt', cost: '0 CC' },
-      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '40 CC' },
-    ],
   },
   {
     id: 'anonymous',
@@ -34,10 +27,6 @@ const CARD_TYPES = [
     Icon: AnonCardIcon,
     desc: 'Let anyone send you anonymous messages wrapped in a designed card.',
     accent: '#7ef7ff',
-    tiers: [
-      { id: 'classic', label: 'Classic', desc: 'Free to receive, clean template', cost: '0 CC' },
-      { id: 'elite', label: 'Elite', desc: 'Premium template with full effects', cost: '45 CC' },
-    ],
   },
   {
     id: 'poll',
@@ -45,10 +34,6 @@ const CARD_TYPES = [
     Icon: PollCardIcon,
     desc: 'Ask your audience a question. See live results when they answer.',
     accent: '#60a5fa',
-    tiers: [
-      { id: 'classic', label: 'Classic', desc: 'Simple question + options', cost: '0 CC' },
-      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '35 CC' },
-    ],
   },
   {
     id: 'trivia',
@@ -56,66 +41,39 @@ const CARD_TYPES = [
     Icon: TriviaCardIcon,
     desc: 'Quiz your friends. They see their score and correct answers.',
     accent: '#a78bfa',
-    tiers: [
-      { id: 'classic', label: 'Classic', desc: 'Standard quiz format', cost: '0 CC' },
-      { id: 'elite', label: 'Elite', desc: 'Styled card with full effects', cost: '50 CC' },
-    ],
   },
 ]
 
+function pricingHint(typeId) {
+  const costs = TIER_COST_BY_TYPE[typeId] || TIER_COST_BY_TYPE.personal
+  const max = Math.max(...Object.values(costs).filter((v) => typeof v === 'number'))
+  return max > 0 ? `Free to start · premium touches up to ${max} CC` : 'Free to start'
+}
+
 function CreateCardPicker() {
   const navigate = useNavigate()
-  const [step, setStep] = useState('type')
-  const [selectedType, setSelectedType] = useState(null)
 
   return (
     <div className="ccp-backdrop" onClick={() => navigate(-1)}>
       <div className="ccp-modal" onClick={e => e.stopPropagation()}>
-        {step === 'type' && (
-          <>
-            <button className="ccp-close" onClick={() => navigate(-1)}>×</button>
-            <p className="eyebrow">Create</p>
-            <h2 className="ccp-heading">What kind of card?</h2>
-            <div className="ccp-type-grid">
-              {CARD_TYPES.map(type => (
-                <button
-                  key={type.id}
-                  className="ccp-type-card"
-                  style={{ '--type-accent': type.accent }}
-                  onClick={() => { setSelectedType(type); setStep('tier') }}
-                >
-                  <type.Icon size={32} className="ccp-type-icon" />
-                  <strong className="ccp-type-label">{type.label}</strong>
-                  <p className="ccp-type-desc">{type.desc}</p>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-        {step === 'tier' && selectedType && (
-          <>
-            <button className="ccp-back" onClick={() => setStep('type')}>← Back</button>
-            <p className="eyebrow" style={{ color: selectedType.accent, display: 'flex', alignItems: 'center', gap: 6 }}><selectedType.Icon size={14} color={selectedType.accent} /> {selectedType.label}</p>
-            <h2 className="ccp-heading">Choose a tier</h2>
-            <div className="ccp-tier-list">
-              {selectedType.tiers.map(tier => (
-                <button
-                  key={tier.id}
-                  className="ccp-tier-card"
-                  style={{ '--type-accent': selectedType.accent }}
-                  onClick={() => navigate(`/studio?type=${selectedType.id}&tier=${tier.id}`, { state: { isNew: true } })}
-                >
-                  <div className="ccp-tier-top">
-                    <strong className="ccp-tier-label">{tier.label}</strong>
-                    <span className="ccp-tier-cost">{tier.cost}</span>
-                  </div>
-                  <p className="ccp-tier-desc">{tier.desc}</p>
-                  <span className="ccp-tier-arrow">→</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+        <button className="ccp-close" onClick={() => navigate(-1)}>×</button>
+        <p className="eyebrow">Create</p>
+        <h2 className="ccp-heading">What kind of card?</h2>
+        <div className="ccp-type-grid">
+          {CARD_TYPES.map(type => (
+            <button
+              key={type.id}
+              className="ccp-type-card"
+              style={{ '--type-accent': type.accent }}
+              onClick={() => navigate(`/studio?type=${type.id}`, { state: { isNew: true } })}
+            >
+              <type.Icon size={32} className="ccp-type-icon" />
+              <strong className="ccp-type-label">{type.label}</strong>
+              <p className="ccp-type-desc">{type.desc}</p>
+              <span className="ccp-type-pricing">{pricingHint(type.id)}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
