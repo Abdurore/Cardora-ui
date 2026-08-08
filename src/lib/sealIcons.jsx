@@ -60,3 +60,19 @@ export function renderSealContent(sealIconKey, monogramLetter) {
   }
   return SEAL_ICONS[sealIconKey] || SEAL_ICONS.wax
 }
+
+// Was hand-copied byte-for-byte in Envelope.jsx and twice more in
+// CardStudio.jsx (desktop + mobile envelope previews) before this module
+// existed — same drift risk as the seal icons themselves.
+export function deriveRecipientName(explicit, email) {
+  if (explicit) return explicit
+  if (!email || typeof email !== 'string') return ''
+  const local = email.split('@')[0] || ''
+  if (!local) return ''
+  return local
+    .replace(/[._-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}

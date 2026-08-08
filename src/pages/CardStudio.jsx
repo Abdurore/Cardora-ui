@@ -18,7 +18,8 @@ import ColorPicker from '../components/ColorPicker.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { getCardPrices, getMediaVideos, getMediaMusic, attachGiftToCard } from '../lib/api.js'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
-import { SEAL_ICON_OPTIONS, renderSealContent } from '../lib/sealIcons.jsx'
+import { SEAL_ICON_OPTIONS } from '../lib/sealIcons.jsx'
+import StudioEnvelope from '../components/StudioEnvelope.jsx'
 import AmbientParticles from '../components/AmbientParticles.jsx'
 import { getTierLimits } from '../lib/tierLimits.js'
 import { PALETTES, getPalettesForTier, applyPalette } from '../lib/palettes.js'
@@ -178,19 +179,6 @@ function deepMerge(target, source) {
     }
   }
   return result
-}
-
-function deriveRecipientName(explicit, email) {
-  if (explicit) return explicit
-  if (!email || typeof email !== 'string') return ''
-  const local = email.split('@')[0] || ''
-  if (!local) return ''
-  return local
-    .replace(/[._-]+/g, ' ')
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ')
 }
 
 function ColorInput({ value, onChange, label }) {
@@ -456,10 +444,6 @@ function CardStudio() {
   const [activeTool, setActiveTool] = useState(defaultToolId)
   const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'envelope' : 'card')
   const [showPreview, setShowPreview] = useState(false)
-  // Desktop canvas view mode — 'play' mounts CardPreviewModal embedded inline
-  // in the same frame Design mode uses (see .cs-canvas-play-stage), instead
-  // of the full-screen modal takeover `showPreview` still drives for mobile.
-  const [studioViewMode, setStudioViewMode] = useState('design')
   const [savedState, setSavedState] = useState(initialAutoSaved ? 'Restored from last session' : 'Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
   const [publishForm, setPublishForm] = useState({
@@ -3430,52 +3414,13 @@ function CardStudio() {
                   Live Preview
                 </p>
               )}
-              <div className="cs-view-mode-toggle" role="tablist" aria-label="Studio view mode">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={studioViewMode === 'design'}
-                  className={`cs-view-mode-btn ${studioViewMode === 'design' ? 'active' : ''}`}
-                  onClick={() => setStudioViewMode('design')}
-                >
-                  Design
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={studioViewMode === 'play'}
-                  className={`cs-view-mode-btn ${studioViewMode === 'play' ? 'active' : ''}`}
-                  onClick={() => setStudioViewMode('play')}
-                >
-                  ▶ Play it through
-                </button>
-              </div>
+              <button type="button" className="cs-preview-toggle" onClick={enterPreview}>
+                ▶ Play it through
+              </button>
             </div>
 
-            {/* Play mode — same CardPreviewModal the recipient gets, mounted
-                inline in this frame instead of a full-screen takeover. */}
-            {studioViewMode === 'play' && (
-              <div className="cs-canvas-play-stage">
-                <CardPreviewModal
-                  cardObject={previewCardObject}
-                  studioType={studioType}
-                  tier={studioTier}
-                  allowedTools={allowedToolIds}
-                  tierLimits={previewTierLimits}
-                  pollData={pollData}
-                  triviaData={triviaData}
-                  anonTemplate={anonTemplate}
-                  allowAnonMedia={!!anonTemplate.allowMedia}
-                  embedded
-                  onClose={() => setStudioViewMode('design')}
-                />
-              </div>
-            )}
-
-            {/* Phone frame — Design mode. Kept mounted (display:none rather
-                than unmounted) while Play mode is active so its edit state
-                (scroll position, in-progress inline edits) isn't lost. */}
-            <div className="cs-phone-frame" style={{ display: studioViewMode === 'play' ? 'none' : undefined }}>
+            {/* Phone frame */}
+            <div className="cs-phone-frame">
               <div className="cs-phone-notch" />
               <div className={`cs-phone-screen${previewBgAnimated ? ' cs-bg-anim' : ''}`} style={{ background: previewBg, backgroundSize: previewBgAnimated ? '300% 300%' : undefined }}>
                 {c.background.type === 'image' && c.background.imageUrl ? (
@@ -3486,135 +3431,22 @@ function CardStudio() {
                 ) : null}
                 {renderStudioAmbientEffect()}
                 {/* Envelope State Preview — editable */}
-                {activeStep === 'envelope' && (() => {
-                  const env = c.closedState.envelope || {}
-                  const paperTextureClass = `paper-${env.paperTexture || 'smooth'}`
-                  const sealIconKey = env.sealIcon || 'monogram'
-                  const recipientName = deriveRecipientName(env.recipientCaption, currentUser?.email)
-                  const monogramLetter = recipientName ? recipientName.charAt(0).toUpperCase() : '♥'
-                  const sealContent = <span style={{ width: '24px', height: '24px', display: 'inline-flex', color: 'inherit' }}>{renderSealContent(sealIconKey, monogramLetter)}</span>
-
-                  return (
-                    <div
-                      className="cs-preview-envelope-container"
-                      onClick={() => setActiveEditEl(null)}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      {/* Envelope body — natural 240px width, no scale tricks */}
-                      <div
-                        className={`envelope-body ${paperTextureClass} cs-editable-envelope`}
-                        style={{
-                          '--envelope-body': env.bodyColor || '#1a1f2c',
-                          '--envelope-flap': env.flapColor || '#242a38',
-                          '--envelope-border': c.closedState.borderColor || 'rgba(126, 247, 255, 0.25)',
-                          width: '240px',
-                          position: 'relative',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <div className="envelope-inside-glow" />
-
-                        {/* Body hitbox — covers full envelope at z:1 */}
-                        <div
-                          className={`envelope-body-hitbox${activeEditEl?.type === 'envelopeBody' ? ' cs-edit-active' : ''}`}
-                          onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeBody', index: 0 }) }}
-                          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}
-                        />
-
-                        {/* Visual flap — no pointer events, purely decorative */}
-                        <div className="envelope-flap" style={{ pointerEvents: 'none' }} />
-
-                        {/* SVG glowing triangle outline — only when flap is active */}
-                        {activeEditEl?.type === 'envelopeFlap' && (
-                          <svg
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '62%', zIndex: 5, pointerEvents: 'none', overflow: 'visible' }}
-                            viewBox="0 0 100 100"
-                            preserveAspectRatio="none"
-                          >
-                            <defs>
-                              <filter id="flap-glow" x="-40%" y="-40%" width="180%" height="180%">
-                                <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
-                                <feMerge>
-                                  <feMergeNode in="blur" />
-                                  <feMergeNode in="blur" />
-                                  <feMergeNode in="SourceGraphic" />
-                                </feMerge>
-                              </filter>
-                            </defs>
-                            <polygon
-                              points="0,0 100,0 50,100"
-                              fill="none"
-                              stroke="rgba(126,247,255,0.45)"
-                              strokeWidth="2"
-                              filter="url(#flap-glow)"
-                            />
-                          </svg>
-                        )}
-
-                        {/* Transparent flap hit zone at z:3 — above flap visual but below seal */}
-                        <div
-                          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '62%', zIndex: 3, cursor: 'pointer', clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
-                          onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeFlap', index: 0 }) }}
-                        />
-
-                        {/* Seal — z:10 so it's always on top and clickable */}
-                        <span
-                          className={`envelope-seal${activeEditEl?.type === 'envelopeSeal' ? ' cs-edit-active' : ''}`}
-                          style={{ '--seal-color': env.sealColor || '#b03030', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}
-                          onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeSeal', index: 0 }) }}
-                        >
-                          {sealContent}
-                        </span>
-
-                        {/* Floating toolbar for desktop — anchored inside envelope body */}
-                        {activeEditEl && (activeEditEl.type === 'envelopeBody' || activeEditEl.type === 'envelopeFlap' || activeEditEl.type === 'envelopeSeal') && (
-                          <div className="cs-edit-toolbar cs-edit-toolbar-envelope-inner" onClick={e => e.stopPropagation()}>
-                            {activeEditEl.type === 'envelopeBody' && (
-                              <>
-                                <span className="cs-edit-toolbar-label">Body</span>
-                                <InlineColorPicker value={env.bodyColor || '#1a1f2c'} onChange={e => update('closedState.envelope.bodyColor', e.target.value)} presets={colorPresets} label="Color" />
-                                <Dropdown
-                                  usePortal
-                                  className="cs-toolbar-dropdown"
-                                  value={env.paperTexture || 'smooth'}
-                                  onChange={v => update('closedState.envelope.paperTexture', v)}
-                                  options={[
-                                    { label: 'Smooth', value: 'smooth' },
-                                    { label: 'Linen', value: 'linen' },
-                                    { label: 'Parchment', value: 'parchment' },
-                                  ]}
-                                />
-                              </>
-                            )}
-                            {activeEditEl.type === 'envelopeFlap' && (
-                              <>
-                                <span className="cs-edit-toolbar-label">Flap</span>
-                                <InlineColorPicker value={env.flapColor || '#242a38'} onChange={e => update('closedState.envelope.flapColor', e.target.value)} presets={colorPresets} label="Color" />
-                              </>
-                            )}
-                            {activeEditEl.type === 'envelopeSeal' && (
-                              <>
-                                <span className="cs-edit-toolbar-label">Seal</span>
-                                <InlineColorPicker value={env.sealColor || '#b03030'} onChange={e => update('closedState.envelope.sealColor', e.target.value)} presets={colorPresets} label="Color" />
-                                <Dropdown
-                                  usePortal
-                                  className="cs-toolbar-dropdown"
-                                  value={env.sealIcon || 'monogram'}
-                                  onChange={v => update('closedState.envelope.sealIcon', v)}
-                                  options={SEAL_ICON_OPTIONS}
-                                />
-                              </>
-                            )}
-                            <button type="button" className="cs-edit-toolbar-close" onClick={() => setActiveEditEl(null)}>×</button>
-                          </div>
-                        )}
-
-                      </div>
-                    </div>
-                  )
-
-                })()}
+                {activeStep === 'envelope' && (
+                  <StudioEnvelope
+                    envelope={c.closedState.envelope}
+                    borderColor={c.closedState.borderColor}
+                    recipientCaption={c.closedState.envelope?.recipientCaption}
+                    recipientEmail={currentUser?.email}
+                    width={240}
+                    activeEditEl={activeEditEl}
+                    onSelect={setActiveEditEl}
+                    onDismiss={() => setActiveEditEl(null)}
+                    showToolbar
+                    colorPresets={colorPresets}
+                    onUpdate={update}
+                    containerStyle={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  />
+                )}
 
                 {/* Letter Peek State Preview — editable */}
                 {activeStep === 'letterPeek' && (
@@ -3750,70 +3582,19 @@ function CardStudio() {
           ) : null}
           {renderStudioAmbientEffect()}
           {activeStep === 'envelope' ? (
-            (() => {
-              const env = c.closedState.envelope || {}
-              const paperTextureClass = `paper-${env.paperTexture || 'smooth'}`
-              const sealIconKey = env.sealIcon || 'monogram'
-              const recipientName = deriveRecipientName(env.recipientCaption, currentUser?.email)
-              const monogramLetter = recipientName ? recipientName.charAt(0).toUpperCase() : '♥'
-              const sealContent = <span style={{ width: '24px', height: '24px', display: 'inline-flex', color: 'inherit' }}>{renderSealContent(sealIconKey, monogramLetter)}</span>
-
-              return (
-                <div className="cs-preview-envelope-container" onClick={() => setActiveEditEl(null)} style={{width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                  <div
-                    className={`envelope-body ${paperTextureClass} cs-editable-envelope`}
-                    style={{
-                      '--envelope-body': env.bodyColor || '#1a1f2c',
-                      '--envelope-flap': env.flapColor || '#242a38',
-                      '--envelope-border': c.closedState.borderColor || 'rgba(126, 247, 255, 0.25)',
-                      width: '260px',
-                      position: 'relative',
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div className="envelope-inside-glow" />
-                    {/* Body hitbox at z:1 — full coverage */}
-                    <div
-                      className={`envelope-body-hitbox${activeEditEl?.type === 'envelopeBody' ? ' cs-edit-active' : ''}`}
-                      onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeBody', index: 0 }) }}
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}
-                    />
-                    {/* Visual flap — pointer-events none */}
-                    <div className="envelope-flap" style={{ pointerEvents: 'none' }} />
-                    {/* SVG triangle glow when flap selected */}
-                    {activeEditEl?.type === 'envelopeFlap' && (
-                      <svg
-                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '62%', zIndex: 5, pointerEvents: 'none', overflow: 'visible' }}
-                        viewBox="0 0 100 100"
-                        preserveAspectRatio="none"
-                      >
-                        <defs>
-                          <filter id="flap-glow-m" x="-40%" y="-40%" width="180%" height="180%">
-                            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
-                            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                          </filter>
-                        </defs>
-                        <polygon points="0,0 100,0 50,100" fill="none" stroke="rgba(126,247,255,0.45)" strokeWidth="2" filter="url(#flap-glow-m)" />
-                      </svg>
-                    )}
-                    {/* Flap hit zone at z:3 */}
-                    <div
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '62%', zIndex: 3, cursor: 'pointer', clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
-                      onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeFlap', index: 0 }) }}
-                    />
-                    {/* Seal at z:10 */}
-                    <span
-                      className={`envelope-seal${activeEditEl?.type === 'envelopeSeal' ? ' cs-edit-active' : ''}`}
-                      style={{ '--seal-color': env.sealColor || '#b03030', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' }}
-                      onClick={(e) => { e.stopPropagation(); setActiveEditEl({ type: 'envelopeSeal', index: 0 }) }}
-                    >
-                      {sealContent}
-                    </span>
-                  </div>
-                </div>
-              )
-            })()
+            <StudioEnvelope
+              envelope={c.closedState.envelope}
+              borderColor={c.closedState.borderColor}
+              recipientCaption={c.closedState.envelope?.recipientCaption}
+              recipientEmail={currentUser?.email}
+              width={260}
+              activeEditEl={activeEditEl}
+              onSelect={setActiveEditEl}
+              onDismiss={() => setActiveEditEl(null)}
+              showToolbar={false}
+              onUpdate={update}
+              containerStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            />
           ) : activeStep === 'letterPeek' ? (
             <div className="cs-preview-closed compact" style={{ backgroundColor: c.closedState.backgroundColor, border: `2px solid ${c.closedState.borderColor}` }} onClick={() => setActiveEditEl(null)}>
               <h3

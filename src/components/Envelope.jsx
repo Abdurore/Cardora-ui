@@ -1,19 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { getEnvelopeTierProfile, getPacingMultiplier } from '../lib/envelopeTiers.js'
-import { SEAL_ICONS } from '../lib/sealIcons.jsx'
-
-function deriveRecipientName(explicit, email) {
-  if (explicit) return explicit
-  if (!email || typeof email !== 'string') return ''
-  const local = email.split('@')[0] || ''
-  if (!local) return ''
-  return local
-    .replace(/[._-]+/g, ' ')
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ')
-}
+import { SEAL_ICONS, deriveRecipientName } from '../lib/sealIcons.jsx'
 
 const TIER_ALIASES = { simple: 'classic', special: 'premium', signature: 'elite' }
 function normaliseTier(tier) {
