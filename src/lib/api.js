@@ -147,7 +147,6 @@ async function request(path, { method = 'GET', body, auth = false, headers = {},
   const token = getStoredToken()
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
-  if (method !== 'GET') console.log('[API Request]', method, url, body)
   let response
   try {
     response = await fetch(url, {

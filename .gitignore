@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Env files — only VITE_ vars end up here and they're bundled into the
+# client JS regardless, but committing env files at all is bad precedent.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

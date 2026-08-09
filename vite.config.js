@@ -12,4 +12,12 @@ export default defineConfig({
   server: {
     historyApiFallback: true,
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.js',
+    // Backend/Cardora is a nested, independently git-tracked repo with its
+    // own Jest test suite — exclude it so vitest doesn't try to run it too.
+    exclude: ['**/node_modules/**', 'Backend/**'],
+  },
 })

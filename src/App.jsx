@@ -1,54 +1,69 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout.jsx'
-import Home from './pages/Home.jsx'
-import Explore from './pages/Explore.jsx'
-import Artists from './pages/Artists.jsx'
-import Store from './pages/Store.jsx'
-import Profile from './pages/Profile.jsx'
-import StoreGifts from './pages/StoreGifts.jsx'
-import CardView from './pages/CardView.jsx'
-import CardStudio from './pages/CardStudio.jsx'
-import AdminDashboard from './pages/AdminDashboard.jsx'
-import ModeratorDashboard from './pages/ModeratorDashboard.jsx'
-import EnterpriseDashboard from './pages/EnterpriseDashboard.jsx'
-import ArtistDashboard from './pages/ArtistDashboard.jsx'
-import WorldChat from './pages/WorldChat.jsx'
-import AuthPage from './pages/AuthPage.jsx'
-import LegalPage from './pages/LegalPage.jsx'
-import AnonSend from './pages/AnonSend.jsx'
-import CreateCardPicker from './pages/CreateCardPicker.jsx'
-import CardResponses from './pages/CardResponses.jsx'
-import QuickCreate from './pages/QuickCreate.jsx'
-import NotFound from './pages/NotFound.jsx'
+
+// Route-level code splitting — previously every page shipped in one ~1.1MB
+// bundle regardless of which route a visitor actually landed on. Each page
+// now loads on demand instead.
+const Home = lazy(() => import('./pages/Home.jsx'))
+const Explore = lazy(() => import('./pages/Explore.jsx'))
+const Artists = lazy(() => import('./pages/Artists.jsx'))
+const Store = lazy(() => import('./pages/Store.jsx'))
+const StoreGifts = lazy(() => import('./pages/StoreGifts.jsx'))
+const Profile = lazy(() => import('./pages/Profile.jsx'))
+const CardView = lazy(() => import('./pages/CardView.jsx'))
+const CardStudio = lazy(() => import('./pages/CardStudio.jsx'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'))
+const ModeratorDashboard = lazy(() => import('./pages/ModeratorDashboard.jsx'))
+const EnterpriseDashboard = lazy(() => import('./pages/EnterpriseDashboard.jsx'))
+const ArtistDashboard = lazy(() => import('./pages/ArtistDashboard.jsx'))
+const WorldChat = lazy(() => import('./pages/WorldChat.jsx'))
+const AuthPage = lazy(() => import('./pages/AuthPage.jsx'))
+const LegalPage = lazy(() => import('./pages/LegalPage.jsx'))
+const AnonSend = lazy(() => import('./pages/AnonSend.jsx'))
+const CreateCardPicker = lazy(() => import('./pages/CreateCardPicker.jsx'))
+const CardResponses = lazy(() => import('./pages/CardResponses.jsx'))
+const QuickCreate = lazy(() => import('./pages/QuickCreate.jsx'))
+const NotFound = lazy(() => import('./pages/NotFound.jsx'))
+
+function RouteFallback() {
+  return (
+    <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center', color: 'rgba(232,241,244,0.5)' }}>
+      Loading…
+    </div>
+  )
+}
 
 function App() {
   return (
-    <Routes>
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/explore" element={<Explore />} />
-        <Route path="/artists" element={<Artists />} />
-        <Route path="/store" element={<Store />} />
-        <Route path="/store/gifts" element={<StoreGifts />} />
-        <Route path="/card/:id" element={<CardView />} />
-        <Route path="/card/:slug/responses" element={<CardResponses />} />
-        <Route path="/studio" element={<CardStudio />} />
-        <Route path="/quick" element={<QuickCreate />} />
-        <Route path="/create" element={<CreateCardPicker />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/moderator" element={<ModeratorDashboard />} />
-        <Route path="/enterprise" element={<EnterpriseDashboard />} />
-        <Route path="/artist" element={<ArtistDashboard />} />
-        <Route path="/chat" element={<WorldChat />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/login" element={<AuthPage mode="login" />} />
-        <Route path="/signup" element={<AuthPage mode="signup" />} />
-        <Route path="/legal/:doc" element={<LegalPage />} />
-        <Route path="*" element={<NotFound />} />
-      </Route>
-      {/* Public anonymous send page — outside MainLayout so no auth context required */}
-      <Route path="/ask/:username" element={<AnonSend />} />
-    </Routes>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/explore" element={<Explore />} />
+          <Route path="/artists" element={<Artists />} />
+          <Route path="/store" element={<Store />} />
+          <Route path="/store/gifts" element={<StoreGifts />} />
+          <Route path="/card/:id" element={<CardView />} />
+          <Route path="/card/:slug/responses" element={<CardResponses />} />
+          <Route path="/studio" element={<CardStudio />} />
+          <Route path="/quick" element={<QuickCreate />} />
+          <Route path="/create" element={<CreateCardPicker />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/moderator" element={<ModeratorDashboard />} />
+          <Route path="/enterprise" element={<EnterpriseDashboard />} />
+          <Route path="/artist" element={<ArtistDashboard />} />
+          <Route path="/chat" element={<WorldChat />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/login" element={<AuthPage mode="login" />} />
+          <Route path="/signup" element={<AuthPage mode="signup" />} />
+          <Route path="/legal/:doc" element={<LegalPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
+        {/* Public anonymous send page — outside MainLayout so no auth context required */}
+        <Route path="/ask/:username" element={<AnonSend />} />
+      </Routes>
+    </Suspense>
   )
 }
 

@@ -977,27 +977,6 @@ function MainLayout() {
         ? { type: 'personal', ...finalPayload }
         : finalPayload
 
-      const endpoint = resolvedType === 'poll'
-        ? `/create-card/poll/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-        : resolvedType === 'chain'
-          ? `/create-card/chain/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-          : resolvedType === 'trivia'
-            ? `/create-card/trivia/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-            : resolvedType === 'anonymous'
-              ? `/create-card/anonymous/${resolvedTier === 'elite' ? 'elite' : 'classic'}`
-              : `/create-card/${resolvedTier}`
-
-      console.group(`%c[CardCreate] POST ${endpoint}`, 'color:#7ef7ff;font-weight:bold')
-      try {
-        console.log('%cFull payload:', 'color:#62ffa2;font-weight:bold', structuredClone(payload))
-        console.log('%cconfig.content:', 'color:#ffcc80;font-weight:bold', structuredClone(backendPayload.config?.content ?? {}))
-        console.log('%cenhancements:', 'color:#a0b8ff;font-weight:bold', structuredClone(payload.enhancements ?? {}))
-        console.log('%c⚠ EXACT JSON being sent:', 'color:#ffd700;font-weight:bold;font-size:13px', JSON.stringify(payload, null, 2))
-      } catch (logErr) {
-        console.log('(could not clone payload for debug logging)', logErr)
-      }
-      console.groupEnd()
-
       let response
       if (resolvedType === 'poll') {
         response = resolvedTier === 'elite'
@@ -1021,7 +1000,6 @@ function MainLayout() {
         else response = await createCardClassic(payload)
       }
 
-      console.log('%c[CardCreate] ✓ Success response:', 'color:#62ffa2;font-weight:bold', response)
       return { ok: true, data: response, message: getResponseMessage(response, 'Card created!') }
     } catch (error) {
       console.group('%c[CardCreate] ✗ Error', 'color:#ff6b6b;font-weight:bold')
