@@ -6888,6 +6888,15 @@ a {
   align-items: start;
 }
 
+/* Rail stays icon-compact regardless of viewport; canvas already grows via
+   1fr. Only the settings column was capped at 340px on every screen size —
+   give the 9 tool panels more breathing room on large monitors. */
+@media (min-width: 1600px) {
+  .cs-layout {
+    grid-template-columns: 190px minmax(0, 1fr) 420px;
+  }
+}
+
 .cs-toolrail,
 .cs-settings,
 .cs-canvas {
