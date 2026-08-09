@@ -6,6 +6,7 @@ import Envelope from './Envelope.jsx'
 import AmbientParticles from './AmbientParticles.jsx'
 import { fireOpenEffect } from '../lib/studioEffects.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
+import { prefersReducedMotion, getMotionIntensity } from '../lib/deviceCapability.js'
 import { claimGiftFromCard } from '../lib/api.js'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
@@ -21,19 +22,33 @@ const ENTRY_DEFAULTS = {
   anonymous: { label: 'Anonymous Card',   Icon: AnonCardIcon,     hint: 'Open to send an anonymous message',  color: '#c084fc' },
 }
 
-// Typewriter hook
+// Typewriter hook — elapsed-time-driven via requestAnimationFrame rather than a
+// setInterval tick per character. A per-character interval fires faster than the
+// browser's own paint cycle for anything but very short text, forcing more React
+// re-renders than frames actually available and guaranteeing dropped frames — worst
+// exactly when it's competing with an open-effect burst and ambient particles on the
+// same card-open transition. Driving off elapsed time instead means it can never
+// outrun the frame rate, and it self-corrects after a dropped frame instead of drifting.
 function useTypewriter(text, speed, active) {
   const [displayed, setDisplayed] = useState('')
   useEffect(() => {
-    if (!active || !text) { setDisplayed(active ? text : ''); return }
+    if (!active || !text) { setDisplayed(active ? text : ''); return undefined }
     setDisplayed('')
-    let i = 0
-    const iv = setInterval(() => {
-      i++
-      setDisplayed(text.slice(0, i))
-      if (i >= text.length) clearInterval(iv)
-    }, speed * 1000 / text.length)
-    return () => clearInterval(iv)
+    const duration = speed * 1000
+    const startTime = performance.now()
+    let frame
+    let lastCount = 0
+    const tick = (now) => {
+      const elapsed = now - startTime
+      const count = Math.min(text.length, Math.floor((elapsed / duration) * text.length))
+      if (count !== lastCount) {
+        lastCount = count
+        setDisplayed(text.slice(0, count))
+      }
+      if (count < text.length) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
   }, [text, speed, active])
   return displayed
 }
@@ -124,6 +139,10 @@ function CardPreviewModal({
   const [questionSubmitError, setQuestionSubmitError] = useState('')
   const [fadeBody, setFadeBody] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
   const [bodyVisible, setBodyVisible] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
+  // Delays the typewriter's start until just after the open-effect burst's
+  // heaviest initial frame, instead of both firing in the same tick — that
+  // concurrent start was a real source of the "lags on open" complaint.
+  const [typewriterReady, setTypewriterReady] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
   const [revealStep, setRevealStep] = useState(0)
   const audioRef = useRef(null)
   const containerRef = useRef(null)
@@ -143,19 +162,17 @@ function CardPreviewModal({
   // card scales on phone / tablet / desktop without leaving the modal.
   const [previewDevice, setPreviewDevice] = useState('fullscreen')
   // Only an explicit accessibility signal fully disables ambient/video
-  // effects. A narrow/short viewport — i.e. virtually every phone, which is
-  // how most recipients actually open a shared card — used to hit this same
-  // gate and silently lose elite-tier ambient effects entirely; it now only
-  // scales particle density down via `ambientIntensity` below.
-  const lowPowerViewer = useMemo(() => {
-    if (typeof window === 'undefined') return false
-    return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false
-  }, [])
-  const smallViewport = useMemo(() => {
-    if (typeof window === 'undefined') return false
-    return window.matchMedia?.('(max-width: 768px), (max-height: 600px)')?.matches || false
-  }, [])
-  const ambientIntensity = smallViewport ? 0.45 : 1
+  // effects and open-effect bursts — reduced-motion is often about
+  // vestibular/motion sensitivity, not just performance, so it stays a hard
+  // gate rather than a scaled-down one.
+  const lowPowerViewer = useMemo(() => prefersReducedMotion(), [])
+  // Separately, a real device-capability signal (shared with PremiumGiftReveal
+  // and studioEffects' open-effect firing) scales particle DENSITY down for
+  // weak-but-not-reduced-motion devices — most recipients open a shared card
+  // on a phone, and a narrow viewport alone used to be the only thing this
+  // checked, missing plenty of weak devices with a normal-sized screen.
+  const motionIntensity = useMemo(() => getMotionIntensity(), [])
+  const ambientIntensity = motionIntensity
 
   const [claimingGift, setClaimingGift] = useState(false)
   const [giftClaimMessage, setGiftClaimMessage] = useState('')
@@ -415,8 +432,8 @@ function CardPreviewModal({
   // reported it as "not text-only".
   const isTextOnlyCard = !primaryImage
 
-  const typedBody = useTypewriter(c.content.body, typeSpeed, stage === 'open' && hasTypewriter)
-  const typedExtended = useTypewriter(c.content.extendedBody, typeSpeed, stage === 'open' && hasTypewriter && typedBody === c.content.body)
+  const typedBody = useTypewriter(c.content.body, typeSpeed, stage === 'open' && hasTypewriter && typewriterReady)
+  const typedExtended = useTypewriter(c.content.extendedBody, typeSpeed, stage === 'open' && hasTypewriter && typewriterReady && typedBody === c.content.body)
 
   // Music — gated by tier (Classic has no music)
   const musicAllowed = limit('allowMusic') && !!c.background.music.url
@@ -519,8 +536,8 @@ function CardPreviewModal({
     if (lowPowerViewer) return
     if (!toolAllowed('animation') || !limit('allowOpenEffects')) return
     if (!c.animation.openEffect || c.animation.openEffect === 'none') return
-    fireOpenEffect(c.animation.openEffect, c.animation.confettiColors)
-  }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits, lowPowerViewer])
+    fireOpenEffect(c.animation.openEffect, c.animation.confettiColors, motionIntensity)
+  }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits, lowPowerViewer, motionIntensity])
 
   // Trivia score reveal — count the number up instead of just printing the
   // final tally, and fire a one-time celebration burst at a strong score.
@@ -613,6 +630,7 @@ function CardPreviewModal({
     previewTimersRef.current.forEach(window.clearTimeout)
     previewTimersRef.current = []
     setRevealStep(0)
+    setTypewriterReady(false)
     triggerOpenEffect()
     setStage('open')
     if (hasFadeIn) {
@@ -622,6 +640,7 @@ function CardPreviewModal({
       setFadeBody(true)
       setBodyVisible(true)
     }
+    schedulePreviewTimer(() => setTypewriterReady(true), 240)
   }
 
   const handleContinue = () => {
@@ -710,6 +729,7 @@ function CardPreviewModal({
     setQuestionSubmitError('')
     setFadeBody(!envelopeEnabled)
     setBodyVisible(!envelopeEnabled)
+    setTypewriterReady(!envelopeEnabled)
     setRevealStep(0)
     setPreviewPollVotes([])
     setPreviewPollSubmitted(false)

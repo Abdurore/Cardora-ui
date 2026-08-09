@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { isLowPowerDevice } from '../lib/deviceCapability.js'
 
 // Heart silhouette path — kept for GiftCard static icons only
 const HEART_PATH =
@@ -105,6 +106,11 @@ const EFFECTS = {
     phases: ['orbit', 'form', 'glow'],
     duration: 4400,
     intensity: 3.35,
+    // A step up from "bigger heart" — a faceted gem silhouette, and a
+    // snappier settle into place than the tiers below it.
+    shapeOverride: 'gem',
+    formForce: 0.034,
+    trailAlpha: 0.12,
   },
   legendary: {
     gradient: ['#f472b6', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'],
@@ -116,12 +122,17 @@ const EFFECTS = {
     phases: ['explode', 'orbit', 'form', 'glow'],
     duration: 5200,
     intensity: 4,
+    // The one genuinely different shape — a six-point nova burst, matching
+    // the "Rainbow" theme's already-different color treatment.
+    shapeOverride: 'star',
+    formForce: 0.036,
+    trailAlpha: 0.11,
   },
 }
 
 Object.values(EFFECTS).forEach((effect) => {
   effect.path = HEART_PATH
-  effect.shape = HEART_SHAPE
+  effect.shape = effect.shapeOverride || HEART_SHAPE
 })
 
 export const giftConfigs = Object.values(EFFECTS).reduce((acc, effect) => {
@@ -160,13 +171,52 @@ function heartPoint(t, centerX, centerY, scale) {
   return { x: centerX + x * scale, y: centerY + y * scale }
 }
 
-function isLowPowerDevice() {
-  if (typeof window === 'undefined') return false
-  const cores = navigator.hardwareConcurrency || 4
-  const narrow = window.innerWidth < 768
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  return narrow || cores <= 4 || reduceMotion
+// Shared perimeter-walker for the polygon-based shapes below: maps t in
+// [0, 2*PI] to a point on a closed polygon's edge, weighted by edge length so
+// particles distribute evenly around the shape regardless of edge size —
+// same (t, centerX, centerY, scale) => {x, y} signature as heartPoint, so it
+// drops into the same particle target-position calls unchanged.
+function makePolygonPoint(vertices) {
+  const edgeLengths = vertices.map((v, i) => {
+    const next = vertices[(i + 1) % vertices.length]
+    return Math.hypot(next[0] - v[0], next[1] - v[1])
+  })
+  const perimeter = edgeLengths.reduce((a, b) => a + b, 0)
+  return (t, centerX, centerY, scale) => {
+    const twoPi = Math.PI * 2
+    const frac = (((t % twoPi) + twoPi) % twoPi) / twoPi
+    let dist = frac * perimeter
+    let i = 0
+    while (i < edgeLengths.length - 1 && dist > edgeLengths[i]) {
+      dist -= edgeLengths[i]
+      i++
+    }
+    const a = vertices[i]
+    const b = vertices[(i + 1) % vertices.length]
+    const segT = edgeLengths[i] === 0 ? 0 : dist / edgeLengths[i]
+    const x = a[0] + (b[0] - a[0]) * segT
+    const y = a[1] + (b[1] - a[1]) * segT
+    return { x: centerX + x * scale, y: centerY + y * scale }
+  }
 }
+
+// Faceted gem/diamond-cut silhouette — Diamond tier's signature shape.
+const gemPoint = makePolygonPoint([[0, -16], [8, -8], [8, 4], [0, 16], [-8, 4], [-8, -8]])
+
+// Six-point nova/starburst — Legendary tier's signature shape.
+const starPoint = makePolygonPoint((() => {
+  const points = 6
+  const outer = 16
+  const inner = 6.5
+  const step = Math.PI / points
+  return Array.from({ length: points * 2 }, (_, i) => {
+    const r = i % 2 === 0 ? outer : inner
+    const angle = i * step - Math.PI / 2
+    return [Math.cos(angle) * r, Math.sin(angle) * r]
+  })
+})())
+
+const SHAPE_POINTS = { heart: heartPoint, gem: gemPoint, star: starPoint }
 
 function PremiumGiftReveal({ effect = 'spark', onComplete }) {
   const canvasRef = useRef(null)
@@ -183,6 +233,9 @@ function PremiumGiftReveal({ effect = 'spark', onComplete }) {
     const lowPower = isLowPowerDevice()
     const maxDpr = lowPower ? 1.5 : 2
     const dpr = Math.min(window.devicePixelRatio || 1, maxDpr)
+    const pointFn = SHAPE_POINTS[config.shape] || heartPoint
+    const formForce = config.formForce ?? 0.028
+    const trailAlpha = config.trailAlpha ?? 0.15
 
     const resize = () => {
       const { innerWidth, innerHeight } = window
@@ -225,7 +278,7 @@ function PremiumGiftReveal({ effect = 'spark', onComplete }) {
       const { x: cx, y: cy } = center()
       const scale = Math.min(width(), height()) / 42
       particles.forEach((p, index) => {
-        const target = heartPoint((index / particleCount) * Math.PI * 2, cx, cy, scale)
+        const target = pointFn((index / particleCount) * Math.PI * 2, cx, cy, scale)
         p.x = cx
         p.y = cy
         p.tx = target.x
@@ -255,7 +308,7 @@ function PremiumGiftReveal({ effect = 'spark', onComplete }) {
       const { x: cx, y: cy } = center()
       const scale = Math.min(width(), height()) / 42
 
-      ctx.fillStyle = `rgba(2, 2, 5, ${phase === 'glow' ? 0.09 : lowPower ? 0.22 : 0.15})`
+      ctx.fillStyle = `rgba(2, 2, 5, ${phase === 'glow' ? 0.09 : lowPower ? 0.22 : trailAlpha})`
       ctx.fillRect(0, 0, width(), height())
 
       // For rainbow (multi-stop) gradients, each particle picks its own color segment
@@ -267,7 +320,7 @@ function PremiumGiftReveal({ effect = 'spark', onComplete }) {
       }
 
       particles.forEach((p, index) => {
-        const target = heartPoint((index / particleCount) * Math.PI * 2, cx, cy, scale)
+        const target = pointFn((index / particleCount) * Math.PI * 2, cx, cy, scale)
         p.tx = target.x
         p.ty = target.y
 
@@ -288,7 +341,7 @@ function PremiumGiftReveal({ effect = 'spark', onComplete }) {
         }
 
         if (phase === 'form' || config.phases.includes('form')) {
-          const force = phase === 'form' ? 0.028 : 0.008
+          const force = phase === 'form' ? formForce : 0.008
           p.vx += (p.tx - p.x) * force
           p.vy += (p.ty - p.y) * force
         }

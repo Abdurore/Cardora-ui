@@ -41,41 +41,52 @@ function resolveColors(colors) {
   return Array.isArray(colors) && colors.length ? colors : DEFAULT_COLORS
 }
 
-export function fireOpenEffect(type, colors) {
+// `intensity` (0-1, from src/lib/deviceCapability.js) scales both particle counts and
+// how long each effect's continuous tail runs — a weak device gets a smaller, shorter
+// version of the same effect instead of either the full thing or nothing. A duration
+// floor (`durationScale`) keeps it from feeling truncated even at low intensity.
+function scaleCount(count, intensity) {
+  return Math.max(1, Math.round(count * intensity))
+}
+function scaleDuration(ms, intensity) {
+  return Math.round(ms * Math.max(0.35, intensity))
+}
+
+export function fireOpenEffect(type, colors, intensity = 1) {
   const palette = resolveColors(colors)
   switch (type) {
     case 'confetti':
-      return fireConfetti(palette)
+      return fireConfetti(palette, intensity)
     case 'glitterBurst':
-      return fireGlitterBurst(palette)
+      return fireGlitterBurst(palette, intensity)
     case 'goldenBloom':
-      return fireGlitterBurst(['#fff7c2', '#ffd166', '#f4b942', '#ffffff'])
+      return fireGlitterBurst(['#fff7c2', '#ffd166', '#f4b942', '#ffffff'], intensity)
     case 'fireworks':
-      return fireFireworks(palette)
+      return fireFireworks(palette, intensity)
     case 'heartsBurst':
     case 'hearts':
-      return fireShapeBurst('♥', palette, { spread: 96, startVelocity: 43, gravity: 0.68 })
+      return fireShapeBurst('♥', palette, { spread: 96, startVelocity: 43, gravity: 0.68 }, intensity)
     case 'rosePetals':
-      return fireShapeBurst('❦', ['#ff9bd2', '#ff6b9d', '#ffd1e8'], { spread: 120, startVelocity: 32, gravity: 0.45 })
+      return fireShapeBurst('❦', ['#ff9bd2', '#ff6b9d', '#ffd1e8'], { spread: 120, startVelocity: 32, gravity: 0.45 }, intensity)
     case 'starShower':
     case 'stars':
-      return fireStarShower(palette)
+      return fireStarShower(palette, intensity)
     case 'cometTrail':
-      return fireCometTrail(palette)
+      return fireCometTrail(palette, intensity)
     case 'balloons':
-      return fireShapeBurst('●', palette, { spread: 62, startVelocity: 56, gravity: 0.26 })
+      return fireShapeBurst('●', palette, { spread: 62, startVelocity: 56, gravity: 0.26 }, intensity)
     case 'emojiRain':
-      return fireEmojiRain(['✦', '✧', '★', '•'])
+      return fireEmojiRain(['✦', '✧', '★', '•'], intensity)
     case 'sparkleRain':
-      return fireSparkleRain(palette)
+      return fireSparkleRain(palette, intensity)
     default:
       return null
   }
 }
 
-function fireConfetti(colors) {
+function fireConfetti(colors, intensity = 1) {
   confetti({
-    particleCount: 90,
+    particleCount: scaleCount(90, intensity),
     spread: 72,
     startVelocity: 38,
     origin: { x: 0.5, y: 0.58 },
@@ -83,20 +94,21 @@ function fireConfetti(colors) {
     ticks: 140,
     zIndex: 100001,
   })
-  const end = Date.now() + 1900
+  const end = Date.now() + scaleDuration(1900, intensity)
+  const perFrame = scaleCount(4, intensity)
   const frame = () => {
-    confetti({ particleCount: 4, angle: 58, spread: 58, origin: { x: 0, y: 0.68 }, colors, scalar: 0.9, zIndex: 100001 })
-    confetti({ particleCount: 4, angle: 122, spread: 58, origin: { x: 1, y: 0.68 }, colors, scalar: 0.9, zIndex: 100001 })
+    confetti({ particleCount: perFrame, angle: 58, spread: 58, origin: { x: 0, y: 0.68 }, colors, scalar: 0.9, zIndex: 100001 })
+    confetti({ particleCount: perFrame, angle: 122, spread: 58, origin: { x: 1, y: 0.68 }, colors, scalar: 0.9, zIndex: 100001 })
     if (Date.now() < end) requestAnimationFrame(frame)
   }
   frame()
 }
 
-function fireGlitterBurst(colors) {
-  const end = Date.now() + 1800
+function fireGlitterBurst(colors, intensity = 1) {
+  const end = Date.now() + scaleDuration(1800, intensity)
   const frame = () => {
     confetti({
-      particleCount: 12,
+      particleCount: scaleCount(12, intensity),
       spread: 120,
       startVelocity: 18,
       gravity: 0.45,
@@ -112,12 +124,11 @@ function fireGlitterBurst(colors) {
   frame()
 }
 
-function fireFireworks(colors) {
-  const duration = 2400
-  const end = Date.now() + duration
+function fireFireworks(colors, intensity = 1) {
+  const end = Date.now() + scaleDuration(2400, intensity)
   const shoot = () => {
     confetti({
-      particleCount: 70,
+      particleCount: scaleCount(70, intensity),
       startVelocity: 34,
       spread: 360,
       ticks: 95,
@@ -132,11 +143,11 @@ function fireFireworks(colors) {
   shoot()
 }
 
-function fireShapeBurst(emoji, colors, { spread = 70, startVelocity = 45, gravity = 0.8 } = {}) {
-  if (typeof confetti.shapeFromText !== 'function') return fireConfetti(colors)
+function fireShapeBurst(emoji, colors, { spread = 70, startVelocity = 45, gravity = 0.8 } = {}, intensity = 1) {
+  if (typeof confetti.shapeFromText !== 'function') return fireConfetti(colors, intensity)
   const shape = confetti.shapeFromText({ text: emoji, scalar: 2 })
   confetti({
-    particleCount: 44,
+    particleCount: scaleCount(44, intensity),
     spread,
     startVelocity,
     gravity,
@@ -149,7 +160,7 @@ function fireShapeBurst(emoji, colors, { spread = 70, startVelocity = 45, gravit
   })
   setTimeout(() => {
     confetti({
-      particleCount: 34,
+      particleCount: scaleCount(34, intensity),
       spread: spread + 26,
       startVelocity: Math.max(18, startVelocity - 10),
       gravity,
@@ -162,13 +173,13 @@ function fireShapeBurst(emoji, colors, { spread = 70, startVelocity = 45, gravit
   }, 360)
 }
 
-function fireStarShower(colors) {
-  if (typeof confetti.shapeFromText !== 'function') return fireConfetti(colors)
+function fireStarShower(colors, intensity = 1) {
+  if (typeof confetti.shapeFromText !== 'function') return fireConfetti(colors, intensity)
   const shape = confetti.shapeFromText({ text: '★', scalar: 1.8 })
-  const end = Date.now() + 2200
+  const end = Date.now() + scaleDuration(2200, intensity)
   const frame = () => {
     confetti({
-      particleCount: 6,
+      particleCount: scaleCount(6, intensity),
       spread: 180,
       startVelocity: 22,
       ticks: 210,
@@ -184,13 +195,13 @@ function fireStarShower(colors) {
   frame()
 }
 
-function fireSparkleRain(colors) {
-  if (typeof confetti.shapeFromText !== 'function') return fireGlitterBurst(colors)
+function fireSparkleRain(colors, intensity = 1) {
+  if (typeof confetti.shapeFromText !== 'function') return fireGlitterBurst(colors, intensity)
   const shape = confetti.shapeFromText({ text: '✦', scalar: 1.3 })
-  const end = Date.now() + 2000
+  const end = Date.now() + scaleDuration(2000, intensity)
   const frame = () => {
     confetti({
-      particleCount: 5,
+      particleCount: scaleCount(5, intensity),
       spread: 0,
       startVelocity: 8,
       ticks: 200,
@@ -206,14 +217,14 @@ function fireSparkleRain(colors) {
   frame()
 }
 
-function fireCometTrail(colors) {
-  if (typeof confetti.shapeFromText !== 'function') return fireStarShower(colors)
+function fireCometTrail(colors, intensity = 1) {
+  if (typeof confetti.shapeFromText !== 'function') return fireStarShower(colors, intensity)
   const shape = confetti.shapeFromText({ text: '✦', scalar: 1.7 })
-  const end = Date.now() + 2200
+  const end = Date.now() + scaleDuration(2200, intensity)
   const frame = () => {
     const leftSide = Math.random() > 0.5
     confetti({
-      particleCount: 7,
+      particleCount: scaleCount(7, intensity),
       angle: leftSide ? 40 : 140,
       spread: 28,
       startVelocity: 38,
@@ -231,13 +242,13 @@ function fireCometTrail(colors) {
   frame()
 }
 
-function fireEmojiRain(emojis) {
-  if (typeof confetti.shapeFromText !== 'function') return fireGlitterBurst(DEFAULT_COLORS)
+function fireEmojiRain(emojis, intensity = 1) {
+  if (typeof confetti.shapeFromText !== 'function') return fireGlitterBurst(DEFAULT_COLORS, intensity)
   const shapes = emojis.map((e) => confetti.shapeFromText({ text: e, scalar: 1.6 }))
-  const end = Date.now() + 2500
+  const end = Date.now() + scaleDuration(2500, intensity)
   const frame = () => {
     confetti({
-      particleCount: 4,
+      particleCount: scaleCount(4, intensity),
       spread: 140,
       startVelocity: 15,
       gravity: 0.4,
