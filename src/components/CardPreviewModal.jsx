@@ -211,8 +211,7 @@ function CardPreviewModal({
 
   // Lock & reveal gate — honours `interaction.lock` so the studio preview
   // matches what the recipient will actually experience.
-  const lockSpec = cardObject?.interaction?.lock || { type: 'none', value: '' }
-  const revealSpec = cardObject?.interaction?.reveal || { type: 'tap', hint: '' }
+  const lockSpec = cardObject?.interaction?.lock || { type: 'none', value: '', hint: '' }
   // In pageMode the recipient already cleared a password gate upstream in
   // CardView (which fetches the card from the backend and only succeeds once
   // the correct password was supplied) — the backend's sanitizer strips
@@ -1075,8 +1074,8 @@ function CardPreviewModal({
             <div className="cp-lock-icon">🔒</div>
             <h3>This card is locked</h3>
             <p className="cp-lock-sub">
-              {revealSpec.hint?.trim()
-                ? revealSpec.hint
+              {lockSpec.hint?.trim()
+                ? lockSpec.hint
                 : 'Enter the password the sender shared with you.'}
             </p>
             <form className="cp-lock-form" onSubmit={handlePasswordSubmit}>
@@ -1101,8 +1100,8 @@ function CardPreviewModal({
             <div className="cp-lock-icon">⏳</div>
             <h3>Sealed until later</h3>
             <p className="cp-lock-sub">
-              {revealSpec.hint?.trim()
-                ? revealSpec.hint
+              {lockSpec.hint?.trim()
+                ? lockSpec.hint
                 : `This card unlocks on ${new Date(unlockAt).toLocaleString()}.`}
             </p>
             <p className="cp-lock-countdown">{formatCountdown(unlockAt - now)}</p>
@@ -1276,9 +1275,9 @@ function CardPreviewModal({
       {/* ENVELOPE (closed state) — only Personal + Chain cards get the reveal metaphor */}
       {unlocked && stage === 'closed' && envelopeEnabled && (
         <>
-          {revealSpec.hint?.trim() && (
+          {lockSpec.hint?.trim() && (
             <p className="cp-reveal-hint" aria-hidden="true">
-              {revealSpec.hint}
+              {lockSpec.hint}
             </p>
           )}
           <Envelope

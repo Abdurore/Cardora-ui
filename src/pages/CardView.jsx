@@ -14,6 +14,7 @@ function CardView() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(null)
   const [needsPassword, setNeedsPassword] = useState(false)
+  const [lockHint, setLockHint] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [showReport, setShowReport] = useState(false)
@@ -70,6 +71,7 @@ function CardView() {
       } catch (err) {
         if (err.status === 403 || err.payload?.locked) {
           setNeedsPassword(true)
+          setLockHint(err.payload?.lockHint || '')
           setLoading(false)
           if (!cancelled) return
         }
@@ -170,7 +172,7 @@ function CardView() {
         <div className="cv-gate-card">
           <span className="cv-gate-lock">🔒</span>
           <h2>This card is locked</h2>
-          <p>Enter the password to open this card.</p>
+          <p>{lockHint.trim() || 'Enter the password to open this card.'}</p>
           <input
             type="password"
             value={passwordInput}

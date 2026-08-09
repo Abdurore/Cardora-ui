@@ -487,6 +487,13 @@ export function cardObjectToLayoutData(cardObject = null, { allowAnonMedia = fal
       // voice note or photo/video. Read server-side by
       // submitAnonymousMessage to gate whether those fields are kept.
       allowAnonMedia: allowAnonMedia || undefined,
+      // The lock gate's hint text (e.g. "ask me for the password") — backend
+      // enhancements.lock only carries {type, value}, no hint field, so this
+      // was previously never sent at all: it showed correctly in the
+      // sender's own Studio preview (pure local state) but silently vanished
+      // before the real recipient ever saw it. Same "persist in layoutdata"
+      // fix as the fields above.
+      lockHint: cardObject.interaction?.lock?.hint || undefined,
     }
   }
   return layoutdata
@@ -969,8 +976,7 @@ export function backendCardToCardObject(card) {
       })),
     },
     interaction: {
-      lock: { type: lockType, value: enhancements.lock?.value || '' },
-      reveal: { type: 'tap', hint: '' },
+      lock: { type: lockType, value: enhancements.lock?.value || '', hint: styleExtras.lockHint || '' },
     },
     content: {
       heading: content.header || content.message || content.challenge || content.question || content.name || content.questions?.[0]?.question || '',

@@ -16,7 +16,7 @@ import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
-import { getCardPrices, getMediaVideos, getMediaMusic, attachGiftToCard } from '../lib/api.js'
+import { getCardPrices, getMediaVideos, getMediaMusic } from '../lib/api.js'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
 import { SEAL_ICON_OPTIONS } from '../lib/sealIcons.jsx'
 import StudioEnvelope from '../components/StudioEnvelope.jsx'
@@ -1113,27 +1113,20 @@ function CardStudio() {
         console.warn('Card created but no slug returned. Response shape:', JSON.stringify(d))
       }
 
-      // Attach the gift if the user selected one. Keep the real inventory id
-      // separate from the UI row id so duplicate gifts stay selectable.
+      // The gift (if any was selected) is already attached at this point —
+      // backendMappers.js's payload builder includes `giftInventoryId` on the
+      // create-card request itself, and the backend consumes it atomically
+      // with card creation (rolling the card back if the gift turned out to
+      // be unavailable, which would have made `result.ok` false above). A
+      // second, separate /cards/attach-gift call used to run here too, and
+      // it always failed with "This card already has a gift" — the gift had
+      // already been attached during creation — surfacing a scary warning on
+      // an otherwise fully successful send.
       const selectedGift = flushedCardObject.giftEffect || {}
-      let giftAttachWarning = ''
-      if (selectedGift.enabled && selectedGift.giftId) {
-        const cardId = d.cardId || slug
-        try {
-          await attachGiftToCard({
-            cardId,
-            giftInventoryId: selectedGift.giftId,
-          })
-        } catch (err) {
-          // The card itself was created successfully — don't block sharing it
-          // over a gift-attach failure. Surface it as a warning instead.
-          giftAttachWarning = `Your card was created, but the gift couldn't be attached: ${err.message || 'Unknown error'}. Check your gift inventory.`
-        }
-      }
 
-      setSendResult({ ok: true, slug, message: result.message, warning: giftAttachWarning })
+      setSendResult({ ok: true, slug, message: result.message })
       refreshBalance?.()
-      if (selectedGift && !giftAttachWarning) {
+      if (selectedGift.enabled && selectedGift.giftId) {
         consumeGift?.(selectedGift.id || selectedGift.inventoryId || selectedGift.giftId || selectedGift._id)
       }
       // Card sent successfully — clear the autosave so the next studio visit
@@ -2091,42 +2084,30 @@ function CardStudio() {
               ))}
             </div>
             {(c.interaction.lock.type === 'time' || c.interaction.lock.type === 'password') && (
-              <label className="cs-field">
-                <span>{c.interaction.lock.type === 'time' ? 'Unlock Date/Time' : 'Password'}</span>
-                <input
-                  type={c.interaction.lock.type === 'time' ? 'datetime-local' : 'text'}
-                  value={c.interaction.lock.value}
-                  onChange={e => update('interaction.lock.value', e.target.value)}
-                />
-              </label>
+              <>
+                <label className="cs-field">
+                  <span>{c.interaction.lock.type === 'time' ? 'Unlock Date/Time' : 'Password'}</span>
+                  <input
+                    type={c.interaction.lock.type === 'time' ? 'datetime-local' : 'text'}
+                    value={c.interaction.lock.value}
+                    onChange={e => update('interaction.lock.value', e.target.value)}
+                  />
+                </label>
+                <label className="cs-field">
+                  <span>Hint</span>
+                  <input
+                    value={c.interaction.lock.hint || ''}
+                    onChange={e => update('interaction.lock.hint', e.target.value)}
+                    placeholder={c.interaction.lock.type === 'time' ? 'e.g. "Unlocks on our anniversary"' : 'e.g. "Ask me for the password"'}
+                  />
+                </label>
+              </>
             )}
             {c.interaction.lock.type === 'tap' && (
               <p className="cs-hint">Recipient taps anywhere on the card to reveal it — creates a sense of anticipation.</p>
             )}
             {c.interaction.lock.type === 'scratch' && (
               <p className="cs-hint">Recipient scratches through an overlay to reveal the card — like a scratch card.</p>
-            )}
-          </div>
-
-          <div className="cs-sub-section">
-            <p className="cs-sub-label">Reveal Type</p>
-            <div className="cs-choice-row">
-              {['tap', 'password', 'zip'].map(type => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`cs-chip ${c.interaction.reveal.type === type ? 'active' : ''}`}
-                  onClick={() => update('interaction.reveal.type', type)}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
-            {c.interaction.reveal.type !== 'tap' && (
-              <label className="cs-field">
-                <span>Hint</span>
-                <input value={c.interaction.reveal.hint} onChange={e => update('interaction.reveal.hint', e.target.value)} placeholder="Hint for the receiver..." />
-              </label>
             )}
           </div>
 
@@ -4210,11 +4191,6 @@ function CardStudio() {
               </div>
             )}
 
-            {!isSending && sendResult?.ok && sendResult?.warning && (
-              <p className="cs-send-modal-note" style={{ color: '#ffb4b4' }}>
-                {sendResult.warning}
-              </p>
-            )}
             {!isSending && sendResult?.ok && tierCost > 0 && (
               <div className="cs-send-modal-cc-deducted">
                 <span className="cs-send-modal-cc-icon">✓</span>

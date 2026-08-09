@@ -101,9 +101,8 @@ export const defaultCardObject = {
     lock: {
       type: 'none',
       value: '',
-    },
-    reveal: {
-      type: 'tap',
+      // Shown to the recipient on the password/timer lock gate — e.g. "ask
+      // me for the password" or "unlocks after our anniversary dinner".
       hint: '',
     },
   },
@@ -294,8 +293,7 @@ export const templateCardObjects = {
       images: [],
     },
     interaction: {
-      lock: { type: 'none', value: '' },
-      reveal: { type: 'tap', hint: '' },
+      lock: { type: 'none', value: '', hint: '' },
     },
     content: {
       heading: 'Will You Be Mine?',
@@ -376,8 +374,7 @@ export const templateCardObjects = {
       images: [],
     },
     interaction: {
-      lock: { type: 'none', value: '' },
-      reveal: { type: 'tap', hint: '' },
+      lock: { type: 'none', value: '', hint: '' },
     },
     content: {
       heading: 'To Every Year We Built Together',
@@ -458,8 +455,7 @@ export const templateCardObjects = {
       images: [],
     },
     interaction: {
-      lock: { type: 'none', value: '' },
-      reveal: { type: 'tap', hint: '' },
+      lock: { type: 'none', value: '', hint: '' },
     },
     content: {
       heading: 'Happy Birthday!',
@@ -540,8 +536,7 @@ export const templateCardObjects = {
       images: [],
     },
     interaction: {
-      lock: { type: 'none', value: '' },
-      reveal: { type: 'tap', hint: '' },
+      lock: { type: 'none', value: '', hint: '' },
     },
     content: {
       heading: 'Your Heading Here',
