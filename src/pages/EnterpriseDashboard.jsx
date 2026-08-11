@@ -54,6 +54,16 @@ function EnterpriseDashboard() {
     }
   }
 
+  // Compute aggregate analytics from individual ad data as fallback
+  const computedStats = useMemo(() => {
+    const totalViews = ads.reduce((sum, ad) => sum + (ad.views ?? ad.currentViews ?? ad.viewCount ?? 0), 0)
+    const totalClicks = ads.reduce((sum, ad) => sum + (ad.clicks ?? ad.clickCount ?? ad.totalClicks ?? 0), 0)
+    const totalImpressions = ads.reduce((sum, ad) => sum + (ad.impressions ?? ad.impressionCount ?? ad.views ?? ad.currentViews ?? 0), 0)
+    const totalCompletions = ads.reduce((sum, ad) => sum + (ad.completions ?? ad.completionCount ?? ad.completed ?? 0), 0)
+    const uniqueViewers = ads.reduce((sum, ad) => sum + (ad.uniqueViewers ?? ad.uniqueUsers ?? 0), 0)
+    return { totalViews, totalClicks, totalImpressions, totalCompletions, uniqueViewers }
+  }, [ads])
+
   if (!isEnterprise) {
     return (
       <div className="page-body">
@@ -72,16 +82,6 @@ function EnterpriseDashboard() {
 
   // Deeply unwrap stats — try top-level fields, then nested shapes
   const _rawStats = stats?.stats || stats?.adStats || stats?.data?.stats || stats
-  
-  // Compute aggregate analytics from individual ad data as fallback
-  const computedStats = useMemo(() => {
-    const totalViews = ads.reduce((sum, ad) => sum + (ad.views ?? ad.currentViews ?? ad.viewCount ?? 0), 0)
-    const totalClicks = ads.reduce((sum, ad) => sum + (ad.clicks ?? ad.clickCount ?? ad.totalClicks ?? 0), 0)
-    const totalImpressions = ads.reduce((sum, ad) => sum + (ad.impressions ?? ad.impressionCount ?? ad.views ?? ad.currentViews ?? 0), 0)
-    const totalCompletions = ads.reduce((sum, ad) => sum + (ad.completions ?? ad.completionCount ?? ad.completed ?? 0), 0)
-    const uniqueViewers = ads.reduce((sum, ad) => sum + (ad.uniqueViewers ?? ad.uniqueUsers ?? 0), 0)
-    return { totalViews, totalClicks, totalImpressions, totalCompletions, uniqueViewers }
-  }, [ads])
 
   // Use API-provided stats if they exist, otherwise fall back to computed
   const adViews = _rawStats?.views ?? _rawStats?.totalViews ?? (computedStats.totalViews || '—')

@@ -12,8 +12,6 @@ import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
 import VoiceRecorder from './VoiceRecorder.jsx'
 
-const LEGACY_EMOJI_AMBIENTS = new Set(['floating', 'reverse'])
-
 const ENTRY_DEFAULTS = {
   personal:  { label: 'Personal Card',   Icon: PersonalCardIcon, hint: 'Someone sent you a card',            color: '#e2b96e' },
   poll:      { label: 'Poll Card',        Icon: PollCardIcon,     hint: "You've been asked to vote",          color: '#7eb3ff' },
@@ -798,44 +796,17 @@ function CardPreviewModal({
     borderStyle.backgroundClip = 'padding-box'
   }
 
-  // Memoize particle positions
-  const particlePositions = useMemo(() =>
-    Array.from({ length: 18 }).map(() => ({
-      left: `${5 + Math.random() * 90}%`,
-      top: `${5 + Math.random() * 90}%`,
-      delay: `${-Math.random() * 8}s`,
-      size: `${14 + Math.random() * 14}px`,
-    })),
-  [])
-
-  // Background effect — gated by the `animation` tool AND tier ambient cap
+  // Background effect — gated by the `animation` tool AND tier ambient cap.
+  // Always routes through AmbientParticles now, matching Studio's own
+  // design-canvas preview exactly (there used to be a separate legacy
+  // CSS/emoji renderer for 'floating' here, which drifted visually from
+  // what the sender saw while editing).
   const renderBgEffect = () => {
     if (lowPowerViewer) return null
     if (!toolAllowed('animation') || !limit('allowAmbientEffects')) return null
     const eff = c.animation.backgroundEffect
     if (!eff || eff.type === 'none') return null
-    if (LEGACY_EMOJI_AMBIENTS.has(eff.type)) {
-      const emojis = eff.emojis.length > 0 ? eff.emojis : ['✨']
-      return (
-        <div className={`cp-bg-effect cp-bg-${eff.type}`}>
-          {particlePositions.map((pos, i) => (
-            <span
-              key={i}
-              className={`cp-bg-particle cp-p-${(i % 6) + 1}`}
-              style={{
-                left: pos.left,
-                top: pos.top,
-                animationDelay: pos.delay,
-                fontSize: pos.size,
-              }}
-            >
-              {emojis[i % emojis.length]}
-            </span>
-          ))}
-        </div>
-      )
-    }
-    return <AmbientParticles type={eff.type} colors={c.animation.confettiColors} intensity={ambientIntensity} />
+    return <AmbientParticles type={eff.type} intensity={ambientIntensity} />
   }
 
   const renderGradientBorder = (children, className = '') => {

@@ -86,7 +86,7 @@ export const defaultCardObject = {
     // dropped (and, under computed tiering, would show every fresh card as
     // "Elite" before the user touched anything).
     openEffect: 'none',
-    confettiColors: ['#76efff', '#62ffa2', '#ff9bd2'],
+    confettiColors: ['#000000', '#ffffff', '#c0c0c0'],
     backgroundEffect: {
       type: 'none',
       emojis: ['✨', '💫'],
@@ -138,25 +138,29 @@ export const defaultCardObject = {
 // Free ambient music URLs (royalty-free). Each preset declares a minimum tier —
 // Classic never sees music; Premium gets the first two lighter moods; Elite gets
 // the full library + any admin-curated tracks.
+// Pixabay's CDN links previously here all returned 403 — they're signed,
+// time-limited URLs rather than stable direct links, so every preset track was
+// silently broken. These are Kevin MacLeod / Incompetech tracks (CC-BY 3.0)
+// re-hosted on our own Cloudinary account.
 export const musicPresets = [
   {
     label: 'Soft Piano',
-    url: 'https://cdn.pixabay.com/audio/2024/11/29/audio_a0727dc75c.mp3',
+    url: 'https://res.cloudinary.com/dyhp4ustd/video/upload/v1786296416/cardora-music/dlsfuyfbq7hdg5gmxk9r.mp3',
     tier: 'premium',
   },
   {
     label: 'Gentle Ambience',
-    url: 'https://cdn.pixabay.com/audio/2022/02/23/audio_ea70ad31a4.mp3',
+    url: 'https://res.cloudinary.com/dyhp4ustd/video/upload/v1786296443/cardora-music/nzxijrauop5v580i3bhl.mp3',
     tier: 'premium',
   },
   {
     label: 'Romantic Strings',
-    url: 'https://cdn.pixabay.com/audio/2024/02/14/audio_8ceb40cf47.mp3',
+    url: 'https://res.cloudinary.com/dyhp4ustd/video/upload/v1786296464/cardora-music/dkjwrinxre4xawepl8pi.mp3',
     tier: 'elite',
   },
   {
     label: 'Celebration',
-    url: 'https://cdn.pixabay.com/audio/2021/11/10/audio_f4c1282990.mp3',
+    url: 'https://res.cloudinary.com/dyhp4ustd/video/upload/v1786296490/cardora-music/lruqpuyolsp2ubgdafsq.mp3',
     tier: 'elite',
   },
 ]

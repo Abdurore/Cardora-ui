@@ -18,6 +18,7 @@ import ColorPicker from '../components/ColorPicker.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { getCardPrices, getMediaVideos, getMediaMusic } from '../lib/api.js'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
+import { getMotionIntensity } from '../lib/deviceCapability.js'
 import { SEAL_ICON_OPTIONS } from '../lib/sealIcons.jsx'
 import StudioEnvelope from '../components/StudioEnvelope.jsx'
 import AmbientParticles from '../components/AmbientParticles.jsx'
@@ -302,6 +303,11 @@ function CardStudio() {
   const [searchParams] = useSearchParams()
   const { currentUser, publishTemplate, updateMarketplaceTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, consumeGift, inventory = [] } = useOutletContext() || {}
   const [cardPrices, setCardPrices] = useState(TIER_COST_BY_TYPE)
+  // Scales the Studio's own live-preview ambient particles the same way
+  // CardPreviewModal scales the recipient's — otherwise a weak device got a
+  // full-intensity particle canvas while editing even though the send-side
+  // preview and the real card both back off for it.
+  const studioMotionIntensity = useMemo(() => getMotionIntensity(), [])
   // Read card type and tier from location state (set by CreateCardPicker)
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   // Set when arriving here via Profile's "Edit Design" action — re-saves an
@@ -462,7 +468,6 @@ function CardStudio() {
   ) // { previewUrl, cloudUrl } | null
   const [screenshotUploading, setScreenshotUploading] = useState(false)
   const screenshotInputRef = useRef(null)
-  const [emojiInput, setEmojiInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sendResult, setSendResult] = useState(null) // { ok, slug?, message }
   const [showSendModal, setShowSendModal] = useState(false)
@@ -1323,20 +1328,6 @@ function CardStudio() {
     update('animation.confettiColors', c.animation.confettiColors.filter((_, i) => i !== idx))
   }
 
-  const addBackgroundEmoji = () => {
-    const nextEmoji = emojiInput.trim()
-    if (!nextEmoji) return
-    update('animation.backgroundEffect.emojis', [...c.animation.backgroundEffect.emojis, nextEmoji])
-    setEmojiInput('')
-  }
-
-  const removeBackgroundEmoji = (idx) => {
-    update(
-      'animation.backgroundEffect.emojis',
-      c.animation.backgroundEffect.emojis.filter((_, i) => i !== idx),
-    )
-  }
-
   const addBorderColor = () => {
     update('card.cardBorder.colors', [...c.card.cardBorder.colors, '#ffffff'])
   }
@@ -1559,9 +1550,11 @@ function CardStudio() {
             {['color', 'gradient', 'video', 'animated'].map(type => {
               // Every background type is usable from the start now — picking
               // one just changes what the card computes to at send time
-              // (video is always an elite touch; gradient/animated are
+              // (video and animated are always an elite touch; gradient is
               // premium for personal cards, elite for every other type).
-              const pipTier = type === 'color' ? null : (type === 'video' ? 'elite' : (studioType === 'personal' ? 'premium' : 'elite'))
+              const pipTier = type === 'color' ? null
+                : (type === 'video' || type === 'animated') ? 'elite'
+                : (studioType === 'personal' ? 'premium' : 'elite')
               return (
                 <button
                   key={type}
@@ -1879,8 +1872,8 @@ function CardStudio() {
                         title={preset.label}
                       >
                         <span className="cs-border-preset-swatch" style={{ background: `linear-gradient(120deg, ${preset.colors.join(', ')})` }} />
+                        <span className="cs-swatch-tier-pip"><TierPip tier={preset.tier} compact /></span>
                         <span className="cs-border-preset-label">{preset.label}</span>
-                        <TierPip tier={preset.tier} compact />
                       </button>
                     )
                   })}
@@ -2011,47 +2004,6 @@ function CardStudio() {
                 </button>
               ))}
             </div>
-            {c.animation.backgroundEffect.type === 'floating' && (
-              <div className="cs-sub-section">
-                <p className="cs-sub-label">Background Emojis</p>
-                <div className="cs-emoji-builder">
-                  <input
-                    value={emojiInput}
-                    onChange={(event) => setEmojiInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        addBackgroundEmoji()
-                      }
-                    }}
-                    placeholder="Type or paste an emoji"
-                  />
-                  <button type="button" className="cs-button small" onClick={addBackgroundEmoji}>
-                    Add
-                  </button>
-                </div>
-                {c.animation.backgroundEffect.emojis.length ? (
-                  <div className="cs-emoji-list">
-                    {c.animation.backgroundEffect.emojis.map((emoji, index) => (
-                      <button
-                        key={`${emoji}-${index}`}
-                        type="button"
-                        className="cs-emoji-chip"
-                        onClick={() => removeBackgroundEmoji(index)}
-                        title="Remove emoji"
-                      >
-                        <span>{emoji}</span>
-                        <small>Remove</small>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.55 }}>
-                    No emojis added yet.
-                  </p>
-                )}
-              </div>
-            )}
           </div>
         </>
       )
@@ -2613,7 +2565,7 @@ function CardStudio() {
   const renderStudioAmbientEffect = () => {
     const eff = c.animation?.backgroundEffect
     if (!eff || eff.type === 'none') return null
-    return <AmbientParticles type={eff.type} colors={c.animation.confettiColors} zIndex={1} />
+    return <AmbientParticles type={eff.type} zIndex={1} intensity={studioMotionIntensity} />
   }
 
   const renderStudioContentPreview = (compact = false) => {
@@ -3108,11 +3060,17 @@ function CardStudio() {
                 {isActive && (
                   <>
                     <div className="cs-image-selected-bar" onClick={e => e.stopPropagation()}>
-                      <select value={img.fit || 'cover'} onChange={e => updateImageSetting(i, 'fit', e.target.value)}>
-                        <option value="cover">Cover</option>
-                        <option value="contain">Contain</option>
-                        <option value="fill">Fill</option>
-                      </select>
+                      <Dropdown
+                        className="cs-m2-dropdown"
+                        usePortal
+                        value={img.fit || 'cover'}
+                        onChange={v => updateImageSetting(i, 'fit', v)}
+                        options={[
+                          { value: 'cover', label: 'Cover' },
+                          { value: 'contain', label: 'Contain' },
+                          { value: 'fill', label: 'Fill' },
+                        ]}
+                      />
                       <button type="button" onClick={() => { removeImage(i); setActiveEditEl(null) }}>Remove</button>
                     </div>
                     <div className="cs-resize-handle" onPointerDown={e => { e.stopPropagation(); startImageResize(e, i) }} />
@@ -3748,11 +3706,17 @@ function CardStudio() {
                 if (!img) return null
                 return (
                   <>
-                    <select className="cs-m2-select" value={img.fit || 'cover'} onChange={e => updateImageSetting(activeEditEl.index, 'fit', e.target.value)}>
-                      <option value="cover">Cover</option>
-                      <option value="contain">Contain</option>
-                      <option value="fill">Fill</option>
-                    </select>
+                    <Dropdown
+                      className="cs-m2-dropdown"
+                      usePortal
+                      value={img.fit || 'cover'}
+                      onChange={v => updateImageSetting(activeEditEl.index, 'fit', v)}
+                      options={[
+                        { value: 'cover', label: 'Cover' },
+                        { value: 'contain', label: 'Contain' },
+                        { value: 'fill', label: 'Fill' },
+                      ]}
+                    />
                     <span className="cs-m2-ctrl-sep" />
                     <span className="cs-m2-slider-label">X</span>
                     <input type="range" min="0" max="100" value={img.positionX ?? 50} className="cs-m2-slider" onChange={e => updateImageSetting(activeEditEl.index, 'positionX', Number(e.target.value))} />
@@ -3997,26 +3961,27 @@ function CardStudio() {
               </label>
               <label className="cs-field cs-publish-field">
                 <span className="cs-publish-field-label">Category</span>
-                <select
+                <Dropdown
                   value={publishForm.category || 'birthday'}
-                  onChange={(event) =>
-                    setPublishForm((prev) => ({ ...prev, category: event.target.value }))
+                  onChange={(val) =>
+                    setPublishForm((prev) => ({ ...prev, category: val }))
                   }
-                >
-                  <option value="birthday">Birthday</option>
-                  <option value="anniversary">Anniversary</option>
-                  <option value="wedding">Wedding</option>
-                  <option value="proposal">Proposal</option>
-                  <option value="graduation">Graduation</option>
-                  <option value="holiday">Holiday</option>
-                  <option value="thank-you">Thank You</option>
-                  <option value="apology">Apology</option>
-                  <option value="celebration">Celebration</option>
-                  <option value="just-because">Just Because</option>
-                  <option value="get-well">Get Well</option>
-                  <option value="sympathy">Sympathy</option>
-                  <option value="other">Other</option>
-                </select>
+                  options={[
+                    { value: 'birthday', label: 'Birthday' },
+                    { value: 'anniversary', label: 'Anniversary' },
+                    { value: 'wedding', label: 'Wedding' },
+                    { value: 'proposal', label: 'Proposal' },
+                    { value: 'graduation', label: 'Graduation' },
+                    { value: 'holiday', label: 'Holiday' },
+                    { value: 'thank-you', label: 'Thank You' },
+                    { value: 'apology', label: 'Apology' },
+                    { value: 'celebration', label: 'Celebration' },
+                    { value: 'just-because', label: 'Just Because' },
+                    { value: 'get-well', label: 'Get Well' },
+                    { value: 'sympathy', label: 'Sympathy' },
+                    { value: 'other', label: 'Other' },
+                  ]}
+                />
               </label>
             </div>
 

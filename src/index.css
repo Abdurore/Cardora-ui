@@ -225,6 +225,18 @@ select optgroup {
   color: var(--text);
 }
 
+/* Global native checkbox/radio/range theming — accent-color recolors the
+   browser's own control (no appearance:none rebuild needed) and both are
+   already theme-aware since --primary flips per [data-theme="light"], so
+   this one rule closes every checkbox/radio/range gap app-wide instead of
+   leaving it to be added ad hoc per component (which is how AuthPage.jsx's
+   terms/privacy checkboxes ended up rendering default OS chrome). */
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"] {
+  accent-color: var(--primary);
+}
+
 button {
   background: transparent;
   border: none;

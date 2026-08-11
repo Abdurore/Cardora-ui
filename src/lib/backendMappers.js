@@ -494,6 +494,12 @@ export function cardObjectToLayoutData(cardObject = null, { allowAnonMedia = fal
       // before the real recipient ever saw it. Same "persist in layoutdata"
       // fix as the fields above.
       lockHint: cardObject.interaction?.lock?.hint || undefined,
+      // The palette system's 4th anchor (primary/surface/accent are real,
+      // stored colors — ink/text never was). backendCardToCardObject always
+      // derived text color from background luminance instead, so a hand-
+      // picked ink color (via Theme > Advanced colors) silently reset to
+      // plain black/white on every reload. Same "persist in layoutdata" fix.
+      inkColor: cardObject.theme?.textColor || undefined,
     }
   }
   return layoutdata
@@ -872,9 +878,12 @@ export function backendCardToCardObject(card) {
   const fontFamily = config.font || 'Cinzel'
 
   // Derive text / heading colour from background luminance so light-surface
-  // palettes (paper-ink, jade-parchment) don't render white text on cream.
+  // palettes (paper-ink, jade-parchment) don't render white text on cream —
+  // but prefer a sender's actual hand-picked ink color when one was set
+  // (Theme > Advanced colors), the same "persist in layoutdata" pattern as
+  // cardBorder/backgroundOpacity/lockHint above.
   const onLight = isLightColor(bgColor)
-  const baseTextColor = onLight ? '#1a1a1a' : '#ffffff'
+  const baseTextColor = styleExtras.inkColor || (onLight ? '#1a1a1a' : '#ffffff')
   const baseHeadingColor = onLight ? '#0a0a0a' : '#ffffff'
 
   const questionItems = content.questionBlock?.enabled && content.questionBlock?.question

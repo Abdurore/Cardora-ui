@@ -155,6 +155,11 @@ const RULES = [
     trim: (c) => { if (c.background) c.background.type = 'color' },
   },
   {
+    id: 'animatedBg', label: 'Animated background', tier: 'elite',
+    test: (c) => c?.background?.type === 'animated',
+    trim: (c) => { if (c.background) c.background.type = 'color' },
+  },
+  {
     id: 'openEffect', label: 'Opening effect', tier: 'elite',
     // Any non-'none' open effect is elite-only in practice — the backend
     // rejects openEffect on premium cards outright regardless of which
@@ -260,8 +265,8 @@ const RULES = [
     trim: (c) => { if (c.card?.cardBorder) c.card.cardBorder.type = 'solid' },
   },
   {
-    id: 'richBg', label: 'Animated background', tier: 'premium',
-    test: (c) => ['gradient', 'animated'].includes(c?.background?.type),
+    id: 'richBg', label: 'Gradient background', tier: 'premium',
+    test: (c) => c?.background?.type === 'gradient',
     trim: (c) => { if (c.background) c.background.type = 'color' },
   },
   {
