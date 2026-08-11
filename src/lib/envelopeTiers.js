@@ -1,3 +1,5 @@
+import { getDepthProfile } from './deviceCapability.js'
+
 const BASE_PROFILES = {
   simple: {
     parallax: false,
@@ -41,31 +43,22 @@ function resolveTierKey(tier) {
   return ALIAS[key] || (BASE_PROFILES[key] ? key : 'simple')
 }
 
-function isLowEndDevice() {
-  if (typeof navigator === 'undefined') return false
-  const cores = navigator.hardwareConcurrency || 8
-  const memory = navigator.deviceMemory || 8
-  return cores <= 4 || memory <= 2
-}
-
-function prefersReducedMotion() {
-  if (typeof window === 'undefined' || !window.matchMedia) return false
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
-function isTouchOnly() {
-  if (typeof window === 'undefined' || !window.matchMedia) return false
-  return window.matchMedia('(hover: none) and (pointer: coarse)').matches
-}
-
 export function getEnvelopeTierProfile(tier) {
   const key = resolveTierKey(tier)
   const base = { ...BASE_PROFILES[key] }
+  const depth = getDepthProfile()
 
-  if (prefersReducedMotion()) {
+  // Depth is no longer tied to tier or pointer type. Parallax used to be off
+  // for classic and off again for every touch device, which between them left
+  // the envelope a completely static image on phones — the main way cards get
+  // opened. It now tracks device capability alone, and getDepthProfile()
+  // already scales the tilt down (or to zero) where that's warranted.
+  base.parallax = depth.tilt > 0
+  base.depth = depth.level
+
+  if (depth.level === 'none') {
     return {
       ...base,
-      parallax: false,
       particles: 0,
       ambientAudio: false,
       letterbox: false,
@@ -74,18 +67,14 @@ export function getEnvelopeTierProfile(tier) {
     }
   }
 
-  if (isLowEndDevice()) {
+  if (depth.level === 'lite') {
     return {
-      ...BASE_PROFILES.simple,
-      monogram: base.monogram,
-      caption: base.caption,
-      ambientAudio: base.ambientAudio,
+      ...base,
+      particles: Math.min(base.particles, 4),
+      letterbox: false,
+      closingFold: false,
       downgraded: true,
     }
-  }
-
-  if (isTouchOnly()) {
-    base.parallax = false
   }
 
   return base

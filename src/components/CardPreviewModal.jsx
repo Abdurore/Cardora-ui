@@ -7,6 +7,7 @@ import AmbientParticles from './AmbientParticles.jsx'
 import { fireOpenEffect } from '../lib/studioEffects.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
 import { prefersReducedMotion, getMotionIntensity } from '../lib/deviceCapability.js'
+import { useDepthMotion } from '../lib/useDepthMotion.js'
 import { claimGiftFromCard } from '../lib/api.js'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
@@ -147,6 +148,11 @@ function CardPreviewModal({
   const openCardInnerRef = useRef(null)
   const openCardBodyRef = useRef(null)
   const openCardMediaRef = useRef(null)
+  // Gentler than the envelope's — the card is read, not admired, and a strong
+  // tilt fights legibility. Only the 'open' stage gets it: the interaction
+  // stages (poll, trivia, question, anon reply, chain) are separate stages with
+  // their own wrappers, so precise tap targets are never tilting underneath.
+  const openCardDepthRef = useDepthMotion({ maxTilt: 5, disabled: stage !== 'open' })
   const bodyAutoScrollPausedRef = useRef(false)
   const bodyAutoScrollResumeTimerRef = useRef(null)
   const bodyAutoScrollLastTopRef = useRef(0)
@@ -932,6 +938,35 @@ function CardPreviewModal({
     c.media.images.length,
   ])
 
+  // Legibility guard: flatten the card's tilt while it's being scrolled or
+  // while a field has focus. Toggles a class rather than React state — the
+  // whole point of the depth motion is that it never re-renders.
+  useEffect(() => {
+    if (stage !== 'open') return undefined
+    const wrap = openCardDepthRef.current
+    const scroller = openCardInnerRef.current
+    if (!wrap || !scroller) return undefined
+
+    let settle = null
+    const pause = () => {
+      wrap.classList.add('is-depth-paused')
+      window.clearTimeout(settle)
+      settle = window.setTimeout(() => wrap.classList.remove('is-depth-paused'), 900)
+    }
+    const hold = () => { window.clearTimeout(settle); wrap.classList.add('is-depth-paused') }
+    const release = () => { settle = window.setTimeout(() => wrap.classList.remove('is-depth-paused'), 400) }
+
+    scroller.addEventListener('scroll', pause, { passive: true })
+    wrap.addEventListener('focusin', hold)
+    wrap.addEventListener('focusout', release)
+    return () => {
+      window.clearTimeout(settle)
+      scroller.removeEventListener('scroll', pause)
+      wrap.removeEventListener('focusin', hold)
+      wrap.removeEventListener('focusout', release)
+    }
+  }, [stage, openCardDepthRef])
+
   useEffect(() => {
     if (stage !== 'open' || revealStep < 4 || c.media.images.length < 2) return undefined
     const el = openCardMediaRef.current
@@ -1262,7 +1297,7 @@ function CardPreviewModal({
 
       {/* OPEN CARD — also gated by lock for non-envelope card types. */}
       {unlocked && stage === 'open' && (
-        <div className="cp-card-wrap cp-card-wrap-full">
+        <div ref={openCardDepthRef} className="cp-card-wrap cp-card-wrap-full cp-card-wrap-depth">
           {renderGradientBorder(
             <article
               className={`cp-card cp-card-full ${isTextOnlyCard ? 'cp-card-text-only' : 'cp-card-with-media'}`}
