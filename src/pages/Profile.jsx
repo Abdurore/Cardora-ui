@@ -16,7 +16,7 @@ import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
-import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getCardAnalytics, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground, getWalletSummary, getBanks, resolveBankAccount, saveBankDetails, withdrawGiftWallet, updateTemplate, getEnterpriseAdStats } from '../lib/api.js'
+import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground, getWalletSummary, getBanks, resolveBankAccount, saveBankDetails, withdrawGiftWallet, updateTemplate, getEnterpriseAdStats } from '../lib/api.js'
 import { mapTemplateToCard, normalizeCheckoutSession } from '../lib/backendMappers.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
@@ -128,8 +128,6 @@ function Profile() {
   const [isSavingCurrency, setIsSavingCurrency] = useState(false)
   const [showAllStats, setShowAllStats] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
-  const [cardAnalytics, setCardAnalytics] = useState({}) // keyed by slug
-  const [loadingCardAnalytics, setLoadingCardAnalytics] = useState({}) // keyed by slug
   const [shareTarget, setShareTarget] = useState(null) // { url, title } | null
   const [myTemplates, setMyTemplates] = useState(null) // null = not loaded yet
 
@@ -187,22 +185,6 @@ function Profile() {
     refreshPremiumState()
     return () => { cancelled = true }
   }, [location.search, navigate, refreshBalance])
-
-  const fetchCardAnalytics = async (slug) => {
-    if (!slug || cardAnalytics[slug] !== undefined) return
-    setLoadingCardAnalytics(prev => ({ ...prev, [slug]: true }))
-    try {
-      const res = await getCardAnalytics(slug)
-      setCardAnalytics(prev => ({ ...prev, [slug]: res?.analytics || res?.data || res || null }))
-    } catch {
-      // Don't cache the failure as `null` — that satisfies the `!== undefined`
-      // guard above forever, so a single transient error (e.g. a rate limit)
-      // would permanently blank this card's analytics until a full reload.
-      // Leaving the key unset lets the next call to fetchCardAnalytics retry.
-    } finally {
-      setLoadingCardAnalytics(prev => ({ ...prev, [slug]: false }))
-    }
-  }
 
   // Favorites resolve against whatever the user has favorited from the live
   // marketplace — no demo-data fallback.

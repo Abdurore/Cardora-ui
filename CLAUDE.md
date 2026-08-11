@@ -1,4 +1,56 @@
-# Cardora UI — Project Memory
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+npm run dev      # Vite dev server
+npm run build    # production build
+npm run preview  # serve the built bundle on :4173 (SPA fallback on)
+npm run lint     # eslint (flat config; `dist` ignored)
+npm test         # vitest run (jsdom + @testing-library, setup in src/test/setup.js)
+
+npx vitest run src/lib/tierRequirements.test.js   # one file
+npx vitest run -t "flags background music"        # one test by name
+npx vitest                                        # watch mode
+```
+
+`Backend/Cardora/` is a separate, independently git-tracked repo (gitignored here) kept only as the schema reference this file cites. Both `vite.config.js` (vitest `exclude`) and `eslint.config.js` (`globalIgnores`) skip `Backend/**` — it's a Node/Jest project, so linting it under this config's browser globals reported 275 phantom `no-undef` errors that buried every real frontend one. Keep it excluded when touching either config.
+
+Env (`.env`, gitignored; see `.env.example`): `VITE_API_BASE_URL` (falls back to the deployed Render backend if unset), `VITE_CLOUDINARY_CLOUD_NAME`, `VITE_CLOUDINARY_UPLOAD_PRESET`.
+
+## Architecture
+
+React 19 + Vite SPA, no state library and no TypeScript. Three things carry the app:
+
+**1. `MainLayout.jsx` is the app-wide store.** Every route except `/ask/:username` renders inside it, and it passes ~40 values/handlers through a single `<Outlet context={{...}}>` — session (`currentUser`, `authReady`, `balance`, `inventory`), marketplace data, and every backend action (`createCardOnBackend`, `getUserCardsFromBackend`, `openAuthModal`, `refreshBalance`, `openEditor`, …). Pages consume it with `useOutletContext()`. New global state or a new backend action belongs in that context object, not in a new provider. Its handlers return `{ ok, message, ... }` rather than throwing — callers branch on `ok` and toast `message`.
+
+**2. `cardObject` is the client-side card format.** Defined by `defaultCardObject` in `src/data/cardDefaults.js` (`palette`, `background`, `theme`, `card`, `closedState`, `envelope`, `questions`, `animation`, …). The Studio edits it, `CardPreviewModal.jsx` renders it, and it is *not* the backend shape. `src/lib/backendMappers.js` is the only translator, in both directions:
+- `cardObjectToBackendPayload(cardObject, { type, tier, poll, trivia, chain })` → the `{ config, enhancements, layoutdata }` payload (see the schema section below for every rename/clamp it performs).
+- `backendCardToCardObject` / `mapBackendCard` → back into a `cardObject` for rendering; `mapTemplateToCard`, `normalizeUser`, `normalizeAuthResponse`, `unwrapData`, etc. absorb the backend's inconsistent envelopes (`data.x` vs `x`, snake vs camel). Add new tolerance here, not in pages.
+
+**3. `src/lib/api.js` is the only place `fetch` happens.** One `request()` helper adds the bearer token, an `X-Guest-Id` (stable per-browser UUID so unauthenticated recipients aren't collapsed by IP), timeouts, and HTML-error-page detection; `requestFirstSuccess()` walks candidate paths but only falls through on 404/405 so real validation errors aren't masked. **The auth token lives in `sessionStorage`, not `localStorage`** (tab-scoped on purpose: a second account in another tab used to clobber the first tab's session and its World Chat socket auth) — use `getStoredToken`/`setStoredToken`/`clearStoredToken`, never touch the key directly.
+
+### Card creation path
+
+`CardStudio` / `QuickCreate` → `createCardOnBackend(cardObject, { type, poll, chain, trivia, tier })` in MainLayout → resolves type/tier (premium is personal-only, so non-personal premium is upgraded to elite) → `cardObjectToBackendPayload` → client-side Joi-mirroring validation → picks one of the ~12 `createCard*` endpoint functions. Recipient side: `CardView.jsx` fetches by slug, maps via `mapBackendCard`, and renders through the same `CardPreviewModal` the Studio previews with — server-side vote/answer state comes from the render model's `interaction` block, kept in separate state from the card.
+
+### Rendering, motion, performance
+
+- `CardPreviewModal.jsx` (~2.4k lines) is the shared card renderer: envelope → open → effects → interaction, used for both Studio preview and the live recipient view. `Envelope.jsx` / `StudioEnvelope.jsx` share the sealed-envelope visuals.
+- `src/lib/deviceCapability.js` is the single source of truth for "is this device weak" (`isLowPowerDevice`, `getMotionIntensity`, `getDepthProfile`, `getGalaxyProfile`). Don't re-invent per-component capability checks — that divergence was a real bug.
+- `useDepthMotion.js` writes CSS custom properties directly onto the element (never React state) for pointer/gyro/idle tilt.
+- `galaxyScene.js` is imperative three.js with a strict `dispose()` — WebGL contexts cap around 16 per page, so leaking one per preview open hard-fails the page. `GalaxyExperience.jsx` is `lazy()`-loaded so three.js never enters the main bundle; `galaxyThemes.js` is deliberately split from `studioEffects.js` so importing themes doesn't drag `canvas-confetti` into the entry chunk.
+- All routes are `lazy()` in `App.jsx`. Keep it that way when adding pages.
+
+### Styling
+
+`src/index.css` defines the theme tokens (`--primary`, `--surface`, `--text`, `--btn-*`, …) with a `:root[data-theme="light"]` override; `main.jsx` stamps `data-theme` from `localStorage['cardora-theme']` before render. **Always style through these vars** — hardcoded colors break light mode. `src/App.css` is one ~29k-line file for all component styles (known wart; append near related rules rather than restructuring wholesale).
+
+### Deployment extras
+
+`vercel.json` rewrites everything to the SPA, except that *bot user-agents* hitting `/card/:slug` and `/ask/:username` are routed to the serverless functions in `api/` (`card-meta.js`, `ask-meta.js`), which render real per-card Open Graph HTML — scrapers never run the SPA's client-side meta injection.
 
 ## Frontend tier model: "design free, pay at send"
 
@@ -151,7 +203,7 @@ Empty strings on required fields = **400 validation error**. Frontend `handleCre
 3. **lock.type `'time'`** → backend wants `'timer'`. Mapper converts.
 4. **music `url`** → backend wants `track`. Mapper renames.
 5. **openEffect.colors with empty strings** → fails colorSchema min(1). Mapper fills with `colors.accent || '#ffffff'`.
-6. **media URL = blob/file** → fails Joi.uri(). Mapper filters to `^(https?:|data:)`.
+6. **media URL = blob/file** → fails Joi.uri(). Mapper keeps only `^https?:` URLs (so `blob:`/`file:`/`data:` from an un-flushed local upload are dropped, not sent) — flush pending uploads to Cloudinary *before* building the payload, or the images silently vanish from the sent card.
 7. **Empty option/rule strings** in poll/chain/trivia → fails per-item min(1). Mapper filters them out.
 8. **Trivia question with < 2 options** → fails options min(2). Mapper drops the question.
 9. **correctIndex >= options.length** → backend custom validator rejects. Mapper clamps to valid range.

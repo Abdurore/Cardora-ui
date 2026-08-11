@@ -44,13 +44,11 @@ import {
   updateAdminPackage,
   getAdminStatsReferrals,
   getAdminCoupons,
-  sendAdminBroadcast,
   getMediaVideos,
   uploadMediaVideo,
   deleteMediaVideo,
   getMediaMusic,
   uploadMediaMusic,
-  updateMediaMusic,
   deleteMediaMusic,
   getProfileBackgrounds,
   createProfileBackground,
@@ -89,14 +87,15 @@ const GIFT_EFFECT_OPTIONS = [
 ]
 const GIFT_TIER_OPTIONS = ['common', 'rare', 'epic', 'legendary', 'mythic']
 
-// Persist trim points locally (backend doesn't store startSec/endSec yet).
-// Keyed by track _id OR cloudinary URL so drafts survive before an ID is assigned.
+// Read-only back-compat: tracks saved under the older flow stored their trim
+// points here (the backend rejects startSec/endSec), keyed by track _id OR
+// cloudinary URL. Nothing writes this store any more — new uploads are trimmed
+// destructively before upload (see handleSaveDraftTrack), so the stored clip IS
+// the trimmed clip — but existing entries still need reattaching on every list
+// refresh, so the read path stays.
 const TRIM_STORE_KEY = 'cardora-music-trim'
 function readTrimStore() {
   try { return JSON.parse(localStorage.getItem(TRIM_STORE_KEY) || '{}') } catch { return {} }
-}
-function writeTrimStore(store) {
-  try { localStorage.setItem(TRIM_STORE_KEY, JSON.stringify(store)) } catch {}
 }
 function mergeTrimData(tracks) {
   const store = readTrimStore()
@@ -1116,20 +1115,6 @@ const handleBroadcast = async () => {
     setMusicDraft(null)
   }
 
-  const handleAddTrack = async () => {
-    if (!newTrack.name || !newTrack.url) { showMsg('Name and audio required.', false); return }
-    try {
-      await uploadMediaMusic({ name: newTrack.name, url: newTrack.url })
-      showMsg('Track added to library!')
-      setNewTrack({ name: '', url: '' })
-      if (mediaMusicInputRef.current) mediaMusicInputRef.current.value = ''
-      refreshMediaSilent()
-    } catch (err) {
-      console.error('[Admin] uploadMediaMusic failed', err)
-      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
-    }
-  }
-
   const getTemplateAdminId = (tplOrId) => {
     if (!tplOrId) return ''
     if (typeof tplOrId === 'string') return tplOrId
@@ -1229,39 +1214,6 @@ const handleBroadcast = async () => {
         return
       }
       showMsg(fallback?.message || err.message || 'Delete failed.', false)
-    }
-  }
-
-  const handleSaveTrack = async (updated) => {
-    const id = updated._id || updated.id
-    if (!id) {
-      showMsg('Cannot save: missing track id.', false)
-      return
-    }
-    try {
-      // Backend validator currently rejects startSec/endSec. Persist them in
-      // localStorage and reattach via mergeTrimData on every list refresh.
-      const store = readTrimStore()
-      store[id] = {
-        startSec: Number(updated.startSec || 0),
-        endSec: Number(updated.endSec || 0),
-      }
-      // Also key by URL so the entry survives if the id changes (edge case).
-      const url = updated.url || updated.audioUrl
-      if (url) store[url] = store[id]
-      writeTrimStore(store)
-      await updateMediaMusic(id, {
-        name: updated.name,
-        duration: Math.round(Number(updated.duration || 0)),
-      })
-      setMediaMusic((prev) =>
-        prev.map((t) => ((t._id || t.id) === id ? { ...t, ...updated } : t)),
-      )
-      showMsg('Track saved.')
-      refreshMediaSilent()
-    } catch (err) {
-      console.error('[Admin] updateMediaMusic failed', err)
-      showMsg(`Save failed: ${err.message || 'unknown error'}`, false)
     }
   }
 
@@ -1437,10 +1389,10 @@ const handleBroadcast = async () => {
           </div>
         )}
 
-        {/* GIFTS & CHAT FRAMES */}
+        {/* GIFTS */}
         {activeTab === 'Gifts' && !loading && (
           <div className="admin-section">
-            <h3 className="admin-section-title">Gift & Chat Frame Management</h3>
+            <h3 className="admin-section-title">Gift Management</h3>
 
             {/* Signup Bonus Controls */}
             <div className="admin-sub-section">

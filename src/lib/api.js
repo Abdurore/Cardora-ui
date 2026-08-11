@@ -553,8 +553,12 @@ export async function getUserAnalytics() {
   return request('/user-analytics', { auth: true })
 }
 
+// Live backend route (analyticsRoutes.js), but currently unused by any page:
+// Profile.jsx once held per-slug fetch/caching state for it that nothing ever
+// called or rendered, so that dead half was removed. This wrapper is kept
+// because the endpoint works — wire it up when the per-card analytics UI lands.
 export async function getCardAnalytics(slug) {
-  return request(`/card-analytics/${slug}`, { auth: true })
+  return request(`/card-analytics/${encodeURIComponent(slug)}`, { auth: true })
 }
 
 /* ═══════════════════════════════════════════════
@@ -717,12 +721,12 @@ export async function deleteAdminRedeemCode(code) {
   return request('/admin/redeem-codes', { method: 'DELETE', auth: true, body: { code } })
 }
 
+// The admin "broadcast to all users" action. There is no /admin/broadcast-message
+// route on the backend (only this one plus the /admin/broadcast-requests approval
+// endpoints), so this is the endpoint that actually mails every user — don't add a
+// `sendAdminBroadcast` stub back and wire the button to it, it will 404.
 export async function sendSeasonalReminder(payload) {
   return request('/admin/send-seasonal-reminder', { method: 'POST', auth: true, body: payload })
-}
-
-export async function sendAdminBroadcast(payload) {
-  return request('/admin/broadcast-message', { method: 'POST', auth: true, body: payload })
 }
 
 export async function getAdminStatsOverview() {

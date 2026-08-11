@@ -517,7 +517,6 @@ function CardStudio() {
   const [sendEmail, setSendEmail] = useState('')
   const fileInputRef = useRef(null)
   const pendingUploadsRef = useRef(new Map()) // blobUrl → { file, type }
-  const [isUploading, setIsUploading] = useState(false)
 
   // Interactive preview editing
   const [activeEditEl, setActiveEditEl] = useState(null) // { type:'heading'|'body'|'extendedBody'|'image', index:number }
@@ -1515,13 +1514,15 @@ function CardStudio() {
           <p className="cs-panel-eyebrow">Media</p>
           <h3>Add images to your card <TierPip tier="elite" /></h3>
           <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
+          {/* Picking a file only queues a local blob URL in pendingUploadsRef —
+              the Cloudinary upload is deferred to send time — so there is no
+              in-flight state to reflect here. */}
           <button
             type="button"
-            className={`cs-button ${isUploading ? 'loading' : ''}`}
-            onClick={() => !isUploading && fileInputRef.current?.click()}
-            disabled={isUploading}
+            className="cs-button"
+            onClick={() => fileInputRef.current?.click()}
           >
-            {isUploading ? 'Uploading...' : '+ Upload Image'}
+            + Upload Image
           </button>
           {c.media.images.length === 0 && (
             <p className="cs-empty">No images added yet.</p>

@@ -107,6 +107,18 @@
   --secondary:      #059669;   /* emerald — mint counterpart */
   --tertiary:       #d97706;   /* amber for warm highlights */
 
+  /* ── Type Colors ──
+     The dark values above are pale by design (they sit on near-black), which
+     made them unreadable as *text* on white — the card-type picker's pricing
+     line measured as low as 1.26:1. Same hue, darkened to carry contrast on a
+     light surface. The -bg tints and -grad gradients keep their dark-mode
+     definitions on purpose: they back icons/chips rather than carry text. */
+  --type-personal:  #b45309;   /* amber-700 */
+  --type-poll:      #1d4ed8;   /* blue-700 */
+  --type-trivia:    #7e22ce;   /* purple-700 */
+  --type-chain:     #be185d;   /* pink-700 */
+  --type-anonymous: #0e7490;   /* cyan-700 */
+
   /* Surfaces — white cards on warm-neutral page bg */
   --bg:       #f4f8fb;
   --surface:  #ffffff;
