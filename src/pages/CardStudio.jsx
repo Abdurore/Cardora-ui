@@ -233,7 +233,10 @@ function wrapCanvasText(ctx, text, centerX, startY, maxWidth, lineHeight) {
 }
 
 
-function StudioAudioPlayer({ src, volume = 0.8 }) {
+// `silenced` is set whenever this preview has no business making noise — the
+// "Play it through" modal is open (it plays the card's own music, so the two
+// would overlap), or the tool panel showing this player is closed.
+function StudioAudioPlayer({ src, volume = 0.8, silenced = false }) {
   const audioRef = useRef(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
@@ -248,6 +251,34 @@ function StudioAudioPlayer({ src, volume = 0.8 }) {
     setIsPlaying(false)
     setCurrentTime(0)
   }, [src])
+
+  // Detaching an <audio> element does not reliably stop playback in Chrome, so
+  // leaving the Studio (or switching tools) could leave a track playing over
+  // the rest of the app with no visible control to stop it. Pause explicitly.
+  useEffect(() => () => {
+    const el = audioRef.current
+    if (el) { el.pause(); el.currentTime = 0 }
+  }, [])
+
+  useEffect(() => {
+    if (!silenced) return
+    const el = audioRef.current
+    if (el) el.pause()
+    setIsPlaying(false)
+  }, [silenced])
+
+  // Backgrounding the tab should stop the preview too — it's a deliberate
+  // "listen to this track" control, not the card's ambience.
+  useEffect(() => {
+    const onHidden = () => {
+      if (!document.hidden) return
+      const el = audioRef.current
+      if (el) el.pause()
+      setIsPlaying(false)
+    }
+    document.addEventListener('visibilitychange', onHidden)
+    return () => document.removeEventListener('visibilitychange', onHidden)
+  }, [])
 
   const togglePlayback = async () => {
     if (!audioRef.current) return
@@ -1715,7 +1746,7 @@ function CardStudio() {
               })()}
               {c.background.music.url ? (
                 <>
-                  <StudioAudioPlayer src={c.background.music.url} volume={c.background.music.volume} />
+                  <StudioAudioPlayer src={c.background.music.url} volume={c.background.music.volume} silenced={showPreview} />
                   <button type="button" className="cs-inline-remove" style={{ marginTop: 4 }} onClick={() => update('background.music.url', '')}>Remove track</button>
                 </>
               ) : null}
@@ -2048,88 +2079,109 @@ function CardStudio() {
           </p>
 
           <div className="cs-sub-section">
-            <button
-              type="button"
-              className={`cs-chip ${exp.type === 'galaxy' ? 'active' : ''}`}
-              onClick={() => update('experience.type', exp.type === 'galaxy' ? 'none' : 'galaxy')}
-            >
-              {exp.type === 'galaxy' ? 'Galaxy on' : 'Turn on galaxy'}
+            {/* Not .cs-toggle-field: that sets flex-direction on .cs-field,
+                which is display:grid, so the rule never takes effect and the
+                control stacks vertically. */}
+            <label className="cs-gx-toggle">
+              <input
+                type="checkbox"
+                checked={exp.type === 'galaxy'}
+                onChange={e => update('experience.type', e.target.checked ? 'galaxy' : 'none')}
+              />
+              <span className="cs-gx-toggle-label">Open this card as a galaxy</span>
               <TierPip tier="elite" compact />
-            </button>
+            </label>
           </div>
 
           {exp.type === 'galaxy' && (
             <>
               {images.length === 0 ? (
-                <p className="cs-field" style={{ fontSize: '0.82rem', opacity: 0.6 }}>
-                  Add photos in the Media panel first — each one becomes a memory in the galaxy.
+                <p className="cs-info-note">
+                  Add photos in the Media panel first — each one becomes a memory
+                  orbiting the galaxy.
                 </p>
               ) : (
                 <>
                   <div className="cs-sub-section">
                     <p className="cs-sub-label">Color Theme</p>
-                    <div className="cs-choice-row">
+                    <div className="cs-gx-theme-row">
                       {GALAXY_THEMES.map(t => (
                         <button
                           key={t.value}
                           type="button"
-                          className={`cs-chip ${(exp.theme || 'rose') === t.value ? 'active' : ''}`}
+                          className={`cs-gx-theme ${(exp.theme || 'rose') === t.value ? 'active' : ''}`}
                           onClick={() => update('experience.theme', t.value)}
+                          title={t.label}
                         >
                           <span
-                            className="cs-gx-theme-swatch"
-                            style={{ background: `linear-gradient(120deg, ${t.dust.join(', ')})` }}
+                            className="cs-gx-theme-orb"
+                            style={{
+                              background: `radial-gradient(circle at 32% 28%, ${t.core}, ${t.dust[1]} 60%, ${t.haze})`,
+                            }}
                           />
-                          {t.label}
+                          <span className="cs-gx-theme-name">{t.label}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div className="cs-sub-section">
-                    <p className="cs-sub-label">Galaxy Name</p>
-                    <input
-                      className="cs-field"
-                      value={exp.coreLabel || ''}
-                      maxLength={60}
-                      placeholder="Cosmos of Memories"
-                      onChange={e => update('experience.coreLabel', e.target.value)}
-                    />
+                    <label className="cs-field">
+                      <span>Galaxy Name</span>
+                      <input
+                        value={exp.coreLabel || ''}
+                        maxLength={60}
+                        placeholder="Cosmos of Memories"
+                        onChange={e => update('experience.coreLabel', e.target.value)}
+                      />
+                    </label>
+                    <p className="cs-field-hint">Shown at the centre of the galaxy.</p>
                   </div>
 
                   <div className="cs-sub-section">
                     <p className="cs-sub-label">Memories</p>
+                    <p className="cs-field-hint">
+                      Pick which photos become planets, and what each one says.
+                    </p>
                     {images.map((img, i) => {
                       const memory = memoryFor(i)
                       return (
-                        <div key={i} className="cs-gx-memory">
+                        <div key={i} className={`cs-gx-memory${memory ? ' is-on' : ''}`}>
                           <label className="cs-gx-memory-head">
                             <input
                               type="checkbox"
                               checked={!!memory}
                               onChange={() => toggleMemory(i)}
                             />
-                            {img.url && <img src={img.url} alt="" className="cs-gx-memory-thumb" />}
-                            <span>Photo {i + 1}</span>
+                            {img.url
+                              ? <img src={img.url} alt="" className="cs-gx-memory-thumb" />
+                              : <span className="cs-gx-memory-thumb is-empty" />}
+                            <span className="cs-gx-memory-title">
+                              {memory?.title?.trim() || `Photo ${i + 1}`}
+                            </span>
                           </label>
                           {memory && (
-                            <>
-                              <input
-                                className="cs-field"
-                                value={memory.title || ''}
-                                maxLength={60}
-                                placeholder="How it started"
-                                onChange={e => setMemory(i, { title: e.target.value })}
-                              />
-                              <textarea
-                                className="cs-field"
-                                rows={2}
-                                value={memory.note || ''}
-                                maxLength={400}
-                                placeholder="What this moment means…"
-                                onChange={e => setMemory(i, { note: e.target.value })}
-                              />
-                            </>
+                            <div className="cs-gx-memory-body">
+                              <label className="cs-field">
+                                <span>Title</span>
+                                <input
+                                  value={memory.title || ''}
+                                  maxLength={60}
+                                  placeholder="How it started"
+                                  onChange={e => setMemory(i, { title: e.target.value })}
+                                />
+                              </label>
+                              <label className="cs-field">
+                                <span>Note</span>
+                                <textarea
+                                  rows={2}
+                                  value={memory.note || ''}
+                                  maxLength={400}
+                                  placeholder="What this moment means…"
+                                  onChange={e => setMemory(i, { note: e.target.value })}
+                                />
+                              </label>
+                            </div>
                           )}
                         </div>
                       )
@@ -2138,25 +2190,27 @@ function CardStudio() {
 
                   <div className="cs-sub-section">
                     <p className="cs-sub-label">Core Notes</p>
-                    <p className="cs-field" style={{ fontSize: '0.76rem', opacity: 0.55 }}>
-                      Short lines that float out when the recipient taps the centre of the galaxy.
+                    <p className="cs-field-hint">
+                      Short lines that float out when the recipient taps the centre.
                     </p>
                     {(exp.coreNotes || []).map((note, i) => (
-                      <div key={i} className="cs-color-row">
-                        <input
-                          className="cs-field"
-                          value={note}
-                          maxLength={140}
-                          placeholder="You are the softest place I know."
-                          onChange={e => {
-                            const next = [...exp.coreNotes]
-                            next[i] = e.target.value
-                            update('experience.coreNotes', next)
-                          }}
-                        />
+                      <div key={i} className="cs-gx-note-row">
+                        <label className="cs-field">
+                          <input
+                            value={note}
+                            maxLength={140}
+                            placeholder="You are the softest place I know."
+                            onChange={e => {
+                              const next = [...exp.coreNotes]
+                              next[i] = e.target.value
+                              update('experience.coreNotes', next)
+                            }}
+                          />
+                        </label>
                         <button
                           type="button"
                           className="cs-inline-remove"
+                          aria-label={`Remove note ${i + 1}`}
                           onClick={() => update('experience.coreNotes', exp.coreNotes.filter((_, j) => j !== i))}
                         >×</button>
                       </div>

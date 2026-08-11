@@ -523,6 +523,21 @@ function CardPreviewModal({
     }
   }, [c.background.music.url, c.background.music.volume, stage, musicAllowed, musicTrimmed, musicStartSec, musicEndSec])
 
+  // Card music should not keep playing into a tab the viewer has switched away
+  // from. Resume only if the stage still wants sound — `stage` is read through
+  // a ref-free closure here because the effect re-runs whenever it changes.
+  useEffect(() => {
+    if (!musicAllowed) return undefined
+    const onVisibility = () => {
+      const el = audioRef.current
+      if (!el) return
+      if (document.hidden) el.pause()
+      else if (!el.ended && el.currentTime > 0) el.play().catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [musicAllowed])
+
   // While trimmed playback is active, loop within [startSec, endSec] manually.
   // Native <audio loop> covers the file end; we also need to loop at the
   // user-defined endSec.
