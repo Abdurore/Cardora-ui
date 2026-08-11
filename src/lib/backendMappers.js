@@ -502,6 +502,18 @@ export function cardObjectToLayoutData(cardObject = null, { allowAnonMedia = fal
       inkColor: cardObject.theme?.textColor || undefined,
     }
   }
+  // The galaxy scene. Memories index into media.images, and that array gets
+  // filtered on the way out (blob:/file: URLs fail Joi.uri()), so any entry
+  // pointing past the surviving images is dropped here rather than left to
+  // resolve to a missing photo on the recipient's side.
+  if (cardObject?.experience?.type && cardObject.experience.type !== 'none') {
+    const experience = structuredClone(cardObject.experience)
+    const imageCount = (cardObject.media?.images || [])
+      .filter(img => /^(https?:|data:)/.test(img?.url || '')).length
+    experience.memories = (experience.memories || [])
+      .filter(m => Number.isInteger(m?.mediaIndex) && m.mediaIndex >= 0 && m.mediaIndex < imageCount)
+    layoutdata.experience = experience
+  }
   return layoutdata
 }
 
@@ -1006,6 +1018,19 @@ export function backendCardToCardObject(card) {
       giftName: attachedGift.giftName || attachedGift.name || storedGiftEffect.giftName || '',
       status: attachedGift.status || storedGiftEffect.status || 'available',
     } : (storedGiftEffect.enabled ? storedGiftEffect : { enabled: false, effectKey: 'none', giftTitle: '', giftAmount: '', status: 'available' }),
+    experience: (() => {
+      const stored = layoutdata.experience
+      const base = structuredClone(defaultCardObject.experience)
+      if (!stored || stored.type !== 'galaxy') return base
+      const imageCount = (enhancements.media || []).length
+      return {
+        ...base,
+        ...stored,
+        memories: (stored.memories || []).filter(m =>
+          Number.isInteger(m?.mediaIndex) && m.mediaIndex >= 0 && m.mediaIndex < imageCount),
+        coreNotes: (stored.coreNotes || []).filter(Boolean),
+      }
+    })(),
   })
 }
 

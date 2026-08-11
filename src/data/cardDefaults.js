@@ -133,6 +133,20 @@ export const defaultCardObject = {
   layout: {
     elementOrder: ['media', 'heading', 'body'],
   },
+
+  // An immersive full-screen scene shown between the envelope opening and the
+  // card itself. `memories` doesn't carry its own photos — each entry points
+  // by index into media.images, which already round-trips through the
+  // backend's enhancements.media[] and is already Cloudinary-hosted. The whole
+  // object rides to the backend inside layoutdata, which is unknown(true),
+  // so no schema change is needed (same trick as closedState and styleExtras).
+  experience: {
+    type: 'none',
+    theme: 'rose',
+    coreLabel: '',
+    memories: [],
+    coreNotes: [],
+  },
 }
 
 // Free ambient music URLs (royalty-free). Each preset declares a minimum tier —

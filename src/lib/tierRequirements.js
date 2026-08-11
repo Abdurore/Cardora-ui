@@ -160,6 +160,11 @@ const RULES = [
     trim: (c) => { if (c.background) c.background.type = 'color' },
   },
   {
+    id: 'galaxyExperience', label: 'Galaxy experience', tier: 'elite',
+    test: (c) => c?.experience?.type === 'galaxy',
+    trim: (c) => { if (c.experience) c.experience.type = 'none' },
+  },
+  {
     id: 'openEffect', label: 'Opening effect', tier: 'elite',
     // Any non-'none' open effect is elite-only in practice — the backend
     // rejects openEffect on premium cards outright regardless of which

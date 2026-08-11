@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeCardTier } from './tierRequirements.js'
+import { computeCardTier, trimCardToTier } from './tierRequirements.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
 
 // `computeCardTier` is the single source of truth for what a card costs and
@@ -79,5 +79,21 @@ describe('computeCardTier', () => {
     const { tier, reasons } = computeCardTier(card, { type: 'poll' })
     expect(tier).toBe('elite')
     expect(reasons.find((r) => r.id === 'gradBorder')?.tier).toBe('elite')
+  })
+
+  it('flags the galaxy experience as elite', () => {
+    const card = freshCard()
+    card.experience.type = 'galaxy'
+    const { tier, reasons } = computeCardTier(card, { type: 'personal' })
+    expect(tier).toBe('elite')
+    expect(reasons.some((r) => r.id === 'galaxyExperience')).toBe(true)
+  })
+
+  it('trims the galaxy experience back to free', () => {
+    const card = freshCard()
+    card.experience.type = 'galaxy'
+    const trimmed = trimCardToTier(card, 'classic', { type: 'personal' })
+    expect(trimmed.cardObject.experience.type).toBe('none')
+    expect(computeCardTier(trimmed.cardObject, { type: 'personal' }).tier).toBe('classic')
   })
 })
