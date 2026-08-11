@@ -3,35 +3,12 @@ import { createPortal } from 'react-dom'
 import { useOutletContext, useNavigate, useLocation, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import ScreenNav from '../components/ScreenNav.jsx'
-import { getWorldChat, getPublicProfile, API_BASE, getChatFrames, getCachedChatFrames, getStoredToken, getTemplateById } from '../lib/api.js'
+import { getWorldChat, getPublicProfile, API_BASE, getStoredToken, getTemplateById } from '../lib/api.js'
 import { MdBolt, MdPalette, MdDomain } from 'react-icons/md'
 import { BiShield } from 'react-icons/bi'
 import { IoPersonOutline, IoSparkles } from 'react-icons/io5'
 import { FaCrown } from 'react-icons/fa'
 import { mapChatMessage, mapTemplateToCard } from '../lib/backendMappers.js'
-import { getChatFrameId, getChatFrameUrl, getLocalEquippedChatFrameId, normalizeChatFrame } from '../lib/chatFrames.js'
-
-function pickFrameList(payload) {
-  if (Array.isArray(payload)) return payload
-  const root = payload?.data && typeof payload.data === 'object' ? payload.data : payload
-  if (Array.isArray(root)) return root
-  if (Array.isArray(root?.chatFrames)) return root.chatFrames
-  if (Array.isArray(root?.frames)) return root.frames
-  if (Array.isArray(root?.items)) return root.items
-  if (Array.isArray(root?.data)) return root.data
-  if (Array.isArray(root?.chatFrames?.docs)) return root.chatFrames.docs
-  if (Array.isArray(root?.frames?.docs)) return root.frames.docs
-  return []
-}
-
-function buildFrameCatalog(...sources) {
-  const catalog = {}
-  sources.flat().forEach(frame => {
-    const normalized = normalizeChatFrame(frame)
-    if (normalized?.id && normalized.url) catalog[normalized.id] = normalized.url
-  })
-  return catalog
-}
 
 function formatAge(isoStr) {
   if (!isoStr) return ''
@@ -59,37 +36,12 @@ function WorldChat() {
   const [joinLeave, setJoinLeave] = useState([])
   const [onlineCount, setOnlineCount] = useState(0)
   const [, setTick] = useState(0)
-  const [frameCatalog, setFrameCatalog] = useState({})
   const [profileCard, setProfileCard] = useState(null) // { userId, username, avatarUrl, role }
   const [profileDetails, setProfileDetails] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const socketRef = useRef(null)
   const messagesEndRef = useRef(null)
   const cooldownRef = useRef(null)
-  // Maps userId -> chatFrameUrl so frames persist as messages scroll in
-  const userFrameMap = useRef({})
-  const userFrameIdMap = useRef({})
-  const userFrameProfileFetches = useRef(new Set())
-  const frameCatalogRef = useRef({})
-
-  // Seed the map with the current user's equipped frame as soon as we have it
-  const localFrameId = getLocalEquippedChatFrameId(currentUser?.id)
-  const myFrameUrl = localFrameId === '__frameless__' ? null : getChatFrameUrl(currentUser) || null
-  const myFrameId = localFrameId === '__frameless__'
-    ? ''
-    : (localFrameId || getChatFrameId(currentUser?.chatFrame) || currentUser?.chatFrameId || currentUser?.equippedChatFrameId || currentUser?.equippedFrameId || getChatFrameId(currentUser?.equippedChatFrame) || getChatFrameId(currentUser?.equippedFrame) || '')
-  if (currentUser?.id && myFrameUrl) {
-    userFrameMap.current[currentUser.id] = myFrameUrl
-  } else if (currentUser?.id && myFrameId && frameCatalogRef.current[myFrameId]) {
-    userFrameMap.current[currentUser.id] = frameCatalogRef.current[myFrameId]
-  } else if (currentUser?.id) {
-    delete userFrameMap.current[currentUser.id]
-  }
-  if (currentUser?.id && myFrameId) {
-    userFrameIdMap.current[currentUser.id] = myFrameId
-  } else if (currentUser?.id) {
-    delete userFrameIdMap.current[currentUser.id]
-  }
 
   // Arrives here via CardDetailModal's "Share to World Chat" action, which
   // navigates here with the template attached in route state.
@@ -103,56 +55,10 @@ function WorldChat() {
 
   const MSG_CAP = 150
 
-  const resolveMessageFrameUrl = useCallback((msg) => {
-    const directUrl = msg.chatFrameUrl || getChatFrameUrl(msg)
-    if (directUrl) return directUrl
-    const frameId = msg.chatFrameId || getChatFrameId(msg.chatFrame) || getChatFrameId(msg.equippedChatFrame) || userFrameIdMap.current[msg.userId]
-    return frameId ? frameCatalog[frameId] || userFrameMap.current[msg.userId] || null : userFrameMap.current[msg.userId] || null
-  }, [frameCatalog])
-
-  useEffect(() => {
-    frameCatalogRef.current = frameCatalog
-    Object.entries(userFrameIdMap.current).forEach(([userId, frameId]) => {
-      if (frameCatalog[frameId]) userFrameMap.current[userId] = frameCatalog[frameId]
-    })
-  }, [frameCatalog])
-
-  const rememberUserFrame = useCallback((userId, frameUrl, frameId = '') => {
-    if (!userId) return false
-    let changed = false
-    if (frameId && userFrameIdMap.current[userId] !== frameId) {
-      userFrameIdMap.current[userId] = frameId
-      changed = true
-    }
-    if (frameUrl && userFrameMap.current[userId] !== frameUrl) {
-      userFrameMap.current[userId] = frameUrl
-      changed = true
-    } else if (!frameUrl && frameId && frameCatalogRef.current[frameId] && userFrameMap.current[userId] !== frameCatalogRef.current[frameId]) {
-      userFrameMap.current[userId] = frameCatalogRef.current[frameId]
-      changed = true
-    }
-    return changed
-  }, [])
-
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
-
-  useEffect(() => {
-    if (!currentUser) return
-    let cancelled = false
-    const cachedFrames = getCachedChatFrames()
-    ;(async () => {
-      try {
-        const res = await getChatFrames()
-        if (!cancelled) setFrameCatalog(buildFrameCatalog(pickFrameList(res), cachedFrames))
-      } catch {
-        if (!cancelled) setFrameCatalog(buildFrameCatalog(cachedFrames))
-      }
-    })()
-    return () => { cancelled = true }
-  }, [currentUser])
 
   // Load message history
   useEffect(() => {
@@ -163,11 +69,7 @@ function WorldChat() {
         const res = await getWorldChat('page=1&limit=50')
         const raw = res?.data?.messages || res?.messages || []
         if (!cancelled) {
-          const mappedMessages = raw.map(mapChatMessage)
-          mappedMessages.forEach(msg => {
-            rememberUserFrame(msg.userId, msg.chatFrameUrl, msg.chatFrameId)
-          })
-          setMessages(mappedMessages)
+          setMessages(raw.map(mapChatMessage))
           setLoading(false)
           setTimeout(scrollToBottom, 100)
         }
@@ -202,20 +104,6 @@ function WorldChat() {
 
     socket.on('new_message', (data) => {
       const msg = mapChatMessage(data)
-      if (msg.userId && msg.chatFrameId) {
-        userFrameIdMap.current[msg.userId] = msg.chatFrameId
-      }
-      if (!msg.chatFrameUrl && msg.chatFrameId && frameCatalogRef.current[msg.chatFrameId]) {
-        msg.chatFrameUrl = frameCatalogRef.current[msg.chatFrameId]
-      }
-      // Cache whatever frameUrl the server sends for this user
-      if (msg.userId && msg.chatFrameUrl) {
-        rememberUserFrame(msg.userId, msg.chatFrameUrl, msg.chatFrameId)
-      }
-      // For the current user, always apply their known frame from the map
-      if (msg.userId === currentUser?.id && !msg.chatFrameUrl && userFrameMap.current[currentUser.id]) {
-        msg.chatFrameUrl = userFrameMap.current[currentUser.id]
-      }
       setMessages(prev => {
         const next = [...prev, msg]
         return next.length > MSG_CAP ? next.slice(-MSG_CAP) : next
@@ -262,37 +150,7 @@ function WorldChat() {
       socket.disconnect()
       clearInterval(cooldownRef.current)
     }
-  }, [currentUser, scrollToBottom, rememberUserFrame])
-
-  useEffect(() => {
-    if (!currentUser || messages.length === 0) return
-    let cancelled = false
-    const missingUsers = []
-    messages.forEach(msg => {
-      if (!msg.userId || msg.userId === currentUser.id) return
-      if (resolveMessageFrameUrl(msg)) return
-      const fetchKey = msg.userId || msg.username
-      if (!fetchKey || userFrameProfileFetches.current.has(fetchKey)) return
-      userFrameProfileFetches.current.add(fetchKey)
-      missingUsers.push({ userId: msg.userId, username: msg.username, fetchKey })
-    })
-    if (missingUsers.length === 0) return
-    missingUsers.slice(0, 12).forEach(({ userId, username, fetchKey }) => {
-      ;(async () => {
-        try {
-          const res = await getPublicProfile(userId || username)
-          if (cancelled) return
-          const profile = res?.data?.user || res?.data?.profile || res?.user || res?.profile || res?.data || res
-          const frameUrl = getChatFrameUrl(profile)
-          const frameId = profile?.chatFrameId || profile?.equippedChatFrameId || profile?.equippedFrameId || getChatFrameId(profile?.chatFrame) || getChatFrameId(profile?.equippedChatFrame) || getChatFrameId(profile?.equippedFrame) || ''
-          if (rememberUserFrame(userId, frameUrl, frameId)) setTick(t => t + 1)
-        } catch {
-          userFrameProfileFetches.current.delete(fetchKey)
-        }
-      })()
-    })
-    return () => { cancelled = true }
-  }, [currentUser, messages, resolveMessageFrameUrl, rememberUserFrame])
+  }, [currentUser, scrollToBottom])
 
   // Online / offline detection
   useEffect(() => {
@@ -494,13 +352,6 @@ function WorldChat() {
           ) : (
             messages.map((msg) => {
               const isMe = msg.userId === currentUser.id
-              // Apply frame from map if not already on the message
-              const myFrame = userFrameMap.current[currentUser.id]
-              let frameUrl = myFrame && myFrame !== '__frameless__' ? myFrame : null
-              if (!frameUrl) {
-                frameUrl = resolveMessageFrameUrl(msg) || userFrameMap.current[msg.userId] || null
-                if (frameUrl === '__frameless__') frameUrl = null
-              }
               const openProfile = () => setProfileCard({
                 userId: msg.userId,
                 username: msg.username,
@@ -536,17 +387,7 @@ function WorldChat() {
                     </div>
                   )}
                   <div className="chat-msg-body">
-                    <div className={`chat-msg-bubble-wrap ${frameUrl ? 'has-frame' : ''}`}>
-                      {frameUrl && (
-                        <div
-                          className="chat-msg-frame-overlay"
-                          style={{
-                            borderImageSource: `url(${frameUrl})`,
-                            borderImageSlice: '33% fill',
-                            borderImageWidth: '24px'
-                          }}
-                        />
-                      )}
+                    <div className="chat-msg-bubble-wrap">
                       {msg.type === 'template_share' ? (
                         <button
                           type="button"

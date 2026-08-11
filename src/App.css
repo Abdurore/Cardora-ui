@@ -12451,7 +12451,6 @@ a {
   box-shadow: 0 12px 28px rgba(12, 60, 72, 0.4);
 }
 
-/* Chat bubble wrapper for frame overlay */
 .chat-msg-bubble-wrap {
   position: relative;
   display: inline-flex;
@@ -12460,34 +12459,13 @@ a {
   align-self: flex-start;
 }
 
-.chat-msg-frame-overlay {
-  position: absolute;
-  inset: -8px;
-  pointer-events: none;
-  z-index: 0;
-  border-style: solid;
-  border-color: transparent;
-}
 
-.chat-msg-bubble-wrap.has-frame {
-  padding: 5px 6px;
-  margin: 4px 8px;
-  max-width: calc(100% - 16px);
-}
 
-.chat-msg.me .chat-msg-bubble-wrap.has-frame {
-  margin: 4px 8px;
-}
 
 .chat-msg.me .chat-msg-bubble-wrap {
   align-self: flex-end;
 }
 
-.chat-msg-bubble-wrap.has-frame .chat-msg-bubble {
-  position: relative;
-  z-index: 1;
-  border-radius: 8px !important;
-}
 
 .chat-msg-time {
   font-size: 0.65rem;
@@ -26839,32 +26817,7 @@ a {
   }
 }
 
-/* ════════════════════════════════════════════════════════════
-   STORE COSMETICS — Chat Frames Grid
-   ════════════════════════════════════════════════════════════ */
-.store-cosmetics-section {
-  max-width: 700px;
-  margin: 0 auto;
-}
-.store-cosmetics-intro {
-  margin-bottom: 18px;
-}
-.store-cosmetics-intro h4 {
-  margin: 0 0 4px;
-  font-family: 'Cinzel', serif;
-  font-size: 1.2rem;
-  color: #ecfbff;
-}
-.store-cosmetics-intro p {
-  margin: 0;
-  font-size: 0.88rem;
-  color: rgba(200,230,240,0.55);
-  line-height: 1.5;
-}
 
-/* Light theme cosmetics */
-[data-theme="light"] .store-cosmetics-intro h4 { color: var(--text); }
-[data-theme="light"] .store-cosmetics-intro p { color: var(--text-muted); }
 
 /* ════════════════════════════════════════════════════════════
    PROFILE PREMIUM SECTION
@@ -27596,68 +27549,12 @@ a {
   flex-wrap: wrap;
 }
 
-/* ════════════════════════════════════════════════════════════
-   COSMETICS RESTYLE — better sizing and card layout
-   ════════════════════════════════════════════════════════════ */
-.store-cosmetics-section {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 0 8px;
-}
-.store-cosmetics-intro {
-  margin-bottom: 20px;
-  text-align: center;
-}
-.store-cosmetics-intro h4 {
-  font-size: 1.35rem;
-  margin-bottom: 6px;
-}
 
-.store-cosmetics-section {
-  max-width: 980px;
-}
 
-.store-cosmetics-intro {
-  text-align: left;
-  display: grid;
-  gap: 6px;
-}
 
-.store-cosmetics-intro .eyebrow {
-  margin: 0;
-}
 
-/* Store card preview bubble with overlay frame */
-.cf-bubble-wrap {
-  position: relative;
-  display: inline-flex;
-  max-width: 100%;
-  padding: 12px;
-  isolation: isolate;
-  align-self: flex-start;
-}
 
-.cf-frame-overlay {
-  position: absolute;
-  inset: -8px;
-  pointer-events: none;
-  z-index: 0;
-  border-style: solid;
-  border-color: transparent;
-}
 
-.cf-bubble-text {
-  position: relative;
-  z-index: 1;
-  padding: 10px 14px;
-  border-radius: 14px 14px 14px 4px;
-  background: linear-gradient(180deg, rgba(16, 30, 38, 0.92), rgba(10, 20, 26, 0.96));
-  border: 1px solid rgba(126, 247, 255, 0.1);
-  color: #e8f6fa;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  word-break: break-word;
-}
 
 [data-theme="light"] .store-frame-empty {
   background: var(--surface);
@@ -27665,287 +27562,42 @@ a {
   color: var(--text-muted);
 }
 
-/* ── Chat Frame Cards (cf-*) ── */
-.store-cosmetics-content {
-  display: flex;
-  flex-direction: column;
-  gap: 36px;
-}
 
-.cf-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
 
-.cf-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
 
-.cf-section-title {
-  margin: 0;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(220, 242, 247, 0.55);
-}
 
-.cf-section-count {
-  font-size: 0.75rem;
-  color: rgba(220, 242, 247, 0.35);
-  background: rgba(126, 247, 255, 0.06);
-  border: 1px solid rgba(126, 247, 255, 0.1);
-  padding: 3px 10px;
-  border-radius: 100px;
-}
 
-.cf-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
-  gap: 16px;
-}
 
-.cf-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(126, 247, 255, 0.1);
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
 
-.cf-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(126, 247, 255, 0.24);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
-}
 
-.cf-card--equipped {
-  border-color: rgba(98, 255, 162, 0.4);
-  box-shadow: 0 0 0 1px rgba(98, 255, 162, 0.2), 0 8px 28px rgba(0, 0, 0, 0.3);
-}
 
-.cf-equipped-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 10;
-  background: linear-gradient(135deg, #62ffa2, #7ef7ff);
-  color: #041015;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  padding: 4px 10px;
-  border-radius: 100px;
-  pointer-events: none;
-}
 
-.cf-preview {
-  width: 100%;
-  padding: 28px 22px 28px 18px;
-  background:
-    radial-gradient(circle at top left, rgba(126, 247, 255, 0.12), transparent 50%),
-    linear-gradient(180deg, rgba(8, 18, 24, 0.97) 0%, rgba(4, 10, 14, 0.99) 100%);
-  border-bottom: 1px solid rgba(126, 247, 255, 0.08);
-  overflow: visible;
-  border-radius: 16px 16px 0 0;
-}
 
-.cf-preview-inner {
-  display: grid;
-  grid-template-columns: 38px 1fr;
-  gap: 10px;
-  align-items: start;
-}
 
-.cf-avatar-wrap {
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-}
 
-.cf-avatar {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #7ef7ff, #62ffa2);
-  color: #041015;
-  font-size: 0.78rem;
-  font-weight: 900;
-  letter-spacing: -0.01em;
-}
 
-.cf-avatar-img {
-  display: block;
-  object-fit: cover;
-}
 
-.cf-bubble-col {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-}
 
-.cf-bubble-meta {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
 
-.cf-bubble-meta strong {
-  color: #7ef7ff;
-  font-size: 0.74rem;
-  font-weight: 700;
-}
 
-.cf-bubble-meta span {
-  color: rgba(220, 242, 247, 0.32);
-  font-size: 0.64rem;
-}
 
-.cf-info {
-  padding: 14px 16px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  flex: 1;
-}
 
-.cf-info-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 
-.cf-name {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #ddf3fa;
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.cf-price {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #7ef7ff;
-  background: rgba(126, 247, 255, 0.1);
-  padding: 3px 9px;
-  border-radius: 100px;
-  border: 1px solid rgba(126, 247, 255, 0.18);
-  white-space: nowrap;
-}
 
-.cf-owned-tag {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: #62ffa2;
-  background: rgba(98, 255, 162, 0.1);
-  padding: 3px 9px;
-  border-radius: 100px;
-  border: 1px solid rgba(98, 255, 162, 0.2);
-  white-space: nowrap;
-}
 
-.cf-equipped-tag {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: #041015;
-  background: linear-gradient(135deg, #62ffa2, #7ef7ff);
-  padding: 3px 9px;
-  border-radius: 100px;
-  white-space: nowrap;
-}
 
-.cf-desc {
-  font-size: 0.76rem;
-  color: rgba(200, 230, 240, 0.45);
-  margin: 0;
-  line-height: 1.4;
-}
 
-.cf-actions {
-  padding: 0 14px 14px;
-}
 
-.cf-btn {
-  width: 100%;
-  padding: 11px 16px;
-  border-radius: 10px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  transition: opacity 0.18s ease, transform 0.15s ease, background 0.2s ease;
-  letter-spacing: 0.01em;
-}
 
-.cf-btn:active {
-  transform: scale(0.97);
-}
 
-.cf-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
 
-.cf-btn--buy {
-  background: linear-gradient(135deg, #7ef7ff 0%, #62ffa2 100%);
-  color: #041015;
-  box-shadow: 0 4px 16px rgba(126, 247, 255, 0.25);
-}
 
-.cf-btn--buy:not(:disabled):hover {
-  opacity: 0.88;
-  box-shadow: 0 6px 22px rgba(126, 247, 255, 0.35);
-}
 
-.cf-btn--equip {
-  background: rgba(126, 247, 255, 0.1);
-  color: #7ef7ff;
-  border: 1px solid rgba(126, 247, 255, 0.22);
-}
 
-.cf-btn--equip:not(:disabled):hover {
-  background: rgba(126, 247, 255, 0.18);
-}
 
-.cf-btn--equipped {
-  background: rgba(98, 255, 162, 0.08);
-  color: #62ffa2;
-  border: 1px solid rgba(98, 255, 162, 0.2);
-}
 
-.cf-btn-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: cf-spin 0.65s linear infinite;
-  display: inline-block;
-}
 
-@keyframes cf-spin {
-  to { transform: rotate(360deg); }
-}
 
 .store-frame-empty {
   display: flex;
@@ -27969,36 +27621,9 @@ a {
 }
 
 /* Light theme overrides */
-[data-theme="light"] .cf-card {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: var(--accent-tint);
-}
 
-[data-theme="light"] .cf-card--equipped {
-  border-color: var(--primary);
-}
 
-[data-theme="light"] .cf-preview {
-  background: linear-gradient(180deg, rgba(235, 250, 255, 0.96), rgba(220, 243, 252, 0.98));
-  border-bottom-color: var(--accent-tint);
-}
 
-[data-theme="light"] .cf-section-title { color: var(--text-muted); }
-[data-theme="light"] .cf-section-count { color: var(--text-muted); }
-[data-theme="light"] .cf-name { color: var(--text); }
-[data-theme="light"] .cf-bubble-meta strong { color: var(--primary); }
-[data-theme="light"] .cf-bubble-meta span { color: rgba(44, 90, 110, 0.5); }
-[data-theme="light"] .cf-desc { color: var(--text-muted); }
-[data-theme="light"] .cf-price {
-  color: var(--primary);
-  background: rgba(10, 122, 143, 0.08);
-  border-color: rgba(10, 122, 143, 0.2);
-}
-[data-theme="light"] .cf-btn--equip {
-  color: var(--primary);
-  background: rgba(10, 122, 143, 0.08);
-  border-color: rgba(10, 122, 143, 0.2);
-}
 
 
 [data-theme="light"] .card:hover {
@@ -28617,85 +28242,16 @@ a {
 
 
 
-/* -- Admin Chat Frame Tiles -- */
-.admin-frame-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 16px;
-  margin-top: 12px;
-}
 
-.admin-frame-tile {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(126,247,255,0.12);
-  padding: 12px;
-  transition: border-color 0.2s;
-}
 
-.admin-frame-tile:hover {
-  border-color: rgba(126,247,255,0.28);
-}
 
-.admin-frame-tile-preview {
-  width: 100%;
-  aspect-ratio: 1;
-  background: rgba(0,0,0,0.3);
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
-.admin-frame-tile-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
 
-.admin-frame-tile-no-img {
-  font-size: 0.72rem;
-  color: rgba(220,240,247,0.3);
-}
 
-.admin-frame-tile-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
 
-.admin-frame-tile-name {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #ddf3fa;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.admin-frame-tile-price {
-  font-size: 0.72rem;
-  color: #7ef7ff;
-  font-weight: 600;
-}
 
-.admin-frame-tile-id {
-  font-size: 0.62rem;
-  color: rgba(220,240,247,0.3);
-  font-family: monospace;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.admin-frame-tile-delete {
-  width: 100%;
-  margin-top: auto;
-}
 
 /* Final contrast pass: these must stay after the repeated light-theme blocks. */
 [data-theme="light"] .cs-settings h3,

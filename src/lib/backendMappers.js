@@ -1,7 +1,6 @@
 import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
 import { formatGiftName, giftNameToEffectKey, formatGiftAmount } from './gifts.js'
 
-import { getChatFrameId, getChatFrameUrl } from './chatFrames.js'
 
 const ROLE_MAP = {
   admin: 'Admin',
@@ -159,10 +158,6 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     profileBackground: user.equippedProfileBackground || user.profileBackground || user.equippedBackground || user.selectedProfileBackground || user.background || null,
     equippedBackground: user.equippedProfileBackground || user.equippedBackground || user.profileBackground || user.selectedProfileBackground || null,
     profileBackgroundUrl: user.profileBackgroundUrl || user.equippedProfileBackground?.url || user.backgroundUrl || user.selectedProfileBackgroundUrl || user.profileBackground?.url || user.equippedBackground?.url || user.selectedProfileBackground?.url || '',
-    chatFrameId: user.chatFrameId || user.equippedChatFrameId || user.equippedFrameId || getChatFrameId(user.chatFrame) || getChatFrameId(user.equippedChatFrame) || getChatFrameId(user.equippedFrame) || '',
-    chatFrameUrl: getChatFrameUrl(user),
-    equippedChatFrame: user.equippedChatFrame || user.chatFrame || user.equippedFrame || null,
-    chatFrames: user.chatFrames || user.purchasedChatFrames || user.ownedChatFrames || user.unlockedChatFrames || user.unlockedFrames || [],
     createdAt: user.createdAt || '',
     avatarColor: extras.avatarColor || 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
     avatarUrl: user.profilePictureUrl || extras.avatarUrl || '',
@@ -1134,8 +1129,6 @@ export function mapChatMessage(msg) {
     profilePictureUrl: msg.profilePictureUrl || msg.avatarUrl || user.profilePictureUrl || user.avatarUrl || null,
     role: msg.role || user.role || '',
     createdAt: msg.createdAt || new Date().toISOString(),
-    chatFrameUrl: getChatFrameUrl(msg) || getChatFrameUrl(user) || null,
-    chatFrameId: msg.chatFrameId || msg.equippedChatFrameId || msg.equippedFrameId || getChatFrameId(msg.chatFrame) || getChatFrameId(msg.equippedChatFrame) || user.chatFrameId || user.equippedChatFrameId || user.equippedFrameId || getChatFrameId(user.chatFrame) || getChatFrameId(user.equippedChatFrame) || null,
     ...(msg.type === 'template_share' ? {
       type: 'template_share',
       templateId: msg.templateId || '',
