@@ -20,6 +20,8 @@ npx vitest                                        # watch mode
 
 Env (`.env`, gitignored; see `.env.example`): `VITE_API_BASE_URL` (falls back to the deployed Render backend if unset), `VITE_CLOUDINARY_CLOUD_NAME`, `VITE_CLOUDINARY_UPLOAD_PRESET`.
 
+**`VITE_*` values are inlined at build time, so they must exist on the deploy host (Vercel → Settings → Environment Variables), and changing them requires a rebuild — setting them on a live project does nothing until you redeploy.** Missing Cloudinary vars fail silently in the worst way: `uploadToCloudinary`'s guard folds to `true`, the minifier drops the whole upload implementation, and the deployed chunk becomes a bare `throw` while the build still reports success. `vite.config.js` now guards this — hard-fails a build on a deploy host (`VERCEL`/`CI` set), warns-but-builds locally so contributors without a `.env` aren't blocked. Override with `SKIP_ENV_CHECK=1`.
+
 ## Architecture
 
 React 19 + Vite SPA, no state library and no TypeScript. Three things carry the app:
