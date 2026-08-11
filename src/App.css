@@ -28979,3 +28979,398 @@ textarea:focus-visible,
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* ═══════════════════════════════════════════════════
+   GALAXY EXPERIENCE
+   The scene itself is inherently dark (it's a night sky), so there are no
+   light-theme overrides for the canvas — only for the DOM chrome layered
+   over it, which has to stay legible either way.
+   ═══════════════════════════════════════════════════ */
+.gx-root,
+.gx-intro,
+.gx-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background:
+    radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--gx-haze, #2b2145) 55%, transparent) 0%, transparent 65%),
+    #05060a;
+  overflow: hidden;
+}
+
+.gx-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* ── Intro ── */
+.gx-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+}
+
+.gx-intro-star {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  background: var(--gx-core, #ffd9e3);
+  box-shadow: 0 0 30px 10px color-mix(in srgb, var(--gx-core, #ffd9e3) 45%, transparent);
+  animation: gxStarPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes gxStarPulse {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 30px 10px color-mix(in srgb, var(--gx-core, #ffd9e3) 45%, transparent); }
+  50%      { transform: scale(1.25); box-shadow: 0 0 46px 18px color-mix(in srgb, var(--gx-core, #ffd9e3) 22%, transparent); }
+}
+
+.gx-intro-label {
+  margin: 0;
+  font-size: 0.74rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gx-core, #ffd9e3);
+}
+
+.gx-intro-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Labels ──
+   Positioned every frame by GalaxyExperience's own rAF writing transforms
+   straight onto these nodes; `left/top: 0` is the origin those translates are
+   measured from. Never give these a transform in CSS — it would be
+   overwritten 60 times a second. */
+.gx-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.gx-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(8, 10, 16, 0.72);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 0.25s ease, border-color 0.2s ease;
+}
+
+.gx-label:hover,
+.gx-label.is-active {
+  border-color: var(--gx-core, #ffd9e3);
+}
+
+/* While a memory panel is open the other labels recede — the per-frame rAF
+   owns each label's own `opacity`, so the dimming has to come from the parent
+   rather than from a class on the label itself. */
+.gx-labels.is-dimmed {
+  opacity: 0.25;
+  transition: opacity 0.3s ease;
+}
+
+.gx-labels.is-dimmed .gx-label {
+  pointer-events: none !important;
+}
+
+.gx-core-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  pointer-events: none;
+  font-family: 'Cinzel', serif;
+  font-style: italic;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  color: color-mix(in srgb, var(--gx-core, #ffd9e3) 85%, transparent);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--gx-core, #ffd9e3) 40%, transparent);
+}
+
+/* ── Memory panel ── */
+.gx-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 148px;
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 40px));
+  padding: 18px 20px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 10, 16, 0.86);
+  backdrop-filter: blur(14px);
+  animation: gxPanelIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes gxPanelIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(18px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.gx-panel-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gx-panel-close:hover { color: #fff; }
+
+.gx-panel-title {
+  margin: 0 0 6px;
+  font-family: 'Cinzel', serif;
+  font-size: 1.05rem;
+  color: var(--gx-core, #ffd9e3);
+}
+
+.gx-panel-note {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.gx-panel-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.gx-panel-nav button {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.gx-panel-nav button:hover {
+  border-color: var(--gx-core, #ffd9e3);
+  color: #fff;
+}
+
+/* ── Core notes ── */
+.gx-notes {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 40px 24px 140px;
+  cursor: pointer;
+}
+
+.gx-note {
+  margin: 0;
+  max-width: 320px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgba(8, 10, 16, 0.78);
+  backdrop-filter: blur(8px);
+  font-family: 'Cinzel', serif;
+  font-style: italic;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.9);
+  animation: gxNoteFloat 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes gxNoteFloat {
+  from { opacity: 0; transform: translateY(26px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Chrome ── */
+/* Sat at bottom:16px/58px originally, which put both behind the Studio
+   preview's device-size toolbar (FULL/PHONE/TABLET/DESKTOP) — the continue
+   button was completely unreachable there. Raised to clear it; the recipient
+   view has no such toolbar and simply gets a little more bottom margin. */
+.gx-hint {
+  position: absolute;
+  bottom: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  pointer-events: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.gx-continue {
+  position: absolute;
+  bottom: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 9px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(8, 10, 16, 0.8);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 0.82rem;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.gx-continue:hover {
+  border-color: var(--gx-core, #ffd9e3);
+}
+
+/* ── Fallback (no WebGL, or reduced motion) ── */
+.gx-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 28px 22px 80px;
+  overflow-y: auto;
+}
+
+.gx-fallback-title {
+  margin: 0;
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.gx-fallback-list,
+.gx-fallback-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gx-fallback-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.gx-fallback-item img {
+  width: 68px;
+  height: 68px;
+  flex: none;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.gx-fallback-item h3 {
+  margin: 0 0 4px;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.gx-fallback-item p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.gx-fallback-notes li {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  font-style: italic;
+  font-size: 0.86rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+@media (max-width: 520px) {
+  .gx-panel { bottom: 140px; }
+  .gx-label { font-size: 0.62rem; padding: 4px 9px; }
+  .gx-core-label { font-size: 0.95rem; }
+}
+
+/* ── Studio: galaxy theme + memory editor ──
+   Deliberately NOT reusing .cs-border-preset-swatch: that one is
+   `position:absolute; inset:0` and fills its positioned ancestor, which inside
+   a plain chip means it covers the whole settings panel. */
+.cs-gx-theme-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 4px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* ── Studio: galaxy memory editor ── */
+.cs-gx-memory {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--cs-border, rgba(255, 255, 255, 0.1));
+  background: var(--cs-surface-2, rgba(255, 255, 255, 0.03));
+}
+
+.cs-gx-memory-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.cs-gx-memory-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex: none;
+}

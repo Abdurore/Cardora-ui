@@ -6,7 +6,7 @@ import {
   HiOutlineSparkles, HiOutlineChatBubbleLeft, HiOutlineLockClosed,
   HiOutlineDocumentText, HiOutlineMusicalNote, HiOutlineEye,
   HiOutlineGift, HiOutlineChartBarSquare, HiOutlineLightBulb,
-  HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash
+  HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash, HiOutlineGlobeAlt
 } from 'react-icons/hi2'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 import { IoColorPaletteOutline } from 'react-icons/io5'
@@ -18,6 +18,7 @@ import ColorPicker from '../components/ColorPicker.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { getCardPrices, getMediaVideos, getMediaMusic } from '../lib/api.js'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
+import { GALAXY_THEMES } from '../lib/galaxyThemes.js'
 import { getMotionIntensity } from '../lib/deviceCapability.js'
 import { SEAL_ICON_OPTIONS } from '../lib/sealIcons.jsx'
 import StudioEnvelope from '../components/StudioEnvelope.jsx'
@@ -61,6 +62,7 @@ const ALL_TOOLS = [
   { id: 'background', icon: HiOutlinePaintBrush, label: 'Background', hint: 'Colors, gradients, music', group: 'Style' },
   { id: 'cardStyle', icon: HiOutlineSparkles, label: 'Card Style', hint: 'Border, scrollbar, text FX', group: 'Style' },
   { id: 'animation', icon: HiOutlineSparkles, label: 'Animation', hint: 'Confetti & effects', group: 'Effects' },
+  { id: 'experience', icon: HiOutlineGlobeAlt, label: 'Experience', hint: 'Galaxy of memories', group: 'Effects' },
   { id: 'gifts', icon: HiOutlineGift, label: 'Gifts', hint: 'End-of-card gift reveal', group: 'Interactive' },
   { id: 'interaction', icon: HiOutlineLockClosed, label: 'Interaction', hint: 'Lock & reveal', group: 'Interactive' },
   { id: 'chain', icon: HiOutlineArrowPathRoundedSquare, label: 'Chain', hint: 'Invite recipient to reply with a card', group: 'Interactive' },
@@ -92,7 +94,10 @@ const BORDER_PRESETS = [
 // row exposed, plus `cardStyle` for anonymous (it was missing there for no
 // documented reason — every other type's full row includes it).
 const TOOLS_BY_TYPE = {
-  personal:  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'gifts'],
+  // `experience` is personal-only for now: every other type has its own
+  // interaction stage after the card, and a full-screen scene competing with
+  // those needs its own design pass.
+  personal:  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'experience', 'interaction', 'gifts'],
   poll:      ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'poll'],
   trivia:    ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'trivia'],
   chain:     ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'chain'],
@@ -425,9 +430,15 @@ function CardStudio() {
   const defaultToolId = activeTools[0]?.id || 'content'
 
   const [cardObject, setCardObject] = useState(() => {
-    if (existingDraftObject) return structuredClone(existingDraftObject)
-    if (initialAutoSaved?.cardObject) return structuredClone(initialAutoSaved.cardObject)
-    
+    // Restored drafts are merged over the current defaults rather than used
+    // verbatim: a draft saved before a field existed has no key for it, and
+    // reading `c.newField.x` on it throws. (This is why CardView needed a
+    // one-off backfillEnvelope patch — the same class of bug, one field at a
+    // time.) deepMerge lets the saved values win while any field added since
+    // the draft was written comes in from defaultCardObject.
+    if (existingDraftObject) return deepMerge(structuredClone(defaultCardObject), existingDraftObject)
+    if (initialAutoSaved?.cardObject) return deepMerge(structuredClone(defaultCardObject), initialAutoSaved.cardObject)
+
     let base = resolveTemplateCardObject(cardData)
     const isLightMode = document.documentElement.getAttribute('data-theme') === 'light'
     if (isLightMode && !cardData && !existingDraftObject && !initialAutoSaved) {
@@ -2005,6 +2016,163 @@ function CardStudio() {
               ))}
             </div>
           </div>
+        </>
+      )
+    }
+
+    // EXPERIENCE (galaxy)
+    if (activeTool === 'experience') {
+      const exp = c.experience || {}
+      const images = c.media?.images || []
+      const memories = exp.memories || []
+      const memoryFor = (index) => memories.find(m => m.mediaIndex === index)
+      const setMemory = (index, patch) => {
+        const existing = memoryFor(index)
+        const next = existing
+          ? memories.map(m => (m.mediaIndex === index ? { ...m, ...patch } : m))
+          : [...memories, { mediaIndex: index, title: '', note: '', ...patch }]
+        update('experience.memories', next.sort((a, b) => a.mediaIndex - b.mediaIndex))
+      }
+      const toggleMemory = (index) => {
+        if (memoryFor(index)) update('experience.memories', memories.filter(m => m.mediaIndex !== index))
+        else setMemory(index, {})
+      }
+
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Experience</p>
+          <h3>Galaxy of memories</h3>
+          <p className="cs-panel-hint">
+            Your photos become planets orbiting a galaxy. The recipient explores it
+            after the envelope opens, then reads the card.
+          </p>
+
+          <div className="cs-sub-section">
+            <button
+              type="button"
+              className={`cs-chip ${exp.type === 'galaxy' ? 'active' : ''}`}
+              onClick={() => update('experience.type', exp.type === 'galaxy' ? 'none' : 'galaxy')}
+            >
+              {exp.type === 'galaxy' ? 'Galaxy on' : 'Turn on galaxy'}
+              <TierPip tier="elite" compact />
+            </button>
+          </div>
+
+          {exp.type === 'galaxy' && (
+            <>
+              {images.length === 0 ? (
+                <p className="cs-field" style={{ fontSize: '0.82rem', opacity: 0.6 }}>
+                  Add photos in the Media panel first — each one becomes a memory in the galaxy.
+                </p>
+              ) : (
+                <>
+                  <div className="cs-sub-section">
+                    <p className="cs-sub-label">Color Theme</p>
+                    <div className="cs-choice-row">
+                      {GALAXY_THEMES.map(t => (
+                        <button
+                          key={t.value}
+                          type="button"
+                          className={`cs-chip ${(exp.theme || 'rose') === t.value ? 'active' : ''}`}
+                          onClick={() => update('experience.theme', t.value)}
+                        >
+                          <span
+                            className="cs-gx-theme-swatch"
+                            style={{ background: `linear-gradient(120deg, ${t.dust.join(', ')})` }}
+                          />
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="cs-sub-section">
+                    <p className="cs-sub-label">Galaxy Name</p>
+                    <input
+                      className="cs-field"
+                      value={exp.coreLabel || ''}
+                      maxLength={60}
+                      placeholder="Cosmos of Memories"
+                      onChange={e => update('experience.coreLabel', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="cs-sub-section">
+                    <p className="cs-sub-label">Memories</p>
+                    {images.map((img, i) => {
+                      const memory = memoryFor(i)
+                      return (
+                        <div key={i} className="cs-gx-memory">
+                          <label className="cs-gx-memory-head">
+                            <input
+                              type="checkbox"
+                              checked={!!memory}
+                              onChange={() => toggleMemory(i)}
+                            />
+                            {img.url && <img src={img.url} alt="" className="cs-gx-memory-thumb" />}
+                            <span>Photo {i + 1}</span>
+                          </label>
+                          {memory && (
+                            <>
+                              <input
+                                className="cs-field"
+                                value={memory.title || ''}
+                                maxLength={60}
+                                placeholder="How it started"
+                                onChange={e => setMemory(i, { title: e.target.value })}
+                              />
+                              <textarea
+                                className="cs-field"
+                                rows={2}
+                                value={memory.note || ''}
+                                maxLength={400}
+                                placeholder="What this moment means…"
+                                onChange={e => setMemory(i, { note: e.target.value })}
+                              />
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="cs-sub-section">
+                    <p className="cs-sub-label">Core Notes</p>
+                    <p className="cs-field" style={{ fontSize: '0.76rem', opacity: 0.55 }}>
+                      Short lines that float out when the recipient taps the centre of the galaxy.
+                    </p>
+                    {(exp.coreNotes || []).map((note, i) => (
+                      <div key={i} className="cs-color-row">
+                        <input
+                          className="cs-field"
+                          value={note}
+                          maxLength={140}
+                          placeholder="You are the softest place I know."
+                          onChange={e => {
+                            const next = [...exp.coreNotes]
+                            next[i] = e.target.value
+                            update('experience.coreNotes', next)
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="cs-inline-remove"
+                          onClick={() => update('experience.coreNotes', exp.coreNotes.filter((_, j) => j !== i))}
+                        >×</button>
+                      </div>
+                    ))}
+                    {(exp.coreNotes || []).length < 8 && (
+                      <button
+                        type="button"
+                        className="cs-button small"
+                        onClick={() => update('experience.coreNotes', [...(exp.coreNotes || []), ''])}
+                      >+ Add Note</button>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </>
       )
     }

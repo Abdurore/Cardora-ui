@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
 import PremiumGiftReveal from './PremiumGiftReveal.jsx'
@@ -12,6 +12,10 @@ import { claimGiftFromCard } from '../lib/api.js'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
 import VoiceRecorder from './VoiceRecorder.jsx'
+
+// Code-split: three.js is a large dependency and must never load for a card
+// that doesn't use the galaxy.
+const GalaxyExperience = lazy(() => import('./GalaxyExperience.jsx'))
 
 const ENTRY_DEFAULTS = {
   personal:  { label: 'Personal Card',   Icon: PersonalCardIcon, hint: 'Someone sent you a card',            color: '#e2b96e' },
@@ -500,7 +504,7 @@ function CardPreviewModal({
 
     audioRef.current.volume = c.background.music.volume
 
-    if (stage === 'open' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply' || stage === 'chainReplies' || stage === 'question') {
+    if (stage === 'galaxy' || stage === 'open' || stage === 'end' || stage === 'giftIntro' || stage === 'giftReceive' || stage === 'pollVote' || stage === 'triviaQ' || stage === 'triviaResults' || stage === 'anonPreview' || stage === 'anonReply' || stage === 'chainReplies' || stage === 'question') {
       // Honour trim window: jump to start point if we're outside the segment.
       if (musicTrimmed) {
         const t = audioRef.current.currentTime
@@ -629,7 +633,22 @@ function CardPreviewModal({
     setStage('open')
   }
 
+  // The galaxy sits between the envelope and the card rather than replacing
+  // either, so every downstream stage (questions, gifts, reactions, end) is
+  // reached exactly as before once the recipient continues.
+  const galaxyEnabled = c.experience?.type === 'galaxy'
+    && (c.experience?.memories?.length || 0) > 0
+    && mediaAllowed
+
   const handleOpen = () => {
+    if (galaxyEnabled) {
+      setStage('galaxy')
+      return
+    }
+    openCardNow()
+  }
+
+  const openCardNow = () => {
     previewTimersRef.current.forEach(window.clearTimeout)
     previewTimersRef.current = []
     setRevealStep(0)
@@ -1293,6 +1312,17 @@ function CardPreviewModal({
             onOpenComplete={handleOpen}
           />
         </>
+      )}
+
+      {/* GALAXY — full-screen scene between the envelope and the card. */}
+      {unlocked && stage === 'galaxy' && (
+        <Suspense fallback={<div className="gx-intro" aria-busy="true" />}>
+          <GalaxyExperience
+            experience={c.experience}
+            images={c.media.images}
+            onContinue={openCardNow}
+          />
+        </Suspense>
       )}
 
       {/* OPEN CARD — also gated by lock for non-envelope card types. */}
