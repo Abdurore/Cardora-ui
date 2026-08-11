@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const SESSION_SHOWN_KEY = 'cardora:bannerShownThisSession'
@@ -24,16 +24,19 @@ function WelcomeBackBanner({ currentUser }) {
     return () => clearTimeout(timer)
   }, [currentUser])
 
-  useEffect(() => {
-    if (!visible) return
-    const timer = setTimeout(() => dismiss(), AUTO_DISMISS_MS)
-    return () => clearTimeout(timer)
-  }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const dismiss = () => {
+  // Declared before the auto-dismiss effect that calls it: state setters are
+  // stable, so the callback never needs to be re-created, and the effect can
+  // depend on it honestly instead of suppressing exhaustive-deps.
+  const dismiss = useCallback(() => {
     setExiting(true)
     setTimeout(() => setVisible(false), 380)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!visible) return
+    const timer = setTimeout(dismiss, AUTO_DISMISS_MS)
+    return () => clearTimeout(timer)
+  }, [visible, dismiss])
 
   const handleEarn = () => {
     dismiss()

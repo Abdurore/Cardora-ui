@@ -1970,7 +1970,9 @@
   margin: 0;
   font-family: 'Cinzel', serif;
   font-size: clamp(1.8rem, 4vw, 2.8rem);
-  color: #ecfbff;
+  /* Was #ecfbff — near-white, so the document title vanished against the light
+     theme's white card (measured 1.06:1). */
+  color: var(--text);
 }
 
 .legal-page-updated {
@@ -15913,9 +15915,13 @@ a {
   justify-content: center;
 }
 
+/* The card-type picker is the entry point to every card, so it has to survive
+   both themes. It used to hardcode a dark panel while `.ccp-heading` resolved
+   to var(--text) — in light mode that painted dark navy text on the dark panel
+   and the heading disappeared entirely. Everything here goes through tokens. */
 .ccp-modal {
-  background: #0b1e28;
-  border: 1px solid rgba(126,247,255,0.1);
+  background: var(--elevated);
+  border: 1px solid var(--border);
   border-radius: 20px;
   padding: 36px 32px 32px;
   width: min(520px, 94vw);
@@ -15927,7 +15933,7 @@ a {
 .ccp-close, .ccp-back {
   background: none;
   border: none;
-  color: rgba(255,255,255,0.5);
+  color: var(--text-dim);
   font-size: 1rem;
   cursor: pointer;
   padding: 4px 8px;
@@ -15935,12 +15941,12 @@ a {
   transition: color 0.2s;
 }
 .ccp-close { position: absolute; top: 16px; right: 16px; font-size: 1.4rem; }
-.ccp-close:hover, .ccp-back:hover { color: #fff; }
+.ccp-close:hover, .ccp-back:hover { color: var(--text); }
 
 .ccp-heading {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--text);
   margin: 4px 0 24px;
 }
 
@@ -15951,8 +15957,8 @@ a {
 }
 
 .ccp-type-card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--hover);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 20px 16px;
   cursor: pointer;
@@ -15963,8 +15969,8 @@ a {
   gap: 6px;
 }
 .ccp-type-card:hover {
-  border-color: var(--type-accent, rgba(126,247,255,0.4));
-  background: rgba(255,255,255,0.06);
+  border-color: var(--type-accent, var(--accent-border));
+  background: var(--accent-soft);
   transform: translateY(-2px);
 }
 
@@ -15975,14 +15981,19 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  color: var(--type-accent, #7ef7ff);
+  background: var(--hover);
+  border: 1px solid var(--border);
+  color: var(--type-accent, var(--primary));
   flex-shrink: 0;
 }
-.ccp-type-label { font-size: 1rem; font-weight: 700; color: #fff; }
-.ccp-type-desc { font-size: 0.8rem; color: rgba(255,255,255,0.5); line-height: 1.4; }
+.ccp-type-label { font-size: 1rem; font-weight: 700; color: var(--text); }
+.ccp-type-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
 .ccp-type-pricing { display: block; margin-top: 8px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.02em; color: var(--type-accent); opacity: 0.85; }
+/* --type-accent is injected inline per card from CreateCardPicker.jsx, so it
+   can't flip with the theme. Those accents are tuned for a dark panel (the
+   cyan one measured 1.26:1 on white); the icon and hover border still use
+   them, but the pricing text needs a readable colour on a light surface. */
+[data-theme="light"] .ccp-type-pricing { color: var(--text-muted); opacity: 1; }
 
 .ccp-tier-list {
   display: flex;
@@ -15991,8 +16002,8 @@ a {
 }
 
 .ccp-tier-card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--hover);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px 20px;
   cursor: pointer;
@@ -16001,8 +16012,8 @@ a {
   transition: border-color 0.2s, background 0.2s;
 }
 .ccp-tier-card:hover {
-  border-color: var(--type-accent, rgba(126,247,255,0.4));
-  background: rgba(255,255,255,0.05);
+  border-color: var(--type-accent, var(--accent-border));
+  background: var(--accent-soft);
 }
 
 .ccp-tier-top {
@@ -16011,13 +16022,13 @@ a {
   align-items: center;
   margin-bottom: 4px;
 }
-.ccp-tier-label { font-size: 1rem; font-weight: 700; color: #fff; }
+.ccp-tier-label { font-size: 1rem; font-weight: 700; color: var(--text); }
 .ccp-tier-cost {
   font-size: 0.85rem;
-  color: var(--type-accent, rgba(126,247,255,0.8));
+  color: var(--type-accent, var(--primary));
   font-weight: 600;
 }
-.ccp-tier-desc { font-size: 0.82rem; color: rgba(255,255,255,0.5); }
+.ccp-tier-desc { font-size: 0.82rem; color: var(--text-muted); }
 .ccp-tier-arrow {
   position: absolute;
   right: 20px;
