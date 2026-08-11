@@ -1570,15 +1570,19 @@ const handleBroadcast = async () => {
                 <label className="admin-field"><span>Price (NGN)</span><input type="number" placeholder="500" value={newGift.priceNgn} onChange={e => setNewGift(p => ({ ...p, priceNgn: Number(e.target.value) }))} /></label>
                 <label className="admin-field">
                   <span>Type (heart color)</span>
-                  <select value={newGift.effectKey} onChange={e => setNewGift(p => ({ ...p, effectKey: e.target.value }))}>
-                    {GIFT_EFFECT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                  </select>
+                  <Dropdown
+                    value={newGift.effectKey}
+                    onChange={v => setNewGift(p => ({ ...p, effectKey: v }))}
+                    options={GIFT_EFFECT_OPTIONS}
+                  />
                 </label>
                 <label className="admin-field">
                   <span>Tier</span>
-                  <select value={newGift.tier} onChange={e => setNewGift(p => ({ ...p, tier: e.target.value }))}>
-                    {GIFT_TIER_OPTIONS.map(t => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
-                  </select>
+                  <Dropdown
+                    value={newGift.tier}
+                    onChange={v => setNewGift(p => ({ ...p, tier: v }))}
+                    options={GIFT_TIER_OPTIONS.map(t => ({ value: t, label: t[0].toUpperCase() + t.slice(1) }))}
+                  />
                 </label>
                 <button className="primary" type="button" onClick={handleCreateAdminGift}>Create Gift</button>
               </div>
@@ -1803,12 +1807,16 @@ const handleBroadcast = async () => {
                 </label>
                 <label className="admin-field">
                   <span>New Role</span>
-                  <select value={roleForm.role} onChange={e => setRoleForm(p => ({ ...p, role: e.target.value }))}>
-                    <option value="moderator">Moderator</option>
-                    <option value="enterprise">Enterprise</option>
-                    <option value="artist">Artist</option>
-                    <option value="user">User (reset)</option>
-                  </select>
+                  <Dropdown
+                    value={roleForm.role}
+                    onChange={v => setRoleForm(p => ({ ...p, role: v }))}
+                    options={[
+                      { value: 'moderator', label: 'Moderator' },
+                      { value: 'enterprise', label: 'Enterprise' },
+                      { value: 'artist', label: 'Artist' },
+                      { value: 'user', label: 'User (reset)' },
+                    ]}
+                  />
                 </label>
                 <button className="primary" type="button" onClick={() => openRoleConfirm()}>Assign Role</button>
               </div>
@@ -1884,35 +1892,35 @@ const handleBroadcast = async () => {
             <div className="admin-inline-form admin-reports-filters">
               <label className="admin-field">
                 <span>Type</span>
-                <select
+                <Dropdown
                   value={reportFilter.type}
-                  onChange={e => {
-                    const val = e.target.value
+                  onChange={val => {
                     setReportFilter(p => ({ ...p, type: val }))
                     handleLoadReports({ type: val })
                   }}
-                >
-                  <option value="">All types</option>
-                  <option value="user">User</option>
-                  <option value="card">Card</option>
-                  <option value="template">Template</option>
-                </select>
+                  options={[
+                    { value: '', label: 'All types' },
+                    { value: 'user', label: 'User' },
+                    { value: 'card', label: 'Card' },
+                    { value: 'template', label: 'Template' },
+                  ]}
+                />
               </label>
               <label className="admin-field">
                 <span>Status</span>
-                <select
+                <Dropdown
                   value={reportFilter.status}
-                  onChange={e => {
-                    const val = e.target.value
+                  onChange={val => {
                     setReportFilter(p => ({ ...p, status: val }))
                     handleLoadReports({ status: val })
                   }}
-                >
-                  <option value="open">Open</option>
-                  <option value="reviewed">Reviewed</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="dismissed">Dismissed</option>
-                </select>
+                  options={[
+                    { value: 'open', label: 'Open' },
+                    { value: 'reviewed', label: 'Reviewed' },
+                    { value: 'resolved', label: 'Resolved' },
+                    { value: 'dismissed', label: 'Dismissed' },
+                  ]}
+                />
               </label>
               <button className="primary" type="button" onClick={() => handleLoadReports()}>Refresh</button>
             </div>
@@ -2314,27 +2322,23 @@ const handleBroadcast = async () => {
                 />
                 <label className="admin-field">
                   <span>Enterprise Account <small>(optional)</small></span>
-                  <select
+                  <Dropdown
                     value={newAd.enterpriseName}
-                    onChange={e => {
-                      const username = e.target.value
+                    onChange={username => {
                       setNewAd(p => ({
                         ...p,
                         enterpriseId: username,
                         enterpriseName: username,
                       }))
                     }}
-                  >
-                    <option value="">No enterprise owner</option>
-                    {enterpriseUsers.map(user => {
-                      const username = user.username || user.name || user.email
-                      return (
-                        <option key={username} value={username}>
-                          {username}
-                        </option>
-                      )
-                    })}
-                  </select>
+                    options={[
+                      { value: '', label: 'No enterprise owner' },
+                      ...enterpriseUsers.map(user => {
+                        const username = user.username || user.name || user.email
+                        return { value: username, label: username }
+                      }),
+                    ]}
+                  />
                 </label>
 
                 {/* Video drag-and-drop upload */}
@@ -2448,11 +2452,11 @@ const handleBroadcast = async () => {
                       <td>
                         {(() => {
                           const displayValue = ad.enterpriseAccountUsername || ad.enterpriseAccountName || ad.enterpriseName || ad.owner?.username || ad.enterprise?.username || ''
+                          const knownUsernames = enterpriseUsers.map(user => user.username || user.name || user.email)
                           return (
-                            <select
+                            <Dropdown
                               value={displayValue}
-                              onChange={async e => {
-                                const selectedUsername = e.target.value
+                              onChange={async selectedUsername => {
                                 const adId = ad._id || ad.id
                                 if (!adId) return
                                 try {
@@ -2463,22 +2467,12 @@ const handleBroadcast = async () => {
                                   showMsg(err.message || 'Could not assign enterprise account.', false)
                                 }
                               }}
-                            >
-                              <option value="">Unassigned</option>
-                              {displayValue && !enterpriseUsers.some(u => (u.username || u.name || u.email) === displayValue) && (
-                                <option value={displayValue}>
-                                  {displayValue}
-                                </option>
-                              )}
-                              {enterpriseUsers.map(user => {
-                                const username = user.username || user.name || user.email
-                                return (
-                                  <option key={username} value={username}>
-                                    {username}
-                                  </option>
-                                )
-                              })}
-                            </select>
+                              options={[
+                                { value: '', label: 'Unassigned' },
+                                ...(displayValue && !knownUsernames.includes(displayValue) ? [{ value: displayValue, label: displayValue }] : []),
+                                ...knownUsernames.map(username => ({ value: username, label: username })),
+                              ]}
+                            />
                           )
                         })()}
                       </td>

@@ -82,11 +82,11 @@ const SHARE_PLATFORMS = [
 ]
 
 const MAX_IMAGES = 3
-// Was 5 — hid most of the ~24 themes behind an easy-to-miss text link below
-// the grid, with a jarring reflow when expanded. 10 shows two full rows up
-// front so the "more" affordance is a genuine expansion, not the default way
-// most people ever see the collection.
-const PALETTE_INITIAL_COUNT = 10
+// Quick Create is the fast, low-friction path — the full ~24-theme library
+// belongs to Studio. Showing all of them here (or expanding to all in place)
+// turned a 30-second flow into theme-browsing. 6 fills two full grid rows;
+// "See all in Studio" hands off the rest instead of growing this page.
+const PALETTE_INITIAL_COUNT = 6
 
 function QuickCreate() {
   const [params] = useSearchParams()
@@ -107,7 +107,6 @@ function QuickCreate() {
 
   const [selectedPalette, setSelectedPalette] = useState(PALETTES[0])
   const [selectedFont, setSelectedFont] = useState('Poppins')
-  const [showAllPalettes, setShowAllPalettes] = useState(false)
 
   // Personal
   const [heading, setHeading] = useState('')
@@ -419,8 +418,7 @@ function QuickCreate() {
     : cardType === 'poll' ? pollOptions.filter(o => o.trim()).join(' · ')
     : ''
 
-  const visiblePalettes = showAllPalettes ? PALETTES : PALETTES.slice(0, PALETTE_INITIAL_COUNT)
-  const hiddenCount = PALETTES.length - PALETTE_INITIAL_COUNT
+  const visiblePalettes = PALETTES.slice(0, PALETTE_INITIAL_COUNT)
 
   const isLowBalance = tierCost > 0 && bal < tierCost
 
@@ -478,7 +476,7 @@ function QuickCreate() {
                 <span className="qc-step-num">1</span>
                 <div>
                   <h3 className="qc-step-title">Choose a Theme</h3>
-                  <p className="qc-step-sub">{PALETTES.length} themes — some raise the card's tier, shown with a pip.</p>
+                  <p className="qc-step-sub">A few quick picks — open Studio for the full {PALETTES.length}-theme library.</p>
                 </div>
               </div>
               <div className="qc-palette-grid">
@@ -508,20 +506,13 @@ function QuickCreate() {
                 ))}
                 {/* Lives as its own grid cell — matching the swatches' size
                     and visual weight — instead of a plain text link floating
-                    below the grid, which was easy to miss and read as an
-                    afterthought rather than a real "there's more" affordance. */}
-                {!showAllPalettes && hiddenCount > 0 && (
-                  <button type="button" className="qc-palette-swatch qc-palette-more" onClick={() => setShowAllPalettes(true)}>
-                    <span className="qc-palette-more-num">+{hiddenCount}</span>
-                    <span className="qc-swatch-name">More themes</span>
-                  </button>
-                )}
-              </div>
-              {showAllPalettes && (
-                <button type="button" className="qc-show-more-btn" onClick={() => setShowAllPalettes(false)}>
-                  Show less ↑
+                    below the grid. Hands off to Studio (the full library)
+                    rather than expanding this page into theme-browsing. */}
+                <button type="button" className="qc-palette-swatch qc-palette-more" onClick={openInStudio}>
+                  <span className="qc-palette-more-num">+{PALETTES.length - PALETTE_INITIAL_COUNT}</span>
+                  <span className="qc-swatch-name">See all in Studio</span>
                 </button>
-              )}
+              </div>
             </section>
 
             {/* Step 2: Font */}

@@ -1494,24 +1494,25 @@ function Profile() {
             </label>
             <label className="detail-field">
               Category
-              <select
+              <Dropdown
                 value={templateEditForm.category}
-                onChange={(e) => setTemplateEditForm((prev) => ({ ...prev, category: e.target.value }))}
-              >
-                <option value="birthday">Birthday</option>
-                <option value="anniversary">Anniversary</option>
-                <option value="wedding">Wedding</option>
-                <option value="proposal">Proposal</option>
-                <option value="graduation">Graduation</option>
-                <option value="holiday">Holiday</option>
-                <option value="thank-you">Thank You</option>
-                <option value="apology">Apology</option>
-                <option value="celebration">Celebration</option>
-                <option value="just-because">Just Because</option>
-                <option value="get-well">Get Well</option>
-                <option value="sympathy">Sympathy</option>
-                <option value="other">Other</option>
-              </select>
+                onChange={(val) => setTemplateEditForm((prev) => ({ ...prev, category: val }))}
+                options={[
+                  { value: 'birthday', label: 'Birthday' },
+                  { value: 'anniversary', label: 'Anniversary' },
+                  { value: 'wedding', label: 'Wedding' },
+                  { value: 'proposal', label: 'Proposal' },
+                  { value: 'graduation', label: 'Graduation' },
+                  { value: 'holiday', label: 'Holiday' },
+                  { value: 'thank-you', label: 'Thank You' },
+                  { value: 'apology', label: 'Apology' },
+                  { value: 'celebration', label: 'Celebration' },
+                  { value: 'just-because', label: 'Just Because' },
+                  { value: 'get-well', label: 'Get Well' },
+                  { value: 'sympathy', label: 'Sympathy' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
             </label>
             <label className="detail-field">
               Preview image

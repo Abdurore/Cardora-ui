@@ -2495,6 +2495,11 @@
   color: #bdf7ff;
 }
 
+[data-theme="light"] .badge {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
 .card-overlay {
   position: absolute;
   inset: 0;
@@ -2562,6 +2567,17 @@
   right: 10px;
   background: rgba(109, 255, 175, 0.2);
   color: #b6ffdd;
+}
+
+[data-theme="light"] .badge.premium,
+[data-theme="light"] .badge.bonus {
+  background: rgba(5, 150, 105, 0.16);
+  color: var(--secondary);
+}
+
+[data-theme="light"] .badge.draft {
+  background: rgba(217, 119, 6, 0.16);
+  color: var(--tertiary);
 }
 
 .search {
@@ -2861,7 +2877,7 @@
 }
 
 .swatch.s4 {
-  background: #7d9bff;
+  background: #9ef6cf;
 }
 
 .editor-music {
@@ -3817,6 +3833,12 @@
   background: rgba(255, 155, 210, 0.11);
 }
 
+[data-theme="light"] .cdm-like-pill.liked {
+  color: #c2185b;
+  border-color: rgba(194, 24, 91, 0.35);
+  background: rgba(194, 24, 91, 0.1);
+}
+
 /* Features list override */
 .cdm-features {
   margin: 0;
@@ -4005,6 +4027,12 @@
   background: color-mix(in srgb, var(--platform-color, #ecfbff) 12%, transparent);
   border-color: color-mix(in srgb, var(--platform-color, #ecfbff) 35%, transparent);
   transform: translateY(-1px);
+}
+
+[data-theme="light"] .cdm-platform-btn {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--platform-color, var(--text));
 }
 
 .cdm-back-btn {
@@ -7446,12 +7474,27 @@ a {
   position: relative;
   z-index: 0;
 }
+/* Masked to a true ring (padding-sized band only) rather than a solid panel
+   sitting behind the whole card. It used to just be a full conic-gradient
+   rect at z-index:-1 — invisible only because the card's own opaque
+   background painted over the middle of it. The moment Surface Transparency
+   was raised on a gradient/animated border, that solid gradient showed
+   straight through the "transparent" content area instead of the page
+   behind it — the reported "colourful output on the design card preview".
+   inset:0 (not a negative outward inset) — the card sits inside
+   .cs-phone-screen, which clips overflow, so a ring that grew past the
+   card's own edges was silently clipped away entirely. */
 .cs-border-glow::before {
   content: '';
   position: absolute;
-  inset: calc(var(--bdr-w, 2px) * -1);
+  inset: 0;
+  padding: var(--bdr-w, 2px);
   border-radius: 26px;
   background: conic-gradient(from var(--cs-border-angle), var(--bdr-c1, #7ef7ff), var(--bdr-c2, #62ffa2), var(--bdr-c1, #7ef7ff));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
   z-index: -1;
 }
 /* Plain gradient type renders the conic-gradient border statically —
@@ -8196,47 +8239,55 @@ a {
   padding: 0 14px 12px;
 }
 
-/* Border palette presets */
+/* Border palette presets — same full-bleed swatch + bottom-scrim label
+   language as .cs-palette-chip (Theme panel), instead of a thin pill-shaped
+   color bar sitting above a plain text row in a flat card. */
 .cs-border-presets {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   gap: 8px;
 }
 
 .cs-border-preset {
   position: relative;
-  display: grid;
-  gap: 6px;
-  padding: 8px 10px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
   border-radius: 12px;
-  border: 1px solid rgba(118, 239, 255, 0.12);
-  background: rgba(8, 14, 18, 0.55);
-  text-align: left;
+  border: 2px solid rgba(255, 255, 255, 0.07);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   cursor: pointer;
-  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+  background: rgba(8, 14, 18, 0.55);
+  transition: border-color 0.18s ease, transform 0.14s ease, box-shadow 0.18s ease;
 }
 
 .cs-border-preset:hover:not(:disabled) {
-  border-color: rgba(118, 239, 255, 0.32);
-  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .cs-border-preset.active {
-  border-color: rgba(118, 239, 255, 0.5);
-  background: rgba(118, 239, 255, 0.08);
+  border-color: rgba(126, 247, 255, 0.7);
+  box-shadow: 0 0 0 3px rgba(126, 247, 255, 0.12), 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .cs-border-preset-swatch {
-  width: 100%;
-  height: 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  position: absolute;
+  inset: 0;
 }
 
 .cs-border-preset-label {
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: rgba(220, 240, 246, 0.85);
+  position: relative;
+  z-index: 1;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  padding: 3px 8px 6px;
+  width: 100%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
 }
 
 /* Question presets */
@@ -10310,12 +10361,38 @@ a {
   margin-top: 2px;
 }
 
-/* Gradient border wrapper */
+/* Gradient border — masked to a true ring (::before, same technique as the
+   Studio's .cs-border-glow) rather than a padding-revealed solid fill
+   behind the card. The old version filled the whole wrapper with the
+   gradient and relied on the card's own opaque background to cover the
+   middle; raising Surface Transparency on a gradient/animated border made
+   that gradient show straight through instead of the real page behind it. */
 .cp-gradient-border {
   position: relative;
   border-radius: 24px;
+  /* Keeps the child (.cp-card) inset by the border width, same as before —
+     the ::before ring below fills exactly that same gap. Needed so the
+     card doesn't just sit flush over the ring and hide it. */
   padding: var(--border-width, 2px);
+  z-index: 0;
+}
+
+/* inset:0 (not a negative outward inset) so the ring never grows past this
+   wrapper's own box — CardPreviewModal is inside overflow:hidden ancestors
+   (.cp-overlay etc.), and an outward-growing ring got silently clipped
+   away entirely, same issue as the Studio's .cs-border-glow. */
+.cp-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: var(--border-width, 2px);
+  border-radius: inherit;
   background: var(--border-gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  z-index: -1;
 }
 
 .cp-gradient-border.cp-gradient-border-full {
@@ -10324,7 +10401,7 @@ a {
   border-radius: 28px;
 }
 
-.cp-gradient-border.animated {
+.cp-gradient-border.animated::before {
   background: var(--border-gradient);
   background-size: 300% 300%;
   animation: cpBorderSpin var(--border-anim-dur, 2s) linear infinite;
@@ -20683,6 +20760,11 @@ a {
 .admin-status-chip.reviewed { background: rgba(126,247,255,0.1); color: #7ef7ff; }
 .admin-status-chip.resolved { background: rgba(98,255,162,0.1);  color: #62ffa2; }
 .admin-status-chip.dismissed { background: rgba(255,255,255,0.06); color: rgba(233,251,255,0.45); }
+
+[data-theme="light"] .admin-status-chip.open { background: rgba(217,119,6,0.15); color: #b45309; }
+[data-theme="light"] .admin-status-chip.reviewed { background: rgba(8,145,178,0.15); color: #0e7490; }
+[data-theme="light"] .admin-status-chip.resolved { background: rgba(5,150,105,0.16); color: #047857; }
+[data-theme="light"] .admin-status-chip.dismissed { background: rgba(12,25,41,0.08); color: var(--text-muted); }
 .admin-status-ok  { color: #62ffa2; font-weight: 600; }
 .admin-status-err { color: #ff8080; font-weight: 600; }
 
@@ -23209,8 +23291,7 @@ a {
   color: transparent !important;
   animation: brandShimmer 4s ease-in-out infinite;
   filter: none !important;
-  text-shadow: 0 0 2px var(--text-primary), 0 0 8px var(--text-primary), 0 0 16px #ffffff !important;
-  
+  text-shadow: none !important;
 }
 
 [data-theme="light"] .header-capsule-name { color: var(--text); }
@@ -27199,14 +27280,14 @@ a {
    PREMIUM BADGE — shown in profile and WorldChat modal
    ════════════════════════════════════════════════════════════ */
 .profile-premium-badge {
-  background: linear-gradient(135deg, rgba(168,85,247,0.12), rgba(250,204,21,0.1)) !important;
-  border-color: rgba(168,85,247,0.25) !important;
-  color: #a855f7 !important;
+  background: linear-gradient(135deg, rgba(126,247,255,0.12), rgba(98,255,162,0.1)) !important;
+  border-color: rgba(126,247,255,0.25) !important;
+  color: #7ef7ff !important;
 }
 [data-theme="light"] .profile-premium-badge {
-  background: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(250,204,21,0.06)) !important;
-  border-color: rgba(168,85,247,0.18) !important;
-  color: #9333ea !important;
+  background: linear-gradient(135deg, rgba(8,145,178,0.08), rgba(5,150,105,0.06)) !important;
+  border-color: rgba(8,145,178,0.18) !important;
+  color: #0e7490 !important;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -27931,6 +28012,35 @@ a {
   background: var(--inset) !important;
   border-color: var(--border) !important;
   color: var(--text) !important;
+}
+/* .cs-edit-toolbar/.cs-m2-color-input-wrap's swatch chrome was tuned with a
+   white-alpha border (rgba(255,255,255,...)) for the dark canvas — on a
+   light background that border is nearly invisible, leaving the round
+   color swatch looking like unstyled native input chrome. */
+[data-theme="light"] .cs-edit-toolbar input[type="color"] {
+  border-color: var(--border-strong) !important;
+}
+[data-theme="light"] .cs-m2-color-input-wrap {
+  border-color: var(--border-strong) !important;
+}
+
+/* Glassmorphism panels tuned with a white-alpha border/background for the
+   dark canvas — on a light background those borders/fills are near-
+   invisible (white on white), leaving the panel edge undefined. */
+[data-theme="light"] .qc-img-grid-item,
+[data-theme="light"] .cs-q-preview-item,
+[data-theme="light"] .chat-profile-stats,
+[data-theme="light"] .ban-confirm-details > div,
+[data-theme="light"] .anon-section,
+[data-theme="light"] .anon-card-live-preview,
+[data-theme="light"] .cp-media-item-full {
+  border-color: var(--border) !important;
+  background-color: var(--inset) !important;
+}
+/* Decorative border-only overlay (no fill — it sits on top of a card
+   thumbnail image and must stay transparent). */
+[data-theme="light"] .card-thumb-aura {
+  border-color: var(--border) !important;
 }
 [data-theme="light"] .color-picker-hex:focus {
   border-color: var(--primary) !important;

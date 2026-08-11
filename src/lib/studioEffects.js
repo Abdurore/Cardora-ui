@@ -1,6 +1,33 @@
 import confetti from 'canvas-confetti'
 
-const DEFAULT_COLORS = ['#76efff', '#62ffa2', '#ff9bd2', '#ffd166', '#f4fdff']
+const DEFAULT_COLORS = ['#000000', '#ffffff', '#c0c0c0']
+
+// Ambient background particles always render from this fixed per-effect
+// palette map — deliberately NOT derived from confettiColors or the card's
+// theme (they used to inherit whatever confetti colors the sender picked,
+// coupling two settings that should be independent). Each effect gets its
+// own thematic colors (icy blue for snow, warm amber for embers, etc.)
+// instead of every effect sharing one black/white/silver look, which made
+// snow, fireflies and embers visually indistinguishable from each other.
+const AMBIENT_COLOR_DEFAULT = ['#ffffff', '#c0c0c0', '#8f9aa8']
+const AMBIENT_COLORS_BY_TYPE = {
+  sparkle: ['#fff8dc', '#ffd700', '#ffffff'],
+  shimmer: ['#fff8dc', '#ffd700', '#ffffff'],
+  stars: ['#ffffff', '#cfe8ff', '#8fb8ff'],
+  starfield: ['#ffffff', '#cfe8ff', '#8fb8ff'],
+  aurora: ['#7cffcb', '#7ec8ff', '#c792ff'],
+  snow: ['#ffffff', '#eaf6ff', '#bfe0ff'],
+  bubbles: ['#bfe9ff', '#8fd8ff', '#ffffff'],
+  fountain: ['#9fe8ff', '#5ec8ff', '#ffffff'],
+  floating: ['#ff9bc2', '#ff5c8a', '#ffffff'],
+  hearts: ['#ff9bc2', '#ff5c8a', '#ffffff'],
+  lanterns: ['#ffb347', '#ff8c42', '#ffd67d'],
+  petals: ['#ffb7d1', '#ff8fb3', '#ffe3ef'],
+  fireflies: ['#fff1a8', '#ffe066', '#ffd23f'],
+  embers: ['#ff6b35', '#ff9f45', '#ffcf6b'],
+  rain: ['#9fb8d9', '#c7d6ea', '#ffffff'],
+  meteors: ['#ffffff', '#ffd27f', '#ff9d5c'],
+}
 
 // Each effect carries its minimum tier. Classic = none. Premium unlocks the
 // lighter set. Elite unlocks everything. Some newer keys are mapped back to
@@ -292,8 +319,8 @@ function scalePreset(preset, intensity) {
   return scaled
 }
 
-export function getAmbientPreset(type, colors = DEFAULT_COLORS, intensity = 1) {
-  const palette = resolveColors(colors)
+export function getAmbientPreset(type, intensity = 1) {
+  const palette = AMBIENT_COLORS_BY_TYPE[type] || AMBIENT_COLOR_DEFAULT
   return scalePreset(getAmbientPresetRaw(type, palette), intensity)
 }
 
@@ -343,11 +370,11 @@ function getAmbientPresetRaw(type, palette) {
         ...BASE_FULLSCREEN,
         particles: {
           number: { value: 150, density: { enable: true, area: 800 } },
-          color: { value: '#ffffff' },
+          color: { value: palette },
           shape: { type: 'circle' },
           opacity: { value: { min: 0.35, max: 0.86 } },
           size: { value: { min: 1, max: 4 } },
-          move: { enable: true, speed: { min: 0.8, max: 2.1 }, direction: 'bottom', random: true, straight: false, outModes: 'out' },
+          move: { enable: true, speed: { min: 0.6, max: 1.7 }, direction: 'bottom', random: true, straight: false, outModes: 'out' },
           wobble: { enable: true, distance: 10, speed: 5 },
         },
       }
@@ -360,7 +387,7 @@ function getAmbientPresetRaw(type, palette) {
           shape: { type: 'circle' },
           opacity: { value: { min: 0.15, max: 0.48 }, animation: { enable: true, speed: 0.8, sync: false } },
           size: { value: { min: 7, max: 24 } },
-          move: { enable: true, speed: { min: 0.8, max: 2.2 }, direction: 'top', random: true, straight: false, outModes: 'destroy' },
+          move: { enable: true, speed: { min: 0.6, max: 1.8 }, direction: 'top', random: true, straight: false, outModes: 'destroy' },
         },
       }
     case 'fountain':
@@ -378,30 +405,60 @@ function getAmbientPresetRaw(type, palette) {
           size: { value: { min: 2, max: 5 } },
           move: {
             enable: true,
-            gravity: { enable: true, acceleration: 18 },
-            speed: { min: 16, max: 28 },
+            gravity: { enable: true, acceleration: 13 },
+            speed: { min: 11, max: 19 },
             direction: 'top',
             outModes: { default: 'destroy', bottom: 'none' },
           },
-          life: { duration: { value: 4 }, count: 1 },
+          life: { duration: { value: 4.5 }, count: 1 },
         },
       }
     case 'floating':
     case 'hearts':
-    case 'petals':
     case 'lanterns':
+      // No `density`: tsParticles' density factor scales `number.value`
+      // against a 1920x1080 reference area, which crushed this count to
+      // 0 spawned particles on the small Studio preview canvas.
       return {
         ...BASE_FULLSCREEN,
         particles: {
-          number: { value: type === 'lanterns' ? 20 : 34, density: { enable: true, area: 900 } },
-          color: { value: type === 'lanterns' ? ['#ffd166', '#fff3b0', '#ff9f1c'] : ['#ff6b9d', '#ff9bd2', '#ffc2e2'] },
+          number: { value: type === 'lanterns' ? 20 : 34 },
+          color: { value: palette },
           shape: {
             type: 'char',
-            options: { char: { value: type === 'lanterns' ? ['◆'] : type === 'petals' ? ['❦'] : ['♥'], font: 'Verdana', weight: '400' } },
+            options: { char: { value: type === 'lanterns' ? ['◆'] : ['♥'], font: 'Verdana', weight: '400' } },
           },
           opacity: { value: { min: 0.4, max: 0.9 }, animation: { enable: true, speed: 0.9, sync: false } },
           size: { value: type === 'lanterns' ? { min: 12, max: 28 } : { min: 10, max: 22 } },
           move: { enable: true, speed: type === 'lanterns' ? 0.55 : 1.1, direction: 'top', random: true, straight: false, outModes: 'out' },
+        },
+      }
+    case 'petals':
+      // Falls and tumbles like a real petal — distinct from floating/
+      // hearts/lanterns, which all drift upward. Multiple glyphs + free
+      // rotation give it visual variety instead of one static symbol.
+      return {
+        ...BASE_FULLSCREEN,
+        particles: {
+          number: { value: 40 },
+          color: { value: palette },
+          shape: {
+            type: 'char',
+            options: { char: { value: ['❀', '✿', '❁'], font: 'Verdana', weight: '400' } },
+          },
+          opacity: { value: { min: 0.5, max: 0.95 } },
+          size: { value: { min: 9, max: 19 } },
+          rotate: { value: { min: 0, max: 360 }, animation: { enable: true, speed: 14, sync: false } },
+          move: {
+            enable: true,
+            speed: { min: 0.6, max: 1.6 },
+            direction: 'bottom',
+            random: true,
+            straight: false,
+            outModes: 'out',
+            drift: { min: -0.6, max: 0.6 },
+          },
+          wobble: { enable: true, distance: 14, speed: 6 },
         },
       }
     case 'fireflies':
@@ -409,7 +466,7 @@ function getAmbientPresetRaw(type, palette) {
         ...BASE_FULLSCREEN,
         particles: {
           number: { value: 70 },
-          color: { value: ['#fff6b3', '#ffd166', '#f6ffa2'] },
+          color: { value: palette },
           shape: { type: 'circle' },
           opacity: {
             value: { min: 0.08, max: 1 },
@@ -433,7 +490,7 @@ function getAmbientPresetRaw(type, palette) {
         ...BASE_FULLSCREEN,
         particles: {
           number: { value: 55, density: { enable: true, area: 900 } },
-          color: { value: ['#ff9f1c', '#ff6b35', '#ffd166', '#ffb703'] },
+          color: { value: palette },
           shape: { type: 'circle' },
           opacity: {
             value: { min: 0.15, max: 0.9 },
@@ -454,31 +511,47 @@ function getAmbientPresetRaw(type, palette) {
       }
     case 'rain':
       // Thin, fast, low-opacity streaks — visually distinct from snow's
-      // round, slow, high-opacity dots.
+      // round, slow, high-opacity dots. The 'line' shape only draws a
+      // moveTo/lineTo path (zero area) — filling that paints nothing, it
+      // must be stroked, so `stroke` is required or the streaks are
+      // invisible even though particles are spawning correctly.
+      // `rotate: 90` is required: the line shape draws horizontally
+      // (moveTo/lineTo along the x-axis) regardless of travel direction,
+      // so without a 90-degree rotation the streaks fall straight down
+      // while lying sideways instead of pointing the way they're moving.
       return {
         ...BASE_FULLSCREEN,
         particles: {
-          number: { value: 140, density: { enable: true, area: 700 } },
+          number: { value: 90 },
           color: { value: palette },
           shape: { type: 'line' },
           opacity: { value: { min: 0.12, max: 0.4 } },
           size: { value: { min: 8, max: 18 } },
-          rotate: { value: 12 },
-          move: { enable: true, speed: { min: 9, max: 15 }, direction: 'bottom', straight: true, outModes: 'out' },
+          rotate: { value: 90 },
+          stroke: { width: { min: 1, max: 2 }, color: { value: palette } },
+          move: { enable: true, speed: { min: 7, max: 11 }, direction: 'bottom', straight: true, outModes: 'out' },
         },
       }
     case 'meteors':
-      // Sparse, high-speed angled streaks with a fading trail — an
-      // occasional event, not a constant field like starfield/rain.
+      // Sparse, high-speed angled streaks — an occasional event, not a
+      // constant field like starfield/rain. No `move.trail`: tsParticles'
+      // trail technique fades the canvas by painting a low-opacity rect
+      // instead of clearing it each frame, which accumulates to a solid
+      // opaque backdrop over time — fatal for this canvas, which must
+      // stay transparent so the card/page behind it stays visible.
+      // `density` is deliberately omitted: tsParticles' density factor
+      // scales `number.value` against a 1920x1080 reference area, which
+      // crushed this already-low count to ~0 spawned particles on the
+      // small Studio preview canvas — omitting it uses the literal count.
       return {
         ...BASE_FULLSCREEN,
         particles: {
-          number: { value: 8, density: { enable: true, area: 1400 } },
+          number: { value: 8 },
           color: { value: palette },
           shape: { type: 'star' },
           opacity: { value: { min: 0.3, max: 0.9 } },
           size: { value: { min: 1.5, max: 3.5 } },
-          move: { enable: true, speed: { min: 14, max: 22 }, direction: 'bottom-left', straight: true, trail: { enable: true, length: 12, fill: { color: 'transparent' } }, outModes: 'destroy' },
+          move: { enable: true, speed: { min: 10, max: 16 }, direction: 'bottom-left', straight: true, outModes: 'destroy' },
         },
       }
     default:

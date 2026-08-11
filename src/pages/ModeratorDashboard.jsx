@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import StatusModal from '../components/StatusModal.jsx'
+import Dropdown from '../components/Dropdown.jsx'
 import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import {
@@ -263,27 +264,29 @@ function ModeratorDashboard() {
             <div className="admin-inline-form admin-reports-filters">
               <label className="admin-field">
                 <span>Type</span>
-                <select
+                <Dropdown
                   value={reportFilter.type}
-                  onChange={e => { const v = e.target.value; setReportFilter(p => ({ ...p, type: v })); loadReports({ type: v }) }}
-                >
-                  <option value="">All types</option>
-                  <option value="user">User</option>
-                  <option value="card">Card</option>
-                  <option value="template">Template</option>
-                </select>
+                  onChange={v => { setReportFilter(p => ({ ...p, type: v })); loadReports({ type: v }) }}
+                  options={[
+                    { value: '', label: 'All types' },
+                    { value: 'user', label: 'User' },
+                    { value: 'card', label: 'Card' },
+                    { value: 'template', label: 'Template' },
+                  ]}
+                />
               </label>
               <label className="admin-field">
                 <span>Status</span>
-                <select
+                <Dropdown
                   value={reportFilter.status}
-                  onChange={e => { const v = e.target.value; setReportFilter(p => ({ ...p, status: v })); loadReports({ status: v }) }}
-                >
-                  <option value="open">Open</option>
-                  <option value="reviewed">Reviewed</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="dismissed">Dismissed</option>
-                </select>
+                  onChange={v => { setReportFilter(p => ({ ...p, status: v })); loadReports({ status: v }) }}
+                  options={[
+                    { value: 'open', label: 'Open' },
+                    { value: 'reviewed', label: 'Reviewed' },
+                    { value: 'resolved', label: 'Resolved' },
+                    { value: 'dismissed', label: 'Dismissed' },
+                  ]}
+                />
               </label>
               <button className="primary" type="button" onClick={() => loadReports()}>Refresh</button>
             </div>
