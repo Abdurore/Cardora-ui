@@ -1,9 +1,6 @@
-import { getChatFrameId, getChatFrameUrl } from './chatFrames.js'
-
 const DEFAULT_API_BASE = 'https://cardora-uss3.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, '')
 const TOKEN_KEY = 'cardora:authToken'
-const CHAT_FRAME_CACHE_KEY = 'cardora:adminChatFrames'
 const GUEST_ID_KEY = 'cardora:guestId'
 
 // A stable per-browser id for unauthenticated visitors (e.g. recipients answering
@@ -22,52 +19,6 @@ function getGuestId() {
   } catch {
     return ''
   }
-}
-
-function readStorageJson(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-export function getCachedChatFrames() {
-  const frames = readStorageJson(CHAT_FRAME_CACHE_KEY, [])
-  return Array.isArray(frames) ? frames : []
-}
-
-export function rememberChatFrame(frame) {
-  if (!frame || typeof frame !== 'object') return
-  const id = getChatFrameId(frame)
-  const url = getChatFrameUrl(frame)
-  if (!id || !url) return
-  const nextFrame = {
-    ...frame,
-    id,
-    url,
-    imageUrl: frame.imageUrl || url,
-    price: frame.price ?? frame.priceCC ?? frame.cost ?? 0,
-  }
-  const frames = getCachedChatFrames()
-  const existingIndex = frames.findIndex(item => (item.id || item.frameId || item._id) === id)
-  const next = existingIndex >= 0
-    ? frames.map((item, index) => (index === existingIndex ? { ...item, ...nextFrame } : item))
-    : [nextFrame, ...frames]
-  try {
-    localStorage.setItem(CHAT_FRAME_CACHE_KEY, JSON.stringify(next))
-  } catch { /* storage can be unavailable in private contexts */ }
-}
-
-export function forgetCachedChatFrame(frameId) {
-  if (!frameId) return
-  const id = String(frameId)
-  const frames = getCachedChatFrames()
-  const next = frames.filter(item => getChatFrameId(item) !== id)
-  try {
-    localStorage.setItem(CHAT_FRAME_CACHE_KEY, JSON.stringify(next))
-  } catch { /* storage can be unavailable in private contexts */ }
 }
 
 function buildUrl(path) {
@@ -273,19 +224,6 @@ export async function equipProfileBackground(backgroundId, blur = false) {
   return request('/users/equip-profile-background', { method: 'PATCH', auth: true, body: { backgroundId, blur } })
 }
 
-// Passing an empty/falsy frameId unequips — the backend treats an empty
-// frameId on this same endpoint as "clear the equipped frame" (see
-// equipChatFrame in userController.js). This used to try three separate
-// unequip endpoints that don't exist (404) and silently fall back to a
-// client-only "removed on this device" state that never reached the server.
-export async function equipChatFrame(frameId) {
-  return request('/users/equip-chat-frame', { method: 'PATCH', auth: true, body: { frameId: frameId || '' } })
-}
-
-export async function buyChatFrame(frameId) {
-  return request('/users/buy-chat-frame', { method: 'POST', auth: true, body: { frameId } })
-}
-
 export async function getProfileBackgrounds() {
   return requestFirstSuccess([
     '/profile-backgrounds',
@@ -300,14 +238,6 @@ export async function createProfileBackground(payload) {
 
 export async function deleteProfileBackground(backgroundId) {
   return request(`/admin/profile-backgrounds/${encodeURIComponent(backgroundId)}`, { method: 'DELETE', auth: true })
-}
-
-export async function getChatFrames() {
-  return request('/chat-frames', { auth: true })
-}
-
-export async function getAdminChatFrames() {
-  return request('/chat-frames', { auth: true })
 }
 
 /* ═══════════════════════════════════════════════
@@ -958,38 +888,6 @@ export async function getSignupBonusStatus() {
 
 export async function resetSignupBonus() {
   return request('/admin/reset-signup-bonus', { method: 'POST', auth: true })
-}
-
-/* ═══════════════════════════════════════════════
-   ADMIN: CHAT FRAMES
-   ═══════════════════════════════════════════════ */
-export async function createChatFrame(payload) {
-  return request('/admin/chat-frames', { method: 'POST', auth: true, body: payload })
-}
-
-export async function deleteChatFrame(frameId) {
-  const id = encodeURIComponent(frameId)
-  return requestFirstSuccess([
-    `/admin/chat-frames/${id}`,
-    `/chat-frames/${id}`,
-    `/admin/chat-frame/${id}`,
-  ], { method: 'DELETE', auth: true })
-}
-
-export async function requestChatFrame(payload) {
-  return request('/admin/chat-frame-requests', { method: 'POST', auth: true, body: payload })
-}
-
-export async function approveChatFrameRequest(requestId) {
-  return request(`/admin/chat-frame-requests/${requestId}/approve`, { method: 'POST', auth: true })
-}
-
-export async function rejectChatFrameRequest(requestId) {
-  return request(`/admin/chat-frame-requests/${requestId}/reject`, { method: 'POST', auth: true })
-}
-
-export async function getChatFrameRequests(query = 'status=pending&page=1&limit=100') {
-  return request(`/admin/chat-frame-requests?${query}`, { auth: true })
 }
 
 /* ═══════════════════════════════════════════════

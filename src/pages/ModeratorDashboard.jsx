@@ -1,11 +1,10 @@
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import StatusModal from '../components/StatusModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
-import { uploadToCloudinary } from '../lib/cloudinary.js'
 import {
   getAdminReports,
   updateAdminReportStatus,
@@ -14,11 +13,9 @@ import {
   disableAdminTemplate,
   getTemplates,
   getModeratorActionLogs,
-  submitBroadcastRequest,
-  requestChatFrame,
-} from '../lib/api.js'
+  submitBroadcastRequest,} from '../lib/api.js'
 
-const TABS = ['Reports', 'Users', 'Templates', 'Logs', 'Broadcast', 'Chat Frames']
+const TABS = ['Reports', 'Users', 'Templates', 'Logs', 'Broadcast']
 
 function ModeratorDashboard() {
   const { currentUser, balance, openAuthModal } = useOutletContext()
@@ -47,13 +44,6 @@ function ModeratorDashboard() {
   // Broadcast request
   const [broadcastForm, setBroadcastForm] = useState({ subject: '', message: '' })
   const [broadcastSubmitting, setBroadcastSubmitting] = useState(false)
-
-  // Chat frame request
-  const [chatFrameForm, setChatFrameForm] = useState({ name: '', url: '', reason: '' })
-  const [chatFrameSubmitting, setChatFrameSubmitting] = useState(false)
-  const [chatFrameUploading, setChatFrameUploading] = useState(false)
-  const [chatFrameDragOver, setChatFrameDragOver] = useState(false)
-  const chatFrameInputRef = useRef(null)
 
   const isModerator = String(currentUser?.role || '').toLowerCase() === 'moderator'
 
@@ -169,45 +159,6 @@ function ModeratorDashboard() {
       showMsg(err.message || 'Submission failed.', false)
     } finally {
       setBroadcastSubmitting(false)
-    }
-  }
-
-  const handleChatFrameFile = async (file) => {
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
-      showMsg(`Please select an image file. Got "${file.type || 'unknown'}".`, false)
-      return
-    }
-    setChatFrameUploading(true)
-    try {
-      const url = await uploadToCloudinary(file, 'image')
-      const fallbackName = file.name.replace(/\.[^.]+$/, '').slice(0, 80)
-      setChatFrameForm(p => ({ ...p, name: p.name || fallbackName, url }))
-      showMsg('Frame image uploaded.')
-    } catch (err) {
-      showMsg(err.message || 'Frame upload failed.', false)
-    } finally {
-      setChatFrameUploading(false)
-    }
-  }
-
-  const handleChatFrameRequest = async () => {
-    if (!chatFrameForm.name.trim() || !chatFrameForm.url.trim()) {
-      showMsg('Frame name and URL are required.', false); return
-    }
-    setChatFrameSubmitting(true)
-    try {
-      await requestChatFrame({
-        name: chatFrameForm.name.trim(),
-        url: chatFrameForm.url.trim(),
-        reason: chatFrameForm.reason.trim() || undefined,
-      })
-      showMsg('Chat frame request submitted to admin for approval.')
-      setChatFrameForm({ name: '', url: '', reason: '' })
-    } catch (err) {
-      showMsg(err.message || 'Chat frame request failed.', false)
-    } finally {
-      setChatFrameSubmitting(false)
     }
   }
 
@@ -475,105 +426,6 @@ function ModeratorDashboard() {
           </div>
         )}
 
-        {/* CHAT FRAME REQUEST */}
-        {activeTab === 'Chat Frames' && (
-          <div className="admin-section">
-            <h3 className="admin-section-title">Request Chat Frame</h3>
-            <p className="admin-section-note">
-              Suggest a new chat frame for the store. The admin will review and approve your request.
-            </p>
-            <div style={{ maxWidth: 480 }}>
-              <div className="admin-inline-form" style={{ flexDirection: 'column', gap: 12 }}>
-                <label className="admin-field" style={{ width: '100%' }}>
-                  <span>Frame Name</span>
-                  <input
-                    placeholder="e.g. Aurora Glow"
-                    value={chatFrameForm.name}
-                    onChange={e => setChatFrameForm(p => ({ ...p, name: e.target.value }))}
-                    maxLength={50}
-                  />
-                </label>
-                <label className="admin-field" style={{ width: '100%' }}>
-                  <span>Frame Image</span>
-                  <input
-                    ref={chatFrameInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={e => handleChatFrameFile(e.target.files?.[0])}
-                  />
-                  <div
-                    onClick={() => !chatFrameUploading && chatFrameInputRef.current?.click()}
-                    onDragOver={e => { e.preventDefault(); setChatFrameDragOver(true) }}
-                    onDragLeave={() => setChatFrameDragOver(false)}
-                    onDrop={e => {
-                      e.preventDefault()
-                      setChatFrameDragOver(false)
-                      const file = e.dataTransfer.files?.[0]
-                      if (file) handleChatFrameFile(file)
-                    }}
-                    style={{
-                      width: '100%',
-                      minHeight: 100,
-                      borderRadius: 12,
-                      border: `2px dashed ${chatFrameDragOver ? 'rgba(139, 92, 246, 0.6)' : 'rgba(255,255,255,0.15)'}`,
-                      background: chatFrameDragOver ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255,255,255,0.03)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 12,
-                      cursor: chatFrameUploading ? 'wait' : 'pointer',
-                      transition: 'border-color 0.15s, background 0.15s',
-                      padding: 12,
-                    }}
-                  >
-                    {chatFrameUploading ? (
-                      <span style={{ color: 'rgba(255,255,255,0.6)' }}>Uploading…</span>
-                    ) : chatFrameForm.url ? (
-                      <>
-                        <img src={chatFrameForm.url} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} />
-                        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Uploaded — drag a new image or click to replace</span>
-                      </>
-                    ) : (
-                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center' }}>
-                        Drag & drop an image here, or click to choose a file
-                      </span>
-                    )}
-                  </div>
-                </label>
-                {chatFrameForm.url && (
-                  <div style={{ width: '100%' }}>
-                    <p className="admin-section-note">This is exactly how the frame will wrap a World Chat bubble — art should sit in the outer ~25% of the image with a transparent center.</p>
-                    <div className="cf-bubble-wrap">
-                      <div className="cf-frame-overlay" style={{ borderImageSource: `url(${chatFrameForm.url})`, borderImageSlice: '33% fill', borderImageWidth: '24px' }} />
-                      <div className="cf-bubble-text">Hey! This frame looks great 🔥</div>
-                    </div>
-                  </div>
-                )}
-                <label className="admin-field" style={{ width: '100%' }}>
-                  <span>Reason / Notes (optional)</span>
-                  <textarea
-                    placeholder="Why should this frame be added to the store?"
-                    value={chatFrameForm.reason}
-                    onChange={e => setChatFrameForm(p => ({ ...p, reason: e.target.value }))}
-                    rows={3}
-                    maxLength={300}
-                    style={{ width: '100%', resize: 'vertical' }}
-                  />
-                </label>
-                <button
-                  className="primary"
-                  type="button"
-                  onClick={handleChatFrameRequest}
-                  disabled={chatFrameSubmitting || !chatFrameForm.name.trim() || !chatFrameForm.url.trim()}
-                  style={{ width: '100%' }}
-                >
-                  {chatFrameSubmitting ? 'Submitting…' : 'Submit Frame Request'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
       <ScreenNav />
 

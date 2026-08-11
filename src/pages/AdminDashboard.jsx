@@ -61,23 +61,12 @@ import {
   rejectTemplate,
   getSignupBonusStatus,
   resetSignupBonus,
-  createChatFrame,
-  deleteChatFrame,
-  forgetCachedChatFrame,
-  approveChatFrameRequest,
-  rejectChatFrameRequest,
-  getChatFrameRequests,
-  rememberChatFrame,
   createAdminGift,
   getAdminGifts,
   deleteAdminGift,
   getBroadcastDeliveryLogs,
-  getAdminChatFrames,
-  getChatFrames,
-  getCachedChatFrames,
 } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
-import { getChatFrameId, getChatFrameUrl, normalizeChatFrame } from '../lib/chatFrames.js'
 import AdminMusicTrack from '../components/AdminMusicTrack.jsx'
 
 const TABS = ['Overview', 'Users', 'Reports', 'Templates', 'Packages', 'Codes', 'Ads', 'Media', 'Gifts', 'Coupons', 'Logs']
@@ -261,15 +250,11 @@ function AdminDashboard() {
   const [allTemplates, setAllTemplates] = useState([])
   const [loading, setLoading] = useState(false)
   const [signupBonus, setSignupBonus] = useState(null)
-  const [adminChatFrames, setAdminChatFrames] = useState([])
-  const [newChatFrame, setNewChatFrame] = useState({ id: '', name: '', url: '', price: 5 })
-  const [chatFrameUploading, setChatFrameUploading] = useState(false)
   const [adminGifts, setAdminGifts] = useState([])
   const [newGift, setNewGift] = useState({ name: '', priceNgn: 500, effectKey: 'tiny', tier: 'common' })
   const [deliveryLogs, setDeliveryLogs] = useState([])
   const [deliveryBroadcastId, setDeliveryBroadcastId] = useState('')
   const [pendingBroadcastRequests, setPendingBroadcastRequests] = useState([])
-  const [pendingChatFrameRequests, setPendingChatFrameRequests] = useState([])
 
   // New package form
   const [newPkg, setNewPkg] = useState({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false })
@@ -296,7 +281,6 @@ function AdminDashboard() {
   const mediaVideoInputRef = useRef(null)
   const mediaMusicInputRef = useRef(null)
   const profileBgInputRef = useRef(null)
-  const chatFrameInputRef = useRef(null)
   // Ban form
   const [banForm, setBanForm] = useState({ identifier: '', durationDays: 7, reason: '' })
   const [banConfirm, setBanConfirm] = useState(null) // { user, payload } | null
@@ -540,29 +524,9 @@ function AdminDashboard() {
           break
         }
         case 'Gifts': {
-          const [giftsRes, framesRes] = await Promise.allSettled([getAdminGifts(), getAdminChatFrames().catch(() => getChatFrames())])
-          if (giftsRes.status === 'fulfilled') {
-            const list = giftsRes.value?.data?.gifts || giftsRes.value?.gifts || giftsRes.value?.data || []
-            setAdminGifts(Array.isArray(list) ? list : [])
-          }
-          if (framesRes.status === 'fulfilled') {
-            const list = pickList(framesRes.value, 'chatFrames', 'frames', 'items') || []
-            const frames = [...list, ...getCachedChatFrames()]
-              .map(normalizeChatFrame)
-              .filter(Boolean)
-            const seen = new Set()
-            setAdminChatFrames(frames.filter(frame => {
-              if (seen.has(frame.id)) return false
-              seen.add(frame.id)
-              return true
-            }))
-          } else {
-            setAdminChatFrames(getCachedChatFrames().map(normalizeChatFrame).filter(Boolean))
-          }
-          try {
-            const reqRes = await getChatFrameRequests()
-            setPendingChatFrameRequests(reqRes?.data?.requests || reqRes?.requests || [])
-          } catch { setPendingChatFrameRequests([]) }
+          const giftsRes = await getAdminGifts()
+          const list = giftsRes?.data?.gifts || giftsRes?.gifts || giftsRes?.data || []
+          setAdminGifts(Array.isArray(list) ? list : [])
           break
         }
       }
@@ -599,8 +563,6 @@ function AdminDashboard() {
     setLogs([])
     setModLogs([])
     setAdminGifts([])
-    setAdminChatFrames([])
-    setPendingChatFrameRequests([])
   }, [currentUser?.id])
 
   useEffect(() => {
@@ -875,51 +837,6 @@ const handleBroadcast = async () => {
     } catch (err) { showMsg(err.message || 'Reset failed.', false) }
   }
 
-  const handleCreateChatFrame = async () => {
-    if (!newChatFrame.name.trim() || !newChatFrame.url.trim()) { showMsg('Name and URL required.', false); return }
-    try {
-      const payload = { id: newChatFrame.id.trim() || `frame_${Date.now()}`, name: newChatFrame.name.trim(), url: newChatFrame.url.trim(), imageUrl: newChatFrame.url.trim(), price: Number(newChatFrame.price) || 5 }
-      await createChatFrame(payload)
-      rememberChatFrame(payload)
-      showMsg('Chat frame created!')
-      setNewChatFrame({ id: '', name: '', url: '', price: 5 })
-      if (chatFrameInputRef.current) chatFrameInputRef.current.value = ''
-      loadTabData('Gifts')
-    } catch (err) { showMsg(err.message || 'Failed.', false) }
-  }
-
-  const handleChatFrameFile = async (file) => {
-    if (!file) { showMsg('No file selected.', false); return }
-    if (!file.type.startsWith('image/')) {
-      showMsg(`Please select an image file. Got "${file.type || 'unknown'}".`, false)
-      return
-    }
-    setChatFrameUploading(true)
-    try {
-      const url = await uploadToCloudinary(file, 'image')
-      const fallbackName = file.name.replace(/\.[^.]+$/, '').slice(0, 80)
-      setNewChatFrame(p => ({ ...p, name: p.name || fallbackName, url }))
-      showMsg('Frame image uploaded. Add a price, then create the frame.')
-    } catch (err) {
-      showMsg(err.message || 'Frame upload failed.', false)
-    } finally {
-      setChatFrameUploading(false)
-    }
-  }
-
-  const handleDeleteChatFrame = async (frame) => {
-    const fid = getChatFrameId(frame)
-    if (!fid) { showMsg('Missing frame identifier.', false); return }
-    if (!await appConfirm('Delete Frame', `Delete "${frame.name || fid}"?`, { variant: 'danger', confirmLabel: 'Delete' })) return
-    try {
-      await deleteChatFrame(fid)
-      forgetCachedChatFrame(fid)
-      showMsg('Deleted.')
-      setAdminChatFrames(p => p.filter(f => getChatFrameId(f) !== fid))
-    }
-    catch (err) { showMsg(err.message || 'Delete failed.', false) }
-  }
-
   const handleCreateAdminGift = async () => {
     if (!newGift.name.trim()) { showMsg('Gift name required.', false); return }
     try {
@@ -969,29 +886,6 @@ const handleBroadcast = async () => {
       await rejectBroadcastRequest(broadcastId)
       showMsg('Broadcast request rejected.')
       setPendingBroadcastRequests(prev => prev.filter(r => r.requestId !== broadcastId))
-    }
-    catch (err) { showMsg(err.message || 'Failed.', false) }
-  }
-
-  const handleApproveChatFrameRequest = async (requestId) => {
-    if (!await appConfirm('Approve Chat Frame', 'Approve this chat frame request and add it to the store?', { confirmLabel: 'Approve' })) return
-    try {
-      const res = await approveChatFrameRequest(requestId)
-      const frame = res?.data?.frame || res?.frame
-      if (frame) rememberChatFrame(frame)
-      showMsg('Chat frame request approved!')
-      setPendingChatFrameRequests(prev => prev.filter(r => r.requestId !== requestId))
-      loadTabData('Gifts')
-    }
-    catch (err) { showMsg(err.message || 'Failed.', false) }
-  }
-
-  const handleRejectChatFrameRequest = async (requestId) => {
-    if (!await appConfirm('Reject Chat Frame', 'Reject this chat frame request?', { variant: 'danger', confirmLabel: 'Reject' })) return
-    try {
-      await rejectChatFrameRequest(requestId)
-      showMsg('Chat frame request rejected.')
-      setPendingChatFrameRequests(prev => prev.filter(r => r.requestId !== requestId))
     }
     catch (err) { showMsg(err.message || 'Failed.', false) }
   }
@@ -1610,119 +1504,6 @@ const handleBroadcast = async () => {
                 </div>
               </div>
             )}
-
-            {/* Create Chat Frame */}
-            <div className="admin-sub-section">
-              <h4>Create Chat Frame</h4>
-              <div className="admin-inline-form">
-                <label className="admin-field"><span>Frame ID</span><input placeholder="frame_neon (auto if empty)" value={newChatFrame.id} onChange={e => setNewChatFrame(p => ({ ...p, id: e.target.value }))} /></label>
-                <label className="admin-field"><span>Name</span><input placeholder="Neon Glow" value={newChatFrame.name} onChange={e => setNewChatFrame(p => ({ ...p, name: e.target.value }))} /></label>
-                <input
-                  ref={chatFrameInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={e => handleChatFrameFile(e.target.files?.[0])}
-                />
-                <button
-                  type="button"
-                  className={`admin-media-file-btn${newChatFrame.url ? ' ready' : ''}${chatFrameUploading ? ' uploading' : ''}`}
-                  onClick={() => !chatFrameUploading && chatFrameInputRef.current?.click()}
-                  disabled={chatFrameUploading}
-                >
-                  {chatFrameUploading ? (
-                    <><span className="admin-media-file-spinner" />Uploading...</>
-                  ) : newChatFrame.url ? (
-                    <><span>Ready</span> Replace image</>
-                  ) : (
-                    <><span className="admin-media-file-icon">Upload</span> Upload image</>
-                  )}
-                </button>
-                <label className="admin-field"><span>Price (CC)</span><input type="number" placeholder="5" value={newChatFrame.price} onChange={e => setNewChatFrame(p => ({ ...p, price: Number(e.target.value) }))} /></label>
-                <button className="primary" type="button" onClick={handleCreateChatFrame} disabled={chatFrameUploading || !newChatFrame.url}>Create Frame</button>
-              </div>
-              {newChatFrame.url && (
-                <>
-                  <p className="admin-media-hint">This is exactly how the frame will wrap a World Chat bubble — the border art should sit in the outer ~25% of the image with a transparent center, since it's stretched around the bubble's edges (not shown as a circular avatar ring).</p>
-                  <div className="cf-bubble-wrap" style={{ marginTop: 8 }}>
-                    <div className="cf-frame-overlay" style={{ borderImageSource: `url(${newChatFrame.url})`, borderImageSlice: '33% fill', borderImageWidth: '24px' }} />
-                    <div className="cf-bubble-text">Hey! This frame looks great 🔥</div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Pending Chat Frame Requests (submitted by moderators) */}
-            <div className="admin-sub-section">
-              <h4>Pending Chat Frame Requests ({pendingChatFrameRequests.length})</h4>
-              {pendingChatFrameRequests.length === 0 ? (
-                <p style={{ color: 'rgba(220,240,247,0.4)' }}>No pending requests.</p>
-              ) : (
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr><th>Preview</th><th>Name</th><th>Price</th><th>Requested by</th><th>Date</th><th>Actions</th></tr>
-                    </thead>
-                    <tbody>
-                      {pendingChatFrameRequests.map((req) => (
-                        <tr key={req.requestId}>
-                          <td>
-                            {req.url
-                              ? <img src={req.url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
-                              : '—'}
-                          </td>
-                          <td>{req.name}</td>
-                          <td>{req.price ?? '—'}</td>
-                          <td>{req.requestedByUsername || req.requestedById || '—'}</td>
-                          <td>{req.createdAt ? new Date(req.createdAt).toLocaleDateString() : '—'}</td>
-                          <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <button type="button" className="admin-action-btn approve" onClick={() => handleApproveChatFrameRequest(req.requestId)}>Approve</button>
-                            <button type="button" className="admin-action-btn reject" onClick={() => handleRejectChatFrameRequest(req.requestId)}>Reject</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Chat Frame List */}
-            <div className="admin-sub-section">
-              <h4>Existing Chat Frames ({adminChatFrames.length})</h4>
-              {adminChatFrames.length === 0 ? (
-                <p style={{ color: 'rgba(220,240,247,0.4)', fontSize: '0.85rem' }}>No frames uploaded yet.</p>
-              ) : (
-                <div className="admin-frame-grid">
-                  {adminChatFrames.map((f, i) => {
-                    const imgUrl = getChatFrameUrl(f)
-                    const frameId = getChatFrameId(f)
-                    return (
-                      <div key={frameId || i} className="admin-frame-tile">
-                        <div className="admin-frame-tile-preview">
-                          {imgUrl
-                            ? <img src={imgUrl} alt={f.name || 'Frame'} />
-                            : <span className="admin-frame-tile-no-img">No image</span>
-                          }
-                        </div>
-                        <div className="admin-frame-tile-info">
-                          <span className="admin-frame-tile-name">{f.name || '—'}</span>
-                          <span className="admin-frame-tile-price">{f.price ?? '—'} CC</span>
-                          <span className="admin-frame-tile-id">{frameId || '—'}</span>
-                        </div>
-                        <button
-                          type="button"
-                          className="admin-action-btn danger admin-frame-tile-delete"
-                          onClick={() => handleDeleteChatFrame(f)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
 
             {/* Broadcast Delivery Logs */}
             <div className="admin-sub-section">

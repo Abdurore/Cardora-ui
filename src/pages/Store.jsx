@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom'
 import { IoSparkles } from 'react-icons/io5'
 import { TiGift } from 'react-icons/ti'
@@ -8,45 +8,9 @@ import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import PackCard from '../components/PackCard.jsx'
 import RewardedAds from '../components/RewardedAds.jsx'
-import { buyChatFrame, equipChatFrame, getUserCoupons, getChatFrames, getCachedChatFrames } from '../lib/api.js'
-import { getEquippedChatFrameId, getLocalEquippedChatFrameId, getOwnedChatFrameIds, normalizeChatFrame, setLocalEquippedChatFrameId } from '../lib/chatFrames.js'
+import { getUserCoupons } from '../lib/api.js'
 
 const REWARD_TABS = ['earn', 'redeem', 'referral']
-
-function pickList(res, ...keys) {
-  for (const key of keys) {
-    if (Array.isArray(res?.[key])) return res[key]
-    if (Array.isArray(res?.data?.[key])) return res.data[key]
-    if (Array.isArray(res?.data?.[key]?.docs)) return res.data[key].docs
-    if (Array.isArray(res?.data?.[key]?.items)) return res.data[key].items
-    if (Array.isArray(res?.result?.[key])) return res.result[key]
-  }
-  if (Array.isArray(res?.data)) return res.data
-  if (Array.isArray(res?.results)) return res.results
-  if (Array.isArray(res)) return res
-  if (res && typeof res === 'object') {
-    for (const value of Object.values(res)) {
-      if (!value || typeof value !== 'object') continue
-      const nested = pickList(value, ...keys)
-      if (nested.length) return nested
-    }
-  }
-  return []
-}
-
-function normalizeFrame(frame) {
-  return normalizeChatFrame(frame)
-}
-
-function mergeFrameSources(...sources) {
-  const map = new Map()
-  sources.flat().forEach(frame => {
-    const normalized = normalizeFrame(frame)
-    if (!normalized?.id || !normalized.url) return
-    map.set(normalized.id, { ...map.get(normalized.id), ...normalized })
-  })
-  return Array.from(map.values())
-}
 
 function Store() {
   const {
@@ -76,7 +40,7 @@ function Store() {
   const [activeSection, setActiveSection] = useState('buy')
 
   useEffect(() => {
-    if (queryTab && ['buy', 'cosmetics', 'rewards'].includes(queryTab)) {
+    if (queryTab && ['buy', 'rewards'].includes(queryTab)) {
       setActiveSection(queryTab)
     }
   }, [queryTab])
@@ -87,49 +51,7 @@ function Store() {
   const [isClaiming, setIsClaiming] = useState(false)
   const [isRedeeming, setIsRedeeming] = useState(false)
   const [copiedField, setCopiedField] = useState('')
-  const [cosmeticMsg, setCosmeticMsg] = useState({ text: '', ok: false })
-  const [buyingFrame, setBuyingFrame] = useState(null)
-  const [equippingFrame, setEquippingFrame] = useState(null)
   const [streakInfo, setStreakInfo] = useState(null)
-  const [chatFrames, setChatFrames] = useState([])
-  const [ownedFrameIds, setOwnedFrameIds] = useState([])
-  const [localEquippedFrameId, setLocalEquippedFrameId] = useState('')
-  // Persist optimistic owned IDs across re-renders so a background refetch can't wipe them
-  const optimisticOwnedIds = useRef(new Set())
-  const [chatFramesLoading, setChatFramesLoading] = useState(true)
-
-  // Ownership itself comes from `currentUser.ownedChatFrames` via
-  // getOwnedChatFrameIds below (the `useEffect` on [currentUser]) — there's
-  // no separate "my owned frames" endpoint on the backend
-  // (`/users/chat-frames` doesn't exist), so a prior version of this call
-  // always 404'd and contributed nothing.
-  const loadChatFrames = useCallback(async () => {
-    setChatFramesLoading(true)
-    const cachedFrames = getCachedChatFrames()
-    try {
-      const res = await getChatFrames()
-      const frames = pickList(res, 'chatFrames', 'frames', 'items')
-      setChatFrames(mergeFrameSources(frames, [], cachedFrames))
-      setOwnedFrameIds([...optimisticOwnedIds.current])
-    } catch {
-      setChatFrames(mergeFrameSources(cachedFrames))
-      setOwnedFrameIds([...optimisticOwnedIds.current])
-    } finally {
-      setChatFramesLoading(false)
-    }
-  }, [])
-
-  // Run once on mount — never depends on currentUser to avoid wiping optimistic state
-  useEffect(() => {
-    loadChatFrames()
-  }, [loadChatFrames])
-
-  useEffect(() => {
-    const localFrameId = getLocalEquippedChatFrameId(currentUser?.id)
-    setLocalEquippedFrameId(localFrameId === '__frameless__' ? '' : (localFrameId || getEquippedChatFrameId(currentUser)))
-    getOwnedChatFrameIds(currentUser).forEach(id => optimisticOwnedIds.current.add(id))
-    setOwnedFrameIds([...optimisticOwnedIds.current])
-  }, [currentUser])
 
   const validPacks = (couponPackages || []).filter(p => (p.cc || 0) > 0)
   const packs = validPacks
@@ -190,40 +112,6 @@ function Store() {
     } catch { /* silent */ }
   }
 
-  const handleBuyFrame = async (frameId) => {
-    if (!currentUser) { openAuthModal(); return }
-    setBuyingFrame(frameId)
-    setCosmeticMsg({ text: '', ok: false })
-    try {
-      const res = await buyChatFrame(frameId)
-      setCosmeticMsg({ text: res?.message || 'Frame purchased!', ok: true })
-      // Add to optimistic ref FIRST so no refetch can wipe it
-      optimisticOwnedIds.current.add(frameId)
-      setOwnedFrameIds(prev => [...new Set([...prev, frameId])])
-      await refreshBalance?.()
-    } catch (err) {
-      setCosmeticMsg({ text: err?.message || 'Could not buy frame.', ok: false })
-    }
-    setBuyingFrame(null)
-  }
-
-  const handleEquipFrame = async (frameId) => {
-    if (!currentUser) { openAuthModal(); return }
-    const nextFrameId = frameId || ''
-    setEquippingFrame(nextFrameId || 'frameless')
-    setCosmeticMsg({ text: '', ok: false })
-    try {
-      const res = await equipChatFrame(nextFrameId)
-      setLocalEquippedFrameId(nextFrameId)
-      setLocalEquippedChatFrameId(currentUser.id, nextFrameId)
-      setCosmeticMsg({ text: res?.message || (nextFrameId ? 'Frame equipped!' : 'Frame removed.'), ok: true })
-      await refreshBalance?.()
-    } catch (err) {
-      setCosmeticMsg({ text: err?.message || 'Could not equip frame.', ok: false })
-    }
-    setEquippingFrame(null)
-  }
-
   const handleRedeem = async () => {
     if (!currentUser) {
       openAuthModal()
@@ -277,13 +165,6 @@ function Store() {
           </button>
           <button
             type="button"
-            className={`tab ${activeSection === 'cosmetics' ? 'active' : ''}`}
-            onClick={() => setActiveSection('cosmetics')}
-          >
-            Cosmetics
-          </button>
-          <button
-            type="button"
             className={`tab ${activeSection === 'rewards' ? 'active' : ''}`}
             onClick={() => setActiveSection('rewards')}
           >
@@ -318,164 +199,6 @@ function Store() {
                 />
               ))
             )}
-          </div>
-        )}
-
-        {activeSection === 'cosmetics' && (
-          <div className="store-cosmetics-section">
-            <div className="store-cosmetics-intro">
-              <p className="eyebrow">Chat cosmetics</p>
-              <h4>Chat Frames</h4>
-              <p>Equip a frame to wrap every message you send in World Chat with a unique border style.</p>
-            </div>
-            {cosmeticMsg.text && (
-              <p className={`store-earn-msg ${cosmeticMsg.ok ? 'success' : 'error'}`}>{cosmeticMsg.text}</p>
-            )}
-            {chatFramesLoading ? (
-              <div className="store-frame-empty">
-                <span className="store-frame-empty-icon">🖼️</span>
-                <span>Loading frames...</span>
-              </div>
-            ) : chatFrames.length === 0 ? (
-              <div className="store-frame-empty">
-                <span className="store-frame-empty-icon">🖼️</span>
-                <span>No chat frames available yet. Check back soon!</span>
-              </div>
-            ) : (() => {
-              const currentEquippedId = localEquippedFrameId || getEquippedChatFrameId(currentUser)
-              const isFrameOwned = (frame) => {
-                if (!frame?.id) return false
-                if (frame.isOwned || frame.owned || frame.purchased || frame.id === currentEquippedId || ownedFrameIds.includes(frame.id)) return true
-                return getOwnedChatFrameIds(currentUser).includes(frame.id)
-              }
-              const ownedFrames = chatFrames.filter(isFrameOwned)
-              const storeFrames = chatFrames.filter(f => !isFrameOwned(f))
-
-              const renderFrameCard = (frame, isOwned) => {
-                const isEquipped = currentEquippedId === frame.id
-                const isEquipping = equippingFrame === frame.id || (isEquipped && equippingFrame === 'frameless')
-                const isBuying = buyingFrame === frame.id
-                const previewAvatarUrl = currentUser?.avatarUrl || currentUser?.profilePictureUrl || currentUser?.avatar || ''
-                return (
-                  <div key={frame.id} className={`cf-card ${isEquipped ? 'cf-card--equipped' : ''} ${isOwned ? 'cf-card--owned' : ''}`}>
-                    {isEquipped && (
-                      <div className="cf-equipped-badge">
-                        <span>✦ Equipped</span>
-                      </div>
-                    )}
-                    <div className="cf-preview" aria-label={`${frame.name} WorldChat preview`}>
-                      <div className="cf-preview-inner">
-                        <div className="cf-avatar-wrap">
-                          {previewAvatarUrl ? (
-                            <img className="cf-avatar cf-avatar-img" src={previewAvatarUrl} alt="" />
-                          ) : (
-                            <span className="cf-avatar">
-                              {(currentUser?.name || currentUser?.username || 'C')[0].toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div className="cf-bubble-col">
-                          <div className="cf-bubble-meta">
-                            <strong>{currentUser?.username || 'cardora'}</strong>
-                            <span>now</span>
-                          </div>
-                          <div className="cf-bubble-wrap">
-                            <div
-                              className="cf-frame-overlay"
-                              style={{
-                                borderImageSource: `url(${frame.url})`,
-                                borderImageSlice: '33% fill',
-                                borderImageWidth: '24px'
-                              }}
-                            />
-                            <div className="cf-bubble-text">
-                              Hey! This frame looks great 🔥
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="cf-info">
-                      <div className="cf-info-top">
-                        <span className="cf-name">{frame.name}</span>
-                        {!isOwned && <span className="cf-price">{frame.price} CC</span>}
-                        {isOwned && !isEquipped && <span className="cf-owned-tag">Owned</span>}
-                        {isEquipped && <span className="cf-equipped-tag">✦ Equipped</span>}
-                      </div>
-                      {frame.desc && <p className="cf-desc">{frame.desc}</p>}
-                    </div>
-
-                    <div className="cf-actions">
-                      {isOwned ? (
-                        <button
-                          type="button"
-                          className={`cf-btn ${isEquipped ? 'cf-btn--equipped' : 'cf-btn--equip'}`}
-                          onClick={() => handleEquipFrame(isEquipped ? null : frame.id)}
-                          disabled={isEquipping}
-                        >
-                          {isEquipping ? (
-                            <span className="cf-btn-spinner" />
-                          ) : isEquipped ? (
-                            'Remove Frame'
-                          ) : (
-                            'Equip Frame'
-                          )}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="cf-btn cf-btn--buy"
-                          onClick={() => handleBuyFrame(frame.id)}
-                          disabled={isBuying}
-                        >
-                          {isBuying ? (
-                            <span className="cf-btn-spinner" />
-                          ) : (
-                            <>Buy for {frame.price} CC</>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              }
-
-              return (
-                <div className="store-cosmetics-content">
-                  {ownedFrames.length > 0 && (
-                    <div className="cf-section">
-                      <div className="cf-section-header">
-                        <h5 className="cf-section-title">Your Collection</h5>
-                        <span className="cf-section-count">{ownedFrames.length} frame{ownedFrames.length !== 1 ? 's' : ''}</span>
-                      </div>
-                      <div className="cf-grid">
-                        {ownedFrames.map(f => renderFrameCard(f, true))}
-                      </div>
-                    </div>
-                  )}
-
-                  {storeFrames.length > 0 && (
-                    <div className="cf-section">
-                      <div className="cf-section-header">
-                        <h5 className="cf-section-title">Available in Store</h5>
-                        <span className="cf-section-count">{storeFrames.length} available</span>
-                      </div>
-                      <div className="cf-grid">
-                        {storeFrames.map(f => renderFrameCard(f, false))}
-                      </div>
-                    </div>
-                  )}
-
-                  {storeFrames.length === 0 && ownedFrames.length > 0 && (
-                    <div className="store-frame-empty" style={{ marginTop: '12px' }}>
-                      <span className="store-frame-empty-icon">🎉</span>
-                      <span>You own all available frames!</span>
-                    </div>
-                  )}
-                </div>
-              )
-            })()}
           </div>
         )}
 
