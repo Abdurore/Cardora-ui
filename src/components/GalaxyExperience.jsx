@@ -89,10 +89,19 @@ function GalaxyExperience({ experience, images = [], onContinue }) {
     let labelRaf = requestAnimationFrame(function tick() {
       labelRaf = requestAnimationFrame(tick)
       const positions = scene.projectLabels()
+      const bounds = canvas.getBoundingClientRect()
       for (const p of positions) {
         const node = labelNodesRef.current[p.index]
         if (!node) continue
-        node.style.transform = `translate(-50%, -50%) translate(${p.x}px, ${p.y}px)`
+        // Keep the pill fully on screen. A planet near the edge would
+        // otherwise push its label half out of view — barely noticeable on a
+        // desktop canvas, but on a phone the labels are a large fraction of
+        // the width and were getting clipped into unreadable fragments.
+        const halfW = node.offsetWidth / 2
+        const halfH = node.offsetHeight / 2
+        const x = Math.min(Math.max(p.x, halfW + 6), bounds.width - halfW - 6)
+        const y = Math.min(Math.max(p.y, halfH + 6), bounds.height - halfH - 6)
+        node.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`
         node.style.opacity = p.visible ? '1' : '0'
         node.style.pointerEvents = p.visible ? 'auto' : 'none'
       }
@@ -117,6 +126,37 @@ function GalaxyExperience({ experience, images = [], onContinue }) {
     if (active == null) scene.resetFocus()
     else scene.focusMemory(active)
   }, [active])
+
+  const step = useCallback((delta) => {
+    setActive((cur) => (cur == null ? null : (cur + delta + memories.length) % memories.length))
+  }, [memories.length])
+
+  // Arrow keys move between memories and Escape closes the panel — the scene
+  // is otherwise pointer-only, which leaves it unusable by keyboard.
+  useEffect(() => {
+    if (active == null) return undefined
+    const onKey = (e) => {
+      if (e.key === 'ArrowRight') { e.preventDefault(); step(1) }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1) }
+      else if (e.key === 'Escape') { e.preventDefault(); setActive(null) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [active, step])
+
+  // Horizontal swipe on the panel moves between memories, which is how a
+  // phone user will reach for it before finding the small arrows.
+  const swipeRef = useRef(null)
+  const onPanelPointerDown = (e) => { swipeRef.current = { x: e.clientX, y: e.clientY } }
+  const onPanelPointerUp = (e) => {
+    const start = swipeRef.current
+    swipeRef.current = null
+    if (!start) return
+    const dx = e.clientX - start.x
+    const dy = e.clientY - start.y
+    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy)) return
+    step(dx < 0 ? 1 : -1)
+  }
 
   if (!memories.length) {
     // Nothing to show — hand straight over rather than presenting an empty sky.
@@ -178,22 +218,25 @@ function GalaxyExperience({ experience, images = [], onContinue }) {
       {coreLabel && active == null && !notesOpen && <p className="gx-core-label">{coreLabel}</p>}
 
       {activeMemory && (
-        <div className="gx-panel" role="dialog" aria-label={activeMemory.title || 'Memory'}>
+        <div
+          className="gx-panel"
+          role="dialog"
+          aria-label={activeMemory.title || 'Memory'}
+          onPointerDown={onPanelPointerDown}
+          onPointerUp={onPanelPointerUp}
+        >
           <button type="button" className="gx-panel-close" onClick={() => setActive(null)} aria-label="Close">×</button>
+          {/* The planet's texture is small and curved; showing the photo flat
+              here is the only place the recipient actually sees it properly. */}
+          {activeMemory.url && (
+            <img className="gx-panel-photo" src={activeMemory.url} alt="" draggable="false" />
+          )}
           {activeMemory.title && <h3 className="gx-panel-title">{activeMemory.title}</h3>}
           {activeMemory.note && <p className="gx-panel-note">{activeMemory.note}</p>}
           <div className="gx-panel-nav">
-            <button
-              type="button"
-              onClick={() => setActive((active - 1 + memories.length) % memories.length)}
-              aria-label="Previous memory"
-            >‹</button>
+            <button type="button" onClick={() => step(-1)} aria-label="Previous memory">‹</button>
             <span>{active + 1} / {memories.length}</span>
-            <button
-              type="button"
-              onClick={() => setActive((active + 1) % memories.length)}
-              aria-label="Next memory"
-            >›</button>
+            <button type="button" onClick={() => step(1)} aria-label="Next memory">›</button>
           </div>
         </div>
       )}

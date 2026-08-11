@@ -28704,6 +28704,17 @@ textarea:focus-visible,
 
 .gx-panel-close:hover { color: #fff; }
 
+.gx-panel-photo {
+  display: block;
+  width: 100%;
+  height: 132px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  user-select: none;
+}
+
 .gx-panel-title {
   margin: 0 0 6px;
   font-family: 'Cinzel', serif;
@@ -28882,10 +28893,62 @@ textarea:focus-visible,
   color: rgba(255, 255, 255, 0.82);
 }
 
-@media (max-width: 520px) {
-  .gx-panel { bottom: 140px; }
-  .gx-label { font-size: 0.62rem; padding: 4px 9px; }
-  .gx-core-label { font-size: 0.95rem; }
+/* ── Galaxy on phones ──
+   The desktop layout stacks panel, hint and button up the bottom of the
+   screen, which on a phone leaves the memory panel squeezed against the
+   planets with the text competing for the same space. Here the panel becomes
+   a bottom sheet spanning the full width, the chrome sits in one compact row
+   above it, and the labels shrink and cap their width so a long memory title
+   can't span the screen or collide with its neighbours. */
+@media (max-width: 620px) {
+  .gx-panel {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    transform: none;
+    max-height: 62vh;
+    overflow-y: auto;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-radius: 18px 18px 0 0;
+    border-bottom: none;
+  }
+
+  @keyframes gxPanelIn {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .gx-panel-photo { height: 108px; }
+
+  /* Sits above the sheet rather than under it. */
+  .gx-hint,
+  .gx-continue { bottom: auto; top: 14px; }
+  .gx-hint { display: none; }
+  .gx-continue {
+    left: auto;
+    right: 12px;
+    transform: none;
+    padding: 7px 14px;
+    font-size: 0.76rem;
+  }
+
+  .gx-label {
+    font-size: 0.6rem;
+    padding: 4px 8px;
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .gx-core-label {
+    font-size: 0.9rem;
+    max-width: 78vw;
+    text-align: center;
+  }
+
+  .gx-note { font-size: 0.86rem; max-width: 86vw; }
+  .gx-notes { padding: 40px 18px 120px; }
 }
 
 
