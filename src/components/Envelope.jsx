@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { getEnvelopeTierProfile, getPacingMultiplier } from '../lib/envelopeTiers.js'
+import { useDepthMotion } from '../lib/useDepthMotion.js'
 import { SEAL_ICONS, deriveRecipientName } from '../lib/sealIcons.jsx'
 
 const TIER_ALIASES = { simple: 'classic', special: 'premium', signature: 'elite' }
 function normaliseTier(tier) {
   const key = String(tier || 'classic').toLowerCase()
   return TIER_ALIASES[key] || key
-}
-
-function isTouchPointer() {
-  if (typeof window === 'undefined') return false
-  return window.matchMedia?.('(hover: none), (pointer: coarse)')?.matches || false
 }
 
 function Envelope({
@@ -28,10 +24,7 @@ function Envelope({
   const pacing = getPacingMultiplier(envelope.pacing)
 
   const [stage, setStage] = useState('arriving')
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
-  const rafRef = useRef(null)
-  const pendingTilt = useRef({ x: 0, y: 0 })
-  const sceneRef = useRef(null)
+  const sceneRef = useDepthMotion({ maxTilt: 12, disabled: !profile.parallax })
   const chimeRef = useRef(null)
   const rustleRef = useRef(null)
   const crackRef = useRef(null)
@@ -77,34 +70,6 @@ function Envelope({
   }, [stage, profile.ambientAudio])
 
   useEffect(() => {
-    if (!profile.parallax) return
-    // Skip parallax entirely on touch devices — mousemove never fires reliably
-    // there and the listener still runs, wasting cycles.
-    if (isTouchPointer()) return
-    const handler = (e) => {
-      if (!sceneRef.current) return
-      const rect = sceneRef.current.getBoundingClientRect()
-      const cx = rect.left + rect.width / 2
-      const cy = rect.top + rect.height / 2
-      const dx = (e.clientX - cx) / rect.width
-      const dy = (e.clientY - cy) / rect.height
-      pendingTilt.current = { x: Math.max(-1, Math.min(1, dx)) * 10, y: Math.max(-1, Math.min(1, dy)) * -8 }
-      if (rafRef.current == null) {
-        rafRef.current = requestAnimationFrame(() => {
-          if (mountedRef.current) setTilt(pendingTilt.current)
-          rafRef.current = null
-        })
-      }
-    }
-    window.addEventListener('mousemove', handler)
-    return () => {
-      window.removeEventListener('mousemove', handler)
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-    }
-  }, [profile.parallax])
-
-  useEffect(() => {
     if (!closing || !profile.closingFold) return
     safeSetStage('closing')
     scheduleTimer(() => safeSetStage('resealed'), 1200 * pacing)
@@ -130,14 +95,11 @@ function Envelope({
   const sceneClass = [
     'envelope-scene',
     `stage-${stage}`,
+    `depth-${profile.depth || 'full'}`,
     profile.letterbox ? 'has-letterbox' : '',
     profile.reducedMotion ? 'reduced-motion' : '',
     closing ? 'is-closing' : '',
   ].filter(Boolean).join(' ')
-
-  const parallaxStyle = profile.parallax
-    ? { transform: `rotateY(${tilt.x}deg) rotateX(${tilt.y}deg)` }
-    : undefined
 
   const sealIconKey = envelope.sealIcon || 'monogram'
   const showMonogram = envelope.showMonogram !== false && sealIconKey === 'monogram' && profile.monogram
@@ -160,7 +122,7 @@ function Envelope({
           ))}
         </div>
       )}
-      <div className="envelope-parallax-wrap" style={parallaxStyle}>
+      <div className="envelope-parallax-wrap">
         <div
           className={`envelope-body ${paperTextureClass} ${stage === 'sealed' || stage === 'arriving' ? 'is-tappable' : ''}`}
           style={{
