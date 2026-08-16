@@ -77,7 +77,7 @@ Reference files live under `Backend/Cardora/src/`. Read them when in doubt:
 - `cards/schema.js` — Joi validation rules (the actual gate)
 - `cards/engine.js` — sanitisation, tier rules, render model
 - `cards/constants.js` — enum values + card costs
-- `middleware/validate.js` — runs Joi with `allowUnknown: false` (extra fields rejected)
+- `middleware/validate.js` — runs Joi with `allowUnknown: false, stripUnknown: false` (extra fields rejected with a 400, never silently dropped). This was actually `stripUnknown: true` for a while — silent-dropping is the more dangerous failure mode for a validator (a client sends a field it thinks does something; the backend quietly ignores it and returns 200 anyway) — fixed to match this doc rather than the other way around. A schema that genuinely needs to tolerate extra fields opts in explicitly with Joi's own `.unknown(true)` at the schema level (e.g. `cards/schema.js`'s `layoutDataSchema`, and `baseCreateSchema`'s top-level `state` field), which overrides this default.
 
 (The old `Backend files/` snapshot folder referenced here previously has been deleted — the live backend at `Backend/Cardora/` is the only source of truth now.)
 
