@@ -18904,6 +18904,13 @@ a {
   line-height: 1.5;
 }
 
+.cs-publish-price-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
 .cs-publish-screenshot-zone {
   position: relative;
   border: 1.5px dashed rgba(118, 239, 255, 0.2);

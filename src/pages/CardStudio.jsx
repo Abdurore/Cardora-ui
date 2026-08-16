@@ -501,6 +501,9 @@ function CardStudio() {
   const [publishForm, setPublishForm] = useState({
     name: cardData?.title || existingDraftObject?.content?.heading || resolveTemplateCardObject(cardData).content.heading,
     category: cardData?.category || 'birthday',
+    // 3.7: 0 = free (unchanged default); 2-15 CC = a paid marketplace
+    // template a buyer must unlock. Enforced again server-side.
+    price: 0,
   })
   const [publishError, setPublishError] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
@@ -912,6 +915,7 @@ function CardStudio() {
         type: publishedType,
         tier: studioTier,
         category: publishForm.category || 'birthday',
+        price: Number(publishForm.price) || 0,
         previewImage,
         poll: studioType === 'poll' ? pollData : undefined,
         trivia: studioType === 'trivia' ? triviaData : undefined,
@@ -4225,6 +4229,28 @@ function CardStudio() {
                     { value: 'other', label: 'Other' },
                   ]}
                 />
+              </label>
+              <label className="cs-field cs-publish-field">
+                <span className="cs-publish-field-label">Price (optional)</span>
+                <Dropdown
+                  value={String(publishForm.price || 0)}
+                  onChange={(val) =>
+                    setPublishForm((prev) => ({ ...prev, price: Number(val) || 0 }))
+                  }
+                  options={[
+                    { value: '0', label: 'Free' },
+                    ...Array.from({ length: 14 }, (_, i) => i + 2).map((cc) => ({
+                      value: String(cc),
+                      label: `${cc} CC`,
+                    })),
+                  ]}
+                />
+                {Number(publishForm.price) > 0 && (
+                  <p className="cs-publish-price-hint">
+                    You'll earn {currentUser?.isFoundingArtist ? '60%' : '50%'} in CC each time someone unlocks
+                    this template. CC commissions can be spent in Cardora but cannot be cashed out or withdrawn.
+                  </p>
+                )}
               </label>
             </div>
 

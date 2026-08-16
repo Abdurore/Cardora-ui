@@ -457,6 +457,12 @@ export async function updateTemplate(payload) {
   return request('/update-template', { method: 'PUT', auth: true, body: payload })
 }
 
+// 3.7: unlock a priced marketplace template permanently for the current user.
+export async function unlockTemplate(templateId) {
+  const id = encodeURIComponent(templateId)
+  return request(`/templates/${id}/unlock`, { method: 'POST', auth: true })
+}
+
 export async function deleteTemplate(payload) {
   const templateId = payload?.templateId || payload?.id || payload?._id || (typeof payload === 'string' ? payload : '')
   if (!templateId) {

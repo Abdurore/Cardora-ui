@@ -13,6 +13,7 @@ import {
   updateTemplate,
   deleteTemplate,
   adminDeleteTemplate,
+  unlockTemplate,
   getCouponPackages,
   getCurrentUser,
   getStoredToken,
@@ -766,7 +767,7 @@ function MainLayout() {
     }
   }
 
-  const publishTemplate = async ({ name, type, tier, category, previewImage, layoutConfig, poll, trivia, chain }) => {
+  const publishTemplate = async ({ name, type, tier, category, previewImage, layoutConfig, price }) => {
     try {
       const resolvedCategory = category || layoutConfig?.category || 'birthday'
       const resolvedPreviewImage = previewImage || layoutConfig?.previewImage || layoutConfig?.previewUrl || ''
@@ -778,16 +779,18 @@ function MainLayout() {
         previewImage: resolvedPreviewImage,
         previewUrl: resolvedPreviewImage,
       })
+      // 3.7: templateSchemas.create only allows name/category/previewImage/
+      // layoutConfig/price at the top level (allowUnknown:false) -- type/
+      // tier/poll/trivia/chain were never read by createTemplate's
+      // controller anyway (they're already embedded in layoutConfig, which
+      // the backend does store), so sending them here 400ed every single
+      // publish attempt.
       const response = await createTemplate({
         name,
-        type: type || 'personal',
-        tier: tier || 'classic',
         category: resolvedCategory,
         previewImage: resolvedPreviewImage,
         layoutConfig: normalizedLayoutConfig,
-        poll,
-        trivia,
-        chain,
+        price: Number(price) || 0,
       })
 
       // Optimistically add the newly-published template to local state so the
@@ -825,7 +828,7 @@ function MainLayout() {
   // Re-saves an EXISTING template's design (used by CardStudio's edit-mode,
   // reached from Profile's "Edit Design" action) — same shape as publishTemplate
   // but calls the update endpoint with the template's id instead of creating a new one.
-  const updateMarketplaceTemplate = async ({ templateId, name, type, tier, category, previewImage, layoutConfig, poll, trivia, chain }) => {
+  const updateMarketplaceTemplate = async ({ templateId, name, type, tier, category, previewImage, layoutConfig, poll, trivia, chain, price }) => {
     try {
       const resolvedCategory = category || layoutConfig?.category || 'birthday'
       const resolvedPreviewImage = previewImage || layoutConfig?.previewImage || layoutConfig?.previewUrl || ''
@@ -846,6 +849,7 @@ function MainLayout() {
         category: resolvedCategory,
         previewImage: resolvedPreviewImage,
         layoutConfig: normalizedLayoutConfig,
+        price: price === undefined ? undefined : Number(price) || 0,
       })
 
       setMarketplaceTemplates((prev) => prev.map((t) => (
@@ -865,6 +869,20 @@ function MainLayout() {
     } catch (error) {
       console.error('Template update failed', error)
       return { ok: false, message: error.message || 'Could not update template.' }
+    }
+  }
+
+  // 3.7: permanently unlocks a priced marketplace template for the current
+  // user (CC debit + artist commission happen server-side, atomically).
+  const handleUnlockTemplate = async (templateId) => {
+    if (!hydratedUser) return { ok: false, message: 'Please log in.' }
+    if (!templateId) return { ok: false, message: 'Missing template id.' }
+    try {
+      const response = await unlockTemplate(templateId)
+      await refreshBalance?.()
+      return { ok: true, message: getResponseMessage(response, 'Template unlocked!') }
+    } catch (error) {
+      return { ok: false, message: error.message || 'Could not unlock this template.' }
     }
   }
 
@@ -1151,6 +1169,7 @@ function MainLayout() {
           publishTemplate,
           updateMarketplaceTemplate,
           deleteMarketplaceTemplate,
+          unlockTemplateAction: handleUnlockTemplate,
           createCardOnBackend: handleCreateCard,
           purchaseGift,
           getUserCardsFromBackend: handleGetUserCards,
