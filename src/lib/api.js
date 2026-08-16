@@ -376,6 +376,13 @@ export async function getAdStats() {
   return request('/ads/stats', { auth: true })
 }
 
+// 3.6: redeem a non-currency ad-reward grant (view_boost / lifetime_extension
+// -- premium_feature applies automatically on the next card created, nothing
+// to redeem here for that type).
+export async function redeemAdRewardGrant(payload) {
+  return request('/ads/redeem-grant', { method: 'POST', auth: true, body: payload })
+}
+
 // Phase 2.3: confirmed against Backend/Cardora/src/routes/adRoutes.js and
 // adminRoutes.js -- NONE of the candidates either of these two functions
 // tried ever existed (adRoutes.js only registers /rewarded, /complete,

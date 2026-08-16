@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getRewardedAd, completeAd, getAdStats, clickAd, trackAdView } from '../lib/api.js'
+import { useOutletContext } from 'react-router-dom'
+import { getRewardedAd, completeAd, getAdStats, clickAd, trackAdView, redeemAdRewardGrant } from '../lib/api.js'
+
+// 3.6: rewarded ads grant non-currency, per-card unlocks now, never CC.
+// premium_feature applies automatically to whatever card the user makes
+// next (nothing to pick), so it needs no redemption UI here.
+const GRANT_LABELS = {
+  premium_feature: { emoji: '🎁', title: 'A premium feature is free on your next card!', needsCard: false },
+  view_boost: { emoji: '👀', title: '+20 views on one of your cards', needsCard: true },
+  lifetime_extension: { emoji: '⏳', title: "+7 days on one of your card's lifetime", needsCard: true },
+}
 
 const AD_COOLDOWN_SECS = 30
 const MIN_WATCH_PCT = 80   // must watch 80% to get full reward
@@ -74,6 +84,7 @@ function mergeLocalAdStats(payload) {
 }
 
 function RewardedAds({ onBalanceUpdate }) {
+  const { getUserCardsFromBackend } = useOutletContext() || {}
   const [ad, setAd] = useState(null)
   const [stats, setStats] = useState(null)
   const [phase, setPhase] = useState('idle')
@@ -83,6 +94,11 @@ function RewardedAds({ onBalanceUpdate }) {
   const [cooldown, setCooldown] = useState(0)
   const [muted, setMuted] = useState(false)
   const [watchedSecs, setWatchedSecs] = useState(0)
+  const [grant, setGrant] = useState(null)
+  const [userCards, setUserCards] = useState(null)
+  const [selectedCardId, setSelectedCardId] = useState('')
+  const [redeemState, setRedeemState] = useState('idle') // idle | redeeming | done | error
+  const [redeemMsg, setRedeemMsg] = useState('')
 
   const timerRef = useRef(null)       // fallback interval for non-video ads
   const cooldownRef = useRef(null)
@@ -136,7 +152,20 @@ function RewardedAds({ onBalanceUpdate }) {
       // chain would now show a fake "+2 CC" for an ad that granted zero.
       const amountEarned = Number(res?.rewardCC ?? 0)
       setReward({ cc: res?.cc || 0, amount: amountEarned })
-      
+
+      // 3.6: the real reward now, if the daily grant cap (3/day) hasn't
+      // been hit -- a per-card unlock, never CC.
+      const grantData = res?.grant || null
+      setGrant(grantData)
+      setSelectedCardId('')
+      setRedeemState('idle')
+      setRedeemMsg('')
+      if (grantData && GRANT_LABELS[grantData.grantType]?.needsCard && !userCards) {
+        getUserCardsFromBackend?.().then((r) => {
+          if (r?.ok) setUserCards(r.cards || [])
+        }).catch(() => {})
+      }
+
       setStats(prev => {
         const mergedPrev = mergeLocalAdStats(prev)
         const { raw: pRaw, stats: pStats, watched, earned, remaining } = adStatsNumbers(mergedPrev)
@@ -166,12 +195,31 @@ function RewardedAds({ onBalanceUpdate }) {
       setError(err.message || 'Could not claim reward.')
       setPhase('error')
     }
-  }, [onBalanceUpdate])
+  }, [onBalanceUpdate, userCards, getUserCardsFromBackend])
+
+  const handleRedeemGrant = async () => {
+    if (!grant || !selectedCardId) return
+    setRedeemState('redeeming')
+    setRedeemMsg('')
+    try {
+      const res = await redeemAdRewardGrant({ token: grant.token, cardId: selectedCardId })
+      setRedeemState('done')
+      setRedeemMsg(res?.message || 'Applied!')
+    } catch (err) {
+      setRedeemState('error')
+      setRedeemMsg(err.message || 'Could not apply your reward.')
+    }
+  }
 
   const loadAd = async () => {
     setPhase('loading')
     setError('')
     setReward(null)
+    setGrant(null)
+    setUserCards(null)
+    setSelectedCardId('')
+    setRedeemState('idle')
+    setRedeemMsg('')
     setWatchedSecs(0)
     setProgress(0)
     try {
@@ -242,9 +290,16 @@ function RewardedAds({ onBalanceUpdate }) {
 
   // Deeply unwrap the stats response — backend may return nested shapes
   const displayStats = mergeLocalAdStats(stats)
-  const { watched: adsWatched, remaining, earned } = adStatsNumbers(displayStats)
+  const { watched: adsWatched, remaining } = adStatsNumbers(displayStats)
   const cooldownPct = Math.round(((AD_COOLDOWN_SECS - cooldown) / AD_COOLDOWN_SECS) * 100)
   const ctaUrl = ad?.ctaUrl || ad?.actionUrl || ad?.url || ad?.link || ad?.linkUrl
+
+  // 3.6: rewards are per-card unlocks now, capped separately (3/day) from
+  // how many ads can be watched (10/day) -- earned/CC tracking above is kept
+  // only because it's always 0 and thus harmless, not because CC is still
+  // the reward.
+  const rawStats = stats?.data?.stats || stats?.stats || stats || {}
+  const grantsRemaining = rawStats.grantsRemainingToday
 
   return (
     <div className="rad-container">
@@ -252,7 +307,7 @@ function RewardedAds({ onBalanceUpdate }) {
         <span className="rad-icon">🎬</span>
         <div>
           <h4 className="rad-title">Watch & Earn</h4>
-          <p className="rad-desc">Watch a short video and earn CC. Up to 10 per day.</p>
+          <p className="rad-desc">Watch a short video and earn a reward — a free feature, extra views, or more time on a card. Up to 3 rewards a day.</p>
         </div>
       </div>
 
@@ -260,13 +315,13 @@ function RewardedAds({ onBalanceUpdate }) {
         <div className="rad-stats">
           <div className="rad-stat"><strong>{adsWatched}</strong><span>Watched</span></div>
           <div className="rad-stat"><strong>{remaining !== null ? remaining : '—'}</strong><span>Remaining</span></div>
-          <div className="rad-stat"><strong>{earned} CC</strong><span>Earned Today</span></div>
+          <div className="rad-stat"><strong>{grantsRemaining ?? '—'}</strong><span>Rewards Left Today</span></div>
         </div>
       )}
 
       {phase === 'idle' && (
         <button className="rad-watch-btn" type="button" onClick={loadAd} disabled={stats && remaining !== null && remaining <= 0}>
-          {stats && remaining !== null && remaining <= 0 ? 'Daily Limit Reached' : '▶ Watch Ad & Earn CC'}
+          {stats && remaining !== null && remaining <= 0 ? 'Daily Limit Reached' : '▶ Watch Ad & Earn Reward'}
         </button>
       )}
 
@@ -349,7 +404,7 @@ function RewardedAds({ onBalanceUpdate }) {
           <div className="rad-progress-bar">
             <div className="rad-progress-fill" style={{ width: `${progress}%` }} />
           </div>
-          <p className="rad-progress-text">{Math.round(progress)}% watched — watch to the end to earn CC</p>
+          <p className="rad-progress-text">{Math.round(progress)}% watched — watch to the end to earn your reward</p>
         </div>
       )}
 
@@ -359,14 +414,54 @@ function RewardedAds({ onBalanceUpdate }) {
 
       {phase === 'done' && reward && (
         <div className="rad-reward">
-          <span className="rad-reward-icon">🎉</span>
-          <h4>+{reward.amount} CC earned!</h4>
-          <p>Your new balance has been updated.</p>
+          {grant ? (
+            <>
+              <span className="rad-reward-icon">{GRANT_LABELS[grant.grantType]?.emoji || '🎁'}</span>
+              <h4>{GRANT_LABELS[grant.grantType]?.title || 'Reward earned!'}</h4>
+              {GRANT_LABELS[grant.grantType]?.needsCard ? (
+                redeemState === 'done' ? (
+                  <p className="success">{redeemMsg}</p>
+                ) : (
+                  <div className="rad-grant-redeem">
+                    <select
+                      value={selectedCardId}
+                      onChange={(e) => setSelectedCardId(e.target.value)}
+                      disabled={!userCards || userCards.length === 0}
+                    >
+                      <option value="">
+                        {userCards === null ? 'Loading your cards…' : userCards.length === 0 ? 'No cards yet' : 'Choose a card'}
+                      </option>
+                      {(userCards || []).map((c) => (
+                        <option key={c.id} value={c.id}>{c.header || c.slug || c.id}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="rad-watch-btn"
+                      type="button"
+                      onClick={handleRedeemGrant}
+                      disabled={!selectedCardId || redeemState === 'redeeming'}
+                    >
+                      {redeemState === 'redeeming' ? 'Applying…' : 'Apply to card'}
+                    </button>
+                    {redeemState === 'error' && <p className="form-error">{redeemMsg}</p>}
+                  </div>
+                )
+              ) : (
+                <p>It'll apply automatically the next time you create a card.</p>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="rad-reward-icon">🙌</span>
+              <h4>Thanks for watching!</h4>
+              <p>You've hit today's reward limit — come back tomorrow for more.</p>
+            </>
+          )}
           {remaining > 1 ? (
-            <button className="rad-watch-btn" type="button" onClick={() => { 
-              setAd(null); 
-              if (cooldown > 0) setPhase('cooldown'); 
-              else setPhase('idle'); 
+            <button className="rad-watch-btn" type="button" onClick={() => {
+              setAd(null);
+              if (cooldown > 0) setPhase('cooldown');
+              else setPhase('idle');
             }}>Watch Another</button>
           ) : (
             <button className="rad-watch-btn" type="button" onClick={() => { setPhase('idle'); setAd(null) }}>Done</button>
