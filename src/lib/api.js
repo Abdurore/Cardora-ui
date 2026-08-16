@@ -339,6 +339,30 @@ export async function claimGiftFromCard(slug) {
 }
 
 /* ═══════════════════════════════════════════════
+   3.7 CC SINKS — spend CC to modify a card you own
+   ═══════════════════════════════════════════════ */
+export async function extendCardLifetime(cardId) {
+  return request(`/cards/${encodeURIComponent(cardId)}/extend-lifetime`, { method: 'POST', auth: true })
+}
+
+export async function setCardVanityLink(cardId, vanitySlug) {
+  return request(`/cards/${encodeURIComponent(cardId)}/vanity-link`, { method: 'POST', auth: true, body: { vanitySlug } })
+}
+
+export async function removeCardBranding(cardId) {
+  return request(`/cards/${encodeURIComponent(cardId)}/remove-branding`, { method: 'POST', auth: true })
+}
+
+// boostType: 'cap' | 'window' | 'prompts'
+export async function boostAnonymousInbox(cardId, boostType) {
+  return request(`/cards/${encodeURIComponent(cardId)}/boost-inbox`, { method: 'POST', auth: true, body: { boostType } })
+}
+
+export async function raiseCardViewCap(cardId) {
+  return request(`/cards/${encodeURIComponent(cardId)}/raise-view-cap`, { method: 'POST', auth: true })
+}
+
+/* ═══════════════════════════════════════════════
    GIFT WALLET / WITHDRAWAL
    ═══════════════════════════════════════════════ */
 export async function getWalletSummary() {
