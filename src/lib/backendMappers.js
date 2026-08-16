@@ -97,28 +97,43 @@ export function getCollection(payload, keys = []) {
   return []
 }
 
+// Phase 2.1: the balance contract is frozen on `cc` (always an absolute
+// integer) across every endpoint that returns one -- see the backend's
+// CLAUDE.md for the full list. This reads `cc` only; the block below is a
+// single fallback path, not a silent guess-and-hope waterfall, and it warns
+// loudly so any remaining drift from the frozen contract stays visible
+// instead of being quietly absorbed.
 export function resolveBalance(...sources) {
-  const candidateKeys = [
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue
+    const value = extractNumber(source.cc)
+    if (value !== null) return value
+  }
+
+  const legacyKeys = [
     'couponBalance',
     'ccBalance',
     'balance',
-    'coupons',
     'availableCoupons',
     'currentCoupons',
     'numberOfCC',
-    'cc',
     'totalCC',
   ]
-
   for (const source of sources) {
     if (!source || typeof source !== 'object') continue
-    for (const key of candidateKeys) {
+    for (const key of legacyKeys) {
       const value = extractNumber(source[key])
-      if (value !== null) return value
+      if (value !== null) {
+        console.warn(`[resolveBalance] No "cc" field found -- fell back to legacy key "${key}". The backend contract should always return "cc"; report this source:`, source)
+        return value
+      }
     }
     if (Array.isArray(source.coupons)) {
       const couponSum = source.coupons.reduce((sum, item) => sum + (extractNumber(item?.amount) || 0), 0)
-      if (couponSum) return couponSum
+      if (couponSum) {
+        console.warn('[resolveBalance] No "cc" field found -- fell back to summing a `coupons` array. Report this source:', source)
+        return couponSum
+      }
     }
   }
 
@@ -1034,7 +1049,17 @@ export function backendCardToCardObject(card) {
  * Uses backendCardToCardObject to reconstruct from config+enhancements per API handbook.
  */
 export function mapBackendCard(card) {
-  const slug = card.slug || card._id || card.cardId || ''
+  // Phase 2.2: every card-returning endpoint puts `slug` at the top level
+  // of the card object (backend CLAUDE.md, cards.schema.js). The
+  // _id/cardId fallback below only exists for a contract violation and
+  // warns loudly if it ever fires.
+  let slug = card.slug || ''
+  if (!slug) {
+    slug = card._id || card.cardId || ''
+    if (slug) {
+      console.warn('[mapBackendCard] Card had no `slug` field -- fell back to _id/cardId. Report this card shape:', JSON.stringify(card)?.slice(0, 400))
+    }
+  }
   const config = card.config || {}
   const layout = card.layoutdata || card.layoutData || card.layoutConfig || {}
   const content = config.content || card.content || layout.content || {}

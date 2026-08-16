@@ -337,11 +337,16 @@ function QuickCreate() {
         return
       }
 
+      // Phase 2.2: the create-card response contract puts `slug` at the top
+      // level -- see the matching fix/comment in CardStudio.jsx.
       const d = result.data
-      const slug =
-        d?.card?.slug || d?.card?.shareSlug || d?.card?.cardId ||
-        d?.slug || d?.shareSlug || d?.cardId ||
-        d?.data?.card?.slug || d?.data?.slug || null
+      let slug = d?.slug || null
+      if (!slug) {
+        slug = d?.card?.slug || d?.renderModel?.slug || null
+        if (slug) {
+          console.warn('[QuickCreate] Card creation response had no top-level `slug` -- fell back to card.slug/renderModel.slug. Report this response shape:', JSON.stringify(d))
+        }
+      }
 
       let finalMessage = result.message
 

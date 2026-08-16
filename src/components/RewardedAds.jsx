@@ -128,7 +128,13 @@ function RewardedAds({ onBalanceUpdate }) {
     setPhase('completing')
     try {
       const res = await completeAd({ adId: adData.id || adData._id })
-      const amountEarned = res?.rewardAmount || adData.rewardCC || res?.reward || 2
+      // Phase 2.1: only trust what the backend actually says was granted
+      // (`rewardCC`, the sole field /ads/complete returns for this). The
+      // old fallback chain (adData.rewardCC, a hardcoded 2) showed the
+      // *advertised* reward regardless of what was actually credited --
+      // since 1.5 removed the CC grant from this endpoint entirely, that
+      // chain would now show a fake "+2 CC" for an ad that granted zero.
+      const amountEarned = Number(res?.rewardCC ?? 0)
       setReward({ cc: res?.cc || 0, amount: amountEarned })
       
       setStats(prev => {

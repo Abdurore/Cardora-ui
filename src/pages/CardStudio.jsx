@@ -1147,16 +1147,21 @@ function CardStudio() {
     const result = await createCardOnBackend?.(flushedCardObject, extras)
     setIsSending(false)
     if (result?.ok) {
-      // Backend returns a unique slug per created card — check every possible shape
+      // Phase 2.2: the backend's create-card response contract puts `slug`
+      // at the top level (createCardInternal, shared by every /create-card*
+      // variant) -- that's the one path every caller of this function goes
+      // through, so it's the only one trusted here. The fallback below
+      // exists only to keep working through a contract violation, and logs
+      // loudly if it ever fires so drift doesn't hide silently.
       const d = result.data || {}
-      const slug =
-        d.card?.slug || d.card?.shareSlug || d.card?.cardId || d.card?._id || d.card?.id ||
-        d.slug || d.shareSlug || d.cardId || d._id || d.id ||
-        d.data?.card?.slug || d.data?.slug || d.data?.cardId || d.data?._id || d.data?.id ||
-        d.renderModel?.slug || d.renderModel?.card?.slug ||
-        ''
+      let slug = d.slug || ''
       if (!slug) {
-        console.warn('Card created but no slug returned. Response shape:', JSON.stringify(d))
+        slug = d.card?.slug || d.renderModel?.slug || ''
+        if (slug) {
+          console.warn('[CardStudio] Card creation response had no top-level `slug` -- fell back to card.slug/renderModel.slug. Report this response shape:', JSON.stringify(d))
+        } else {
+          console.warn('Card created but no slug returned. Response shape:', JSON.stringify(d))
+        }
       }
 
       // The gift (if any was selected) is already attached at this point —

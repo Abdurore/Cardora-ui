@@ -33,13 +33,11 @@ function CardView() {
         const res = await getCardBySlug(id)
         if (cancelled) return
 
-        const candidates = [
-          res?.card, res?.data?.card,
-          res?.renderModel, res?.data?.renderModel,
-          res?.payload?.card, res?.payload,
-          res?.result?.card, res?.result,
-          res?.data, res,
-        ]
+        // Phase 2.2/2.3: GET /cards/:slug's response contract is always
+        // {message, card, renderModel} (backend cardController.js
+        // getCardBySlug) -- res.card is the one real path. The broader
+        // envelope scan below is a fallback for a contract violation, not
+        // the normal case, and warns loudly if it ever actually fires.
         const isCardLike = (c) =>
           c && typeof c === 'object' && !Array.isArray(c) &&
           (c.slug || c._id || c.cardId || c.id ||
@@ -47,7 +45,20 @@ function CardView() {
            c.layoutdata || c.layoutData ||
            c.visuals || c.content || c.type)
 
-        const backendCard = candidates.find(isCardLike)
+        let backendCard = isCardLike(res?.card) ? res.card : null
+        if (!backendCard) {
+          const fallbackCandidates = [
+            res?.data?.card,
+            res?.renderModel, res?.data?.renderModel,
+            res?.payload?.card, res?.payload,
+            res?.result?.card, res?.result,
+            res?.data, res,
+          ]
+          backendCard = fallbackCandidates.find(isCardLike) || null
+          if (backendCard) {
+            console.warn('[CardView] GET /cards/:slug response had no `card` field at the top level -- fell back to a legacy envelope shape. Report this response shape:', JSON.stringify(res)?.slice(0, 400))
+          }
+        }
         if (backendCard) {
           const cardWithSidecars = {
             ...backendCard,

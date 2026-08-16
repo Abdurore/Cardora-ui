@@ -449,16 +449,24 @@ function CardResponses() {
   const loadCard = useCallback(async () => {
     try {
       const res = await getMyCard(slug)
-      const candidates = [
-        res?.card, res?.data?.card,
-        res?.renderModel, res?.data?.renderModel,
-        res?.result?.card, res?.result,
-        res?.data, res,
-      ]
+      // Phase 2.2/2.3: GET /cards/:slug's response contract is always
+      // {message, card, renderModel} -- res.card is the one real path.
       const isCardLike = (c) =>
         c && typeof c === 'object' && !Array.isArray(c) &&
         (c.slug || c._id || c.cardId || c.id || c.config || c.type)
-      const backendCard = candidates.find(isCardLike)
+      let backendCard = isCardLike(res?.card) ? res.card : null
+      if (!backendCard) {
+        const fallbackCandidates = [
+          res?.data?.card,
+          res?.renderModel, res?.data?.renderModel,
+          res?.result?.card, res?.result,
+          res?.data, res,
+        ]
+        backendCard = fallbackCandidates.find(isCardLike) || null
+        if (backendCard) {
+          console.warn('[CardResponses] GET /cards/:slug response had no `card` field at the top level -- fell back to a legacy envelope shape. Report this response shape:', JSON.stringify(res)?.slice(0, 400))
+        }
+      }
       if (backendCard) {
         setRawCard(backendCard)
         setLastRefresh(new Date())

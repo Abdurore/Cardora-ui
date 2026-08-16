@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   cardObjectToBackendPayload,
   backendCardToCardObject,
   unwrapData,
   getResponseMessage,
+  resolveBalance,
+  mapBackendCard,
 } from './backendMappers.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
 
@@ -348,5 +350,48 @@ describe('response envelope tolerance', () => {
     expect(getResponseMessage({ message: 'a' })).toBe('a')
     expect(getResponseMessage({ data: { message: 'b' } })).toBe('b')
     expect(getResponseMessage({}, 'fallback')).toBe('fallback')
+  })
+})
+
+// Phase 2.1: the backend's CC balance contract is frozen on `cc`, always an
+// absolute integer, across every endpoint that returns one.
+describe('resolveBalance', () => {
+  it('reads the canonical cc field', () => {
+    expect(resolveBalance({ cc: 42 })).toBe(42)
+  })
+
+  it('checks every source in order, still preferring cc over a legacy key', () => {
+    expect(resolveBalance({ balance: 99 }, { cc: 7 })).toBe(7)
+  })
+
+  it('warns and falls back to a legacy key when cc is absent from every source', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(resolveBalance({ couponBalance: 15 })).toBe(15)
+    expect(warn).toHaveBeenCalledOnce()
+    warn.mockRestore()
+  })
+
+  it('returns 0 and never throws when nothing matches', () => {
+    expect(resolveBalance({}, null, undefined, { unrelated: 1 })).toBe(0)
+  })
+})
+
+// Phase 2.2: every card-returning endpoint puts `slug` at the top level of
+// the card object.
+describe('mapBackendCard slug resolution', () => {
+  it('uses the top-level slug without warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const mapped = mapBackendCard({ slug: 'abc123', type: 'personal', config: {}, enhancements: {} })
+    expect(mapped.slug).toBe('abc123')
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('warns and falls back to _id/cardId when slug is missing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const mapped = mapBackendCard({ _id: 'legacy-id', type: 'personal', config: {}, enhancements: {} })
+    expect(mapped.slug).toBe('legacy-id')
+    expect(warn).toHaveBeenCalledOnce()
+    warn.mockRestore()
   })
 })
