@@ -239,7 +239,7 @@ function Store() {
                   </div>
                   <div className="store-earn-info">
                     <h4>Daily Free Coupon</h4>
-                    <p>Claim {streakInfo?.isPremium ? '2 CC' : '1 CC'} every day. {streakInfo?.isPremium ? '(Premium bonus!)' : 'Premium users earn 2×!'}</p>
+                    <p>Claim 1 CC every day.</p>
                     {streakInfo && streakInfo.streak > 0 && (
                       <div className="store-streak-badge">
                         <span className="store-streak-fire"><HiOutlineFire size={16} /></span>
