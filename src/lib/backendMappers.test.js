@@ -6,6 +6,7 @@ import {
   getResponseMessage,
   resolveBalance,
   mapBackendCard,
+  mapCouponPackage,
 } from './backendMappers.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
 
@@ -393,5 +394,23 @@ describe('mapBackendCard slug resolution', () => {
     expect(mapped.slug).toBe('legacy-id')
     expect(warn).toHaveBeenCalledOnce()
     warn.mockRestore()
+  })
+})
+
+// 3.1: "display the effective per-CC rate and badge on every tile."
+describe('mapCouponPackage', () => {
+  it('computes the effective per-CC rate', () => {
+    const mapped = mapCouponPackage({ packageId: 'p1', name: 'Popular Pack', numberOfCC: 70, price: 2500, priceCurrency: 'NGN' })
+    expect(mapped.effectiveRate).toBe('NGN 35.71/CC')
+  })
+
+  it('uses the package\'s own badge text, not a generic "Featured" label', () => {
+    const mapped = mapCouponPackage({ packageId: 'p1', name: 'Popular Pack', numberOfCC: 70, price: 2500, priceCurrency: 'NGN', badge: 'POPULAR', featured: true })
+    expect(mapped.bonus).toBe('POPULAR')
+  })
+
+  it('falls back to "Featured" for a legacy package with no badge', () => {
+    const mapped = mapCouponPackage({ packageId: 'p1', name: 'Old Pack', numberOfCC: 100, price: 4000, priceCurrency: 'NGN', featured: true })
+    expect(mapped.bonus).toBe('Featured')
   })
 })

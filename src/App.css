@@ -2766,6 +2766,15 @@
   color: #aaf9ff;
 }
 
+/* 3.1: uses a token (not a hardcoded color) so it reads correctly in both
+   themes without a matching data-theme="light" override -- see CLAUDE.md's
+   7.13 rule for touched files. */
+.pack-effective-rate {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
 .gift-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -256,7 +256,7 @@ function AdminDashboard() {
   const [pendingBroadcastRequests, setPendingBroadcastRequests] = useState([])
 
   // New package form
-  const [newPkg, setNewPkg] = useState({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false })
+  const [newPkg, setNewPkg] = useState({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false, badge: '' })
   // New redeem code form
   const [newCode, setNewCode] = useState({ numberOfCC: 10, maxUses: 200, isActive: true })
   // New ad form
@@ -723,7 +723,7 @@ function AdminDashboard() {
     try {
       await createAdminPackage(newPkg)
       showMsg('Package created!')
-      setNewPkg({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false })
+      setNewPkg({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false, badge: '' })
       loadTabData('Packages')
     } catch (err) {
       showMsg(err.message || 'Failed', false)
@@ -1937,6 +1937,10 @@ const handleBroadcast = async () => {
                   <span>Price (USD)</span>
                   <input type="number" placeholder="9.99" value={newPkg.price} onChange={e => setNewPkg(p => ({ ...p, price: Number(e.target.value) }))} step="0.01" />
                 </label>
+                <label className="admin-field">
+                  <span>Badge (e.g. "POPULAR", "20% MORE")</span>
+                  <input placeholder="Optional" value={newPkg.badge} onChange={e => setNewPkg(p => ({ ...p, badge: e.target.value }))} />
+                </label>
                 <label className="admin-check"><input type="checkbox" checked={newPkg.featured} onChange={e => setNewPkg(p => ({ ...p, featured: e.target.checked }))} /> Featured</label>
                 <button className="primary" type="button" onClick={handleCreatePackage}>Create</button>
               </div>
@@ -1944,7 +1948,7 @@ const handleBroadcast = async () => {
             <div className="admin-table-wrap">
               <table className="admin-table">
                 <thead>
-                  <tr><th>Name</th><th>CC</th><th>Price</th><th>Featured</th><th>Actions</th></tr>
+                  <tr><th>Name</th><th>CC</th><th>Price</th><th>Badge</th><th>Featured</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {packages.map(pkg => (
@@ -1952,6 +1956,7 @@ const handleBroadcast = async () => {
                       <td>{pkg.name}</td>
                       <td>{pkg.numberOfCC}</td>
                       <td>{pkg.price}</td>
+                      <td>{pkg.badge || '-'}</td>
                       <td>{pkg.featured ? 'Starred' : '-'}</td>
                       <td>
                         <button type="button" className="admin-action-btn approve" onClick={() => handleTogglePackage(pkg)}>

@@ -308,14 +308,26 @@ export function mapCouponPackage(pack, targetCurrency) {
   const currency = targetCurrency || pack.priceCurrency || pack.currency || 'NGN'
   const locale = CURRENCY_LOCALE[currency] || 'en-US'
   const formatter = new Intl.NumberFormat(locale)
+  const priceAmount = Number(pack.price || pack.basePrice || 0)
+  // 3.1: "display the effective per-CC rate and badge on every tile" --
+  // badge is now the pack's own explicit label (e.g. "POPULAR", "20% MORE")
+  // rather than a generic featured flag; effectiveRate is the derived
+  // price-per-CC shown so a buyer can compare packs without doing the
+  // division themselves. Only meaningful in the pack's own priceCurrency
+  // (NGN by default) -- a currency-converted price would need its own
+  // effective-rate conversion, not attempted here.
+  const effectiveRate = ccAmount > 0
+    ? `${currency} ${formatter.format(Math.round((priceAmount / ccAmount) * 100) / 100)}/CC`
+    : ''
   return {
     id: pack.packageId || pack._id,
     packageId: pack.packageId || pack._id,
     title: pack.name || `${ccAmount} CC Pack`,
     amount: `${ccAmount} CC`,
     cc: ccAmount,
-    price: `${currency} ${formatter.format(pack.price || pack.basePrice || 0)}`,
-    bonus: pack.featured ? 'Featured' : '',
+    price: `${currency} ${formatter.format(priceAmount)}`,
+    effectiveRate,
+    bonus: pack.badge || (pack.featured ? 'Featured' : ''),
     description: pack.description || '',
     raw: pack,
   }

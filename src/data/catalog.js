@@ -252,15 +252,6 @@ export const exploreCards = [
   },
 ]
 
-export const storePacks = [
-  { title: 'Starter Glow', amount: '500 CC', cc: 500, price: 'NGN 5,000', bonus: '+50 Bonus' },
-  { title: 'Momentum Pack', amount: '1000 CC', cc: 1000, price: 'NGN 9,000', bonus: '+150 Bonus' },
-  { title: 'Signature Vault', amount: '2000 CC', cc: 2000, price: 'NGN 16,000', bonus: '+400 Bonus' },
-  { title: 'Creator Stack', amount: '750 CC', cc: 750, price: 'NGN 7,000', bonus: '+80 Bonus' },
-  { title: 'Premium Reserve', amount: '1500 CC', cc: 1500, price: 'NGN 12,500', bonus: '+220 Bonus' },
-  { title: 'Forever Bundle', amount: '3000 CC', cc: 3000, price: 'NGN 22,000', bonus: '+700 Bonus' },
-]
-
 export const storeGifts = [
   {
     title: 'Tiny Heart',
