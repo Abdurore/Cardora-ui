@@ -271,8 +271,8 @@ function CardView() {
       await submitCardResponse(card.slug || id, payload)
     }
   }
-  const handleAnonSubmit = async (message, extras = {}) => {
-    await sendCardAnonymousMessage(card.slug || id, { message, voice: extras.voice, media: extras.media })
+  const handleAnonSubmit = async (message) => {
+    await sendCardAnonymousMessage(card.slug || id, { message })
   }
   const handleQuestionResponse = async (answer) => {
     await submitCardResponse(card.slug || id, { answer })
@@ -298,7 +298,6 @@ function CardView() {
         onTriviaComplete={handleTriviaComplete}
         onChainReply={handleChainReply}
         onAnonSubmit={handleAnonSubmit}
-        allowAnonMedia={!!card.layoutdata?.styleExtras?.allowAnonMedia}
         reactions={reactions}
         onReact={handleReact}
         onQuestionResponse={handleQuestionResponse}

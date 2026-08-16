@@ -927,7 +927,6 @@ function MainLayout() {
         poll,
         trivia,
         chain,
-        allowAnonMedia: !!anonTemplate?.allowMedia,
       })
 
       // Client-side validation matching backend Joi rules. Catching here surfaces

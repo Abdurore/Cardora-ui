@@ -667,8 +667,8 @@ function CardStudio() {
   // (tierCost, the tier meter, the send receipt, CardPreviewModal's
   // recipient simulation) derives from.
   const tierRequirement = useMemo(
-    () => computeCardTier(cardObject, { type: studioType, pollData, triviaData, chainData, isArtist, allowAnonMedia: anonTemplate.allowMedia }),
-    [cardObject, studioType, pollData, triviaData, chainData, isArtist, anonTemplate.allowMedia],
+    () => computeCardTier(cardObject, { type: studioType, pollData, triviaData, chainData, isArtist }),
+    [cardObject, studioType, pollData, triviaData, chainData, isArtist],
   )
   const studioTier = tierRequirement.tier
   const tierLabel = TIER_LABELS[studioTier] || 'Classic'
@@ -706,8 +706,8 @@ function CardStudio() {
   // What "Trim extras & send free" would actually remove — computed ahead of
   // time so the send receipt can show it before the sender commits to it.
   const trimPreview = useMemo(
-    () => (tierCost > 0 ? trimCardToTier(cardObject, 'classic', { type: studioType, pollData, triviaData, chainData, allowAnonMedia: anonTemplate.allowMedia }) : null),
-    [tierCost, cardObject, studioType, pollData, triviaData, chainData, anonTemplate.allowMedia],
+    () => (tierCost > 0 ? trimCardToTier(cardObject, 'classic', { type: studioType, pollData, triviaData, chainData }) : null),
+    [tierCost, cardObject, studioType, pollData, triviaData, chainData],
   )
 
   // Auto-save: every change persists to localStorage after a short debounce so
@@ -1103,7 +1103,6 @@ function CardStudio() {
     const sourcePoll = overrides.pollData || pollData
     const sourceTrivia = overrides.triviaData || triviaData
     const sourceChain = overrides.chainData || chainData
-    const sourceAllowAnonMedia = overrides.allowAnonMedia ?? anonTemplate.allowMedia
     const sourceTier = overrides.tier || studioTier
     const sourceCost = overrides.tier
       ? getCardTotalCost(overrides.cardObject || cardObject, overrides.tier, studioType, cardPrices, { type: studioType }, featureSurcharges)
@@ -1160,7 +1159,7 @@ function CardStudio() {
       poll: studioType === 'poll' ? sourcePoll : undefined,
       trivia: studioType === 'trivia' ? sourceTrivia : undefined,
       chain: sourceChain.enabled ? sourceChain : undefined,
-      anonTemplate: studioType === 'anonymous' ? { enabled: true, tier: sourceTier, allowMedia: sourceAllowAnonMedia } : undefined,
+      anonTemplate: studioType === 'anonymous' ? { enabled: true, tier: sourceTier } : undefined,
     }
 
     const result = await createCardOnBackend?.(flushedCardObject, extras)
@@ -1228,18 +1227,16 @@ function CardStudio() {
   // actually got sent), and sends that exact trimmed content immediately
   // rather than waiting a render for state to catch up.
   const handleTrimAndSend = async () => {
-    const trimmed = trimCardToTier(cardObject, 'classic', { type: studioType, pollData, triviaData, chainData, allowAnonMedia: anonTemplate.allowMedia })
+    const trimmed = trimCardToTier(cardObject, 'classic', { type: studioType, pollData, triviaData, chainData })
     setCardObject(trimmed.cardObject)
     if (studioType === 'poll') setPollData(trimmed.pollData)
     if (studioType === 'trivia') setTriviaData(trimmed.triviaData)
     if (studioType === 'chain') setChainData(trimmed.chainData)
-    if (studioType === 'anonymous') setAnonTemplate(prev => ({ ...prev, allowMedia: trimmed.allowAnonMedia }))
     await handleSend({
       cardObject: trimmed.cardObject,
       pollData: trimmed.pollData,
       triviaData: trimmed.triviaData,
       chainData: trimmed.chainData,
-      allowAnonMedia: trimmed.allowAnonMedia,
       tier: 'classic',
     })
   }
@@ -2615,20 +2612,6 @@ function CardStudio() {
             </p>
           )}
 
-          <div className="cs-sub-section">
-            <label className="cs-field cs-toggle-field">
-              <span>Allow voice &amp; photo replies <TierPip tier="elite" compact /></span>
-              <input
-                type="checkbox"
-                checked={!!anonTemplate.allowMedia}
-                onChange={(e) => setAnonTemplate((prev) => ({ ...prev, allowMedia: e.target.checked }))}
-              />
-            </label>
-            <p className="cs-hint">
-              Whoever replies to this card can record a short voice note or attach a photo/video,
-              alongside their text message.
-            </p>
-          </div>
         </>
       )
     }
@@ -4156,7 +4139,6 @@ function CardStudio() {
           pollData={pollData}
           triviaData={triviaData}
           anonTemplate={anonTemplate}
-          allowAnonMedia={!!anonTemplate.allowMedia}
           onClose={() => {
             setShowPreview(false)
             setActiveEditEl(null)

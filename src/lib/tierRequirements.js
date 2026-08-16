@@ -331,11 +331,6 @@ const RULES = [
     test: (c, ctx) => (ctx.chainData?.rules?.length || 0) > 5,
     trim: (c, ctx) => { if (ctx.chainData?.rules) ctx.chainData.rules = ctx.chainData.rules.slice(0, 5) },
   },
-  {
-    id: 'anonMedia', label: 'Voice & photo replies', tier: 'elite',
-    test: (c, ctx) => !!ctx.allowAnonMedia,
-    trim: (c, ctx) => { ctx.allowAnonMedia = false },
-  },
   // ── premium (personal only — escalates to elite for every other type) ──
   {
     id: 'ambient', label: 'Ambient effect', tier: 'premium',
@@ -386,9 +381,9 @@ function labelFor(rule, card, ctx) {
  * Artists are informational-only (always shown as elite/unlocked, never
  * charged — their flow is Publish, not Send).
  */
-export function computeCardTier(cardObject, { type = 'personal', pollData = null, triviaData = null, chainData = null, isArtist = false, allowAnonMedia = false } = {}) {
+export function computeCardTier(cardObject, { type = 'personal', pollData = null, triviaData = null, chainData = null, isArtist = false } = {}) {
   if (isArtist) return { tier: 'elite', reasons: [] }
-  const ctx = { type, pollData, triviaData, chainData, allowAnonMedia }
+  const ctx = { type, pollData, triviaData, chainData }
   const reasons = RULES
     .filter((r) => safeTest(r, cardObject, ctx))
     .map((r) => ({
@@ -408,14 +403,13 @@ export function computeCardTier(cardObject, { type = 'personal', pollData = null
  * that computes to `targetTier` or below, plus the list of what got removed
  * — powers "Trim extras & send free" in the send receipt.
  */
-export function trimCardToTier(cardObject, targetTier, { type = 'personal', pollData = null, triviaData = null, chainData = null, allowAnonMedia = false } = {}) {
+export function trimCardToTier(cardObject, targetTier, { type = 'personal', pollData = null, triviaData = null, chainData = null } = {}) {
   const clonedCard = structuredClone(cardObject)
   const ctx = {
     type,
     pollData: pollData ? structuredClone(pollData) : null,
     triviaData: triviaData ? structuredClone(triviaData) : null,
     chainData: chainData ? structuredClone(chainData) : null,
-    allowAnonMedia,
   }
   const removed = []
   const targetRank = TIER_RANK[targetTier] ?? 0
@@ -444,7 +438,6 @@ export function trimCardToTier(cardObject, targetTier, { type = 'personal', poll
     pollData: ctx.pollData,
     triviaData: ctx.triviaData,
     chainData: ctx.chainData,
-    allowAnonMedia: ctx.allowAnonMedia,
     removed,
   }
 }

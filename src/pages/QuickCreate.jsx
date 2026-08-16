@@ -131,7 +131,6 @@ function QuickCreate() {
 
   // Anonymous
   const [anonMessage, setAnonMessage] = useState('')
-  const [anonAllowMedia, setAnonAllowMedia] = useState(false)
 
   const [images, setImages] = useState([])
   const [isDragOver, setIsDragOver] = useState(false)
@@ -222,8 +221,8 @@ function QuickCreate() {
   const pollDataForTier = useMemo(() => ({ options: pollOptions }), [pollOptions])
   const triviaDataForTier = useMemo(() => ({ questions: [{ options: triviaOptions }] }), [triviaOptions])
   const tierRequirement = useMemo(
-    () => computeCardTier(builtCardObject, { type: cardType, pollData: pollDataForTier, triviaData: triviaDataForTier, chainData: null, allowAnonMedia: anonAllowMedia }),
-    [builtCardObject, cardType, pollDataForTier, triviaDataForTier, anonAllowMedia],
+    () => computeCardTier(builtCardObject, { type: cardType, pollData: pollDataForTier, triviaData: triviaDataForTier, chainData: null }),
+    [builtCardObject, cardType, pollDataForTier, triviaDataForTier],
   )
   const cardTier = tierRequirement.tier
   // 3.2: base type/tier cost + additive feature surcharges -- mirrors
@@ -342,7 +341,7 @@ function QuickCreate() {
         poll: pollData,
         chain: chainData,
         trivia: triviaData,
-        anonTemplate: cardType === 'anonymous' ? { allowMedia: anonAllowMedia } : undefined,
+        anonTemplate: cardType === 'anonymous' ? {} : undefined,
       })
 
       if (!result.ok) {
@@ -724,15 +723,6 @@ function QuickCreate() {
                     />
                   </div>
                   <p className="qc-type-hint">Replies are completely anonymous — no names, no tracking.</p>
-                  <label className="qc-toggle-field">
-                    <span>Allow voice &amp; photo replies <TierPip tier="elite" compact /></span>
-                    <input
-                      type="checkbox"
-                      checked={anonAllowMedia}
-                      onChange={e => setAnonAllowMedia(e.target.checked)}
-                    />
-                  </label>
-                  <p className="qc-type-hint">Whoever replies can record a short voice note or attach a photo/video.</p>
                 </div>
               )}
             </section>

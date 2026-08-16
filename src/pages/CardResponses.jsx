@@ -118,15 +118,9 @@ function AnonInboxView({ state, content }) {
             <div key={r.id || i} className="cr-anon-item">
               <div className="cr-anon-avatar">A</div>
               <div className="cr-anon-content">
+                {/* 4.2: anonymous is text-only -- media/voice are no longer
+                    rendered even for older messages that still have them. */}
                 <p className="cr-anon-text">{r.text || r.message || '—'}</p>
-                {r.voice?.url && (
-                  <audio className="cr-anon-voice" src={r.voice.url} controls preload="none" />
-                )}
-                {r.media?.url && (
-                  r.media.type === 'video'
-                    ? <video className="cr-anon-media" src={r.media.url} controls preload="none" />
-                    : <img className="cr-anon-media" src={r.media.url} alt="" onClick={() => window.open(r.media.url, '_blank')} />
-                )}
                 <span className="cr-anon-time">{timeSince(r.timestamp || r.createdAt)}</span>
               </div>
             </div>

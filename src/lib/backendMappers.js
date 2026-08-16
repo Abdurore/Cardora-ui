@@ -475,7 +475,7 @@ function isLightColor(hex) {
  * (stripUnknown: true). Gift attachment data travels via the separate
  * giftAttachment field created by POST /cards/attach-gift.
  */
-export function cardObjectToLayoutData(cardObject = null, { allowAnonMedia = false } = {}) {
+export function cardObjectToLayoutData(cardObject = null) {
   const layoutdata = {
     paperTexture: {
       type: 'none',
@@ -505,10 +505,6 @@ export function cardObjectToLayoutData(cardObject = null, { allowAnonMedia = fal
       // to 0 on every reload/send — the slider reset to fully opaque no
       // matter what the sender picked.
       backgroundOpacity: cardObject.card?.backgroundOpacity,
-      // Elite-only opt-in: lets an anonymous card's responders attach a
-      // voice note or photo/video. Read server-side by
-      // submitAnonymousMessage to gate whether those fields are kept.
-      allowAnonMedia: allowAnonMedia || undefined,
       // The lock gate's hint text (e.g. "ask me for the password") — backend
       // enhancements.lock only carries {type, value}, no hint field, so this
       // was previously never sent at all: it showed correctly in the
@@ -569,7 +565,6 @@ export function cardObjectToBackendPayload(cardObject, {
   poll = null,
   trivia = null,
   chain = null,
-  allowAnonMedia = false,
 } = {}) {
   const FB = { background: '#0b0f12', gradient: ['#76efff', '#62ffa2'], accent: '#76efff' }
 
@@ -845,7 +840,7 @@ export function cardObjectToBackendPayload(cardObject, {
 
   // Include layoutdata for paper texture metadata.
   // The backend stores layoutdata and returns it with GET /cards/:slug.
-  const layoutdata = cardObjectToLayoutData(cardObject, { allowAnonMedia: type === 'anonymous' && tier === 'elite' && allowAnonMedia })
+  const layoutdata = cardObjectToLayoutData(cardObject)
 
   const payload = {
     config: { colors, font, content },

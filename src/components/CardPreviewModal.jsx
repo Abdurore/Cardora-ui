@@ -9,9 +9,7 @@ import { shouldShowEnvelope } from '../lib/tierLimits.js'
 import { prefersReducedMotion, getMotionIntensity } from '../lib/deviceCapability.js'
 import { useDepthMotion } from '../lib/useDepthMotion.js'
 import { claimGiftFromCard } from '../lib/api.js'
-import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
-import VoiceRecorder from './VoiceRecorder.jsx'
 
 // Code-split: three.js is a large dependency and must never load for a card
 // that doesn't use the galaxy.
@@ -67,7 +65,6 @@ function CardPreviewModal({
   pollData = null,
   triviaData = null,
   anonTemplate = null,
-  allowAnonMedia = false,
   pageMode = false,
   cardTitle = '',
   onPollSubmit = null,
@@ -404,9 +401,6 @@ function CardPreviewModal({
     }
     setReactionPending(false)
   }
-  const [anonVoice, setAnonVoice] = useState(null) // { blob, duration } | null
-  const [anonMediaFile, setAnonMediaFile] = useState(null) // File | null
-  const [anonMediaPreviewUrl, setAnonMediaPreviewUrl] = useState('')
   const [anonUploadError, setAnonUploadError] = useState('')
 
   // Chain reply state (pageMode only)
@@ -781,9 +775,6 @@ function CardPreviewModal({
     setAnonMessage('')
     setAnonSubmitting(false)
     setAnonSubmitted(false)
-    setAnonVoice(null)
-    setAnonMediaFile(null)
-    setAnonMediaPreviewUrl(url => { if (url) URL.revokeObjectURL(url); return '' })
     setAnonUploadError('')
     setChainMessage('')
     setChainSubmitting(false)
@@ -2024,46 +2015,7 @@ function CardPreviewModal({
                     {anonMessage.length} / 500
                   </div>
 
-                  {allowAnonMedia && (
-                    <div className="cp-anon-media-attach">
-                      <VoiceRecorder
-                        accentColor={c.theme.accentColor}
-                        disabled={anonSubmitting}
-                        onChange={setAnonVoice}
-                      />
-                      {anonMediaPreviewUrl ? (
-                        <div className="cp-anon-media-preview">
-                          {anonMediaFile?.type?.startsWith('video/')
-                            ? <video src={anonMediaPreviewUrl} muted controls style={{ maxHeight: 120 }} />
-                            : <img src={anonMediaPreviewUrl} alt="" style={{ maxHeight: 120 }} />}
-                          <button
-                            type="button"
-                            className="cp-anon-media-remove"
-                            onClick={() => { setAnonMediaFile(null); setAnonMediaPreviewUrl(url => { URL.revokeObjectURL(url); return '' }) }}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="cp-anon-media-picker" style={{ borderColor: `${c.theme.accentColor}40`, color: c.card.textColor }}>
-                          + Attach a photo or video
-                          <input
-                            type="file"
-                            accept="image/*,video/*"
-                            hidden
-                            disabled={anonSubmitting}
-                            onChange={e => {
-                              const file = e.target.files?.[0]
-                              if (!file) return
-                              setAnonMediaFile(file)
-                              setAnonMediaPreviewUrl(URL.createObjectURL(file))
-                            }}
-                          />
-                        </label>
-                      )}
-                      {anonUploadError && <p className="cp-submit-error" style={{ color: c.card.textColor }}>{anonUploadError}</p>}
-                    </div>
-                  )}
+                  {anonUploadError && <p className="cp-submit-error" style={{ color: c.card.textColor }}>{anonUploadError}</p>}
 
                   <button
                     className="cp-continue-btn visible"
@@ -2074,20 +2026,11 @@ function CardPreviewModal({
                       setAnonSubmitting(true)
                       setAnonUploadError('')
                       try {
-                        const extras = {}
-                        if (anonVoice?.blob) {
-                          // Audio uploads as Cloudinary's 'video' resource type —
-                          // it streams audio-only files more efficiently than 'raw'.
-                          extras.voice = { url: await uploadToCloudinary(anonVoice.blob, 'video'), duration: anonVoice.duration }
-                        }
-                        if (anonMediaFile) {
-                          const url = await uploadToCloudinary(anonMediaFile, anonMediaFile.type.startsWith('video/') ? 'video' : 'image')
-                          extras.media = { type: anonMediaFile.type.startsWith('video/') ? 'video' : 'image', url }
-                        }
-                        if (onAnonSubmit) await onAnonSubmit(anonMessage.trim(), extras)
+                        // 4.2: anonymous is text-only -- no voice/media extras.
+                        if (onAnonSubmit) await onAnonSubmit(anonMessage.trim())
                         setAnonSubmitted(true)
                       } catch (err) {
-                        setAnonUploadError(err?.message || 'Could not send your attachment. Try again, or send without it.')
+                        setAnonUploadError(err?.message || 'Could not send your message. Try again.')
                       }
                       setAnonSubmitting(false)
                     }}
