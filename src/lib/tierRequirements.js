@@ -20,12 +20,41 @@ export const TIER_RANK = { classic: 0, premium: 1, elite: 2 }
 // Same fallback pricing table CardStudio/QuickCreate already hardcode —
 // dedupe: both should import TIER_COST_BY_TYPE from here instead of keeping
 // their own copies.
+// 3.2: every type now has a real premium rung -- mirrors
+// Backend/Cardora/src/cards/constants.js CARD_COSTS exactly. Premium used
+// to be personal-only (every other type auto-escalated straight to elite);
+// that restriction is gone on both sides.
 export const TIER_COST_BY_TYPE = {
-  personal: { classic: 0, premium: 25, elite: 35 },
-  poll: { classic: 0, premium: null, elite: 35 },
-  trivia: { classic: 0, premium: null, elite: 50 },
-  chain: { classic: 0, premium: null, elite: 40 },
-  anonymous: { classic: 0, premium: null, elite: 45 },
+  personal: { classic: 0, premium: 10, elite: 20 },
+  poll: { classic: 0, premium: 8, elite: 16 },
+  trivia: { classic: 0, premium: 8, elite: 16 },
+  chain: { classic: 0, premium: 8, elite: 16 },
+  anonymous: { classic: 0, premium: 6, elite: 12 },
+}
+
+// Additive surcharges on top of the base type/tier cost above -- mirrors
+// Backend/Cardora/src/cards/constants.js FEATURE_SURCHARGES exactly. Kept
+// as a fallback the same way TIER_COST_BY_TYPE is: normalizeFeatureSurcharges
+// prefers the live GET /cards/prices response when available.
+export const FEATURE_SURCHARGES_FALLBACK = {
+  additionalPhoto: 1, // per photo beyond the first
+  music: 2,
+  premiumTheme: 2,
+  lock: 2,
+  questionBlock: 2,
+  galaxyExperience: 8,
+}
+
+export function normalizeFeatureSurcharges(payload) {
+  const source = payload?.featureSurcharges || payload?.data?.featureSurcharges || {}
+  const normalized = { ...FEATURE_SURCHARGES_FALLBACK }
+  for (const key of Object.keys(normalized)) {
+    const rawValue = source[key]
+    if (rawValue !== undefined && rawValue !== null && rawValue !== '') {
+      normalized[key] = Number(rawValue)
+    }
+  }
+  return normalized
 }
 
 // Normalizes a `getCardPrices()` API response against the fallback table —
@@ -49,6 +78,55 @@ export function normalizeCardPrices(payload) {
 export function getTierCost(tier, type, cardPrices) {
   const table = cardPrices?.[type] || cardPrices?.personal || TIER_COST_BY_TYPE[type] || TIER_COST_BY_TYPE.personal
   return table?.[tier] ?? 0
+}
+
+// 3.2: additive surcharges on top of the base tier cost. Mirrors
+// Backend/Cardora/src/cards/engine.js computeFeatureSurcharges exactly —
+// same six triggers, same "first photo free" rule, same font-based proxy
+// for "premium theme" (the backend can't see ambient effects/borders/
+// palette id, only the plain config.font string, so that's the one part of
+// this bundled concept checked on both sides). Keep the two in sync.
+export function computeFeatureSurcharges(cardObject, ctx = {}, featureSurcharges = FEATURE_SURCHARGES_FALLBACK) {
+  const breakdown = []
+  let total = 0
+  const add = (id, label, amount) => {
+    if (amount <= 0) return
+    breakdown.push({ id, label, amount })
+    total += amount
+  }
+
+  const photoCount = cardObject?.media?.images?.length || 0
+  if (photoCount > 1) {
+    const extra = photoCount - 1
+    add('additionalPhoto', `${extra} extra photo${extra === 1 ? '' : 's'}`, extra * featureSurcharges.additionalPhoto)
+  }
+  if (nonEmpty(cardObject?.background?.music?.url)) {
+    add('music', 'Background music', featureSurcharges.music)
+  }
+  if (fontTier(cardObject?.theme?.fontFamily) === 'premium') {
+    add('premiumTheme', 'Premium theme', featureSurcharges.premiumTheme)
+  }
+  if ((cardObject?.interaction?.lock?.type || 'none') !== 'none') {
+    add('lock', 'Card lock', featureSurcharges.lock)
+  }
+  if ((ctx.type || 'personal') === 'personal' && nonEmpty(cardObject?.questions?.items?.[0]?.text)) {
+    add('questionBlock', 'Question block', featureSurcharges.questionBlock)
+  }
+  if (cardObject?.experience?.type === 'galaxy') {
+    add('galaxyExperience', 'Galaxy experience', featureSurcharges.galaxyExperience)
+  }
+
+  return { total, breakdown }
+}
+
+// The full amount the sender will actually be charged: base type/tier cost
+// + feature surcharges. The backend is still the source of truth at charge
+// time (cardController.js's getCardTotalCost) -- this is what the live tier
+// meter/send receipt show so the two never visibly disagree.
+export function getCardTotalCost(cardObject, tier, type, cardPrices, ctx = {}, featureSurcharges = FEATURE_SURCHARGES_FALLBACK) {
+  const base = getTierCost(tier, type, cardPrices)
+  const { total } = computeFeatureSurcharges(cardObject, { ...ctx, type }, featureSurcharges)
+  return base + total
 }
 
 const AMBIENT_TIER = AMBIENT_EFFECTS.reduce((map, e) => {
@@ -316,10 +394,10 @@ export function computeCardTier(cardObject, { type = 'personal', pollData = null
     .map((r) => ({
       id: r.id,
       label: labelFor(r, cardObject, ctx),
-      // Premium only exists for personal cards — every other type escalates
-      // straight to elite (matches MainLayout.handleCreateCard's own
-      // premium→elite normalization for non-personal types).
-      tier: r.tier === 'premium' && type !== 'personal' ? 'elite' : r.tier,
+      // 3.2: premium used to be personal-only, so every other type escalated
+      // straight to elite. Every type now has a real premium rung, so a
+      // rule's own tier is used as-is.
+      tier: r.tier,
     }))
   const tier = reasons.reduce((t, r) => (TIER_RANK[r.tier] > TIER_RANK[t] ? r.tier : t), 'classic')
   return { tier, reasons }
@@ -348,13 +426,13 @@ export function trimCardToTier(cardObject, targetTier, { type = 'personal', poll
   for (let pass = 0; pass < 3; pass++) {
     let changed = false
     for (const r of RULES) {
-      const effectiveTier = r.tier === 'premium' && type !== 'personal' ? 'elite' : r.tier
-      if (TIER_RANK[effectiveTier] <= targetRank) continue
+      // 3.2: no more premium -> elite escalation for non-personal types.
+      if (TIER_RANK[r.tier] <= targetRank) continue
       if (!safeTest(r, clonedCard, ctx)) continue
       const label = labelFor(r, clonedCard, ctx)
       r.trim(clonedCard, ctx)
       if (!safeTest(r, clonedCard, ctx)) {
-        removed.push({ id: r.id, label, tier: effectiveTier })
+        removed.push({ id: r.id, label, tier: r.tier })
         changed = true
       }
     }

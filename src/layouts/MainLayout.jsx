@@ -899,9 +899,9 @@ function MainLayout() {
   const handleCreateCard = async (cardObject, { type, poll, chain, trivia, tier, anonTemplate } = {}) => {
     try {
       const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : (anonTemplate ? 'anonymous' : type)
-      // Premium is personal-only — upgrade poll/chain/trivia/anon to elite instead
-      const rawTier = (tier || 'classic').toLowerCase()
-      const resolvedTier = (rawTier === 'premium' && resolvedType !== 'personal') ? 'elite' : rawTier
+      // 3.2: every type now has a real premium rung — no more auto-upgrade
+      // to elite for non-personal premium touches.
+      const resolvedTier = (tier || 'classic').toLowerCase()
 
       const backendPayload = cardObjectToBackendPayload(cardObject, {
         type: resolvedType,
@@ -971,14 +971,23 @@ function MainLayout() {
       }
 
       // Backend validation rules (confirmed from actual 400 responses):
-      // - /create-card/{tier} (personal): type REQUIRED, tier FORBIDDEN in body
-      // - /create-card/{type}/{tier} (typed): type FORBIDDEN, tier FORBIDDEN in body
-      const payload = isPersonal
-        ? { type: 'personal', ...finalPayload }
+      // - /create-card/{classic|premium|elite}: type REQUIRED, tier FORBIDDEN in body
+      // - /create-card/{type}/{classic|elite}: type FORBIDDEN, tier FORBIDDEN in body
+      // 3.2: every type now has a real premium rung, but the per-type forced
+      // routes (poll/chain/trivia/anonymous) only ever had classic/elite
+      // variants — there is no /create-card/poll/premium etc. Premium at any
+      // type routes through the generic /create-card/premium instead, which
+      // requires `type` in the body (unlike the classic/elite forced-type
+      // routes, which forbid it).
+      const needsExplicitType = isPersonal || resolvedTier === 'premium'
+      const payload = needsExplicitType
+        ? { type: resolvedType, ...finalPayload }
         : finalPayload
 
       let response
-      if (resolvedType === 'poll') {
+      if (resolvedTier === 'premium') {
+        response = await createCardPremium(payload)
+      } else if (resolvedType === 'poll') {
         response = resolvedTier === 'elite'
           ? await createCardPollElite(payload)
           : await createCardPollClassic(payload)
@@ -991,13 +1000,13 @@ function MainLayout() {
           ? await createCardTriviaElite(payload)
           : await createCardTriviaClassic(payload)
       } else if (resolvedType === 'anonymous') {
-        response = resolvedTier === 'classic'
-          ? await createCardAnonClassic(payload)
-          : await createCardAnonElite(payload)
+        response = resolvedTier === 'elite'
+          ? await createCardAnonElite(payload)
+          : await createCardAnonClassic(payload)
+      } else if (resolvedTier === 'elite') {
+        response = await createCardElite(payload)
       } else {
-        if (resolvedTier === 'elite') response = await createCardElite(payload)
-        else if (resolvedTier === 'premium') response = await createCardPremium(payload)
-        else response = await createCardClassic(payload)
+        response = await createCardClassic(payload)
       }
 
       return { ok: true, data: response, message: getResponseMessage(response, 'Card created!') }

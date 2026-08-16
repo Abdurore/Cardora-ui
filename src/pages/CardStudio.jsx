@@ -28,7 +28,7 @@ import { PALETTES, getPalettesForTier, applyPalette } from '../lib/palettes.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import InlineColorPicker from '../components/InlineColorPicker.jsx'
 import { GiftIcon } from '../components/GiftCard.jsx'
-import { computeCardTier, trimCardToTier, getTierCost, normalizeCardPrices, TIER_COST_BY_TYPE, fontTier } from '../lib/tierRequirements.js'
+import { computeCardTier, trimCardToTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, TIER_COST_BY_TYPE, fontTier } from '../lib/tierRequirements.js'
 import TierMeter from '../components/TierMeter.jsx'
 import TierPip from '../components/TierPip.jsx'
 import SendReceipt from '../components/SendReceipt.jsx'
@@ -339,6 +339,7 @@ function CardStudio() {
   const [searchParams] = useSearchParams()
   const { currentUser, publishTemplate, updateMarketplaceTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, consumeGift, inventory = [] } = useOutletContext() || {}
   const [cardPrices, setCardPrices] = useState(TIER_COST_BY_TYPE)
+  const [featureSurcharges, setFeatureSurcharges] = useState(() => normalizeFeatureSurcharges(null))
   // Scales the Studio's own live-preview ambient particles the same way
   // CardPreviewModal scales the recipient's — otherwise a weak device got a
   // full-intensity particle canvas while editing even though the send-side
@@ -401,7 +402,10 @@ function CardStudio() {
     ;(async () => {
       try {
         const payload = await getCardPrices()
-        if (mounted) setCardPrices(normalizeCardPrices(payload))
+        if (mounted) {
+          setCardPrices(normalizeCardPrices(payload))
+          setFeatureSurcharges(normalizeFeatureSurcharges(payload))
+        }
       } catch (error) {
         console.warn('Card pricing load failed; using bundled fallback prices.', error)
       }
@@ -665,7 +669,16 @@ function CardStudio() {
   )
   const studioTier = tierRequirement.tier
   const tierLabel = TIER_LABELS[studioTier] || 'Classic'
-  const tierCost = getTierCost(studioTier, studioType, cardPrices)
+  // 3.2: base type/tier cost + additive feature surcharges (music, Galaxy,
+  // lock, question block, extra photos, premium-tier font) -- mirrors what
+  // the backend actually charges at creation (cardController.js's
+  // getCardTotalCost), fetched live via featureSurcharges rather than
+  // hardcoded so the two can't drift.
+  const tierCost = getCardTotalCost(cardObject, studioTier, studioType, cardPrices, { type: studioType }, featureSurcharges)
+  const featureSurchargeBreakdown = useMemo(
+    () => computeFeatureSurcharges(cardObject, { type: studioType }, featureSurcharges).breakdown,
+    [cardObject, studioType, featureSurcharges],
+  )
   // What CardPreviewModal should simulate for the recipient — unlike the
   // studio's own always-elite editing caps (`tierLimits` above), this must
   // reflect the tier the card will actually send at.
@@ -1088,7 +1101,9 @@ function CardStudio() {
     const sourceChain = overrides.chainData || chainData
     const sourceAllowAnonMedia = overrides.allowAnonMedia ?? anonTemplate.allowMedia
     const sourceTier = overrides.tier || studioTier
-    const sourceCost = overrides.tier ? getTierCost(overrides.tier, studioType, cardPrices) : tierCost
+    const sourceCost = overrides.tier
+      ? getCardTotalCost(overrides.cardObject || cardObject, overrides.tier, studioType, cardPrices, { type: studioType }, featureSurcharges)
+      : tierCost
     if (sourceCost > 0 && (balance ?? 0) < sourceCost) {
       setSendResult({ ok: false, message: `You need ${sourceCost} CC to send this card. Your balance: ${balance ?? 0} CC.` })
       return
@@ -4368,6 +4383,8 @@ function CardStudio() {
                 reasons={tierRequirement.reasons}
                 tier={studioTier}
                 cost={tierCost}
+                tierFloor={getTierCost(studioTier, studioType, cardPrices)}
+                surcharges={featureSurchargeBreakdown}
                 balance={balance ?? 0}
                 sending={isSending}
                 onSend={handleConfirmSend}

@@ -9,6 +9,15 @@ function SendReceipt({
   reasons = [],
   tier = 'classic',
   cost = 0,
+  // 3.2: base type/tier price this card's reasons put it at — `cost` is the
+  // full charge (tierFloor + sum of surcharges), kept separate so the
+  // receipt can show the floor as its own line rather than implying the
+  // tier alone explains the whole total.
+  tierFloor = 0,
+  // [{ id, label, amount }] — additive per-feature surcharges on top of
+  // tierFloor (background music, Galaxy, lock, question block, extra
+  // photos, premium-tier font). See src/lib/tierRequirements.js.
+  surcharges = [],
   balance = 0,
   sending = false,
   onSend,
@@ -66,6 +75,21 @@ function SendReceipt({
         </ul>
       ) : (
         <p className="cs-send-confirm-note">No premium touches — this card is free to send.</p>
+      )}
+
+      {cost > 0 && (
+        <ul className="cs-send-receipt-lineitems">
+          <li>
+            <span>{tierLabel} card</span>
+            <span>{tierFloor > 0 ? `${tierFloor} CC` : 'Free'}</span>
+          </li>
+          {surcharges.map((s) => (
+            <li key={s.id}>
+              <span>{s.label}</span>
+              <span>+{s.amount} CC</span>
+            </li>
+          ))}
+        </ul>
       )}
 
       <div className="cs-send-receipt-total">

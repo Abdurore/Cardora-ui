@@ -36,7 +36,7 @@ React 19 + Vite SPA, no state library and no TypeScript. Three things carry the 
 
 ### Card creation path
 
-`CardStudio` / `QuickCreate` → `createCardOnBackend(cardObject, { type, poll, chain, trivia, tier })` in MainLayout → resolves type/tier (premium is personal-only, so non-personal premium is upgraded to elite) → `cardObjectToBackendPayload` → client-side Joi-mirroring validation → picks one of the ~12 `createCard*` endpoint functions. Recipient side: `CardView.jsx` fetches by slug, maps via `mapBackendCard`, and renders through the same `CardPreviewModal` the Studio previews with — server-side vote/answer state comes from the render model's `interaction` block, kept in separate state from the card.
+`CardStudio` / `QuickCreate` → `createCardOnBackend(cardObject, { type, poll, chain, trivia, tier })` in MainLayout → resolves type/tier (every type has a real premium rung now — 3.2 — so premium routes through the generic `/create-card/premium` for every type except when classic/elite can use a forced-type route) → `cardObjectToBackendPayload` → client-side Joi-mirroring validation → picks one of the ~12 `createCard*` endpoint functions. Recipient side: `CardView.jsx` fetches by slug, maps via `mapBackendCard`, and renders through the same `CardPreviewModal` the Studio previews with — server-side vote/answer state comes from the render model's `interaction` block, kept in separate state from the card.
 
 ### Rendering, motion, performance
 
@@ -61,7 +61,8 @@ The Studio (`src/pages/CardStudio.jsx`) and Quick Create (`src/pages/QuickCreate
 **Single source of truth**: `src/lib/tierRequirements.js`.
 - `computeCardTier(cardObject, { type, pollData, triviaData, chainData, isArtist })` → `{ tier, reasons }`. Data-driven rule registry — every rule mirrors a real backend gate (`Backend/Cardora/src/cards/engine.js` `assertNoInvalidEnhancements`, or a `tierLimits.js` cap). Artists always compute `elite` with no cost (informational only — their flow is Publish, not Send).
 - `trimCardToTier(cardObject, targetTier, ctx)` → deep-cloned, stripped-down `{ cardObject, pollData, triviaData, chainData, removed }`. Powers "Trim extras & send free."
-- `getTierCost` / `normalizeCardPrices` / `TIER_COST_BY_TYPE` — shared pricing, fetched live via `getCardPrices()` with the same fallback table CardStudio and QuickCreate both import from here (don't re-duplicate it in either page).
+- `getTierCost` / `normalizeCardPrices` / `TIER_COST_BY_TYPE` — the base type/tier price, fetched live via `getCardPrices()` with the same fallback table CardStudio and QuickCreate both import from here (don't re-duplicate it in either page).
+- `getCardTotalCost` / `computeFeatureSurcharges` / `normalizeFeatureSurcharges` / `FEATURE_SURCHARGES_FALLBACK` (3.2) — the *actual* charge is the base cost above **plus** additive surcharges for specific features (music, Galaxy, lock, question block, extra photos beyond the first, a premium-tier font). `getCardTotalCost` is what CardStudio/QuickCreate actually use for the displayed/charged total now — `getTierCost` alone is the tier floor only, not what gets charged. Mirrors `Backend/Cardora/src/cards/engine.js`'s `getCardTotalCost`/`computeFeatureSurcharges` exactly; keep both in sync.
 
 **Gotchas already handled — don't reintroduce them:**
 - A blank draft's starting colors depend on the *viewer's own* site theme at creation time (CardStudio seeds light-mode-friendly colors when the studio itself is in light mode). `hasCustomColors`/`envelopeDeviates` in tierRequirements.js compare against **both** the dark and light untouched baselines — comparing against only one, or against mere truthiness, flags every fresh card as "hand-picked colors" (this shipped as a real bug once already).
@@ -110,24 +111,41 @@ Per `cards/schema.js`'s `baseCreateSchema`, these top-level fields are valid —
 |---|---|---|
 | `POST /create-card` | required | required |
 | `POST /create-card/classic` | required | forced to `classic` (defaulted; omit it) |
-| `POST /create-card/premium` | required | forced to `premium` — personal only! |
+| `POST /create-card/premium` | required | forced to `premium` — every type, not personal-only (3.2) |
 | `POST /create-card/elite` | required | forced to `elite` (defaulted; omit it) |
 | `POST /create-card/anonymous` | forced to `anonymous` | forced to `elite` |
 | `POST /create-card/{poll\|chain\|trivia\|anonymous}/{classic\|elite}` | forced to match the path | forced to match the path |
 
 "Forced" means defaulted-if-omitted and validated-if-sent (see above) — not `Joi.forbidden()`.
 
-### Card type/tier matrix (from `CARD_COSTS`)
+**No `/create-card/{type}/premium` route exists** for poll/chain/trivia/anonymous — those forced-type routes only ever had classic/elite variants. A premium poll/chain/trivia/anonymous card goes through the generic `POST /create-card/premium` instead, with `type` included in the body (that route requires it, unlike the forced-type routes above which forbid it) — see `MainLayout.jsx`'s `handleCreateCard`.
+
+### Card type/tier matrix (from `CARD_COSTS`) — 3.2
 
 | Type | classic | premium | elite |
 |---|---|---|---|
-| personal | 0 CC | 25 CC | 35 CC |
-| poll | 0 CC | ❌ | 35 CC |
-| chain | 0 CC | ❌ | 40 CC |
-| trivia | 0 CC | ❌ | 50 CC |
-| anonymous | 0 CC | ❌ | 45 CC |
+| personal | 0 CC | 10 CC | 20 CC |
+| poll | 0 CC | 8 CC | 16 CC |
+| chain | 0 CC | 8 CC | 16 CC |
+| trivia | 0 CC | 8 CC | 16 CC |
+| anonymous | 0 CC | 6 CC | 12 CC |
 
-Premium is **only allowed for personal**. Engine throws if `tier==='premium' && type!=='personal'`.
+Premium is allowed for **every type** — the old personal-only restriction (auto-upgrading any other type's premium touch straight to elite) is gone from both `engine.js`'s `ensureTierAndType` and `MainLayout.jsx`'s `handleCreateCard`.
+
+### Feature surcharges (additive, on top of the tier floor above) — 3.2
+
+| Feature | Surcharge |
+|---|---|
+| Additional photo (each, beyond the first) | 1 CC |
+| Background music | 2 CC |
+| Premium theme (a premium-tier font selected) | 2 CC |
+| Card lock | 2 CC |
+| Question block (personal only) | 2 CC |
+| Galaxy experience | 8 CC |
+| Scheduled send | Free (Phase 6.3, not built yet) |
+| Chain contribution (replying to someone else's chain) | Free (Phase 6.4/6.5, not built yet) |
+
+A card's real charge is `CARD_COSTS[type][tier] + sum(triggered surcharges)` — e.g. an elite personal card with music and a lock costs `20 + 2 + 2 = 24 CC`, not a flat 20 regardless of what's on it. Computed server-side in `cards/engine.js`'s `getCardTotalCost`/`computeFeatureSurcharges` (the actual charge at creation — `cardController.js` uses this, not `getCardCost` alone) and mirrored frontend-side in `src/lib/tierRequirements.js`'s functions of the same name, fed by `GET /cards/prices`'s `featureSurcharges` field. "Premium theme" is checked via `config.font` membership in `PREMIUM_ONLY_FONTS` (`cards/constants.js`) on the backend — the fuller frontend concept (ambient effects, borders, palette id) isn't schema-guaranteed to survive to the backend, so font is the one part of it both sides can agree on.
 
 ### config.colors (3 fields, exact)
 
@@ -171,7 +189,7 @@ Empty strings on required fields = **400 validation error**. Frontend `handleCre
 
 **classic** → MUST be `{}` (or exactly defaults — engine stringifies and compares).
 
-**premium** (personal only) → no `video` background, no music, no openEffect, no media.
+**premium** (every type since 3.2, not personal-only) → no `video` background, no music, no openEffect, no media — these restrictions are a tier behavior, not a type restriction.
 
 **elite** → all enhancements allowed.
 

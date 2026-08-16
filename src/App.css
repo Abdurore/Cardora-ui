@@ -6785,6 +6785,20 @@ a {
   max-height: 220px;
   overflow-y: auto;
 }
+.cs-send-receipt-lineitems {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  padding: 4px 2px;
+}
+.cs-send-receipt-lineitems li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .cs-send-receipt-total,
 .cs-send-receipt-balance {
   display: flex;

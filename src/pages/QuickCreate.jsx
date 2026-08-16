@@ -8,7 +8,7 @@ import { attachGiftToCard, getCardPrices } from '../lib/api.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import { GiftIcon } from '../components/GiftCard.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
-import { computeCardTier, trimCardToTier, getTierCost, normalizeCardPrices, fontTier } from '../lib/tierRequirements.js'
+import { computeCardTier, trimCardToTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, fontTier } from '../lib/tierRequirements.js'
 import TierPip from '../components/TierPip.jsx'
 import TierMeter from '../components/TierMeter.jsx'
 import SendReceipt from '../components/SendReceipt.jsx'
@@ -99,9 +99,14 @@ function QuickCreate() {
   // the hardcoded fallback table only, so a backend price change would
   // silently desync between the two creation flows.
   const [cardPrices, setCardPrices] = useState(null)
+  const [featureSurcharges, setFeatureSurcharges] = useState(() => normalizeFeatureSurcharges(null))
   useEffect(() => {
     let mounted = true
-    getCardPrices().then((payload) => { if (mounted) setCardPrices(normalizeCardPrices(payload)) }).catch(() => {})
+    getCardPrices().then((payload) => {
+      if (!mounted) return
+      setCardPrices(normalizeCardPrices(payload))
+      setFeatureSurcharges(normalizeFeatureSurcharges(payload))
+    }).catch(() => {})
     return () => { mounted = false }
   }, [])
 
@@ -221,7 +226,15 @@ function QuickCreate() {
     [builtCardObject, cardType, pollDataForTier, triviaDataForTier, anonAllowMedia],
   )
   const cardTier = tierRequirement.tier
-  const tierCost = getTierCost(cardTier, cardType, cardPrices)
+  // 3.2: base type/tier cost + additive feature surcharges -- mirrors
+  // CardStudio.jsx's equivalent, both sharing the same tierRequirements.js
+  // functions so Quick Create and the full Studio can never disagree on
+  // what a card costs.
+  const tierCost = getCardTotalCost(builtCardObject, cardTier, cardType, cardPrices, { type: cardType }, featureSurcharges)
+  const featureSurchargeBreakdown = useMemo(
+    () => computeFeatureSurcharges(builtCardObject, { type: cardType }, featureSurcharges).breakdown,
+    [builtCardObject, cardType, featureSurcharges],
+  )
   const trimPreview = useMemo(
     () => (tierCost > 0 ? trimCardToTier(builtCardObject, 'classic', { type: cardType, pollData: pollDataForTier, triviaData: triviaDataForTier, chainData: null }) : null),
     [tierCost, builtCardObject, cardType, pollDataForTier, triviaDataForTier],
@@ -910,6 +923,8 @@ function QuickCreate() {
                 reasons={tierRequirement.reasons}
                 tier={cardTier}
                 cost={tierCost}
+                tierFloor={getTierCost(cardTier, cardType, cardPrices)}
+                surcharges={featureSurchargeBreakdown}
                 balance={bal}
                 sending={isSending}
                 onSend={handleSend}
