@@ -149,22 +149,9 @@ async function request(path, { method = 'GET', body, auth = false, headers = {},
   return payload
 }
 
-async function requestFirstSuccess(paths, options = {}) {
-  let lastError = null
-  for (const path of paths) {
-    try {
-      return await request(path, options)
-    } catch (error) {
-      lastError = error
-      if (!error.status) throw error
-      // Only try the next candidate when the route itself appears absent.
-      // Validation/auth/card-type errors are real backend responses and should
-      // not be hidden by later fallback 404 HTML pages.
-      if (![404, 405].includes(error.status)) throw error
-    }
-  }
-  throw lastError || new Error('Request failed.')
-}
+// requestFirstSuccess (the multi-candidate-path waterfall helper) was
+// removed in Phase 2.3 -- every call site was collapsed to the one real
+// backend path, and this had no remaining callers.
 
 /* ═══════════════════════════════════════════════
    AUTH
@@ -225,11 +212,11 @@ export async function equipProfileBackground(backgroundId, blur = false) {
 }
 
 export async function getProfileBackgrounds() {
-  return requestFirstSuccess([
-    '/profile-backgrounds',
-    '/users/profile-backgrounds',
-    '/admin/profile-backgrounds',
-  ], { auth: true })
+  // Phase 2.3: confirmed real (userRoutes.js registers this exact path,
+  // and a duplicate of it at /users/profile-backgrounds -- picking the
+  // shorter one). /admin/profile-backgrounds is a different, admin-only
+  // CRUD endpoint, not a second listing path for this.
+  return request('/profile-backgrounds', { auth: true })
 }
 
 export async function createProfileBackground(payload) {
@@ -268,56 +255,29 @@ export async function getMyCard(slug) {
   return request(`/cards/${slug}`, { auth: true })
 }
 
+// Phase 2.3: all four of these used to try 4-8 candidate paths each,
+// confirmed against Backend/Cardora/src/routes/cardRoutes.js -- exactly one
+// path is ever registered for any of them (no `/public/cards/...` prefix
+// exists anywhere in the backend, and none of the alternate action-word
+// spellings do either).
 export async function submitCardResponse(slug, body) {
   const hasAuth = !!getStoredToken()
-  return requestFirstSuccess([
-    `/cards/${slug}/response`,
-    `/cards/${slug}/responses`,
-    `/public/cards/${slug}/response`,
-    `/public/cards/${slug}/responses`,
-  ], { method: 'POST', auth: hasAuth, body })
+  return request(`/cards/${slug}/response`, { method: 'POST', auth: hasAuth, body })
 }
 
 export async function submitPollVote(slug, body) {
   const hasAuth = !!getStoredToken()
-  return requestFirstSuccess([
-    `/cards/${slug}/poll-vote`,
-    `/cards/${slug}/poll/vote`,
-    `/cards/${slug}/vote`,
-    `/cards/${slug}/response`,
-    `/public/cards/${slug}/poll-vote`,
-    `/public/cards/${slug}/poll/vote`,
-    `/public/cards/${slug}/vote`,
-    `/public/cards/${slug}/response`,
-  ], { method: 'POST', auth: hasAuth, body })
+  return request(`/cards/${slug}/poll-vote`, { method: 'POST', auth: hasAuth, body })
 }
 
 export async function submitChainReply(slug, body) {
   const hasAuth = !!getStoredToken()
-  return requestFirstSuccess([
-    `/cards/${slug}/chain-reply`,
-    `/cards/${slug}/chain/reply`,
-    `/cards/${slug}/reply`,
-    `/cards/${slug}/response`,
-    `/public/cards/${slug}/chain-reply`,
-    `/public/cards/${slug}/chain/reply`,
-    `/public/cards/${slug}/reply`,
-    `/public/cards/${slug}/response`,
-  ], { method: 'POST', auth: hasAuth, body })
+  return request(`/cards/${slug}/chain-reply`, { method: 'POST', auth: hasAuth, body })
 }
 
 export async function submitTriviaAnswer(slug, body) {
   const hasAuth = !!getStoredToken()
-  return requestFirstSuccess([
-    `/cards/${slug}/trivia-submit`,
-    `/cards/${slug}/trivia/submit`,
-    `/cards/${slug}/trivia-answer`,
-    `/cards/${slug}/response`,
-    `/public/cards/${slug}/trivia-submit`,
-    `/public/cards/${slug}/trivia/submit`,
-    `/public/cards/${slug}/trivia-answer`,
-    `/public/cards/${slug}/response`,
-  ], { method: 'POST', auth: hasAuth, body })
+  return request(`/cards/${slug}/trivia-submit`, { method: 'POST', auth: hasAuth, body })
 }
 
 /* ═══════════════════════════════════════════════
@@ -416,24 +376,25 @@ export async function getAdStats() {
   return request('/ads/stats', { auth: true })
 }
 
+// Phase 2.3: confirmed against Backend/Cardora/src/routes/adRoutes.js and
+// adminRoutes.js -- NONE of the candidates either of these two functions
+// tried ever existed (adRoutes.js only registers /rewarded, /complete,
+// /stats, /enterprise-stats; there is no click/view-tracking route
+// anywhere in the backend, user-facing or admin). Every call from both of
+// these has always 404'd, silently, since both call sites in
+// RewardedAds.jsx swallow the error into a console.warn. This is a real
+// backend gap, not a routing-path guess to fix here -- reduced to one call
+// each (stops five wasted requests becoming one) but left clearly flagged
+// rather than pointed at a URL invented for this pass. Needs either a real
+// click/view-tracking endpoint built on the backend, or these calls (and
+// the enterprise ad-analytics features that would depend on them) removed
+// from the frontend as dead weight.
 export async function clickAd(adId) {
-  return requestFirstSuccess([
-    `/ads/${adId}/click`,
-    `/ads/click`,
-    `/ads/track-click`,
-    `/ads/interaction`,
-    `/admin/ads/${adId}/click`,
-  ], { method: 'POST', auth: true, body: { adId, id: adId, action: 'click' } })
+  return request(`/ads/${adId}/click`, { method: 'POST', auth: true, body: { adId, id: adId, action: 'click' } })
 }
 
 export async function trackAdView(adId) {
-  return requestFirstSuccess([
-    `/ads/${adId}/view`,
-    `/ads/view`,
-    `/ads/track-view`,
-    `/ads/interaction`,
-    `/admin/ads/${adId}/view`,
-  ], { method: 'POST', auth: true, body: { adId, id: adId, action: 'view' } })
+  return request(`/ads/${adId}/view`, { method: 'POST', auth: true, body: { adId, id: adId, action: 'view' } })
 }
 
 /* ═══════════════════════════════════════════════
@@ -656,21 +617,20 @@ export async function disableAdminTemplate(templateId, payload = {}) {
 
 export async function enableAdminTemplate(templateId) {
   const id = encodeURIComponent(templateId)
-  return requestFirstSuccess([
-    `/admin/templates/${id}/enable`,
-    `/admin/templates/${id}/restore`,
-    `/admin/templates/${id}/reenable`,
-  ], { method: 'PATCH', auth: true })
+  // Phase 2.3: confirmed against Backend/Cardora/src/routes/adminRoutes.js
+  // -- /admin/templates/:id/disable exists (disableAdminTemplate, above,
+  // uses it correctly) but there is no enable/restore/reenable counterpart
+  // anywhere in the backend. None of the three candidates this used to try
+  // were ever real. A disabled admin template currently cannot be
+  // re-enabled through this app at all -- reduced to one call (stops three
+  // wasted requests becoming one) but this is a real backend gap, not a
+  // path to guess at here.
+  return request(`/admin/templates/${id}/enable`, { method: 'PATCH', auth: true })
 }
 
 export async function getEnterpriseAdStats() {
-  return requestFirstSuccess([
-    '/ads/enterprise-stats',
-    '/ads/enterprise/stats',
-    '/enterprise/ads/stats',
-    '/enterprise/ads',
-    '/ads/my-stats',
-  ], { auth: true })
+  // Phase 2.3: confirmed real (adRoutes.js registers exactly this path).
+  return request('/ads/enterprise-stats', { auth: true })
 }
 
 export async function reportUser(targetId, reason, details = '') {
