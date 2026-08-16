@@ -853,14 +853,14 @@ function Profile() {
                 <span className="profile-premium-star"><FaCrown size={24} /></span>
                 <div>
                   <h4 className="profile-premium-title">Cardora Premium</h4>
-                  <p className="profile-premium-sub">₦500 / 30 days — double daily CC, exclusive profile backgrounds, streak tracking, and more.</p>
+                  <p className="profile-premium-sub">₦500 / 30 days — exclusive profile backgrounds, streak tracking, no ads, and more.</p>
                 </div>
               </div>
 
               <div className="profile-premium-perks-row">
-                <span className="profile-premium-perk-chip">2x Daily CC</span>
                 <span className="profile-premium-perk-chip">Backgrounds</span>
                 <span className="profile-premium-perk-chip">Streaks</span>
+                <span className="profile-premium-perk-chip">No Ads</span>
                 <span className="profile-premium-perk-chip">Gift Premium</span>
               </div>
 
