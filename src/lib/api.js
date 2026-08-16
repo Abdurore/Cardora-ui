@@ -624,14 +624,9 @@ export async function disableAdminTemplate(templateId, payload = {}) {
 
 export async function enableAdminTemplate(templateId) {
   const id = encodeURIComponent(templateId)
-  // Phase 2.3: confirmed against Backend/Cardora/src/routes/adminRoutes.js
-  // -- /admin/templates/:id/disable exists (disableAdminTemplate, above,
-  // uses it correctly) but there is no enable/restore/reenable counterpart
-  // anywhere in the backend. None of the three candidates this used to try
-  // were ever real. A disabled admin template currently cannot be
-  // re-enabled through this app at all -- reduced to one call (stops three
-  // wasted requests becoming one) but this is a real backend gap, not a
-  // path to guess at here.
+  // 3.7: PATCH /admin/templates/:id/enable now exists (adminController.js's
+  // enableTemplate) -- Phase 2.3 found this endpoint missing entirely; the
+  // fix is folded into 3.7's marketplace-template work per direction.
   return request(`/admin/templates/${id}/enable`, { method: 'PATCH', auth: true })
 }
 
