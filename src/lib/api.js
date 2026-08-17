@@ -316,20 +316,10 @@ export async function giftPremium(username) {
 }
 
 /* ═══════════════════════════════════════════════
-   GIFTS (Flutterwave-backed)
+   GIFTS — purchase/checkout removed (4.1, -> v2 CC-denominated). Attach/
+   claim stay: a card that already has a gift attached still renders and
+   can still be claimed.
    ═══════════════════════════════════════════════ */
-export async function getGiftCatalog() {
-  return request('/gifts/catalog')
-}
-
-export async function createFlutterwaveGiftCheckout(payload) {
-  return request('/gifts/flutterwave/checkout', { method: 'POST', auth: true, body: payload })
-}
-
-export async function verifyGiftPayment(payload) {
-  return request('/gifts/verify-payment', { method: 'POST', auth: true, body: payload })
-}
-
 export async function attachGiftToCard(payload) {
   return request('/cards/attach-gift', { method: 'POST', auth: true, body: payload })
 }
@@ -360,29 +350,6 @@ export async function boostAnonymousInbox(cardId, boostType) {
 
 export async function raiseCardViewCap(cardId) {
   return request(`/cards/${encodeURIComponent(cardId)}/raise-view-cap`, { method: 'POST', auth: true })
-}
-
-/* ═══════════════════════════════════════════════
-   GIFT WALLET / WITHDRAWAL
-   ═══════════════════════════════════════════════ */
-export async function getWalletSummary() {
-  return request('/wallet', { auth: true })
-}
-
-export async function getBanks() {
-  return request('/wallet/banks', { auth: true })
-}
-
-export async function resolveBankAccount(payload) {
-  return request('/wallet/resolve-bank-account', { method: 'POST', auth: true, body: payload })
-}
-
-export async function saveBankDetails(payload) {
-  return request('/wallet/bank-details', { method: 'POST', auth: true, body: payload })
-}
-
-export async function withdrawGiftWallet(payload) {
-  return request('/wallet/withdraw', { method: 'POST', auth: true, body: payload })
 }
 
 /* ═══════════════════════════════════════════════

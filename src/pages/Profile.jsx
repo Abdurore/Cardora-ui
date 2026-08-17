@@ -7,7 +7,6 @@ import { FaCrown } from 'react-icons/fa'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
-import InventoryCard from '../components/InventoryCard.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
 import ShareCardModal from '../components/ShareCardModal.jsx'
@@ -16,18 +15,10 @@ import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
-import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground, getWalletSummary, getBanks, resolveBankAccount, saveBankDetails, withdrawGiftWallet, updateTemplate, getEnterpriseAdStats } from '../lib/api.js'
+import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground, updateTemplate, getEnterpriseAdStats } from '../lib/api.js'
 import { mapTemplateToCard, normalizeCheckoutSession } from '../lib/backendMappers.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
-
-// The gift wallet/withdrawal system is NGN-only (same scope as StoreGifts.jsx's
-// Flutterwave gift pricing) — matches that page's ₦-symbol formatting rather
-// than the multi-currency "NGN 5,000" style used for CC packages in Store.jsx,
-// which genuinely needs a currency code since it also renders USD/EUR/etc.
-function formatNgn(amount) {
-  return '₦' + Number(amount || 0).toLocaleString()
-}
 
 const ROLE_CONFIG = {
   Artist: { badge: 'role-artist', icon: <MdPalette size={16} />, desc: 'Create and publish templates to the marketplace' },
@@ -79,7 +70,6 @@ function Profile() {
     deleteMarketplaceTemplate,
     onCurrencyChange,
     refreshBalance,
-    inventory = [],
   } = useOutletContext()
   const navigate = useNavigate()
   const location = useLocation()
@@ -103,18 +93,6 @@ function Profile() {
   const [editForm, setEditForm] = useState({ name: '', username: '', bio: '' })
   const [editMsg, setEditMsg] = useState({ text: '', ok: false })
   const [isSavingProfile, setIsSavingProfile] = useState(false)
-
-  const [showWallet, setShowWallet] = useState(false)
-  const [walletSummary, setWalletSummary] = useState(null)
-  const [loadingWallet, setLoadingWallet] = useState(false)
-  const [walletMsg, setWalletMsg] = useState({ text: '', ok: false })
-  const [banks, setBanks] = useState([])
-  const [bankForm, setBankForm] = useState({ bankCode: '', accountNumber: '' })
-  const [resolvedAccountName, setResolvedAccountName] = useState('')
-  const [resolvingBank, setResolvingBank] = useState(false)
-  const [savingBank, setSavingBank] = useState(false)
-  const [withdrawAmount, setWithdrawAmount] = useState('')
-  const [withdrawing, setWithdrawing] = useState(false)
 
   const [editingTemplate, setEditingTemplate] = useState(null)
   const [templateEditForm, setTemplateEditForm] = useState({ name: '', category: '', previewImage: '' })
@@ -189,8 +167,6 @@ function Profile() {
   // Favorites resolve against whatever the user has favorited from the live
   // marketplace — no demo-data fallback.
   const favoriteCards = (marketplaceTemplates || []).filter((card) => favorites.includes(card.id))
-  const giftInventory = inventory
-  const giftWalletNgn = currentUser?.giftWalletNgn || 0
   const rawRole = String(currentUser?.role || 'Visitor').trim().toLowerCase()
   const roleName = rawRole.charAt(0).toUpperCase() + rawRole.slice(1)
   const totalCardCount = userCards.length + savedDrafts.length
@@ -336,86 +312,6 @@ function Profile() {
     }
   }
 
-  const loadWalletSummary = async () => {
-    setLoadingWallet(true)
-    try {
-      const [summary, bankList] = await Promise.all([
-        getWalletSummary(),
-        banks.length ? Promise.resolve({ banks }) : getBanks().catch(() => ({ banks: [] })),
-      ])
-      setWalletSummary(summary)
-      if (bankList?.banks?.length) setBanks(bankList.banks)
-    } catch (err) {
-      setWalletMsg({ text: err?.message || 'Could not load your wallet.', ok: false })
-    } finally {
-      setLoadingWallet(false)
-    }
-  }
-
-  const openWallet = () => {
-    setShowWallet(true)
-    setWalletMsg({ text: '', ok: false })
-    loadWalletSummary()
-  }
-
-  const handleResolveBank = async () => {
-    if (!bankForm.bankCode || !bankForm.accountNumber.trim()) {
-      setWalletMsg({ text: 'Choose a bank and enter your account number.', ok: false })
-      return
-    }
-    setResolvingBank(true)
-    setWalletMsg({ text: '', ok: false })
-    try {
-      const res = await resolveBankAccount({ bankCode: bankForm.bankCode, accountNumber: bankForm.accountNumber.trim() })
-      setResolvedAccountName(res?.accountName || '')
-    } catch (err) {
-      setResolvedAccountName('')
-      setWalletMsg({ text: err?.message || 'Could not verify that account.', ok: false })
-    } finally {
-      setResolvingBank(false)
-    }
-  }
-
-  const handleSaveBank = async () => {
-    setSavingBank(true)
-    setWalletMsg({ text: '', ok: false })
-    try {
-      await saveBankDetails({ bankCode: bankForm.bankCode, accountNumber: bankForm.accountNumber.trim() })
-      setWalletMsg({ text: 'Bank account saved.', ok: true })
-      setResolvedAccountName('')
-      setBankForm({ bankCode: '', accountNumber: '' })
-      await loadWalletSummary()
-    } catch (err) {
-      setWalletMsg({ text: err?.message || 'Could not save bank details.', ok: false })
-    } finally {
-      setSavingBank(false)
-    }
-  }
-
-  const handleWithdraw = async () => {
-    const amount = Number(withdrawAmount)
-    const minWithdrawal = walletSummary?.minWithdrawalNgn || 500
-    if (!Number.isFinite(amount) || amount < minWithdrawal) {
-      setWalletMsg({ text: `Minimum withdrawal is ${formatNgn(minWithdrawal)}.`, ok: false })
-      return
-    }
-    if (amount > (walletSummary?.giftWalletNgn || 0)) {
-      setWalletMsg({ text: 'That amount is more than your gift wallet balance.', ok: false })
-      return
-    }
-    setWithdrawing(true)
-    setWalletMsg({ text: '', ok: false })
-    try {
-      const res = await withdrawGiftWallet({ amountNgn: amount })
-      setWalletMsg({ text: res?.message || 'Withdrawal initiated.', ok: true })
-      setWithdrawAmount('')
-      await Promise.all([loadWalletSummary(), refreshBalance?.()])
-    } catch (err) {
-      setWalletMsg({ text: err?.message || 'Withdrawal failed.', ok: false })
-    } finally {
-      setWithdrawing(false)
-    }
-  }
 
   const openTemplateEdit = (card) => {
     setEditingTemplate(card)
@@ -745,17 +641,6 @@ function Profile() {
                     <div className="profile-stat">
                       <strong>{favoriteCards.length}</strong>
                       <span>Saved</span>
-                    </div>
-                    <div className="profile-stat">
-                      <strong>{giftInventory.length}</strong>
-                      <span>Gifts</span>
-                    </div>
-                    <div className="profile-stat profile-stat-clickable" role="button" tabIndex={0}
-                      onClick={openWallet}
-                      onKeyDown={(e) => { if (e.key === 'Enter') openWallet() }}
-                    >
-                      <strong>{formatNgn(giftWalletNgn)}</strong>
-                      <span>Gift Wallet — Withdraw</span>
                     </div>
                   </>
                 )}
@@ -1221,28 +1106,6 @@ function Profile() {
           </div>
         ) : null}
 
-        {/* Gift Inventory — display only. Artists design/publish templates
-            rather than send or receive real gifts, so this section (and the
-            "Buy a gift" flow in the Store) doesn't apply to their account type. */}
-        {!isArtist && (
-          <div>
-            <h4 className="section-title">Gift Inventory</h4>
-            {giftInventory.length ? (
-              <div className="inventory inventory-clean">
-                {giftInventory.map((gift, index) => (
-                  <InventoryCard
-                    key={gift.id || gift.inventoryId || gift._id || `${gift.giftName || gift.name || 'gift'}-${index}`}
-                    {...gift}
-                    variant={`v${(index % 4) + 1}`}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="empty-state">No gifts in your inventory yet.</p>
-            )}
-          </div>
-        )}
-
         {/* CC Income History */}
         {currentUser?.ccIncomeHistory?.length > 0 && (
           <div>
@@ -1353,107 +1216,6 @@ function Profile() {
               </button>
               <button className="ghost" type="button" onClick={() => setShowEditProfile(false)}>Cancel</button>
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* Gift Wallet Modal */}
-      {showWallet && (
-        <section className="detail-modal" role="dialog" aria-modal="true">
-          <div className="detail-backdrop" onClick={() => setShowWallet(false)} />
-          <div className="detail-card artist-apply-modal wallet-modal">
-            <p className="eyebrow">Gift Wallet</p>
-            <h3>Withdraw your balance</h3>
-            {loadingWallet && !walletSummary ? (
-              <p className="detail-subtitle">Loading your wallet...</p>
-            ) : (
-              <>
-                <div className="wallet-balance-row">
-                  <span>Available balance</span>
-                  <strong>{formatNgn(walletSummary?.giftWalletNgn ?? giftWalletNgn)}</strong>
-                </div>
-
-                {walletSummary?.bankDetails ? (
-                  <>
-                    <div className="wallet-bank-row">
-                      <span>{walletSummary.bankDetails.bankName || 'Bank account'}</span>
-                      <strong>{walletSummary.bankDetails.accountName} · {walletSummary.bankDetails.accountNumberMasked}</strong>
-                    </div>
-                    <label className="detail-field">
-                      Amount to withdraw (NGN)
-                      <input
-                        type="number"
-                        min={walletSummary?.minWithdrawalNgn || 500}
-                        value={withdrawAmount}
-                        onChange={(e) => setWithdrawAmount(e.target.value)}
-                        placeholder={`Minimum ${formatNgn(walletSummary?.minWithdrawalNgn || 500)}`}
-                      />
-                    </label>
-                    {walletMsg.text && <p className={`store-earn-msg artist-apply-msg ${walletMsg.ok ? 'success' : 'error'}`}>{walletMsg.text}</p>}
-                    <div className="detail-actions artist-apply-actions">
-                      <button className="primary" type="button" onClick={handleWithdraw} disabled={withdrawing}>
-                        {withdrawing ? 'Processing...' : 'Withdraw'}
-                      </button>
-                      <button className="ghost" type="button" onClick={() => setShowWallet(false)}>Close</button>
-                    </div>
-
-                    {walletSummary?.withdrawals?.length > 0 && (
-                      <div className="wallet-history">
-                        <p className="wallet-history-title">Recent withdrawals</p>
-                        {walletSummary.withdrawals.slice(0, 5).map((w) => (
-                          <div key={w.id || w.reference} className="wallet-history-row">
-                            <span>{formatNgn(w.amountNgn)}</span>
-                            <span className={`wallet-status wallet-status-${w.status}`}>{w.status}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <p className="detail-subtitle">Add and verify a bank account to withdraw your gift wallet balance.</p>
-                    <label className="detail-field">
-                      Bank
-                      <Dropdown
-                        value={bankForm.bankCode}
-                        onChange={(val) => { setBankForm((prev) => ({ ...prev, bankCode: val })); setResolvedAccountName('') }}
-                        options={banks.map((bank) => ({ value: bank.code, label: bank.name }))}
-                        placeholder="Select your bank"
-                        searchable
-                        searchPlaceholder="Search banks…"
-                      />
-                    </label>
-                    <label className="detail-field">
-                      Account number
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={10}
-                        value={bankForm.accountNumber}
-                        onChange={(e) => { setBankForm((prev) => ({ ...prev, accountNumber: e.target.value.replace(/\D/g, '') })); setResolvedAccountName('') }}
-                        placeholder="0123456789"
-                      />
-                    </label>
-                    {resolvedAccountName ? (
-                      <p className="wallet-resolved-name">Account name: <strong>{resolvedAccountName}</strong></p>
-                    ) : null}
-                    {walletMsg.text && <p className={`store-earn-msg artist-apply-msg ${walletMsg.ok ? 'success' : 'error'}`}>{walletMsg.text}</p>}
-                    <div className="detail-actions artist-apply-actions">
-                      {resolvedAccountName ? (
-                        <button className="primary" type="button" onClick={handleSaveBank} disabled={savingBank}>
-                          {savingBank ? 'Saving...' : 'Confirm & Save'}
-                        </button>
-                      ) : (
-                        <button className="primary" type="button" onClick={handleResolveBank} disabled={resolvingBank}>
-                          {resolvingBank ? 'Verifying...' : 'Verify Account'}
-                        </button>
-                      )}
-                      <button className="ghost" type="button" onClick={() => setShowWallet(false)}>Cancel</button>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
           </div>
         </section>
       )}

@@ -51,8 +51,6 @@ import {
   resetPassword,
   deleteAccount,
   updateCurrency,
-  createFlutterwaveGiftCheckout,
-  verifyGiftPayment,
 } from '../lib/api.js'
 import {
   getPrimaryUser,
@@ -66,7 +64,7 @@ import {
   cardObjectToBackendPayload,
   mapBackendCard,
 } from '../lib/backendMappers.js'
-import { forgetConfirmedGift, getConfirmedGiftInventory, normalizeGiftInventory } from '../lib/gifts.js'
+import { forgetConfirmedGift, normalizeGiftInventory } from '../lib/gifts.js'
 
 const USER_META_PREFIX = 'cardora:userMeta:'
 
@@ -205,73 +203,6 @@ function MainLayout() {
       const meta = readUserMeta(rawUser?._id || rawUser?.id || rawUser?.userId || rawUser?.email)
       const session = normalizeUserSession(userData, couponsData, meta)
       const normalized = session.normalized
-      const userKey = normalized.id || rawUser?._id || rawUser?.id || rawUser?.email
-      const locallyConfirmedGifts = getConfirmedGiftInventory(userKey)
-      if (locallyConfirmedGifts.length) {
-        const currentGifts = Array.isArray(normalized.giftsInventory) ? normalized.giftsInventory : []
-        const backendReferences = new Set(currentGifts.flatMap(item => [item.reference, item.txRef, item.transactionRef].filter(Boolean)))
-        normalized.giftsInventory = [
-          ...currentGifts,
-          ...locallyConfirmedGifts.filter(item => {
-            if (item.reference) return !backendReferences.has(item.reference)
-            const itemName = item.giftName || item.name || ''
-            const itemValue = item.valueNgn || item.priceNgn || item.value || item.price || ''
-            return !currentGifts.some(backendItem => {
-              const backendName = backendItem.giftName || backendItem.name || ''
-              const backendValue = backendItem.valueNgn || backendItem.priceNgn || backendItem.value || backendItem.price || ''
-              return backendName === itemName && (!itemValue || !backendValue || String(backendValue) === String(itemValue))
-            })
-          }),
-        ]
-      }
-
-      // Blend pending purchased gift from session storage if not already credited in backend
-      try {
-        const pendingRaw = sessionStorage.getItem('cardora:pendingGiftCheckout')
-        if (pendingRaw) {
-          const pending = JSON.parse(pendingRaw)
-          if (pending && pending.name && Date.now() - pending.savedAt < 300000) { // 5 minutes
-            const backendGifts = Array.isArray(normalized.giftsInventory) ? normalized.giftsInventory : []
-
-            // Check if the backend has already credited a gift matching this purchase.
-            // Match by giftName (the field the backend actually returns), by reference/txRef,
-            // or by detecting a new inventory item added since the purchase was initiated.
-            const hasMatchByName = backendGifts.some(item => {
-              const itemName = item.giftName || item.name || ''
-              return itemName === pending.name && ['available', 'active', 'verified', 'owned', 'complete', 'completed'].includes(String(item.status || 'available').toLowerCase())
-            })
-            const hasMatchByRef = pending.reference && backendGifts.some(item =>
-              item.reference === pending.reference ||
-              item.txRef === pending.reference ||
-              item.transactionRef === pending.reference
-            )
-
-            if (hasMatchByName || hasMatchByRef) {
-              // Gift was credited — clear the pending placeholder
-              sessionStorage.removeItem('cardora:pendingGiftCheckout')
-            } else {
-              // Gift not yet visible in backend — inject unverified placeholder
-              normalized.giftsInventory = [
-                ...backendGifts,
-                {
-                  giftName: pending.name,
-                  name: pending.name,
-                  status: 'unverified',
-                  inventoryId: `pending-${pending.savedAt}`,
-                  _id: `pending-${pending.savedAt}`,
-                  amount: 1,
-                  priceNgn: pending.price,
-                  isPendingLocal: true,
-                }
-              ]
-            }
-          } else if (pending) {
-            // Expired (> 5 min) — clean up stale pending entry
-            sessionStorage.removeItem('cardora:pendingGiftCheckout')
-          }
-        }
-      } catch (e) { /* ignore */ }
-
       setCurrentUser(normalized)
       setBalance(normalized.balance)
       setFavorites(meta.favorites || [])
@@ -521,83 +452,6 @@ function MainLayout() {
       return { ok: true, checkout: false }
     } catch (error) {
       console.error('Checkout start failed', error)
-      return { ok: false, reason: error.message || 'checkout' }
-    }
-  }
-
-  const purchaseGift = async (gift) => {
-    if (!hydratedUser) {
-      navigate('/login')
-      return { ok: false, reason: 'auth' }
-    }
-    if (!gift) return { ok: false, reason: 'no-gift' }
-    const legacyGiftNames = {
-      tiny: 'spark',
-      sweet: 'sweetHeart',
-      purple: 'purpleLove',
-      ocean: 'oceanHeart',
-      emerald: 'emeraldHeart',
-      passion: 'passionHeart',
-      golden: 'goldenHeart',
-      crystal: 'crystalHeart',
-      diamond: 'diamondHeart',
-      legendary: 'legendaryHeart',
-    }
-    const titleKey = String(gift.title || '')
-      .trim()
-      .replace(/[^a-zA-Z0-9 ]+/g, '')
-      .replace(/\s+([a-zA-Z0-9])/g, (_, char) => char.toUpperCase())
-      .replace(/^./, char => char.toLowerCase())
-    const giftNameCandidates = [
-      gift.giftName,
-      gift.name,
-      gift.effectKey,
-      legacyGiftNames[gift.effectKey],
-      titleKey,
-      gift.title,
-    ].filter(Boolean)
-    const uniqueGiftNames = [...new Set(giftNameCandidates)]
-    try {
-      let response = null
-      let lastGiftError = null
-      for (const giftName of uniqueGiftNames) {
-        try {
-          const callbackUrl = `${window.location.origin}/store/gifts?gift=callback&giftName=${encodeURIComponent(giftName)}`
-          response = await createFlutterwaveGiftCheckout({
-            giftName,
-            callbackUrl,
-            callback_url: callbackUrl,
-            redirectUrl: callbackUrl,
-            redirect_url: callbackUrl,
-            returnUrl: callbackUrl,
-          })
-          break
-        } catch (error) {
-          lastGiftError = error
-          const canTryNext =
-            [400, 404].includes(error?.status) &&
-            /gift/i.test(error?.message || '')
-          if (!canTryNext) throw error
-        }
-      }
-      if (!response && lastGiftError) throw lastGiftError
-      const checkout = normalizeCheckoutSession(response)
-      if (checkout.checkoutUrl) {
-        try {
-          sessionStorage.setItem('cardora:pendingGiftCheckout', JSON.stringify({
-            name: gift.giftName || gift.name || gift.effectKey,
-            price: gift.priceNgn || gift.price || gift.valueNgn || gift.value || 0,
-            reference: checkout.reference || checkout.txRef || '',
-            savedAt: Date.now(),
-          }))
-        } catch { /* ignore storage failures */ }
-        window.location.href = checkout.checkoutUrl
-        return { ok: true, checkout: true }
-      }
-      await hydrateSession()
-      return { ok: true, checkout: false }
-    } catch (error) {
-      console.error('Gift checkout failed', error)
       return { ok: false, reason: error.message || 'checkout' }
     }
   }
@@ -1170,7 +1024,6 @@ function MainLayout() {
           deleteMarketplaceTemplate,
           unlockTemplateAction: handleUnlockTemplate,
           createCardOnBackend: handleCreateCard,
-          purchaseGift,
           getUserCardsFromBackend: handleGetUserCards,
           deleteCardOnBackend: handleDeleteCard,
           claimDailyCoupon: handleClaimDailyCoupon,
@@ -1180,7 +1033,6 @@ function MainLayout() {
           onResetPassword: handleResetPassword,
           onDeleteAccount: handleDeleteAccount,
           refreshBalance,
-          verifyGiftPayment,
           userCurrency,
           onCurrencyChange: handleCurrencyChange,
           openCardTypeModal: (preselect = null) => {

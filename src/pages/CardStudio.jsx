@@ -5,7 +5,7 @@ import {
   HiOutlineEnvelope, HiOutlinePaintBrush, HiOutlinePhoto,
   HiOutlineSparkles, HiOutlineChatBubbleLeft, HiOutlineLockClosed,
   HiOutlineDocumentText, HiOutlineMusicalNote, HiOutlineEye,
-  HiOutlineGift, HiOutlineChartBarSquare, HiOutlineLightBulb,
+  HiOutlineChartBarSquare, HiOutlineLightBulb,
   HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash, HiOutlineGlobeAlt
 } from 'react-icons/hi2'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
@@ -27,7 +27,6 @@ import { getTierLimits } from '../lib/tierLimits.js'
 import { PALETTES, getPalettesForTier, applyPalette } from '../lib/palettes.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import InlineColorPicker from '../components/InlineColorPicker.jsx'
-import { GiftIcon } from '../components/GiftCard.jsx'
 import { computeCardTier, trimCardToTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, TIER_COST_BY_TYPE, fontTier } from '../lib/tierRequirements.js'
 import TierMeter from '../components/TierMeter.jsx'
 import TierPip from '../components/TierPip.jsx'
@@ -63,7 +62,6 @@ const ALL_TOOLS = [
   { id: 'cardStyle', icon: HiOutlineSparkles, label: 'Card Style', hint: 'Border, scrollbar, text FX', group: 'Style' },
   { id: 'animation', icon: HiOutlineSparkles, label: 'Animation', hint: 'Confetti & effects', group: 'Effects' },
   { id: 'experience', icon: HiOutlineGlobeAlt, label: 'Experience', hint: 'Galaxy of memories', group: 'Effects' },
-  { id: 'gifts', icon: HiOutlineGift, label: 'Gifts', hint: 'End-of-card gift reveal', group: 'Interactive' },
   { id: 'interaction', icon: HiOutlineLockClosed, label: 'Interaction', hint: 'Lock & reveal', group: 'Interactive' },
   { id: 'chain', icon: HiOutlineArrowPathRoundedSquare, label: 'Chain', hint: 'Invite recipient to reply with a card', group: 'Interactive' },
   { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template', group: 'Interactive' },
@@ -97,7 +95,7 @@ const TOOLS_BY_TYPE = {
   // `experience` is personal-only for now: every other type has its own
   // interaction stage after the card, and a full-screen scene competing with
   // those needs its own design pass.
-  personal:  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'experience', 'interaction', 'gifts'],
+  personal:  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'experience', 'interaction'],
   poll:      ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'poll'],
   trivia:    ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'trivia'],
   chain:     ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'chain'],
@@ -337,7 +335,7 @@ function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const { currentUser, publishTemplate, updateMarketplaceTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, consumeGift, inventory = [] } = useOutletContext() || {}
+  const { currentUser, publishTemplate, updateMarketplaceTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, consumeGift } = useOutletContext() || {}
   const [cardPrices, setCardPrices] = useState(TIER_COST_BY_TYPE)
   const [featureSurcharges, setFeatureSurcharges] = useState(() => normalizeFeatureSurcharges(null))
   // Scales the Studio's own live-preview ambient particles the same way
@@ -416,14 +414,12 @@ function CardStudio() {
   }, [])
 
   // Every tool for the card's type is available from the start — there is no
-  // tier to unlock them with anymore. "Gifts" stays off for artists (it
-  // attaches one specific purchased gift-inventory item to a card, which
-  // doesn't make sense for a reusable marketplace template design).
+  // tier to unlock them with anymore.
   const isArtist = String(currentUser?.role || '').toLowerCase() === 'artist'
-  const allowedToolIds = useMemo(() => {
-    const base = TOOLS_BY_TYPE[studioType] || TOOLS_BY_TYPE.personal
-    return isArtist ? base.filter((id) => id !== 'gifts') : base
-  }, [studioType, isArtist])
+  const allowedToolIds = useMemo(
+    () => TOOLS_BY_TYPE[studioType] || TOOLS_BY_TYPE.personal,
+    [studioType],
+  )
   // Studio editing caps (max poll options, max images, etc.) are always the
   // top-tier caps — the studio itself is unrestricted; only the computed
   // tier/cost that results from what gets used is a consequence, applied at
@@ -2612,113 +2608,6 @@ function CardStudio() {
             </p>
           )}
 
-        </>
-      )
-    }
-
-    // GIFTS
-    if (activeTool === 'gifts') {
-      const selectedGiftInstance = c.giftEffect?.giftInstanceId || c.giftEffect?.giftId || 'none'
-      const availableGifts = inventory.filter(gift => !gift.status || gift.status === 'available' || gift.status === 'active')
-      const pendingGifts = inventory.filter(gift => gift.status === 'unverified' || gift.status === 'pending' || gift.isPendingLocal)
-      return (
-        <>
-          <p className="cs-panel-eyebrow">Gifts</p>
-          <h3>End-of-card gift reveal</h3>
-          <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.7, lineHeight: 1.55 }}>
-            Attach a purchased gift to play after the card reveal. Recipients see a particle
-            animation in the gift's signature colours before they receive it.
-          </p>
-          <div className="cs-sub-section">
-            <p className="cs-sub-label">Select a Gift</p>
-            <button
-              type="button"
-              className={`cs-gift-option ${selectedGiftInstance === 'none' ? 'active' : ''}`}
-              onClick={() => {
-                update('giftEffect.enabled', false)
-                update('giftEffect.effectKey', 'none')
-                update('giftEffect.giftTitle', '')
-                update('giftEffect.giftAmount', '')
-                update('giftEffect.giftId', '')
-                update('giftEffect.giftInstanceId', '')
-                update('giftEffect.giftName', '')
-                update('giftEffect.isPendingLocal', false)
-              }}
-            >
-              <span className="cs-gift-none-icon">✕</span>
-              <span>No Gift</span>
-            </button>
-            {availableGifts.length > 0 ? (
-              <div className="cs-gift-grid">
-                {availableGifts.map((gift, idx) => {
-                  const instanceId = gift.id || `${gift.inventoryId || gift.giftId || gift.effectKey || gift.title}-${idx}`
-                  const backendGiftId = gift.inventoryId || gift.giftId || gift._id || gift.id || ''
-                  return (
-                    <button
-                      key={instanceId}
-                      type="button"
-                      className={`cs-gift-option ${selectedGiftInstance === instanceId ? 'active' : ''}`}
-                      onClick={() => {
-                        update('giftEffect.enabled', true)
-                        update('giftEffect.effectKey', gift.effectKey || gift.title)
-                        update('giftEffect.giftTitle', gift.title)
-                        update('giftEffect.giftAmount', gift.amount || '')
-                        update('giftEffect.giftId', backendGiftId)
-                        update('giftEffect.giftInstanceId', instanceId)
-                        update('giftEffect.giftName', gift.giftName || gift.name || effectKeyToGiftName(gift.effectKey))
-                        update('giftEffect.isPendingLocal', !!gift.isPendingLocal)
-                      }}
-                    >
-                      <GiftIcon effectKey={gift.effectKey} size={36} />
-                      <span>{gift.title}</span>
-                      {gift.amount && <small>{gift.amount}</small>}
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="cs-field" style={{ fontSize: '0.78rem', opacity: 0.5 }}>
-                {pendingGifts.length > 0
-                  ? 'No verified gifts are ready to attach yet.'
-                  : 'No gifts in your inventory yet. Visit the Store to purchase gifts.'}
-              </p>
-            )}
-            {pendingGifts.length > 0 && (
-              <div className="cs-gift-pending-list">
-                <p className="cs-sub-label">Pending Verification</p>
-                <div className="cs-gift-grid">
-                  {pendingGifts.map((gift, idx) => {
-                    const instanceId = gift.id || `${gift.inventoryId || gift.giftId || gift.effectKey || gift.title}-pending-${idx}`
-                    return (
-                      <button
-                        key={instanceId}
-                        type="button"
-                        className="cs-gift-option cs-gift-option-pending"
-                        disabled
-                      >
-                        <GiftIcon effectKey={gift.effectKey} size={36} />
-                        <span>{gift.title}</span>
-                        {gift.amount && <small>{gift.amount}</small>}
-                        <small className="cs-gift-status-note">Pending verification</small>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          {c.giftEffect?.enabled && (
-            <div className="cs-sub-section">
-              <p className="cs-sub-label">Selected Gift</p>
-              <div className="cs-gift-selected">
-                <GiftIcon effectKey={c.giftEffect.effectKey} size={44} />
-                <div>
-                  <strong>{c.giftEffect.giftTitle}</strong>
-                  {c.giftEffect.giftAmount && <span className="cs-gift-amount">{c.giftEffect.giftAmount}</span>}
-                </div>
-              </div>
-            </div>
-          )}
         </>
       )
     }

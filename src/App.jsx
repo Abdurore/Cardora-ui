@@ -9,7 +9,6 @@ const Home = lazy(() => import('./pages/Home.jsx'))
 const Explore = lazy(() => import('./pages/Explore.jsx'))
 const Artists = lazy(() => import('./pages/Artists.jsx'))
 const Store = lazy(() => import('./pages/Store.jsx'))
-const StoreGifts = lazy(() => import('./pages/StoreGifts.jsx'))
 const Profile = lazy(() => import('./pages/Profile.jsx'))
 const CardView = lazy(() => import('./pages/CardView.jsx'))
 const CardStudio = lazy(() => import('./pages/CardStudio.jsx'))
@@ -43,7 +42,6 @@ function App() {
           <Route path="/explore" element={<Explore />} />
           <Route path="/artists" element={<Artists />} />
           <Route path="/store" element={<Store />} />
-          <Route path="/store/gifts" element={<StoreGifts />} />
           <Route path="/card/:id" element={<CardView />} />
           <Route path="/card/:slug/responses" element={<CardResponses />} />
           <Route path="/studio" element={<CardStudio />} />

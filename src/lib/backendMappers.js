@@ -294,6 +294,10 @@ export function mapTemplateToCard(template, index = 0) {
     chain: template.chain || layout.chain || null,
     anonTier: template.anonTier || layout.anonTier || null,
     layoutConfig: layout,
+    // 3.7: marketplace template pricing/unlock state.
+    price: Number(template.price || 0),
+    isLocked: !!template.isLocked,
+    isUnlocked: template.isUnlocked !== false,
     backendTemplate: template,
   }
 }

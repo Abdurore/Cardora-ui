@@ -2727,6 +2727,53 @@
   gap: 12px;
 }
 
+.store-marketplace-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.store-marketplace-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.store-marketplace-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.store-marketplace-preview {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.store-marketplace-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.store-marketplace-artist {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.store-marketplace-unlocked {
+  align-self: flex-start;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .pack-currency-note {
   grid-column: 1 / -1;
   font-size: 11px;
