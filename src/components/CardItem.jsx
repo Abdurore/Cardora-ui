@@ -45,6 +45,10 @@ function CardItem({
   isTemplate = true,
   giftEffect,
   artistName,
+  artistAvatar,
+  isFoundingArtist,
+  price,
+  isUnlocked = true,
 }) {
   const tierInfo = getTierInfo(tier)
   const displayLikes = Number(likeCount ?? likes ?? 0) || 0
@@ -53,6 +57,8 @@ function CardItem({
   const [showReport, setShowReport] = useState(false)
   const giftEnabled = !isTemplate && giftEffect?.enabled && giftEffect?.effectKey && giftEffect.effectKey !== 'none'
   const giftClaimed = giftEnabled && giftEffect?.status === 'claimed'
+  const templatePrice = Number(price || 0)
+  const unlockLabel = templatePrice <= 0 ? 'Use free' : isUnlocked ? 'Use' : `${templatePrice} CC`
 
   return (
     <div
@@ -120,10 +126,22 @@ function CardItem({
         </span>
       )}
 
+      {isTemplate && (
+        <span className={`card-unlock-badge ${templatePrice <= 0 ? 'card-unlock-badge-free' : isUnlocked ? 'card-unlock-badge-owned' : 'card-unlock-badge-priced'}`}>
+          {unlockLabel}
+        </span>
+      )}
+
       <div className="card-info">
         {showOccasion && occasion ? <p className="card-eyebrow">{occasion}</p> : null}
         <h4>{title}</h4>
-        {isTemplate && artistName ? <p className="card-artist-credit">by {artistName}</p> : null}
+        {isTemplate && artistName ? (
+          <p className="card-artist-credit">
+            {artistAvatar ? <img className="card-artist-avatar" src={artistAvatar} alt="" /> : null}
+            by {artistName}
+            {isFoundingArtist ? <span className="card-founding-badge" title="Founding Artist">★ Founding Artist</span> : null}
+          </p>
+        ) : null}
         {subtitle ? <p className="card-subtitle">{truncateText(subtitle, 10)}</p> : null}
         {isTemplate && (
           <div className="card-stats">

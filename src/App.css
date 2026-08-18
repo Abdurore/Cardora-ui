@@ -2277,6 +2277,41 @@
 .card-gift-badge-pending { background: rgba(255, 155, 210, 0.18); color: #ffbfe0; }
 .card-gift-badge-claimed { background: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.55); }
 
+.card-unlock-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  z-index: 3;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.card-unlock-badge-free   { background: rgba(109, 255, 175, 0.18); color: #b6ffdd; }
+.card-unlock-badge-owned  { background: rgba(126, 247, 255, 0.18); color: #a8f4ff; }
+.card-unlock-badge-priced { background: rgba(255, 207, 115, 0.18); color: #ffe2a8; }
+
+.card-artist-avatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.card-founding-badge {
+  margin-left: 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #ffd76a;
+  white-space: nowrap;
+}
+
 .tier-badge {
   display: inline-block;
   position: static;
@@ -3907,6 +3942,18 @@
   font-size: 0.78rem;
   color: rgba(220, 242, 247, 0.75);
   font-weight: 600;
+}
+
+.cdm-unlock-pill {
+  color: #ffe2a8;
+  background: rgba(255, 207, 115, 0.1);
+  border-color: rgba(255, 207, 115, 0.22);
+}
+
+.cdm-unlock-pill.unlocked {
+  color: #b6ffdd;
+  background: rgba(109, 255, 175, 0.1);
+  border-color: rgba(109, 255, 175, 0.22);
 }
 
 .cdm-like-pill {

@@ -49,11 +49,17 @@ function CardDetailModal({
   isLiked = false,
   onToggleLike,
   onTemplateUse,
+  currentUser,
+  balance = 0,
+  onUnlockTemplate,
+  onRequireAuth,
 }) {
-  const [view, setView] = useState('main') // 'main' | 'share'
+  const [view, setView] = useState('main') // 'main' | 'share' | 'unlock'
   const [showReport, setShowReport] = useState(false)
   const [copied, setCopied] = useState(false)
   const [startY, setStartY] = useState(null)
+  const [unlocking, setUnlocking] = useState(false)
+  const [unlockError, setUnlockError] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -71,9 +77,14 @@ function CardDetailModal({
   useEffect(() => {
     setView('main')
     setCopied(false)
+    setUnlockError('')
+    setUnlocking(false)
   }, [card])
 
   if (!card) return null
+
+  const templatePrice = Number(card.price || 0)
+  const isLockedTemplate = templatePrice > 0 && card.isUnlocked === false
 
   const tierInfo = getTierInfo(card?.tier)
   const isPremium = tierInfo.key !== 'classic'
@@ -108,6 +119,35 @@ function CardDetailModal({
   }
 
   const handleUseTemplate = async () => {
+    if (isLockedTemplate) {
+      if (!currentUser) {
+        onRequireAuth?.()
+        return
+      }
+      setView('unlock')
+      return
+    }
+    await proceedToStudio()
+  }
+
+  const handleConfirmUnlock = async () => {
+    if (!currentUser) {
+      onRequireAuth?.()
+      return
+    }
+    const templateId = card.templateId || card.id
+    setUnlocking(true)
+    setUnlockError('')
+    const result = await onUnlockTemplate?.(templateId)
+    setUnlocking(false)
+    if (!result?.ok) {
+      setUnlockError(result?.message || 'Could not unlock this template.')
+      return
+    }
+    await proceedToStudio()
+  }
+
+  const proceedToStudio = async () => {
     const rawType = (card?.type || 'personal').toLowerCase()
     // Pass the type directly — studio now uses backend-aligned type names
     const type = rawType
@@ -204,6 +244,11 @@ function CardDetailModal({
             </button>
             <div className="cdm-meta-pill">{usageCount} users</div>
             <div className="cdm-meta-pill">{viewCount} views</div>
+            {templatePrice > 0 ? (
+              <div className={`cdm-meta-pill cdm-unlock-pill ${isLockedTemplate ? '' : 'unlocked'}`}>
+                {isLockedTemplate ? `Unlock · ${templatePrice} CC` : 'Unlocked'}
+              </div>
+            ) : null}
           </div>
 
           {tierInfo.features ? (
@@ -224,7 +269,7 @@ function CardDetailModal({
                   <rect x="3" y="11" width="6" height="6" rx="1" />
                   <path d="M14 11v6M11 14h6" />
                 </svg>
-                Use Template
+                {isLockedTemplate ? `Unlock — ${templatePrice} CC` : 'Use Template'}
               </button>
               <button className="cdm-btn-share" type="button" onClick={() => setView('share')}>
                 <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -294,6 +339,56 @@ function CardDetailModal({
               <button className="cdm-back-btn" type="button" onClick={() => setView('main')}>
                 ← Back
               </button>
+            </div>
+          )}
+
+          {/* ── Unlock view ── */}
+          {view === 'unlock' && (
+            <div className="cdm-share-panel">
+              <p className="cdm-share-heading">Unlock this template</p>
+              <p className="cdm-share-sub">
+                A one-time purchase — it's yours to use forever after this.
+              </p>
+
+              <div className="store-pay-summary">
+                <div className="store-pay-row">
+                  <span>Template</span>
+                  <strong>{modalTitle}</strong>
+                </div>
+                <div className="store-pay-row">
+                  <span>Price</span>
+                  <strong>{templatePrice} CC</strong>
+                </div>
+                <div className="store-pay-row">
+                  <span>Your balance</span>
+                  <strong>{balance} CC</strong>
+                </div>
+              </div>
+
+              {unlockError ? <p className="form-error">{unlockError}</p> : null}
+
+              <div className="cdm-actions">
+                <button
+                  className="cdm-btn-primary"
+                  type="button"
+                  onClick={handleConfirmUnlock}
+                  disabled={unlocking}
+                >
+                  {unlocking ? 'Unlocking…' : `Unlock — ${templatePrice} CC`}
+                </button>
+                {balance < templatePrice ? (
+                  <button
+                    className="cdm-btn-share"
+                    type="button"
+                    onClick={() => { onClose(); navigate('/store') }}
+                  >
+                    Get more CC
+                  </button>
+                ) : null}
+                <button className="cdm-back-btn" type="button" onClick={() => setView('main')} disabled={unlocking}>
+                  ← Back
+                </button>
+              </div>
             </div>
           )}
         </div>

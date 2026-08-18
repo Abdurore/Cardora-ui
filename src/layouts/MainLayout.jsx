@@ -137,6 +137,14 @@ function MainLayout() {
   const [authModalContext, setAuthModalContext] = useState(null)
   const pendingAuthActionRef = useRef(null)
   const pendingLikesRef = useRef(new Set())
+
+  const openAuthModal = (onAuthenticated, returnTo, context) => {
+    pendingAuthActionRef.current = typeof onAuthenticated === 'function'
+      ? { action: onAuthenticated, returnTo: returnTo || null, expiresAt: Date.now() + 10 * 60 * 1000 }
+      : null
+    setAuthModalContext(context || null)
+    setShowAuth(true)
+  }
   const [showCardTypeModal, setShowCardTypeModal] = useState(false)
   const [cardTypePreselect, setCardTypePreselect] = useState(null)
   const [couponPackages, setCouponPackages] = useState([])
@@ -734,6 +742,14 @@ function MainLayout() {
     try {
       const response = await unlockTemplate(templateId)
       await refreshBalance?.()
+      // Flip locally so the tile/detail modal shows "Use" immediately --
+      // without this the unlock only becomes visible after a full reload.
+      setMarketplaceTemplates((prev) => prev.map((item) => (
+        templateMatches(item, templateId) ? { ...item, isUnlocked: true, isLocked: false } : item
+      )))
+      setSelectedCard((prev) => (
+        templateMatches(prev, templateId) ? { ...prev, isUnlocked: true, isLocked: false } : prev
+      ))
       return { ok: true, message: getResponseMessage(response, 'Template unlocked!') }
     } catch (error) {
       return { ok: false, message: error.message || 'Could not unlock this template.' }
@@ -1003,13 +1019,7 @@ function MainLayout() {
           couponPackages,
           marketplaceTemplates,
           refreshMarketplaceTemplates: loadPublicData,
-          openAuthModal: (onAuthenticated, returnTo, context) => {
-            pendingAuthActionRef.current = typeof onAuthenticated === 'function'
-              ? { action: onAuthenticated, returnTo: returnTo || null, expiresAt: Date.now() + 10 * 60 * 1000 }
-              : null
-            setAuthModalContext(context || null)
-            setShowAuth(true)
-          },
+          openAuthModal,
           updateProfile: handleProfileUpdate,
           deductCC,
           consumeGift,
@@ -1058,6 +1068,10 @@ function MainLayout() {
         isLiked={selectedCard ? likedTemplates.includes(selectedCard.id) : false}
         onToggleLike={toggleLike}
         onTemplateUse={recordTemplateUse}
+        currentUser={hydratedUser}
+        balance={balance}
+        onUnlockTemplate={handleUnlockTemplate}
+        onRequireAuth={openAuthModal}
       />
       <AuthModal
         open={showAuth}
