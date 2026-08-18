@@ -63,20 +63,23 @@ function sanitizeBody(body) {
   return clone
 }
 
-// Tab-scoped on purpose: localStorage is shared across every tab of the same
-// origin, so logging into a second account in another tab silently overwrote
-// the first tab's session (and, via the same shared token, its World Chat
-// socket auth) with whichever account logged in most recently. sessionStorage
-// isolates the token per tab while still surviving reloads within that tab.
+// 4.3: back to localStorage. The tab-scoped sessionStorage design existed
+// only to stop a second account logging in on another tab from clobbering
+// the first tab's session and its World Chat socket auth (a shared token
+// meant one tab's reconnect could silently switch to whichever account
+// logged in most recently, elsewhere). With World Chat deleted that
+// constraint no longer applies -- and sessionStorage was logging every user
+// out on tab close in the meantime, a real retention cost for a product
+// people return to weeks apart.
 export function getStoredToken() {
-  const sessionToken = sessionStorage.getItem(TOKEN_KEY)
-  if (sessionToken) return sessionToken
-  // One-time migration: carry over a pre-existing localStorage session (from
-  // before this change) into this tab's sessionStorage, then stop reading it.
-  const legacyToken = localStorage.getItem(TOKEN_KEY)
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) return token
+  // One-time migration: carry over a pre-existing sessionStorage session
+  // (from before this change) into localStorage, then stop reading it.
+  const legacyToken = sessionStorage.getItem(TOKEN_KEY)
   if (legacyToken) {
-    sessionStorage.setItem(TOKEN_KEY, legacyToken)
-    localStorage.removeItem(TOKEN_KEY)
+    localStorage.setItem(TOKEN_KEY, legacyToken)
+    sessionStorage.removeItem(TOKEN_KEY)
     return legacyToken
   }
   return null
@@ -84,13 +87,13 @@ export function getStoredToken() {
 
 export function setStoredToken(token) {
   if (!token) return
-  sessionStorage.setItem(TOKEN_KEY, token)
-  localStorage.removeItem(TOKEN_KEY)
+  localStorage.setItem(TOKEN_KEY, token)
+  sessionStorage.removeItem(TOKEN_KEY)
 }
 
 export function clearStoredToken() {
-  sessionStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(TOKEN_KEY)
 }
 
 async function request(path, { method = 'GET', body, auth = false, headers = {}, timeout = 30000 } = {}) {
@@ -393,13 +396,6 @@ export async function clickAd(adId) {
 
 export async function trackAdView(adId) {
   return request(`/ads/${adId}/view`, { method: 'POST', auth: true, body: { adId, id: adId, action: 'view' } })
-}
-
-/* ═══════════════════════════════════════════════
-   WORLD CHAT
-   ═══════════════════════════════════════════════ */
-export async function getWorldChat(query = 'page=1&limit=50') {
-  return request(`/chats?${query}`, { auth: true })
 }
 
 /* ═══════════════════════════════════════════════

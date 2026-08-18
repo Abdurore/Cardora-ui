@@ -16,7 +16,6 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'))
 const ModeratorDashboard = lazy(() => import('./pages/ModeratorDashboard.jsx'))
 const EnterpriseDashboard = lazy(() => import('./pages/EnterpriseDashboard.jsx'))
 const ArtistDashboard = lazy(() => import('./pages/ArtistDashboard.jsx'))
-const WorldChat = lazy(() => import('./pages/WorldChat.jsx'))
 const AuthPage = lazy(() => import('./pages/AuthPage.jsx'))
 const LegalPage = lazy(() => import('./pages/LegalPage.jsx'))
 const AnonSend = lazy(() => import('./pages/AnonSend.jsx'))
@@ -51,7 +50,6 @@ function App() {
           <Route path="/moderator" element={<ModeratorDashboard />} />
           <Route path="/enterprise" element={<EnterpriseDashboard />} />
           <Route path="/artist" element={<ArtistDashboard />} />
-          <Route path="/chat" element={<WorldChat />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/signup" element={<AuthPage mode="signup" />} />

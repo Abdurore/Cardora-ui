@@ -808,7 +808,7 @@ function Profile() {
                   <div>
                     <h4>Profile Backgrounds</h4>
                     <p className="profile-premium-bg-hint">
-                      Choose a background for your profile and WorldChat profile modal.
+                      Choose a background for your profile.
                     </p>
                   </div>
                   <button

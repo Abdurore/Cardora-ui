@@ -2252,7 +2252,7 @@ const handleBroadcast = async () => {
                 <span className="admin-media-block-icon">Image</span>
                 <div>
                   <h4 className="admin-media-block-title">Premium Profile Backgrounds</h4>
-                  <p className="admin-media-block-desc">Images premium users can apply to their profile and WorldChat profile modal.</p>
+                  <p className="admin-media-block-desc">Images premium users can apply to their profile.</p>
                 </div>
               </div>
 
