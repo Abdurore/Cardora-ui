@@ -27,11 +27,30 @@ function Explore() {
   const [activeOccasion, setActiveOccasion] = useState(searchParams.get('occasion') || 'all')
   const [visibleCount, setVisibleCount] = useState(12)
   const [trendingTemplates, setTrendingTemplates] = useState([])
+  const [featuredIndex, setFeaturedIndex] = useState(0)
   const CARDS_PER_PAGE = 12
+  const FEATURED_ROTATE_MS = 6000
   // Only show real, live artist-published templates. No catalog placeholders.
   const cardSource = (marketplaceTemplates || []).filter(
     (t) => !t.status || t.status === 'approved' || t.status === 'live',
   )
+
+  const foundingArtistTemplates = useMemo(
+    () => cardSource.filter((c) => c.isFoundingArtist),
+    [cardSource],
+  )
+
+  useEffect(() => {
+    if (foundingArtistTemplates.length < 2) return undefined
+    const id = setInterval(() => {
+      setFeaturedIndex((i) => (i + 1) % foundingArtistTemplates.length)
+    }, FEATURED_ROTATE_MS)
+    return () => clearInterval(id)
+  }, [foundingArtistTemplates.length])
+
+  const featuredTemplate = foundingArtistTemplates.length
+    ? foundingArtistTemplates[featuredIndex % foundingArtistTemplates.length]
+    : null
 
   useEffect(() => {
     getPopularTemplates('days=7&page=1&limit=8')
@@ -144,6 +163,24 @@ function Explore() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
+
+        {/* Founding Artist featured slot — rotates through every Founding
+            Artist template so no single one owns the spot indefinitely. */}
+        {featuredTemplate && !query && activeTag === 'all' && activeType === 'all' ? (
+          <div className="explore-featured">
+            <p className="explore-featured-label">★ Founding Artist Spotlight</p>
+            <div className="explore-featured-rail">
+              <CardItem
+                key={`featured-${featuredTemplate.id}-${featuredIndex}`}
+                {...featuredTemplate}
+                variant="v1"
+                isLiked={likedTemplates.includes(featuredTemplate.id)}
+                onToggleLike={toggleLike}
+                onClick={() => openCardDetails({ ...featuredTemplate, variant: 'v1' })}
+              />
+            </div>
+          </div>
+        ) : null}
 
         {/* Trending rail */}
         {trendingTemplates.length > 0 && !query && activeTag === 'all' && activeType === 'all' ? (

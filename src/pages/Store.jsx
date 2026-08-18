@@ -24,8 +24,6 @@ function Store() {
     refreshBalance,
     userCurrency,
     authReady,
-    marketplaceTemplates,
-    unlockTemplateAction,
   } = useOutletContext()
 
   const [checkoutMessage, setCheckoutMessage] = useState('')
@@ -40,7 +38,7 @@ function Store() {
   const [activeSection, setActiveSection] = useState('buy')
 
   useEffect(() => {
-    if (queryTab && ['buy', 'rewards', 'marketplace'].includes(queryTab)) {
+    if (queryTab && ['buy', 'rewards'].includes(queryTab)) {
       setActiveSection(queryTab)
     }
   }, [queryTab])
@@ -52,23 +50,6 @@ function Store() {
   const [isRedeeming, setIsRedeeming] = useState(false)
   const [copiedField, setCopiedField] = useState('')
   const [streakInfo, setStreakInfo] = useState(null)
-  const [unlockingTemplateId, setUnlockingTemplateId] = useState(null)
-  const [unlockMsg, setUnlockMsg] = useState({ text: '', ok: false })
-
-  const marketplaceListings = (marketplaceTemplates || []).filter((t) => t.price > 0)
-
-  const handleUnlockTemplate = async (template) => {
-    if (!currentUser) {
-      openAuthModal()
-      return
-    }
-    const templateId = template.templateId || template.id
-    setUnlockingTemplateId(templateId)
-    setUnlockMsg({ text: '', ok: false })
-    const result = await unlockTemplateAction?.(templateId)
-    setUnlockMsg({ text: result?.message || (result?.ok ? 'Unlocked!' : 'Could not unlock this template.'), ok: !!result?.ok })
-    setUnlockingTemplateId(null)
-  }
 
   const validPacks = (couponPackages || []).filter(p => (p.cc || 0) > 0)
   const packs = validPacks
@@ -186,13 +167,6 @@ function Store() {
             onClick={() => setActiveSection('rewards')}
           >
             Rewards Hub
-          </button>
-          <button
-            type="button"
-            className={`tab ${activeSection === 'marketplace' ? 'active' : ''}`}
-            onClick={() => setActiveSection('marketplace')}
-          >
-            Marketplace
           </button>
         </div>
 
@@ -424,50 +398,6 @@ function Store() {
                     )
                   })()}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeSection === 'marketplace' && (
-          <div className="store-marketplace-shell">
-            <p className="pack-currency-note">
-              Templates artists have priced — unlock one permanently with CC. Artists earn a commission on every unlock.
-            </p>
-            {unlockMsg.text && (
-              <p className={`store-earn-msg ${unlockMsg.ok ? 'success' : 'error'}`}>{unlockMsg.text}</p>
-            )}
-            {marketplaceListings.length === 0 ? (
-              <div className="store-frame-empty">No priced templates yet — check back soon.</div>
-            ) : (
-              <div className="store-marketplace-grid">
-                {marketplaceListings.map((t) => {
-                  const templateId = t.templateId || t.id
-                  const unlocked = t.isUnlocked || (currentUser && String(t.ownerId) === String(currentUser.id))
-                  return (
-                    <div key={templateId} className="store-marketplace-card">
-                      {t.previewImage && (
-                        <img className="store-marketplace-preview" src={t.previewImage} alt="" />
-                      )}
-                      <div className="store-marketplace-info">
-                        <strong>{t.title}</strong>
-                        <span className="store-marketplace-artist">by {t.artistName || 'Cardora Artist'}</span>
-                      </div>
-                      {unlocked ? (
-                        <span className="store-marketplace-unlocked">Unlocked</span>
-                      ) : (
-                        <button
-                          className="primary"
-                          type="button"
-                          onClick={() => handleUnlockTemplate(t)}
-                          disabled={unlockingTemplateId === templateId}
-                        >
-                          {unlockingTemplateId === templateId ? 'Unlocking…' : `Unlock — ${t.price} CC`}
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
               </div>
             )}
           </div>
