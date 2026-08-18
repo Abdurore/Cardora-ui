@@ -289,6 +289,7 @@ export function mapTemplateToCard(template, index = 0) {
     ownerId,
     artistName,
     artistAvatar,
+    isFoundingArtist: !!template.isFoundingArtist,
     poll: template.poll || layout.poll || null,
     trivia: template.trivia || layout.trivia || null,
     chain: template.chain || layout.chain || null,

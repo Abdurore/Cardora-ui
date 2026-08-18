@@ -4094,6 +4094,7 @@ function CardStudio() {
                     { value: 'thank-you', label: 'Thank You' },
                     { value: 'apology', label: 'Apology' },
                     { value: 'celebration', label: 'Celebration' },
+                    { value: 'congratulations', label: 'Congratulations' },
                     { value: 'just-because', label: 'Just Because' },
                     { value: 'get-well', label: 'Get Well' },
                     { value: 'sympathy', label: 'Sympathy' },

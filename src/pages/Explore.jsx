@@ -6,6 +6,7 @@ import ScreenNav from '../components/ScreenNav.jsx'
 import CardItem from '../components/CardItem.jsx'
 import { getPopularTemplates } from '../lib/api.js'
 import { mapTemplateToCard } from '../lib/backendMappers.js'
+import { EXPLORE_OCCASION_TABS, categoryToOccasionTab } from '../lib/occasionTaxonomy.js'
 
 function Explore() {
   const {
@@ -86,15 +87,6 @@ function Explore() {
     setSearchParams(params, { replace: true })
   }, [activeTag, activeType, activeOccasion, query, setSearchParams])
 
-  const occasions = useMemo(() => {
-    const seen = new Set()
-    cardSource.forEach(c => {
-      const occ = (c.category || c.occasion || '').trim()
-      if (occ) seen.add(occ)
-    })
-    return Array.from(seen).sort()
-  }, [cardSource])
-
   const filteredCards = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return cardSource.filter((card) => {
@@ -111,8 +103,7 @@ function Explore() {
           : activeType === 'personal'
             ? !cardType || cardType === 'personal' || cardType === 'standard' || cardType === 'moment'
             : cardType === activeType
-      const cardOcc = (card.category || card.occasion || '').toLowerCase()
-      const matchesOccasion = activeOccasion === 'all' ? true : cardOcc === activeOccasion.toLowerCase()
+      const matchesOccasion = activeOccasion === 'all' ? true : categoryToOccasionTab(card.category) === activeOccasion
       return matchesQuery && matchesFavorites && matchesType && matchesOccasion
     })
   }, [activeTag, activeType, activeOccasion, cardSource, favorites, query])
@@ -139,7 +130,7 @@ function Explore() {
       <div className="screen-body">
         <div className="marketplace-topbar">
           <div>
-            <p className="eyebrow">Marketplace</p>
+            <p className="eyebrow">Explore</p>
             <h2 className="marketplace-title">Find a card that already feels like a memory.</h2>
           </div>
           <Link to="/artists" className="marketplace-artists-link">Meet the Artists →</Link>
@@ -188,26 +179,24 @@ function Explore() {
           ))}
         </div>
 
-        {/* Occasion/category filter — only shown when there are occasions to filter by */}
-        {occasions.length > 0 && (
-          <div className="tag-list explore-occasion-filter">
+        {/* Occasion filter — fixed 6-tab taxonomy, same one Quick Start uses */}
+        <div className="tag-list explore-occasion-filter">
+          <button
+            className={`tag ${activeOccasion === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveOccasion('all')}
+          >
+            All Occasions
+          </button>
+          {EXPLORE_OCCASION_TABS.map(occ => (
             <button
-              className={`tag ${activeOccasion === 'all' ? 'active' : ''}`}
-              onClick={() => setActiveOccasion('all')}
+              key={occ}
+              className={`tag ${activeOccasion === occ ? 'active' : ''}`}
+              onClick={() => setActiveOccasion(occ)}
             >
-              All Occasions
+              {occ}
             </button>
-            {occasions.map(occ => (
-              <button
-                key={occ}
-                className={`tag ${activeOccasion === occ ? 'active' : ''}`}
-                onClick={() => setActiveOccasion(occ)}
-              >
-                {occ}
-              </button>
-            ))}
-          </div>
-        )}
+          ))}
+        </div>
 
         {/* Favorites filter row */}
         <div className="tag-list">

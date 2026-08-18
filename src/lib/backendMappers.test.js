@@ -7,6 +7,7 @@ import {
   resolveBalance,
   mapBackendCard,
   mapCouponPackage,
+  mapTemplateToCard,
 } from './backendMappers.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
 
@@ -337,6 +338,27 @@ describe('round trip', () => {
 
     // primary drives heading emphasis; accent drives buttons/seal.
     expect(rebuilt.theme.accentColor).toBe('#00ff00')
+  })
+})
+
+describe('mapTemplateToCard — Explore/Marketplace consolidation', () => {
+  it('carries price, lock state, and Founding Artist status through for the Explore grid', () => {
+    const mapped = mapTemplateToCard({
+      id: 'tmpl-1', name: 'Sunset Birthday', category: 'birthday',
+      price: 8, isLocked: true, isUnlocked: false, isFoundingArtist: true,
+      artistName: 'Ada', artistAvatar: 'https://x/avatar.png',
+    })
+    expect(mapped.price).toBe(8)
+    expect(mapped.isLocked).toBe(true)
+    expect(mapped.isUnlocked).toBe(false)
+    expect(mapped.isFoundingArtist).toBe(true)
+  })
+
+  it('defaults a free template to unlocked with no Founding Artist badge', () => {
+    const mapped = mapTemplateToCard({ id: 'tmpl-2', name: 'Free One', category: 'birthday', price: 0 })
+    expect(mapped.price).toBe(0)
+    expect(mapped.isUnlocked).toBe(true)
+    expect(mapped.isFoundingArtist).toBe(false)
   })
 })
 
