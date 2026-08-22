@@ -2114,7 +2114,22 @@ function CardPreviewModal({
                 </div>
 
                 {/* Reply form */}
-                {!chainSubmitted ? (
+                {chainDelivered ? (
+                  // 6.4: the backend already 400s a write to a delivered
+                  // chain -- this just shows the closed state up front
+                  // instead of letting a viewer fill out a form that will
+                  // fail on submit.
+                  <div className="cp-chain-reply-sent">
+                    <p className="cp-chain-sent-msg" style={{ color: c.theme.accentColor }}>This chain has been delivered — no more replies can be added.</p>
+                    <button
+                      className="cp-continue-btn visible"
+                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      onClick={() => setStage('end')}
+                    >
+                      Continue
+                    </button>
+                  </div>
+                ) : !chainSubmitted ? (
                   <div className="cp-chain-reply-form">
                     <input
                       type="text"

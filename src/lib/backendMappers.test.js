@@ -401,6 +401,104 @@ describe('resolveBalance', () => {
 
 // Phase 2.2: every card-returning endpoint puts `slug` at the top level of
 // the card object.
+// 6.4: Chain Card terminal recipient + unlock condition rides in
+// layoutdata.styleExtras.chainTerminal -- the exact path the backend reads
+// (createCardInternal's bounds check, getCardBySlug/checkChainDateUnlocks).
+describe('cardObjectToBackendPayload — chain terminal recipient (6.4)', () => {
+  it('sends chainTerminal when the originator turned it on and named a recipient', () => {
+    const c = card()
+    const { layoutdata } = cardObjectToBackendPayload(c, {
+      type: 'chain',
+      tier: 'classic',
+      chain: {
+        prompt: 'Add your memory',
+        terminal: { enabled: true, recipientName: 'Ada', recipientEmail: 'ada@example.com', unlockType: 'count', unlockCount: '5' },
+      },
+    })
+    expect(layoutdata.styleExtras.chainTerminal).toEqual({
+      recipientName: 'Ada',
+      recipientEmail: 'ada@example.com',
+      unlockType: 'count',
+      unlockAt: undefined,
+      unlockCount: 5,
+    })
+  })
+
+  it('omits chainTerminal entirely when the toggle is off', () => {
+    const c = card()
+    const { layoutdata } = cardObjectToBackendPayload(c, {
+      type: 'chain',
+      tier: 'classic',
+      chain: { prompt: 'Add your memory', terminal: { enabled: false, recipientName: '', unlockType: 'count', unlockCount: 5 } },
+    })
+    expect(layoutdata.styleExtras?.chainTerminal).toBeUndefined()
+  })
+
+  it('omits chainTerminal when enabled but no recipient name was given', () => {
+    // Sending an obviously-incomplete config is pointless -- the backend's
+    // own bounds check would reject it anyway ("recipient name required").
+    const c = card()
+    const { layoutdata } = cardObjectToBackendPayload(c, {
+      type: 'chain',
+      tier: 'classic',
+      chain: { prompt: 'Add your memory', terminal: { enabled: true, recipientName: '   ', unlockType: 'count', unlockCount: 5 } },
+    })
+    expect(layoutdata.styleExtras?.chainTerminal).toBeUndefined()
+  })
+
+  it('sends the date field, not the count field, for a date-based unlock', () => {
+    const c = card()
+    const { layoutdata } = cardObjectToBackendPayload(c, {
+      type: 'chain',
+      tier: 'classic',
+      chain: { prompt: 'x', terminal: { enabled: true, recipientName: 'Ada', unlockType: 'date', unlockAt: '2030-01-01T00:00:00.000Z', unlockCount: 5 } },
+    })
+    expect(layoutdata.styleExtras.chainTerminal.unlockAt).toBe('2030-01-01T00:00:00.000Z')
+    expect(layoutdata.styleExtras.chainTerminal.unlockCount).toBeUndefined()
+  })
+
+  it('never sends chainTerminal for a non-chain type even if terminal data is present', () => {
+    const c = card()
+    const { layoutdata } = cardObjectToBackendPayload(c, {
+      type: 'personal',
+      tier: 'elite',
+      chain: { terminal: { enabled: true, recipientName: 'Ada', unlockType: 'count', unlockCount: 5 } },
+    })
+    expect(layoutdata.styleExtras?.chainTerminal).toBeUndefined()
+  })
+})
+
+describe('mapBackendCard — chain terminal + delivery status (6.4)', () => {
+  function chainBackendCard(overrides = {}) {
+    return {
+      slug: 'chain-1',
+      type: 'chain',
+      config: { content: { challenge: 'Add your memory', rules: [] } },
+      enhancements: {},
+      layoutdata: {},
+      ...overrides,
+    }
+  }
+
+  it('surfaces chainTerminal from layoutdata.styleExtras onto chain.terminal', () => {
+    const terminal = { recipientName: 'Ada', unlockType: 'count', unlockCount: 5 }
+    const mapped = mapBackendCard(chainBackendCard({ layoutdata: { styleExtras: { chainTerminal: terminal } } }))
+    expect(mapped.chain.terminal).toEqual(terminal)
+  })
+
+  it('chain.terminal is null when no terminal was ever set', () => {
+    const mapped = mapBackendCard(chainBackendCard())
+    expect(mapped.chain.terminal).toBeNull()
+  })
+
+  it('surfaces chainDelivered at the top level', () => {
+    const delivered = mapBackendCard(chainBackendCard({ chainDelivered: true }))
+    const notDelivered = mapBackendCard(chainBackendCard())
+    expect(delivered.chainDelivered).toBe(true)
+    expect(notDelivered.chainDelivered).toBe(false)
+  })
+})
+
 describe('mapBackendCard slug resolution', () => {
   it('uses the top-level slug without warning', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})

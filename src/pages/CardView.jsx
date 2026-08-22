@@ -467,6 +467,7 @@ function CardView() {
         onQuestionResponse={handleQuestionResponse}
         interaction={interaction}
         chainState={card._chainState}
+        chainDelivered={!!card.chainDelivered}
         cardId={card.slug || card.id || id}
         senderName={card.senderName || card.sender || card.creatorName || ''}
         currentUser={currentUser}
