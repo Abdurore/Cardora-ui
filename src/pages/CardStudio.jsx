@@ -664,15 +664,16 @@ function CardStudio() {
       questions: [{ text: '', options: ['', '', '', ''], correctIndex: 0 }],
     }
   })
+  const DEFAULT_CHAIN_TERMINAL = { enabled: false, recipientName: '', recipientEmail: '', unlockType: 'count', unlockAt: '', unlockCount: 5 }
   const [chainData, setChainData] = useState(() => {
-    if (initialAutoSaved?.chainData) return initialAutoSaved.chainData
+    if (initialAutoSaved?.chainData) return { terminal: DEFAULT_CHAIN_TERMINAL, ...initialAutoSaved.chainData }
     if (cardData?.chain) {
-      return { enabled: true, prompt: cardData.chain.prompt || cardData.chain.challenge || '' }
+      return { enabled: true, prompt: cardData.chain.prompt || cardData.chain.challenge || '', terminal: cardData.chain.terminal ? { ...DEFAULT_CHAIN_TERMINAL, enabled: true, ...cardData.chain.terminal } : DEFAULT_CHAIN_TERMINAL }
     }
     if (cardData?.layoutConfig?.content?.challenge) {
-      return { enabled: true, prompt: cardData.layoutConfig.content.challenge || '' }
+      return { enabled: true, prompt: cardData.layoutConfig.content.challenge || '', terminal: DEFAULT_CHAIN_TERMINAL }
     }
-    return { enabled: false, prompt: '' }
+    return { enabled: false, prompt: '', terminal: DEFAULT_CHAIN_TERMINAL }
   })
   const [anonTemplate, setAnonTemplate] = useState(() => {
     const saved = initialAutoSaved?.anonTemplate
@@ -2660,6 +2661,79 @@ function CardStudio() {
                 ? 'Recipient will be invited to create and send a card back to you.'
                 : 'Toggle on to invite your recipient to reply with their own card.'}
           </p>
+
+          {/* 6.4: terminal recipient + unlock condition -- Chain Card type
+              only. "Without a terminal recipient it runs open-ended as
+              today." Free -- no rule in tierRequirements.js charges for it. */}
+          {isChainType && (
+            <div className="cs-sub-section">
+              <label className="cs-field cs-toggle-field">
+                <span>Set a terminal recipient</span>
+                <input
+                  type="checkbox"
+                  checked={chainData.terminal?.enabled || false}
+                  onChange={(e) => setChainData((prev) => ({ ...prev, terminal: { ...prev.terminal, enabled: e.target.checked } }))}
+                />
+              </label>
+              {chainData.terminal?.enabled && (
+                <>
+                  <p className="cs-hint">Contributions close once the unlock condition is met, and the finished chain is delivered to this person.</p>
+                  <label className="cs-field">
+                    <span>Recipient name</span>
+                    <input
+                      value={chainData.terminal.recipientName}
+                      onChange={(e) => setChainData((prev) => ({ ...prev, terminal: { ...prev.terminal, recipientName: e.target.value } }))}
+                      placeholder="Ada"
+                    />
+                  </label>
+                  <label className="cs-field">
+                    <span>Recipient email <small>(optional — for a delivery notification)</small></span>
+                    <input
+                      type="email"
+                      value={chainData.terminal.recipientEmail}
+                      onChange={(e) => setChainData((prev) => ({ ...prev, terminal: { ...prev.terminal, recipientEmail: e.target.value } }))}
+                      placeholder="ada@example.com"
+                    />
+                  </label>
+                  <p className="cs-sub-label">Unlock when</p>
+                  <div className="cs-choice-row">
+                    {[{ id: 'count', label: 'N contributors' }, { id: 'date', label: 'A specific date' }].map(({ id, label }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`cs-chip ${chainData.terminal.unlockType === id ? 'active' : ''}`}
+                        onClick={() => setChainData((prev) => ({ ...prev, terminal: { ...prev.terminal, unlockType: id } }))}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {chainData.terminal.unlockType === 'count' ? (
+                    <label className="cs-field">
+                      <span>Number of contributors</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={chainData.terminal.unlockCount}
+                        onChange={(e) => setChainData((prev) => ({ ...prev, terminal: { ...prev.terminal, unlockCount: e.target.value } }))}
+                      />
+                    </label>
+                  ) : (
+                    <label className="cs-field">
+                      <span>Unlock date &amp; time</span>
+                      <input
+                        type="datetime-local"
+                        min={toDatetimeLocalValue(new Date(Date.now() + 60 * 1000))}
+                        value={chainData.terminal.unlockAt ? toDatetimeLocalValue(new Date(chainData.terminal.unlockAt)) : ''}
+                        onChange={(e) => setChainData((prev) => ({ ...prev, terminal: { ...prev.terminal, unlockAt: e.target.value ? new Date(e.target.value).toISOString() : '' } }))}
+                      />
+                    </label>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </>
       )
     }

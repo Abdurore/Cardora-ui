@@ -23518,6 +23518,30 @@ a {
 .cr-chain-name { font-size: 0.82rem; font-weight: 700; color: #e2eaf0; }
 .cr-chain-time { font-size: 0.72rem; color: rgba(220,242,247,0.38); }
 .cr-chain-text { font-size: 0.88rem; color: rgba(220,242,247,0.8); margin: 0; line-height: 1.5; }
+/* 6.4: token-based (not the hardcoded-rgba pattern above) so no separate
+   light-mode override block is needed -- see CLAUDE.md's 7.13 note. */
+.cr-chain-terminal {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  margin-bottom: 14px;
+}
+.cr-chain-terminal p { margin: 0; }
+.cr-chain-delete-btn {
+  flex-shrink: 0;
+  align-self: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.cr-chain-delete-btn:hover { color: var(--text); border-color: var(--text-dim); }
 
 /* ── Anonymous inbox ── */
 .cr-anon-list { display: flex; flex-direction: column; gap: 10px; }
@@ -23610,6 +23634,18 @@ a {
 .cp-chain-reply-body { flex: 1; }
 .cp-chain-reply-name { font-size: 0.75rem; font-weight: 700; display: block; margin-bottom: 2px; }
 .cp-chain-reply-text { font-size: 0.85rem; margin: 0; line-height: 1.5; opacity: 0.85; }
+/* 6.4: "Report on every entry" -- a quiet per-entry trigger, not competing
+   visually with the reply content itself. */
+.cp-chain-reply-report {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  opacity: 0.35;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px;
+}
+.cp-chain-reply-report:hover { opacity: 0.75; }
 .cp-chain-reply-form { display: flex; flex-direction: column; gap: 10px; }
 .cp-chain-reply-form::before {
   content: 'Add your link';
@@ -23628,6 +23664,34 @@ a {
 .cp-chain-name-input:focus { border-color: currentColor !important; }
 .cp-chain-reply-sent { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
 .cp-chain-sent-msg { font-size: 0.9rem; font-weight: 700; margin: 0; }
+/* 6.4: the pass-along CTA is deliberately the loudest element on this
+   screen -- same visual weight as .cp-continue-btn -- with "skip" reduced
+   to a quiet text link underneath it, not a competing button. */
+.cp-chain-passalong-btn {
+  padding: 14px 28px;
+  border-radius: 999px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.2);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.cp-chain-passalong-btn:hover { transform: translateY(-2px); }
+.cp-chain-passalong-skip {
+  background: none;
+  border: none;
+  font-size: 0.78rem;
+  opacity: 0.6;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 4px;
+}
+.cp-chain-passalong-skip:hover { opacity: 0.85; }
 
 /* ═══════════════════════════════════════════════════════
    LIGHT THEME  —  variable-driven (tokens defined in index.css)

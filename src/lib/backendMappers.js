@@ -852,6 +852,25 @@ export function cardObjectToBackendPayload(cardObject, {
   // The backend stores layoutdata and returns it with GET /cards/:slug.
   const layoutdata = cardObjectToLayoutData(cardObject)
 
+  // 6.4: Chain Card terminal recipient + unlock condition -- same
+  // layoutdata.styleExtras home as scheduledSendAt. Only sent when the
+  // originator actually turned it on and named a recipient; the backend's
+  // own bounds check (recipient required, date/count validity) is the real
+  // gate, this just avoids sending an obviously-incomplete config.
+  if (normalType === 'chain' && chain?.terminal?.enabled && String(chain.terminal.recipientName || '').trim()) {
+    const t = chain.terminal
+    layoutdata.styleExtras = {
+      ...(layoutdata.styleExtras || {}),
+      chainTerminal: {
+        recipientName: t.recipientName.trim(),
+        recipientEmail: t.recipientEmail?.trim() || undefined,
+        unlockType: t.unlockType,
+        unlockAt: t.unlockType === 'date' ? t.unlockAt : undefined,
+        unlockCount: t.unlockType === 'count' ? Number(t.unlockCount) : undefined,
+      },
+    }
+  }
+
   const payload = {
     config: { colors, font, content },
     enhancements,
@@ -1142,8 +1161,11 @@ export function mapBackendCard(card) {
       ? { question: pollContent.question || '', options: pollOptions, allowMultiple: !!pollContent.allowMultiple }
       : (pollContent.question && !content.header ? { question: pollContent.question, options: pollOptions } : null),
     chain: type === 'chain'
-      ? { challenge: chainContent.challenge || chainContent.prompt || '', prompt: chainContent.prompt || chainContent.challenge || '', rules: chainContent.rules || [] }
+      ? { challenge: chainContent.challenge || chainContent.prompt || '', prompt: chainContent.prompt || chainContent.challenge || '', rules: chainContent.rules || [], terminal: layout.styleExtras?.chainTerminal || null }
       : (chainContent.challenge || chainContent.prompt ? { challenge: chainContent.challenge || chainContent.prompt, rules: chainContent.rules || [] } : null),
+    // 6.4: "the compiled card is delivered to the final recipient at
+    // unlock" -- once true, the chain is closed to further entries.
+    chainDelivered: !!card.chainDelivered,
     trivia: type === 'trivia'
       ? { questions: triviaQuestions }
       : (triviaQuestions.length ? { questions: triviaQuestions } : null),

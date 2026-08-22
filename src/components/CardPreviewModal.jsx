@@ -10,6 +10,7 @@ import { prefersReducedMotion, getMotionIntensity } from '../lib/deviceCapabilit
 import { useDepthMotion } from '../lib/useDepthMotion.js'
 import { claimGiftFromCard } from '../lib/api.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
+import ReportModal from './ReportModal.jsx'
 
 // Code-split: three.js is a large dependency and must never load for a card
 // that doesn't use the galaxy.
@@ -73,6 +74,7 @@ function CardPreviewModal({
   onQuestionResponse = null,
   onAnonSubmit = null,
   chainState = null,
+  chainDelivered = false,
   interaction = null,
   reactions = null,
   onReact = null,
@@ -412,6 +414,9 @@ function CardPreviewModal({
   const [chainSubmitted, setChainSubmitted] = useState(false)
   const [chainSubmitError, setChainSubmitError] = useState('')
   const [localChainReplies, setLocalChainReplies] = useState([])
+  // 6.4: "Report on every entry" -- which chain reply (by id/index) is
+  // currently being reported, or null when the modal is closed.
+  const [reportingEntry, setReportingEntry] = useState(null)
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
 
   const giftAllowed = pageMode ? true : limit('allowGifts')
@@ -2084,7 +2089,7 @@ function CardPreviewModal({
                     </p>
                   ) : (
                     localChainReplies.map((r, i) => (
-                      <div key={r.userId || r.id || i} className="cp-chain-reply">
+                      <div key={r.id || r.userId || i} className="cp-chain-reply">
                         <div className="cp-chain-reply-avatar" style={{ background: `${c.theme.accentColor}30`, color: c.theme.accentColor }}>
                           {(r.name || '?')[0].toUpperCase()}
                         </div>
@@ -2092,6 +2097,17 @@ function CardPreviewModal({
                           <span className="cp-chain-reply-name" style={{ color: c.theme.accentColor }}>{r.name || 'Someone'}</span>
                           <p className="cp-chain-reply-text" style={{ color: c.card.textColor }}>{r.response || r.message}</p>
                         </div>
+                        {r.id && (
+                          <button
+                            type="button"
+                            className="cp-chain-reply-report"
+                            title="Report this entry"
+                            aria-label="Report this entry"
+                            onClick={() => setReportingEntry(r)}
+                          >
+                            &#9873;
+                          </button>
+                        )}
                       </div>
                     ))
                   )}
@@ -2153,14 +2169,29 @@ function CardPreviewModal({
                     )}
                   </div>
                 ) : (
+                  // 6.4: "the loudest element is Add yours and send it on →
+                  // wa.me share. This is the growth loop; do not bury it
+                  // under a confirmation." The share link is the page the
+                  // contributor is standing on right now — reusing it (not
+                  // a separately-constructed URL) means it can never drift.
                   <div className="cp-chain-reply-sent">
                     <p className="cp-chain-sent-msg" style={{ color: c.theme.accentColor }}>✓ Reply added to the chain!</p>
-                    <button
-                      className="cp-continue-btn visible"
+                    <a
+                      className="cp-chain-passalong-btn"
                       style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      href={`https://wa.me/?text=${encodeURIComponent(`I just added mine to this chain — add yours! ${typeof window !== 'undefined' ? window.location.href : ''}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Add yours and send it on →
+                    </a>
+                    <button
+                      type="button"
+                      className="cp-chain-passalong-skip"
+                      style={{ color: c.theme.accentColor }}
                       onClick={() => setStage('end')}
                     >
-                      Continue
+                      Continue without sharing
                     </button>
                   </div>
                 )}
@@ -2397,7 +2428,22 @@ function CardPreviewModal({
     </section>
   )
 
-  return pageMode ? inner : createPortal(inner, document.body)
+  // 6.4: rendered as a sibling regardless of pageMode/portal branching below
+  // -- ReportModal already portals itself to document.body, so it doesn't
+  // matter which branch `inner` takes.
+  const reportModal = reportingEntry && (
+    <ReportModal
+      type="card"
+      targetId={cardId}
+      targetName={reportingEntry.name || 'this entry'}
+      entryId={reportingEntry.id}
+      onClose={() => setReportingEntry(null)}
+    />
+  )
+
+  return pageMode
+    ? (<>{inner}{reportModal}</>)
+    : (<>{createPortal(inner, document.body)}{reportModal}</>)
 }
 
 export default CardPreviewModal

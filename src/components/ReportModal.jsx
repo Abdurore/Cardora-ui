@@ -17,7 +17,7 @@ const LABELS = {
   template: 'template',
 }
 
-export default function ReportModal({ type, targetId, targetName, onClose }) {
+export default function ReportModal({ type, targetId, targetName, entryId = null, onClose }) {
   const [reason, setReason] = useState('')
   const [details, setDetails] = useState('')
   const [phase, setPhase] = useState('form') // form | submitting | done | error
@@ -28,7 +28,9 @@ export default function ReportModal({ type, targetId, targetName, onClose }) {
     setPhase('submitting')
     try {
       if (type === 'user') await reportUser(targetId, reason, details)
-      else if (type === 'card') await reportCard(targetId, reason, details)
+      // 6.4: "report on every entry" -- entryId identifies the specific
+      // chain contributor entry alongside the card itself.
+      else if (type === 'card') await reportCard(targetId, reason, details, entryId)
       else await reportTemplate(targetId, reason, details)
       setPhase('done')
     } catch (err) {
@@ -51,7 +53,7 @@ export default function ReportModal({ type, targetId, targetName, onClose }) {
           </div>
         ) : (
           <>
-            <h3 className="report-modal-title">Report {LABELS[type] || 'item'}{targetName ? `: ${targetName}` : ''}</h3>
+            <h3 className="report-modal-title">Report {entryId ? 'entry' : (LABELS[type] || 'item')}{targetName ? `: ${targetName}` : ''}</h3>
             <p className="report-modal-sub">Select a reason so our moderation team can investigate quickly.</p>
 
             <div className="report-modal-reasons">

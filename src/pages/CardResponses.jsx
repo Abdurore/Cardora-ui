@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
 import { HiOutlineTrophy } from 'react-icons/hi2'
-import { getMyCard, revokeCard, releaseCardClaim } from '../lib/api.js'
+import { getMyCard, revokeCard, releaseCardClaim, deleteChainEntry } from '../lib/api.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
@@ -280,8 +280,18 @@ function TriviaLeaderboardView({ state, content }) {
 }
 
 // ── Chain replies ─────────────────────────────────────────────────────
-function ChainRepliesView({ state, content }) {
+function ChainRepliesView({ state, content, terminal, chainDelivered, onDeleteEntry }) {
   const responses = state?.responses || []
+  const [deletingId, setDeletingId] = useState(null)
+
+  const handleDelete = async (entryId) => {
+    setDeletingId(entryId)
+    try {
+      await onDeleteEntry(entryId)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   return (
     <div className="cr-section">
@@ -299,6 +309,19 @@ function ChainRepliesView({ state, content }) {
           </ul>
         </div>
       )}
+      {/* 6.4: terminal recipient + unlock condition status. Presence of
+          the object is the signal -- the backend never stores one unless
+          the originator turned it on (there's no separate `enabled` flag
+          on the stored shape). */}
+      {terminal && (
+        <div className="cr-chain-terminal">
+          {chainDelivered
+            ? <p>✓ Delivered to {terminal.recipientName || 'the terminal recipient'}.</p>
+            : terminal.unlockType === 'count'
+              ? <p>Delivers to {terminal.recipientName || 'the terminal recipient'} after {terminal.unlockCount} contributors ({responses.length} so far).</p>
+              : <p>Delivers to {terminal.recipientName || 'the terminal recipient'} on {terminal.unlockAt ? new Date(terminal.unlockAt).toLocaleString() : 'the set date'}.</p>}
+        </div>
+      )}
       <div className="cr-section-header">
         <h2 className="cr-section-title">Chain Replies</h2>
         <span className="cr-count-badge">{responses.length}</span>
@@ -308,7 +331,7 @@ function ChainRepliesView({ state, content }) {
       ) : (
         <div className="cr-chain-list">
           {[...responses].reverse().map((r, i) => (
-            <div key={r.userId || r.id || i} className="cr-chain-item">
+            <div key={r.id || r.userId || i} className="cr-chain-item">
               <div className="cr-chain-avatar">
                 {(r.name || '?')[0].toUpperCase()}
               </div>
@@ -319,6 +342,20 @@ function ChainRepliesView({ state, content }) {
                 </div>
                 <p className="cr-chain-text">{r.response || r.message || '—'}</p>
               </div>
+              {/* 6.4: originator moderation -- "delete any entry; deleted
+                  entries collapse silently with no tombstone." Entries from
+                  before this feature shipped have no id and aren't
+                  individually deletable. */}
+              {r.id && (
+                <button
+                  type="button"
+                  className="cr-chain-delete-btn"
+                  disabled={deletingId === r.id}
+                  onClick={() => handleDelete(r.id)}
+                >
+                  {deletingId === r.id ? '…' : 'Delete'}
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -516,6 +553,21 @@ function CardResponses() {
     }
   }
 
+  // 6.4: originator moderation -- removes the entry outright, no
+  // tombstone. Optimistic local removal since the backend $pull can't fail
+  // for any reason the sender needs to see (card/ownership were already
+  // confirmed by every earlier render on this page).
+  const handleDeleteChainEntry = async (entryId) => {
+    await deleteChainEntry(slug, entryId)
+    setRawCard((prev) => ({
+      ...prev,
+      state: {
+        ...prev.state,
+        responses: (prev.state?.responses || []).filter((r) => r.id !== entryId),
+      },
+    }))
+  }
+
   // 5.5: lets a new device claim this card fresh -- e.g. the recipient
   // lost their phone, or the sender wants to forward the link to someone
   // else entirely.
@@ -660,7 +712,15 @@ function CardResponses() {
         {(type === 'anonymous' || type === 'anon') && <AnonInboxView state={state} content={content} />}
         {type === 'poll' && <PollResultsView state={state} content={content} />}
         {type === 'trivia' && <TriviaLeaderboardView state={state} content={triviaContent} />}
-        {type === 'chain' && <ChainRepliesView state={state} content={content} />}
+        {type === 'chain' && (
+          <ChainRepliesView
+            state={state}
+            content={content}
+            terminal={layout.styleExtras?.chainTerminal || null}
+            chainDelivered={!!rawCard.chainDelivered}
+            onDeleteEntry={handleDeleteChainEntry}
+          />
+        )}
         {type === 'personal' && <PersonalResponsesView state={state} content={content} giftAttachment={rawCard.giftAttachment} views={rawCard.views} firstOpenedAt={rawCard.firstOpenedAt} />}
 
         {/* Slashed Cardora signature animation at the bottom left */}

@@ -308,6 +308,12 @@ export async function notifyMeForScheduledCard(slug, email) {
   return request(`/cards/${slug}/notify-me`, { method: 'POST', body: { email } })
 }
 
+// 6.4: originator moderation -- owner-only, removes one chain entry
+// outright (no tombstone left behind).
+export async function deleteChainEntry(slug, entryId) {
+  return request(`/cards/${slug}/chain-entries/${entryId}`, { method: 'DELETE', auth: true })
+}
+
 // Phase 2.3: all four of these used to try 4-8 candidate paths each,
 // confirmed against Backend/Cardora/src/routes/cardRoutes.js -- exactly one
 // path is ever registered for any of them (no `/public/cards/...` prefix
@@ -682,8 +688,10 @@ export async function reportUser(targetId, reason, details = '') {
   return request('/reports/users', { method: 'POST', auth: true, body: { targetId, reason, details } })
 }
 
-export async function reportCard(targetId, reason, details = '') {
-  return request('/reports/cards', { method: 'POST', auth: true, body: { targetId, reason, details } })
+// 6.4: entryId lets a chain-card report identify which specific
+// contributor entry it's about, alongside the card itself.
+export async function reportCard(targetId, reason, details = '', entryId = null) {
+  return request('/reports/cards', { method: 'POST', auth: true, body: { targetId, reason, details, ...(entryId ? { entryId } : {}) } })
 }
 
 export async function reportTemplate(targetId, reason, details = '') {
