@@ -1215,6 +1215,11 @@ function CardPreviewModal({
                 <span>{entryMeta.label}</span>
               </div>
 
+              {/* 5.3: sender attribution on the gate itself, not just the
+                  fallback hint text below -- "Someone" when unknown, never
+                  blank. */}
+              <p className="cp-entry-sender">{senderName || 'Someone'} sent you a card</p>
+
               <h1
                 className="cp-entry-title"
                 style={{

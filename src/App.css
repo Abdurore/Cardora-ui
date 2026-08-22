@@ -22708,6 +22708,15 @@ a {
   backdrop-filter: blur(8px);
 }
 
+/* Sender attribution — who this card is actually from */
+.cp-entry-sender {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
 /* Title */
 .cp-entry-title {
   font-size: clamp(1.5rem, 6vw, 2.2rem);

@@ -13,12 +13,15 @@ const BACKEND = (process.env.VITE_API_BASE_URL || 'https://cardora-uss3.onrender
 const SITE_ORIGIN = process.env.SITE_ORIGIN || 'https://cardora.studio'
 const LOGO_URL = `${SITE_ORIGIN}/cardora-logo.png?v=4`
 
+// 5.3: every description takes the resolved sender name (already defaulted
+// to "Someone" by the caller — never blank) so a shared link's unfurl says
+// who it's actually from, not a generic placeholder.
 const TYPE_COPY = {
-  personal: { title: (h) => h || 'You have a surprise', description: 'Someone sent you something made to be opened, not just viewed.' },
-  poll: { title: (h) => h || 'Cast your vote', description: 'Someone wants to know what you think — tap in to vote.' },
-  trivia: { title: () => 'You have been challenged to a quiz', description: 'Think you know the answers? Open the card to find out.' },
-  chain: { title: (h) => h || 'A chain was started for you', description: 'Keep it going — read the challenge and add your reply.' },
-  anonymous: { title: () => 'Send an anonymous message', description: '100% anonymous — nobody will know it was you.' },
+  personal: { title: (h) => h || 'You have a surprise', description: (s) => `${s} sent you something made to be opened, not just viewed.` },
+  poll: { title: (h) => h || 'Cast your vote', description: (s) => `${s} wants to know what you think — tap in to vote.` },
+  trivia: { title: () => 'You have been challenged to a quiz', description: (s) => `${s} challenged you — think you know the answers?` },
+  chain: { title: (h) => h || 'A chain was started for you', description: (s) => `${s} started this — keep it going and add your reply.` },
+  anonymous: { title: () => 'Send an anonymous message', description: () => '100% anonymous — nobody will know it was you.' },
 }
 
 function escapeHtml(value) {
@@ -84,6 +87,7 @@ export default async function handler(req, res) {
   const type = card?.type || 'personal'
   const copy = TYPE_COPY[type] || TYPE_COPY.personal
   const heading = card?.config?.content?.header || card?.config?.content?.question || card?.config?.content?.challenge || card?.name || card?.title || ''
+  const senderName = card?.senderName || 'Someone'
   // A stored per-card preview image (rendered from the card's actual design
   // and uploaded at send time) is a natural next step here — until that
   // exists, every unfurl falls back to the app logo, which is still a real
@@ -94,7 +98,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300')
   res.status(200).send(renderHtml({
     title: card ? copy.title(heading) : 'You have a surprise',
-    description: card ? copy.description : 'You have a surprise waiting on Cardora.',
+    description: card ? copy.description(senderName) : 'You have a surprise waiting on Cardora.',
     image,
     url,
   }))
