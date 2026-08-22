@@ -4806,6 +4806,46 @@
   animation: premiumLoaderTextPulse 3s ease-in-out infinite;
 }
 
+/* 5.1: the client-rendered mirror of api/card-meta.js's server gate --
+   same content, same class names, so there's no flash on handoff. */
+.cardora-ssr-gate img {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+}
+.cardora-ssr-gate .cg-sender {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  opacity: 0.75;
+  animation: none;
+  color: rgba(220, 242, 247, 0.85);
+}
+.cardora-ssr-gate .cg-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  max-width: 26ch;
+  animation: none;
+  color: #f2fdff;
+}
+.cardora-ssr-gate .cg-btn {
+  margin-top: 10px;
+  padding: 14px 32px;
+  border-radius: 100px;
+  border: none;
+  background: linear-gradient(135deg, #7ef7ff, #62ffa2);
+  color: #06110f;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  opacity: 0.85;
+}
+
 @keyframes premiumLoaderFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }

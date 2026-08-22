@@ -24,6 +24,20 @@ function CardView() {
   // `res.renderModel`, not `res.card`.
   const [interaction, setInteraction] = useState(null)
   const [reactions, setReactions] = useState(null)
+  // 5.1: api/card-meta.js now server-renders a real gate (sender name, card
+  // title, Open Card button) for every request, not just bots, and embeds
+  // this global for the client to pick up on mount so the very first paint
+  // matches the server HTML with zero flash. Read-and-delete once -- a
+  // client-side navigation to a *different* card slug later in the same
+  // session must not reuse this page load's stale embed, which is also why
+  // it's ignored outright if the embedded slug doesn't match this route.
+  const [ssrGate] = useState(() => {
+    if (typeof window === 'undefined') return null
+    const data = window.__CARDORA_SSR_CARD__
+    delete window.__CARDORA_SSR_CARD__
+    if (!data || (data.slug && data.slug !== id)) return null
+    return data
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -166,6 +180,24 @@ function CardView() {
 
   // ── Loading ──────────────────────────────────────────────────────────
   if (loading) {
+    // 5.1: the server already painted this exact content before any JS
+    // ran (see api/card-meta.js) — re-render it identically so there's no
+    // flash while the real card fetch finishes in the background.
+    if (ssrGate) {
+      return (
+        <div className="cv-page-loading cardora-ssr-gate">
+          <img src="/cardora-logo.png?v=4" alt="Cardora" />
+          <p className="cg-sender">{ssrGate.senderName || 'Someone'} sent you a card</p>
+          <p className="cg-title">{ssrGate.title || 'Open to see what it is'}</p>
+          <button className="cg-btn" type="button" disabled>Open Card</button>
+        </div>
+      )
+    }
+    // Generic fallback for the cases the server gate can't cover: a
+    // client-side navigation into this route from elsewhere in the app
+    // (the SPA shell is already warm, so a brief spinner is normal), or
+    // the gate function failing to reach the backend in time. This is the
+    // slow-connection path now, not the standard one.
     return (
       <div className="cv-page-loading">
         <div className="cv-logo-loader">
