@@ -15,8 +15,9 @@ import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
-import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground, updateTemplate, getEnterpriseAdStats } from '../lib/api.js'
+import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground, updateTemplate, getEnterpriseAdStats, getReminders, createReminder, deleteReminder } from '../lib/api.js'
 import { mapTemplateToCard, normalizeCheckoutSession } from '../lib/backendMappers.js'
+import { EXPLORE_OCCASION_TABS } from '../lib/occasionTaxonomy.js'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 
@@ -47,6 +48,111 @@ function normalizeProfileBackground(bg) {
     name: bg.name || bg.title || 'Profile Background',
     url,
   }
+}
+
+// 6.2: "Manageable and deletable from profile." Extracted rather than
+// inlined into the already-huge Profile() body -- self-contained state,
+// only needs currentUser to know whether to render at all.
+function RemindersSection({ currentUser }) {
+  const [reminders, setReminders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [recipientName, setRecipientName] = useState('')
+  const [occasion, setOccasion] = useState('Birthday')
+  const [date, setDate] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+
+  const loadReminders = () => {
+    getReminders().then((res) => {
+      setReminders(pickList(res, 'reminders'))
+    }).catch(() => {}).finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    if (!currentUser) return
+    loadReminders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id])
+
+  if (!currentUser) return null
+
+  const handleAdd = async () => {
+    if (!recipientName.trim() || !date) return
+    setSaving(true)
+    try {
+      await createReminder({ recipientName: recipientName.trim(), occasion, date })
+      setRecipientName('')
+      setDate('')
+      setShowAddForm(false)
+      loadReminders()
+    } catch { /* keep the form open so they can retry */ } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (id) => {
+    setDeletingId(id)
+    try {
+      await deleteReminder(id)
+      setReminders((prev) => prev.filter((r) => r.id !== id))
+    } catch { /* leave it in the list on failure */ } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="profile-reminders">
+      <div className="profile-reminders-head">
+        <h4 className="section-title">Occasion Reminders</h4>
+        <button type="button" className="ghost" onClick={() => setShowAddForm((v) => !v)}>
+          {showAddForm ? 'Cancel' : '+ Add'}
+        </button>
+      </div>
+
+      {showAddForm && (
+        <div className="profile-reminder-form">
+          <input
+            type="text"
+            placeholder="Who's this for?"
+            value={recipientName}
+            onChange={(e) => setRecipientName(e.target.value)}
+          />
+          <select value={occasion} onChange={(e) => setOccasion(e.target.value)}>
+            {EXPLORE_OCCASION_TABS.map((occ) => <option key={occ} value={occ}>{occ}</option>)}
+          </select>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <button type="button" className="primary" onClick={handleAdd} disabled={saving || !recipientName.trim() || !date}>
+            {saving ? 'Saving…' : 'Save Reminder'}
+          </button>
+        </div>
+      )}
+
+      {loading ? null : reminders.length === 0 ? (
+        <p className="profile-reminders-empty">No reminders yet.</p>
+      ) : (
+        <div className="profile-reminders-list">
+          {reminders.map((r) => (
+            <div key={r.id} className="profile-reminder-item">
+              <div>
+                <strong>{r.recipientName}'s {r.occasion}</strong>
+                <span>{new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{r.recurring ? ' · yearly' : ''}</span>
+              </div>
+              <button
+                type="button"
+                className="profile-reminder-delete"
+                aria-label="Delete reminder"
+                onClick={() => handleDelete(r.id)}
+                disabled={deletingId === r.id}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 
@@ -871,6 +977,8 @@ function Profile() {
             </div>
           </div>
         )}
+
+        <RemindersSection currentUser={currentUser} />
 
         {currentUser && savedDrafts.length > 0 ? (
           <div>

@@ -927,4 +927,27 @@ export function trackEvent(event, properties = {}) {
   request('/analytics/events', { method: 'POST', body: { event, properties } }).catch(() => {})
 }
 
+/* ═══════════════════════════════════════════════
+   6.2: OCCASION REMINDERS & NOTIFICATIONS
+   ═══════════════════════════════════════════════ */
+export async function createReminder(payload) {
+  return request('/reminders', { method: 'POST', auth: true, body: payload })
+}
+
+export async function getReminders() {
+  return request('/reminders', { auth: true })
+}
+
+export async function deleteReminder(id) {
+  return request(`/reminders/${encodeURIComponent(id)}`, { method: 'DELETE', auth: true })
+}
+
+export async function getNotifications() {
+  return request('/notifications', { auth: true })
+}
+
+export async function markNotificationRead(id) {
+  return request(`/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH', auth: true })
+}
+
 export { API_BASE }

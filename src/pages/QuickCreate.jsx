@@ -4,7 +4,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
 import { PALETTES, applyPalette } from '../lib/palettes.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
-import { attachGiftToCard, getCardPrices, getTemplateById, trackEvent } from '../lib/api.js'
+import { attachGiftToCard, getCardPrices, getTemplateById, getMyCard, trackEvent, createReminder } from '../lib/api.js'
+import { EXPLORE_OCCASION_TABS } from '../lib/occasionTaxonomy.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import { GiftIcon } from '../components/GiftCard.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
@@ -143,6 +144,30 @@ function QuickCreate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId])
 
+  // 6.2: "one-tap create action, prefilled with last year's card as a
+  // starting point" -- the occasion-reminder notification's action links
+  // here with ?fromCard=<slug>. getMyCard (not the public getCardBySlug)
+  // since this is the sender re-reading their own past card, not a
+  // recipient opening it -- avoids the view-count/first-open-claim side
+  // effects that path has for non-owners.
+  const fromCardSlug = params.get('fromCard') || ''
+  useEffect(() => {
+    if (!fromCardSlug) return
+    let cancelled = false
+    getMyCard(fromCardSlug).then((res) => {
+      if (cancelled) return
+      const card = res?.card || res?.data?.card || res?.data || res || null
+      const content = card?.config?.content || null
+      if (!content) return
+      if (cardType === 'personal') {
+        if (content.header) setHeading(content.header)
+        if (content.body) setBody(content.body)
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromCardSlug])
+
   // Poll
   const [pollQuestion, setPollQuestion] = useState('')
   const [pollOptions, setPollOptions] = useState(['', ''])
@@ -167,6 +192,14 @@ function QuickCreate() {
   const [sendResult, setSendResult] = useState(null) // null | { ok, slug, message }
   const [sendCopied, setSendCopied] = useState(false)
   const [sendEmail, setSendEmail] = useState('')
+  // 6.2: "Sender can attach an occasion and date to any recipient at send
+  // time." recipientName is just a display label ("Ada") -- there's no
+  // recipient-account/identity model in this product.
+  const [reminderRecipientName, setReminderRecipientName] = useState('')
+  const [reminderOccasion, setReminderOccasion] = useState('Birthday')
+  const [reminderDate, setReminderDate] = useState('')
+  const [savingReminder, setSavingReminder] = useState(false)
+  const [reminderSaved, setReminderSaved] = useState(false)
   const [error, setError] = useState(null)
   const [selectedGiftId, setSelectedGiftId] = useState('none')
 
@@ -449,6 +482,24 @@ function QuickCreate() {
     navigate(`/studio?type=${cardType}`, {
       state: { draftCardObject: cardObject },
     })
+  }
+
+  const handleSaveReminder = async () => {
+    if (!reminderRecipientName.trim() || !reminderDate) return
+    setSavingReminder(true)
+    try {
+      await createReminder({
+        recipientName: reminderRecipientName.trim(),
+        occasion: reminderOccasion,
+        date: reminderDate,
+        lastCardId: sendResult?.slug || null,
+      })
+      setReminderSaved(true)
+    } catch {
+      // Non-critical -- the card already sent successfully either way.
+    } finally {
+      setSavingReminder(false)
+    }
   }
 
   const cardLink = sendResult?.slug ? `${window.location.origin}/card/${sendResult.slug}` : null
@@ -1052,6 +1103,43 @@ function QuickCreate() {
                   )}
                 </div>
               </>
+            )}
+
+            {/* 6.2: optional occasion reminder, personal cards only */}
+            {!isSending && sendResult?.ok && cardType === 'personal' && (
+              <div className="qc-reminder-block">
+                {reminderSaved ? (
+                  <p className="qc-reminder-saved">✓ We'll remind you 5 days before.</p>
+                ) : (
+                  <>
+                    <p className="cs-send-link-label">Set a reminder for next year (optional)</p>
+                    <div className="qc-reminder-fields">
+                      <input
+                        type="text"
+                        placeholder="Who's this for?"
+                        value={reminderRecipientName}
+                        onChange={(e) => setReminderRecipientName(e.target.value)}
+                      />
+                      <select value={reminderOccasion} onChange={(e) => setReminderOccasion(e.target.value)}>
+                        {EXPLORE_OCCASION_TABS.map((occ) => <option key={occ} value={occ}>{occ}</option>)}
+                      </select>
+                      <input
+                        type="date"
+                        value={reminderDate}
+                        onChange={(e) => setReminderDate(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={handleSaveReminder}
+                        disabled={savingReminder || !reminderRecipientName.trim() || !reminderDate}
+                      >
+                        {savingReminder ? 'Saving…' : 'Remind me'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
 
             {/* Email row */}

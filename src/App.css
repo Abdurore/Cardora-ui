@@ -935,6 +935,63 @@
   color: #62ffa2;
 }
 
+/* 6.2: reminders card, same wrapper look as .profile-currency above. */
+.profile-reminders {
+  margin-top: 24px;
+  padding: 22px 24px;
+  border-radius: 22px;
+  border: 1px solid rgba(126, 247, 255, 0.12);
+  background: linear-gradient(180deg, rgba(10, 18, 22, 0.7), rgba(6, 12, 15, 0.5));
+  box-shadow: inset 0 1px 0 rgba(126, 247, 255, 0.06);
+}
+.profile-reminders-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.profile-reminders-head .section-title { margin: 0; }
+.profile-reminder-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+.profile-reminder-form input,
+.profile-reminder-form select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.profile-reminder-form button { grid-column: 1 / -1; }
+.profile-reminders-empty { margin: 12px 0 0; font-size: 0.85rem; color: var(--text-dim); }
+.profile-reminders-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.profile-reminder-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(126, 247, 255, 0.05);
+  border: 1px solid rgba(126, 247, 255, 0.1);
+}
+.profile-reminder-item div { display: flex; flex-direction: column; gap: 2px; }
+.profile-reminder-item strong { font-size: 0.88rem; color: var(--text); }
+.profile-reminder-item span { font-size: 0.76rem; color: var(--text-dim); }
+.profile-reminder-delete {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+.profile-reminder-delete:hover { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+
 .page {
   padding: 48px 6vw calc(80px + env(safe-area-inset-bottom));
   display: flex;
@@ -18574,6 +18631,31 @@ a {
   border-top: 1px solid rgba(118, 239, 255, 0.06);
 }
 
+/* 6.2: styled via tokens so it needs no separate light-mode block. */
+.qc-reminder-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.qc-reminder-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.qc-reminder-fields input,
+.qc-reminder-fields select {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.qc-reminder-fields button { grid-column: 1 / -1; }
+.qc-reminder-saved { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+
 .cs-send-modal-email-input-wrap {
   display: flex;
   gap: 8px;
@@ -23552,6 +23634,80 @@ a {
   border-color: var(--accent-mid);
 }
 [data-theme="light"] .header-theme-btn:hover { background: var(--accent-mid); }
+
+/* 6.2: notification bell -- styled via tokens directly (var(--surface) etc.)
+   so it needs no separate [data-theme="light"] block, per 7.13's "fix the
+   architecture, don't extend it" rule for new app-chrome components. */
+.header-notifications { position: relative; }
+.header-notif-btn {
+  position: relative;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.11);
+  color: var(--text);
+  cursor: pointer; flex-shrink: 0;
+  transition: background 0.18s, transform 0.18s;
+}
+.header-notif-btn:hover { background: rgba(255,255,255,0.14); transform: scale(1.08); }
+[data-theme="light"] .header-notif-btn { background: var(--accent-soft); border-color: var(--accent-mid); }
+[data-theme="light"] .header-notif-btn:hover { background: var(--accent-mid); }
+.header-notif-badge {
+  position: absolute;
+  top: -3px; right: -3px;
+  min-width: 15px; height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #ff6b6b;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.header-notif-backdrop { position: fixed; inset: 0; z-index: 4998; }
+.header-notif-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(320px, 88vw);
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 4999;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 20px 44px rgba(0,0,0,0.35);
+}
+.header-notif-title {
+  margin: 2px 6px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.header-notif-empty { margin: 6px; font-size: 0.85rem; color: var(--text-dim); }
+.header-notif-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+.header-notif-item:hover { background: var(--surface); }
+.header-notif-item strong { font-size: 0.85rem; }
+.header-notif-item span { font-size: 0.78rem; color: var(--text-muted); }
+.header-notif-item.unread strong::before { content: '● '; color: #7ef7ff; font-size: 0.6rem; }
 
 /* ════════════════════════════════════════════════════════
    LIGHT THEME — comprehensive overrides

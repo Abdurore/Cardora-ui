@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { MdLightMode, MdDarkMode } from 'react-icons/md'
+import { MdLightMode, MdDarkMode, MdNotificationsNone } from 'react-icons/md'
+import { getNotifications, markNotificationRead } from '../lib/api.js'
 
 const BRAND_LOGO = '/cardora-icon.png?v=3'
 
@@ -13,6 +14,36 @@ function getDeviceTheme() {
 }
 
 function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
+  const navigate = useNavigate()
+  // 6.2: this header re-mounts on every route change (each page renders its
+  // own <ScreenHeader>, there's no persistent layout instance) -- self-
+  // contained fetch-on-mount rather than threading notification state
+  // through MainLayout's outlet context for every page that uses this.
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const userId = user?.id
+
+  useEffect(() => {
+    if (!userId) return undefined
+    let cancelled = false
+    getNotifications().then((res) => {
+      if (cancelled) return
+      setNotifications(res?.notifications || res?.data?.notifications || [])
+      setUnreadCount(res?.unreadCount ?? res?.data?.unreadCount ?? 0)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [userId])
+
+  const handleOpenNotification = async (notification) => {
+    setShowNotifications(false)
+    if (!notification.read) {
+      markNotificationRead(notification.id).catch(() => {})
+      setUnreadCount((c) => Math.max(0, c - 1))
+    }
+    if (notification.actionUrl) navigate(notification.actionUrl)
+  }
+
   const [theme, setTheme] = useState(() => {
     try {
       const stored = localStorage.getItem('cardora-theme')
@@ -55,6 +86,43 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
         >
           {theme === 'light' ? <MdDarkMode size={20} /> : <MdLightMode size={20} />}
         </button>
+        {user && (
+          <div className="header-notifications">
+            <button
+              type="button"
+              className="header-notif-btn"
+              onClick={() => setShowNotifications((v) => !v)}
+              aria-label="Notifications"
+              aria-expanded={showNotifications}
+            >
+              <MdNotificationsNone size={20} />
+              {unreadCount > 0 && <span className="header-notif-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            </button>
+            {showNotifications && (
+              <>
+                <div className="header-notif-backdrop" onClick={() => setShowNotifications(false)} />
+                <div className="header-notif-panel">
+                  <p className="header-notif-title">Notifications</p>
+                  {notifications.length === 0 ? (
+                    <p className="header-notif-empty">Nothing yet.</p>
+                  ) : (
+                    notifications.map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        className={`header-notif-item ${n.read ? '' : 'unread'}`}
+                        onClick={() => handleOpenNotification(n)}
+                      >
+                        <strong>{n.title}</strong>
+                        <span>{n.body}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
         {user ? (
           <Link to="/profile" className="header-user-capsule" aria-label="Profile">
             <span className="header-capsule-avatar">
