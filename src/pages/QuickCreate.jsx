@@ -168,6 +168,19 @@ function QuickCreate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromCardSlug])
 
+  // 6.5: "Send one back" -- CardPreviewModal's personal-card end screen
+  // links here with ?replyTo=<originalSlug>&replySender=<name>. The name
+  // rides in the query param itself (not a fetch) specifically to avoid
+  // re-triggering GET /cards/:slug's view-count increment just to look up
+  // a name the replier's own previous screen already had in memory.
+  const replyTo = params.get('replyTo') || ''
+  const replySender = params.get('replySender') || ''
+  useEffect(() => {
+    if (!replyTo || cardType !== 'personal') return
+    setHeading((prev) => prev || (replySender ? `Right back at you, ${replySender}!` : 'Right back at you!'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replyTo])
+
   // Poll
   const [pollQuestion, setPollQuestion] = useState('')
   const [pollOptions, setPollOptions] = useState(['', ''])
@@ -503,6 +516,13 @@ function QuickCreate() {
   }
 
   const cardLink = sendResult?.slug ? `${window.location.origin}/card/${sendResult.slug}` : null
+  // 6.5: there's no real delivery/addressing mechanism for "send one back"
+  // beyond this same generic share row every Quick Create success screen
+  // already has -- just a reply-flavoured share message instead of the
+  // generic one.
+  const shareText = replyTo
+    ? `Sending one back to you${replySender ? `, ${replySender}` : ''}!`
+    : 'Check out this card I made on Cardora'
   const s3 = STEP3_CONFIG[cardType] || STEP3_CONFIG.personal
   const bal = balance ?? 0
 
@@ -656,6 +676,9 @@ function QuickCreate() {
 
               {cardType === 'personal' && (
                 <div className="qc-fields">
+                  {replyTo && (
+                    <p className="qc-reply-banner">↩ Replying to {replySender || 'their card'}</p>
+                  )}
                   <div className="qc-field">
                     <div className="qc-field-header">
                       <label>Heading</label>
@@ -1073,7 +1096,7 @@ function QuickCreate() {
                   {SHARE_PLATFORMS.map((p) => (
                     <a
                       key={p.id}
-                      href={p.getUrl(cardLink, 'Check out this card I made on Cardora')}
+                      href={p.getUrl(cardLink, shareText)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="detail-share-platform-btn"
@@ -1090,7 +1113,7 @@ function QuickCreate() {
                       style={{ '--platform-color': 'rgba(118,239,255,0.7)' }}
                       onClick={async () => {
                         try {
-                          await navigator.share({ title: 'Cardora Card', text: 'Check out this card I made on Cardora', url: cardLink })
+                          await navigator.share({ title: 'Cardora Card', text: shareText, url: cardLink })
                         } catch { /* cancelled */ }
                       }}
                     >

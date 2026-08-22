@@ -18673,6 +18673,19 @@ a {
 .qc-reminder-fields button { grid-column: 1 / -1; }
 .qc-reminder-saved { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
 
+/* 6.5: "Send one back" reply-context banner -- token-based, no light-mode
+   override needed. */
+.qc-reply-banner {
+  margin: 0 0 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .cs-send-modal-email-input-wrap {
   display: flex;
   gap: 8px;

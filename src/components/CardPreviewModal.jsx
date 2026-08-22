@@ -795,6 +795,36 @@ function CardPreviewModal({
     }
   }
 
+  // 6.5: "pre-addressed to the original sender" -- there's no recipient-
+  // identity/inbox system anywhere in this product (cards are shared by
+  // link only), so "addressed" means the new card's own creation flow
+  // knows who it's replying to (via the same ?fromCard=-style convention
+  // 6.2 already established) rather than any real delivery mechanism.
+  // "No account" resolves through the existing signup flow (which already
+  // grants starter CC, covering "zero balance" too) rather than new guest
+  // card-creation infrastructure -- openAuthModal's returnTo lands the
+  // signed-up user right back on this same reply path.
+  const handleSendOneBack = () => {
+    // senderName is passed straight through as a query param rather than
+    // having QuickCreate re-fetch the original card to learn it -- a
+    // second GET /cards/:slug here would double-count this card's view
+    // (getCardBySlug increments `views` on every non-owner fetch) purely
+    // to look up a name the replier's own screen already has in memory.
+    const replyPath = `/quick?type=personal&replyTo=${encodeURIComponent(cardId)}${senderName ? `&replySender=${encodeURIComponent(senderName)}` : ''}`
+    if (!currentUser) {
+      if (openAuthModal) {
+        openAuthModal(null, replyPath, {
+          title: 'Sign in to send one back',
+          message: 'Create a free account and you\'ll land right back here, ready to send your own card.',
+        })
+      } else {
+        navigate('/login')
+      }
+      return
+    }
+    navigate(replyPath)
+  }
+
   useEffect(() => {
     if (!pageMode || stage !== 'end' || !hasGift) return undefined
     const id = window.setTimeout(() => setStage('giftIntro'), 900)
@@ -2274,22 +2304,51 @@ function CardPreviewModal({
                   <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleReset}>
                     Replay
                   </button>
-                  <button
-                    type="button"
-                    className="cp-end-btn ghost"
-                    style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
-                    onClick={() => navigate('/')}
-                  >
-                    Create yours
-                  </button>
-                  <button
-                    type="button"
-                    className="cp-end-btn ghost"
-                    style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)',  }}
-                    onClick={() => navigate('/')}
-                  >
-                    Done
-                  </button>
+                  {studioType === 'personal' ? (
+                    // 6.5: "Every Personal Card ends with Send one back ->
+                    // new Personal Card pre-addressed to the original
+                    // sender... replaces the current unclear Done+ button."
+                    // A quiet "Done" stays underneath for anyone who just
+                    // wants to leave, but it's no longer equal-weight with
+                    // the reply CTA.
+                    <>
+                      <button
+                        type="button"
+                        className="cp-end-btn"
+                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        onClick={handleSendOneBack}
+                      >
+                        Send one back
+                      </button>
+                      <button
+                        type="button"
+                        className="cp-end-btn ghost"
+                        style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }}
+                        onClick={() => navigate('/')}
+                      >
+                        Done
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="cp-end-btn ghost"
+                        style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                        onClick={() => navigate('/')}
+                      >
+                        Create yours
+                      </button>
+                      <button
+                        type="button"
+                        className="cp-end-btn ghost"
+                        style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)',  }}
+                        onClick={() => navigate('/')}
+                      >
+                        Done
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
