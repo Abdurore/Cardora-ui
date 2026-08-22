@@ -4731,6 +4731,22 @@
 
 .cv-gate-lock { font-size: 2.2rem; }
 
+.cv-report-trigger {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 5001;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 14, 20, 0.55);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.72rem;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.cv-report-trigger:hover { color: rgba(255, 255, 255, 0.9); border-color: rgba(255, 255, 255, 0.3); }
+
 .cv-gate-input {
   width: 100%;
   padding: 12px 16px;

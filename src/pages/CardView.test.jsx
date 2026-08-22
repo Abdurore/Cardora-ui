@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import CardView from './CardView.jsx'
+import { getCardBySlug } from '../lib/api.js'
 
 // 5.1: api/card-meta.js embeds window.__CARDORA_SSR_CARD__ so the very
 // first client paint matches the server-rendered gate with zero flash,
@@ -73,5 +74,34 @@ describe('CardView — SSR gate handoff', () => {
     renderAt('abc123')
 
     expect(screen.getByText('Someone sent you a card')).toBeInTheDocument()
+  })
+})
+
+// 5.5: revoke and first-open-claim each get their own dedicated screen --
+// not a generic error, not a 404 -- per the master prompt's failure-states
+// table (6.9) and card-privacy spec (5.5).
+describe('CardView — 5.5 blocked states', () => {
+  it('shows a dedicated screen when the card was revoked by the sender', async () => {
+    const err = new Error('Gone')
+    err.status = 410
+    err.payload = { revoked: true, message: 'This card was withdrawn by the sender.' }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByText('This card was withdrawn by the sender.')).toBeInTheDocument())
+    expect(screen.getByText('This card was withdrawn')).toBeInTheDocument()
+  })
+
+  it('shows a dedicated screen when a different device already claimed the card', async () => {
+    const err = new Error('Conflict')
+    err.status = 409
+    err.payload = { alreadyOpened: true, message: 'This card has already been opened by its recipient.' }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByText('This card has already been opened by its recipient.')).toBeInTheDocument())
+    expect(screen.getByText('Already opened')).toBeInTheDocument()
   })
 })

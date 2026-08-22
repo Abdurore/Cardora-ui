@@ -15,6 +15,8 @@ function CardView() {
   const [fetchError, setFetchError] = useState(null)
   const [needsPassword, setNeedsPassword] = useState(false)
   const [lockHint, setLockHint] = useState('')
+  const [isRevoked, setIsRevoked] = useState(false)
+  const [alreadyOpenedElsewhere, setAlreadyOpenedElsewhere] = useState(false)
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [showReport, setShowReport] = useState(false)
@@ -97,6 +99,16 @@ function CardView() {
         if (err.status === 403 || err.payload?.locked) {
           setNeedsPassword(true)
           setLockHint(err.payload?.lockHint || '')
+          setLoading(false)
+          if (!cancelled) return
+        }
+        if (err.payload?.revoked) {
+          setIsRevoked(true)
+          setLoading(false)
+          if (!cancelled) return
+        }
+        if (err.payload?.alreadyOpened) {
+          setAlreadyOpenedElsewhere(true)
           setLoading(false)
           if (!cancelled) return
         }
@@ -204,6 +216,32 @@ function CardView() {
           <img src="/cardora-logo.png?v=4" alt="" />
         </div>
         <p>Preparing your surprise</p>
+      </div>
+    )
+  }
+
+  // ── Revoked (5.5: sender kill switch) ──────────────────────────────────
+  if (isRevoked) {
+    return (
+      <div className="cv-page-gate">
+        <div className="cv-gate-card">
+          <span className="cv-gate-lock">🚫</span>
+          <h2>This card was withdrawn</h2>
+          <p>This card was withdrawn by the sender.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Already opened elsewhere (5.5: first-open claim) ───────────────────
+  if (alreadyOpenedElsewhere) {
+    return (
+      <div className="cv-page-gate">
+        <div className="cv-gate-card">
+          <span className="cv-gate-lock">✉️</span>
+          <h2>Already opened</h2>
+          <p>This card has already been opened by its recipient.</p>
+        </div>
       </div>
     )
   }
@@ -341,6 +379,19 @@ function CardView() {
         openAuthModal={openAuthModal}
         refreshBalance={refreshBalance}
       />
+      {/* 5.5: "report on every card view" -- this had no trigger anywhere
+          in this component before; showReport could only ever be set back
+          to false. Works for a guest too (see reportRoutes.js's
+          optionalAuth), since most recipients never make an account. */}
+      <button
+        type="button"
+        className="cv-report-trigger"
+        title="Report this card"
+        aria-label="Report this card"
+        onClick={() => setShowReport(true)}
+      >
+        &#9873; Report
+      </button>
       {showReport && (
         <ReportModal
           type="card"

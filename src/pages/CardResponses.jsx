@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
 import { HiOutlineTrophy } from 'react-icons/hi2'
-import { getMyCard } from '../lib/api.js'
+import { getMyCard, revokeCard, releaseCardClaim } from '../lib/api.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
@@ -350,17 +350,20 @@ function GiftStatusBlock({ giftAttachment }) {
 }
 
 // ── Personal responses ────────────────────────────────────────────────
-function ViewsStatBlock({ views }) {
+function ViewsStatBlock({ views, firstOpenedAt }) {
   const count = Number(views) || 0
   return (
     <div className="cr-views-stat">
       <span className="cr-views-stat-num">{count}</span>
       <span className="cr-views-stat-label">{count === 1 ? 'person has' : 'people have'} opened this card's link</span>
+      {firstOpenedAt && (
+        <span className="cr-views-stat-label">First opened {timeSince(firstOpenedAt)}</span>
+      )}
     </div>
   )
 }
 
-function PersonalResponsesView({ state, content, giftAttachment, views }) {
+function PersonalResponsesView({ state, content, giftAttachment, views, firstOpenedAt }) {
   const answers = state?.answers || []
   const hasQuestion = content?.questionBlock?.enabled && content?.questionBlock?.question
   const message = content?.body || content?.message || ''
@@ -368,7 +371,7 @@ function PersonalResponsesView({ state, content, giftAttachment, views }) {
   if (!hasQuestion) {
     return (
       <div className="cr-section">
-        <ViewsStatBlock views={views} />
+        <ViewsStatBlock views={views} firstOpenedAt={firstOpenedAt} />
         <GiftStatusBlock giftAttachment={giftAttachment} />
         {message && (
           <div className="cr-chain-challenge">
@@ -439,6 +442,10 @@ function CardResponses() {
   const [refreshing, setRefreshing] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(null)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [revoking, setRevoking] = useState(false)
+  const [revokeMsg, setRevokeMsg] = useState('')
+  const [releasingClaim, setReleasingClaim] = useState(false)
+  const [claimMsg, setClaimMsg] = useState('')
 
   const loadCard = useCallback(async () => {
     try {
@@ -490,6 +497,39 @@ function CardResponses() {
     setRefreshing(true)
     await loadCard()
     setRefreshing(false)
+  }
+
+  // 5.5: sender revoke -- immediate kill switch, reversible (the same
+  // endpoint reinstates with { revoked: false }).
+  const handleToggleRevoke = async () => {
+    setRevoking(true)
+    setRevokeMsg('')
+    try {
+      const nextRevoked = !rawCard.isRevoked
+      await revokeCard(slug, nextRevoked)
+      setRawCard((prev) => ({ ...prev, isRevoked: nextRevoked }))
+      setRevokeMsg(nextRevoked ? 'Card withdrawn.' : 'Card reinstated.')
+    } catch (err) {
+      setRevokeMsg(err.message || 'Could not update this card.')
+    } finally {
+      setRevoking(false)
+    }
+  }
+
+  // 5.5: lets a new device claim this card fresh -- e.g. the recipient
+  // lost their phone, or the sender wants to forward the link to someone
+  // else entirely.
+  const handleReleaseClaim = async () => {
+    setReleasingClaim(true)
+    setClaimMsg('')
+    try {
+      await releaseCardClaim(slug)
+      setClaimMsg('Claim released — the next device to open this card will claim it.')
+    } catch (err) {
+      setClaimMsg(err.message || 'Could not release the claim.')
+    } finally {
+      setReleasingClaim(false)
+    }
   }
 
   if (loading) {
@@ -580,7 +620,22 @@ function CardResponses() {
                 {linkCopied ? '✨ Copied' : 'Copy Link'}
               </button>
             )}
+            <button
+              className={`cr-action-btn ${rawCard.isRevoked ? 'copied' : ''}`}
+              type="button"
+              onClick={handleToggleRevoke}
+              disabled={revoking}
+            >
+              {revoking ? 'Working…' : rawCard.isRevoked ? 'Reinstate card' : 'Withdraw card'}
+            </button>
+            {(rawCard.type || '').toLowerCase() === 'personal' && rawCard.firstOpenedAt && (
+              <button className="cr-action-btn" type="button" onClick={handleReleaseClaim} disabled={releasingClaim}>
+                {releasingClaim ? 'Working…' : 'Release claim'}
+              </button>
+            )}
           </div>
+          {revokeMsg && <p className="cr-card-date">{revokeMsg}</p>}
+          {claimMsg && <p className="cr-card-date">{claimMsg}</p>}
           {isChain && (
             <p className="cr-live-badge">
               <span className="cr-live-dot" />
@@ -606,7 +661,7 @@ function CardResponses() {
         {type === 'poll' && <PollResultsView state={state} content={content} />}
         {type === 'trivia' && <TriviaLeaderboardView state={state} content={triviaContent} />}
         {type === 'chain' && <ChainRepliesView state={state} content={content} />}
-        {type === 'personal' && <PersonalResponsesView state={state} content={content} giftAttachment={rawCard.giftAttachment} views={rawCard.views} />}
+        {type === 'personal' && <PersonalResponsesView state={state} content={content} giftAttachment={rawCard.giftAttachment} views={rawCard.views} firstOpenedAt={rawCard.firstOpenedAt} />}
 
         {/* Slashed Cardora signature animation at the bottom left */}
         <div className="cp-personal-signature" style={{ 

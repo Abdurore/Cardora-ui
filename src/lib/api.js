@@ -249,13 +249,57 @@ export async function getCardPrices() {
   return request('/cards/prices')
 }
 
+// 5.5: first-open claim. The claiming device gets a server-signed token
+// back in the response, persisted here per-slug; every later fetch of the
+// same card sends it back so the server can tell "the original claimant
+// reopening" apart from "a different device" -- see cardController.js's
+// getCardBySlug for why this can't just be the client-suppliable
+// X-Guest-Id header.
+function claimTokenStorageKey(slug) {
+  return `cardora:claimToken:${slug}`
+}
+
+function getStoredClaimToken(slug) {
+  try {
+    return localStorage.getItem(claimTokenStorageKey(slug)) || ''
+  } catch {
+    return ''
+  }
+}
+
+function storeClaimTokenIfPresent(slug, response) {
+  const token = response?.claimToken || response?.data?.claimToken
+  if (!token) return response
+  try {
+    localStorage.setItem(claimTokenStorageKey(slug), token)
+  } catch { /* ignore */ }
+  return response
+}
+
 export async function getCardBySlug(slug, password) {
   const qs = password ? `?password=${encodeURIComponent(password)}` : ''
-  return request(`/cards/${slug}${qs}`)
+  const claimToken = getStoredClaimToken(slug)
+  const response = await request(`/cards/${slug}${qs}`, {
+    headers: claimToken ? { 'X-Claim-Token': claimToken } : {},
+  })
+  return storeClaimTokenIfPresent(slug, response)
 }
 
 export async function getMyCard(slug) {
   return request(`/cards/${slug}`, { auth: true })
+}
+
+// 5.5: sender-only card management.
+export async function revokeCard(slug, revoked = true) {
+  return request(`/cards/${slug}/revoke`, { method: 'POST', auth: true, body: { revoked } })
+}
+
+export async function releaseCardClaim(slug) {
+  const result = await request(`/cards/${slug}/release-claim`, { method: 'POST', auth: true })
+  try {
+    localStorage.removeItem(claimTokenStorageKey(slug))
+  } catch { /* ignore */ }
+  return result
 }
 
 // Phase 2.3: all four of these used to try 4-8 candidate paths each,
