@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import CardView from './CardView.jsx'
-import { getCardBySlug } from '../lib/api.js'
+import { getCardBySlug, notifyMeForScheduledCard } from '../lib/api.js'
 
 // 5.1: api/card-meta.js embeds window.__CARDORA_SSR_CARD__ so the very
 // first client paint matches the server-rendered gate with zero flash,
@@ -18,6 +18,7 @@ vi.mock('../lib/api.js', () => ({
   submitTriviaAnswer: vi.fn(),
   sendCardAnonymousMessage: vi.fn(),
   reactToCard: vi.fn(),
+  notifyMeForScheduledCard: vi.fn(),
 }))
 
 function renderAt(slug) {
@@ -103,5 +104,64 @@ describe('CardView — 5.5 blocked states', () => {
 
     await waitFor(() => expect(screen.getByText('This card has already been opened by its recipient.')).toBeInTheDocument())
     expect(screen.getByText('Already opened')).toBeInTheDocument()
+  })
+})
+
+// 6.3: scheduled send. The backend gate is also a 403, like the password
+// lock -- these tests exist specifically to prove the two never get
+// conflated (a real bug caught while building this: the password-lock
+// branch checked `err.status === 403` with no further narrowing, so it
+// would have matched every scheduled-and-not-yet-due card too).
+describe('CardView — 6.3 scheduled send', () => {
+  afterEach(() => {
+    vi.mocked(notifyMeForScheduledCard).mockClear()
+  })
+
+  it('shows the countdown/notify-me gate, not the password gate, for a scheduled 403', async () => {
+    const unlockAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const err = new Error('Not yet')
+    err.status = 403
+    err.payload = { scheduled: true, unlockAt, message: "This card isn't open yet." }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByText("This card isn't open yet")).toBeInTheDocument())
+    expect(screen.queryByText('This card is locked')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Password…')).not.toBeInTheDocument()
+  })
+
+  it('submits the notify-me email and shows a confirmation', async () => {
+    const unlockAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const err = new Error('Not yet')
+    err.status = 403
+    err.payload = { scheduled: true, unlockAt }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+    vi.mocked(notifyMeForScheduledCard).mockResolvedValueOnce({ message: 'ok' })
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByPlaceholderText('you@example.com')).toBeInTheDocument())
+    fireEvent.change(screen.getByPlaceholderText('you@example.com'), { target: { value: 'fan@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /Notify me when it opens/i }))
+
+    await waitFor(() => expect(notifyMeForScheduledCard).toHaveBeenCalledWith('abc123', 'fan@example.com'))
+    await waitFor(() => expect(screen.getByText("We'll email you when it opens.")).toBeInTheDocument())
+  })
+
+  it('rejects submitting an empty email without calling the API', async () => {
+    const unlockAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const err = new Error('Not yet')
+    err.status = 403
+    err.payload = { scheduled: true, unlockAt }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Notify me when it opens/i })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /Notify me when it opens/i }))
+
+    expect(screen.getByText('Enter an email address.')).toBeInTheDocument()
+    expect(notifyMeForScheduledCard).not.toHaveBeenCalled()
   })
 })

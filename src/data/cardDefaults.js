@@ -107,6 +107,13 @@ export const defaultCardObject = {
     },
   },
 
+  // 6.3: scheduled send. Empty string means "send immediately" (today's
+  // behavior, unchanged). Rides to the backend inside layoutdata.styleExtras
+  // (see cardObjectToLayoutData) — same trick as lockHint/ogImage.
+  delivery: {
+    scheduledSendAt: '',
+  },
+
   content: {
     heading: 'Your special message',
     body: 'Write something beautiful here...',

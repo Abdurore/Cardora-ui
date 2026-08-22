@@ -6,7 +6,8 @@ import {
   HiOutlineSparkles, HiOutlineChatBubbleLeft, HiOutlineLockClosed,
   HiOutlineDocumentText, HiOutlineMusicalNote, HiOutlineEye,
   HiOutlineChartBarSquare, HiOutlineLightBulb,
-  HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash, HiOutlineGlobeAlt
+  HiOutlineArrowPathRoundedSquare, HiOutlineEyeSlash, HiOutlineGlobeAlt,
+  HiOutlineClock
 } from 'react-icons/hi2'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 import { IoColorPaletteOutline } from 'react-icons/io5'
@@ -63,6 +64,7 @@ const ALL_TOOLS = [
   { id: 'animation', icon: HiOutlineSparkles, label: 'Animation', hint: 'Confetti & effects', group: 'Effects' },
   { id: 'experience', icon: HiOutlineGlobeAlt, label: 'Experience', hint: 'Galaxy of memories', group: 'Effects' },
   { id: 'interaction', icon: HiOutlineLockClosed, label: 'Interaction', hint: 'Lock & reveal', group: 'Interactive' },
+  { id: 'schedule', icon: HiOutlineClock, label: 'Schedule', hint: 'Send later — free, no surcharge', group: 'Interactive' },
   { id: 'chain', icon: HiOutlineArrowPathRoundedSquare, label: 'Chain', hint: 'Invite recipient to reply with a card', group: 'Interactive' },
   { id: 'anon', icon: HiOutlineEyeSlash, label: 'Anonymous', hint: 'Tag as anonymous inbox template', group: 'Interactive' },
   { id: 'poll', icon: HiOutlineChartBarSquare, label: 'Poll', hint: 'Question with selectable choices', group: 'Interactive' },
@@ -70,6 +72,15 @@ const ALL_TOOLS = [
 ]
 
 const TOOL_GROUP_ORDER = ['Content', 'Style', 'Effects', 'Interactive']
+
+// 6.3: datetime-local inputs take/return a timezone-less "YYYY-MM-DDTHH:mm"
+// string in the *browser's own* local time — reading it with `new Date(...)`
+// and writing it back with `.toISOString()` is what converts device-local
+// wall-clock time to/from the UTC instant the backend actually stores.
+function toDatetimeLocalValue(date) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 
 // Named gradient/animated border presets. `tier` decides minimum tier. The
 // `mode` field hints whether the preset is best paired with `gradient` or
@@ -95,11 +106,11 @@ const TOOLS_BY_TYPE = {
   // `experience` is personal-only for now: every other type has its own
   // interaction stage after the card, and a full-screen scene competing with
   // those needs its own design pass.
-  personal:  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'experience', 'interaction'],
-  poll:      ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'poll'],
-  trivia:    ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'trivia'],
-  chain:     ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'chain'],
-  anonymous: ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'anon'],
+  personal:  ['closedState', 'content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'experience', 'interaction', 'schedule'],
+  poll:      ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'schedule', 'poll'],
+  trivia:    ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'schedule', 'trivia'],
+  chain:     ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'schedule', 'chain'],
+  anonymous: ['content', 'media', 'background', 'theme', 'cardStyle', 'animation', 'interaction', 'schedule', 'anon'],
 }
 
 const STUDIO_TYPE_META = {
@@ -2410,6 +2421,43 @@ function CardStudio() {
               </div>
             )
           })()}
+        </>
+      )
+    }
+
+    // 6.3: scheduled send. Free — the frontend never sends a surcharge for
+    // it and computeFeatureSurcharges has no rule for it either, so nothing
+    // needs to change in tierRequirements.js to keep this free.
+    if (activeTool === 'schedule') {
+      const scheduledSendAt = c.delivery?.scheduledSendAt || ''
+      const minDate = new Date(Date.now() + 15 * 60 * 1000)
+      const maxDate = new Date()
+      maxDate.setMonth(maxDate.getMonth() + 12)
+      return (
+        <>
+          <p className="cs-panel-eyebrow">Schedule</p>
+          <h3>Send this card later</h3>
+          <div className="cs-sub-section">
+            <p className="cs-hint">Pick a future date and time — the card stays locked to everyone but you until then. Free, no surcharge.</p>
+            <label className="cs-field">
+              <span>Unlock date &amp; time</span>
+              <input
+                type="datetime-local"
+                value={scheduledSendAt ? toDatetimeLocalValue(new Date(scheduledSendAt)) : ''}
+                min={toDatetimeLocalValue(minDate)}
+                max={toDatetimeLocalValue(maxDate)}
+                onChange={e => {
+                  const val = e.target.value
+                  update('delivery.scheduledSendAt', val ? new Date(val).toISOString() : '')
+                }}
+              />
+            </label>
+            {scheduledSendAt && (
+              <button type="button" className="cs-remove-btn" onClick={() => update('delivery.scheduledSendAt', '')}>
+                Send immediately instead
+              </button>
+            )}
+          </div>
         </>
       )
     }

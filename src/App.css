@@ -4814,6 +4814,23 @@
   font-size: 1rem;
 }
 
+/* 6.3: scheduled-send countdown + notify-me gate */
+.cv-gate-countdown {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--primary, #7ef7ff);
+}
+.cv-gate-notify-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cv-gate-notify-done {
+  color: var(--text-dim, rgba(220, 242, 247, 0.7));
+  font-size: 0.9rem;
+}
+
 .card-view-top {
   width: min(560px, 100%);
   display: flex;

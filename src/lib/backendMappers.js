@@ -523,6 +523,11 @@ export function cardObjectToLayoutData(cardObject = null) {
       // picked ink color (via Theme > Advanced colors) silently reset to
       // plain black/white on every reload. Same "persist in layoutdata" fix.
       inkColor: cardObject.theme?.textColor || undefined,
+      // 6.3: scheduled send — the backend reads this exact path
+      // (layoutdata.styleExtras.scheduledSendAt) to gate recipient access
+      // and to drive the checkScheduledSends cron job. Empty string means
+      // "send immediately," so it's omitted rather than sent as "".
+      scheduledSendAt: cardObject.delivery?.scheduledSendAt || undefined,
     }
   }
   // The galaxy scene. Memories index into media.images, and that array gets
@@ -1020,6 +1025,9 @@ export function backendCardToCardObject(card) {
     },
     interaction: {
       lock: { type: lockType, value: enhancements.lock?.value || '', hint: styleExtras.lockHint || '' },
+    },
+    delivery: {
+      scheduledSendAt: styleExtras.scheduledSendAt || '',
     },
     content: {
       heading: content.header || content.message || content.challenge || content.question || content.name || content.questions?.[0]?.question || '',

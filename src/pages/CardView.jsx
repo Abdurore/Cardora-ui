@@ -1,10 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
-import { getCardBySlug, submitCardResponse, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage, reactToCard } from '../lib/api.js'
+import { getCardBySlug, submitCardResponse, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage, reactToCard, notifyMeForScheduledCard } from '../lib/api.js'
 import { mapBackendCard } from '../lib/backendMappers.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import ReportModal from '../components/ReportModal.jsx'
 import { backfillEnvelope, defaultCardObject } from '../data/cardDefaults.js'
+
+// 6.3: renders the "Xd Yh" / "Zm" countdown on the scheduled-send gate.
+function formatCountdown(ms) {
+  if (ms <= 0) return 'Unlocking any moment now…'
+  const totalMinutes = Math.floor(ms / 60000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  const parts = []
+  if (days) parts.push(`${days}d`)
+  if (days || hours) parts.push(`${hours}h`)
+  if (!days) parts.push(`${minutes}m`)
+  return `Unlocks in ${parts.join(' ')}`
+}
 
 function CardView() {
   const { id } = useParams()
@@ -17,6 +31,13 @@ function CardView() {
   const [lockHint, setLockHint] = useState('')
   const [isRevoked, setIsRevoked] = useState(false)
   const [alreadyOpenedElsewhere, setAlreadyOpenedElsewhere] = useState(false)
+  const [isScheduled, setIsScheduled] = useState(false)
+  const [scheduledUnlockAt, setScheduledUnlockAt] = useState(null)
+  const [countdownText, setCountdownText] = useState('')
+  const [notifyEmail, setNotifyEmail] = useState('')
+  const [notifySubmitting, setNotifySubmitting] = useState(false)
+  const [notifySubmitted, setNotifySubmitted] = useState(false)
+  const [notifyError, setNotifyError] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [showReport, setShowReport] = useState(false)
@@ -96,6 +117,16 @@ function CardView() {
         console.warn('[CardView] Unrecognised response shape:', JSON.stringify(res)?.slice(0, 400))
         setFetchError('Card data format unrecognised')
       } catch (err) {
+        // 6.3: scheduled send is also a 403, but a distinct one (no `locked`
+        // field) -- must be checked before the generic password-lock branch
+        // below, or every scheduled-and-not-yet-due card would incorrectly
+        // render the password gate instead of the countdown/notify-me screen.
+        if (err.payload?.scheduled) {
+          setIsScheduled(true)
+          setScheduledUnlockAt(err.payload?.unlockAt || null)
+          setLoading(false)
+          if (!cancelled) return
+        }
         if (err.status === 403 || err.payload?.locked) {
           setNeedsPassword(true)
           setLockHint(err.payload?.lockHint || '')
@@ -126,6 +157,31 @@ function CardView() {
     })()
     return () => { cancelled = true }
   }, [id])
+
+  // 6.3: ticks the scheduled-send countdown while the gate is showing.
+  useEffect(() => {
+    if (!isScheduled || !scheduledUnlockAt) return undefined
+    const target = new Date(scheduledUnlockAt).getTime()
+    const tick = () => setCountdownText(formatCountdown(target - Date.now()))
+    tick()
+    const interval = setInterval(tick, 30000)
+    return () => clearInterval(interval)
+  }, [isScheduled, scheduledUnlockAt])
+
+  const handleNotifyMeSubmit = async () => {
+    const trimmed = notifyEmail.trim()
+    if (!trimmed) { setNotifyError('Enter an email address.'); return }
+    setNotifySubmitting(true)
+    setNotifyError('')
+    try {
+      await notifyMeForScheduledCard(id, trimmed)
+      setNotifySubmitted(true)
+    } catch (err) {
+      setNotifyError(err.message || 'Could not save that email — try again.')
+    } finally {
+      setNotifySubmitting(false)
+    }
+  }
 
   useEffect(() => {
     // Kept as an in-app fallback for any link-preview generator that does
@@ -216,6 +272,44 @@ function CardView() {
           <img src="/cardora-logo.png?v=4" alt="" />
         </div>
         <p>Preparing your surprise</p>
+      </div>
+    )
+  }
+
+  // ── Scheduled send: not open yet (6.3) ─────────────────────────────────
+  if (isScheduled) {
+    return (
+      <div className="cv-page-gate">
+        <div className="cv-gate-card">
+          <span className="cv-gate-lock">⏳</span>
+          <h2>This card isn't open yet</h2>
+          <p>
+            The sender scheduled it to unlock
+            {scheduledUnlockAt ? ` on ${new Date(scheduledUnlockAt).toLocaleString()}` : ' soon'}.
+          </p>
+          {countdownText && <p className="cv-gate-countdown">{countdownText}</p>}
+          {notifySubmitted ? (
+            <p className="cv-gate-notify-done">We'll email you when it opens.</p>
+          ) : (
+            <div className="cv-gate-notify-form">
+              <input
+                type="email"
+                value={notifyEmail}
+                onChange={e => setNotifyEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="cv-gate-input"
+                onKeyDown={e => { if (e.key === 'Enter') handleNotifyMeSubmit() }}
+              />
+              {notifyError && <p className="auth-error">{notifyError}</p>}
+              <button className="primary" type="button" disabled={notifySubmitting} onClick={handleNotifyMeSubmit}>
+                {notifySubmitting ? 'Saving…' : 'Notify me when it opens'}
+              </button>
+            </div>
+          )}
+          <button className="ghost" type="button" onClick={() => navigate('/')}>
+            Back Home
+          </button>
+        </div>
       </div>
     )
   }

@@ -302,6 +302,12 @@ export async function releaseCardClaim(slug) {
   return result
 }
 
+// 6.3: public -- a recipient who lands on a not-yet-unlocked scheduled card
+// can leave an email with no account required.
+export async function notifyMeForScheduledCard(slug, email) {
+  return request(`/cards/${slug}/notify-me`, { method: 'POST', body: { email } })
+}
+
 // Phase 2.3: all four of these used to try 4-8 candidate paths each,
 // confirmed against Backend/Cardora/src/routes/cardRoutes.js -- exactly one
 // path is ever registered for any of them (no `/public/cards/...` prefix
