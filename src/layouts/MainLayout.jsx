@@ -51,6 +51,7 @@ import {
   resetPassword,
   deleteAccount,
   updateCurrency,
+  trackEvent,
 } from '../lib/api.js'
 import {
   getPrimaryUser,
@@ -784,7 +785,7 @@ function MainLayout() {
     }
   }
 
-  const handleCreateCard = async (cardObject, { type, poll, chain, trivia, tier, anonTemplate } = {}) => {
+  const handleCreateCard = async (cardObject, { type, poll, chain, trivia, tier, anonTemplate, creationPath, templateId } = {}) => {
     try {
       const resolvedType = (type === 'moment' || type === 'standard' || !type) ? 'personal' : (anonTemplate ? 'anonymous' : type)
       // 3.2: every type now has a real premium rung — no more auto-upgrade
@@ -895,6 +896,18 @@ function MainLayout() {
       } else {
         response = await createCardClassic(payload)
       }
+
+      // 6.1: "instrument both paths -- entry, step completion, send. We need
+      // the comparative completion rate." This is the one place both the
+      // Quick and Studio creation paths converge, so it's also the one
+      // place a "send" event can be recorded without duplicating the call
+      // in each page.
+      trackEvent('create_flow_send', {
+        path: creationPath || 'unknown',
+        type: resolvedType,
+        tier: resolvedTier,
+        templateId: templateId || null,
+      })
 
       return { ok: true, data: response, message: getResponseMessage(response, 'Card created!') }
     } catch (error) {
@@ -1088,6 +1101,10 @@ function MainLayout() {
         onClose={() => { setShowCardTypeModal(false); setCardTypePreselect(null) }}
         preselectedType={cardTypePreselect}
         currentUser={hydratedUser}
+        marketplaceTemplates={marketplaceTemplates}
+        balance={balance}
+        unlockTemplateAction={handleUnlockTemplate}
+        openAuthModal={openAuthModal}
       />
       <WelcomeBackBanner currentUser={hydratedUser} />
     </div>

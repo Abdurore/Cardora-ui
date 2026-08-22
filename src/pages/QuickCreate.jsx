@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
 import { PALETTES, applyPalette } from '../lib/palettes.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
-import { attachGiftToCard, getCardPrices } from '../lib/api.js'
+import { attachGiftToCard, getCardPrices, getTemplateById, trackEvent } from '../lib/api.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import { GiftIcon } from '../components/GiftCard.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
@@ -116,6 +116,32 @@ function QuickCreate() {
   // Personal
   const [heading, setHeading] = useState('')
   const [body, setBody] = useState('')
+
+  // 6.1: "pick a template, replace text, send" -- step zero (CardTypeModal)
+  // hands off the chosen template's id here rather than pre-building the
+  // full cardObject itself, since only the already-unlocked, full
+  // layoutConfig (fetched here, not the listing payload) has real content
+  // to seed. Text only, deliberately -- QuickCreate's own palette/font
+  // pickers stay the source of truth for how the card looks, so a
+  // template's visual choices aren't silently forced on someone who just
+  // wanted its wording.
+  const templateId = params.get('template') || ''
+  useEffect(() => {
+    if (!templateId) return
+    let cancelled = false
+    getTemplateById(templateId).then((res) => {
+      if (cancelled) return
+      const template = res?.template || res?.data || res || null
+      const content = template?.layoutConfig?.content || template?.layoutdata?.content || null
+      if (!content) return
+      if (cardType === 'personal') {
+        if (content.header) setHeading(content.header)
+        if (content.body) setBody(content.body)
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId])
 
   // Poll
   const [pollQuestion, setPollQuestion] = useState('')
@@ -282,6 +308,7 @@ function QuickCreate() {
     // Always show the receipt first, even for free sends — same as the
     // Studio, so the tier/cost breakdown is never skipped silently.
     setShowSendModal(true)
+    trackEvent('create_flow_step', { step: 'reached_review', path: 'quick', type: cardType })
   }
 
   // `overrides` lets "Trim extras & send free" pass freshly-trimmed content
@@ -342,6 +369,8 @@ function QuickCreate() {
         chain: chainData,
         trivia: triviaData,
         anonTemplate: cardType === 'anonymous' ? {} : undefined,
+        creationPath: 'quick',
+        templateId: templateId || null,
       })
 
       if (!result.ok) {

@@ -916,4 +916,15 @@ export async function getBroadcastDeliveryLogs({ broadcastId, page = 1, limit = 
   return request(`/admin/broadcast-delivery-logs?${qs}`, { auth: true })
 }
 
+/* ═══════════════════════════════════════════════
+   6.1: CREATION-FUNNEL INSTRUMENTATION
+   ═══════════════════════════════════════════════ */
+// Fire-and-forget by design -- a dropped analytics event must never surface
+// as an error or slow down someone actually creating a card. Swallows its
+// own failures rather than letting request()'s console.error/toast-worthy
+// error path fire for something the user never asked for and can't act on.
+export function trackEvent(event, properties = {}) {
+  request('/analytics/events', { method: 'POST', body: { event, properties } }).catch(() => {})
+}
+
 export { API_BASE }

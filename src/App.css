@@ -7153,6 +7153,23 @@ a {
   font-weight: 700;
 }
 
+/* 6.1: group headers became toggle buttons (Content expanded, the rest
+   collapsed by default) -- reset button chrome, keep the same look. */
+.cs-toolgroup-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 8px 4px 8px;
+}
+.cs-toolgroup-toggle:hover { color: rgba(180, 220, 230, 0.5); }
+.cs-toolgroup-chevron { font-size: 0.65rem; opacity: 0.6; }
+.cs-toolgroup.collapsed { gap: 0; }
+
 .cs-tool {
   display: flex;
   align-items: center;
@@ -16710,37 +16727,59 @@ a {
 .ctm-start-mint { --btn-hover-border: var(--type-anonymous); --btn-hover-shadow: var(--type-anonymous-bg); background: linear-gradient(135deg, var(--type-anonymous-bg), transparent); border-color: color-mix(in srgb, var(--type-anonymous) 40%, transparent); }
 .ctm-start-emerald { --btn-hover-border: var(--type-chain); --btn-hover-shadow: var(--type-chain-bg); background: linear-gradient(135deg, var(--type-chain-bg), transparent); border-color: color-mix(in srgb, var(--type-chain) 40%, transparent); }
 
-/* ——— CardTypeModal mode selection ——— */
-.ctm-mode-section { display: flex; flex-direction: column; gap: 16px; padding: 4px 0; }
-.ctm-mode-heading { font-size: 0.78rem; font-weight: 600; color: rgba(226,234,240,0.5); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 4px; }
-.ctm-mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.ctm-mode-card {
-  background: rgba(255,255,255,0.03);
-  border: 1.5px solid rgba(255,255,255,0.08);
-  border-radius: 18px;
-  padding: 22px 18px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.2s, background 0.2s, transform 0.15s;
+/* ——— CardTypeModal step zero: occasion/template picker (6.1) ——— */
+/* .ctm-card (base tile look) is shared with the type grid above --
+   these only add the deltas this step needs. */
+.ctm-occasion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
-.ctm-mode-card:hover { transform: translateY(-2px); }
-.ctm-mode-quick:hover { border-color: rgba(126,239,255,0.35); background: rgba(126,239,255,0.04); }
-.ctm-mode-studio:hover { border-color: rgba(167,139,250,0.35); background: rgba(167,139,250,0.04); }
-.ctm-mode-icon { font-size: 1.8rem; line-height: 1; margin-bottom: 4px; }
-.ctm-mode-card h3 { margin: 0; font-size: 1.05rem; font-weight: 700; color: #e2eaf0; }
-.ctm-mode-card p { margin: 0; font-size: 0.8rem; color: rgba(226,234,240,0.6); line-height: 1.45; }
-.ctm-mode-hint {
-  margin-top: 4px;
-  font-size: 0.7rem;
+.ctm-occasion-card { align-items: center; text-align: center; gap: 4px; padding: 18px 14px; }
+.ctm-occasion-card strong { font-size: 0.95rem; }
+.ctm-occasion-card p { margin: 0; font-size: 0.76rem; color: rgba(226,234,240,0.55); }
+.ctm-occasion-icon { font-size: 1.4rem; }
+
+.ctm-secondary-label {
+  margin: 18px 0 10px;
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: rgba(226,234,240,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(226,234,240,0.4);
 }
-.ctm-mode-quick .ctm-mode-hint { color: rgba(126,239,255,0.5); }
-.ctm-mode-studio .ctm-mode-hint { color: rgba(167,139,250,0.5); }
+.ctm-secondary-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.ctm-secondary-card { align-items: center; text-align: center; gap: 6px; padding: 12px 8px; }
+.ctm-secondary-card span { font-size: 0.74rem; font-weight: 600; }
+
+.ctm-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.ctm-template-card { gap: 6px; padding: 0 0 12px; overflow: hidden; }
+.ctm-template-preview { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.ctm-template-card strong,
+.ctm-template-card .ctm-template-price { margin-left: 14px; }
+.ctm-template-price { font-size: 0.76rem; color: rgba(126,247,255,0.75); font-weight: 600; margin-bottom: 4px; }
+.ctm-template-blank { align-items: center; text-align: center; justify-content: center; padding: 20px 14px; }
+.ctm-template-blank p { margin: 0; font-size: 0.76rem; color: rgba(226,234,240,0.55); }
+.ctm-template-empty-note {
+  grid-column: 1 / -1;
+  font-size: 0.82rem;
+  color: rgba(226,234,240,0.5);
+  margin: 0 0 4px;
+}
+
+.ctm-unlock-panel { display: flex; flex-direction: column; gap: 12px; }
+.ctm-unlock-title { font-size: 1rem; font-weight: 700; color: #e2eaf0; margin: 0; }
+.ctm-unlock-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  color: rgba(226,234,240,0.7);
+}
 
 /* Studio Type Badge */
 .cs-type-badge {
@@ -22270,6 +22309,7 @@ a {
     display: grid;
     gap: 7px;
   }
+  .cs-m2-layer-group.collapsed { gap: 0; }
   .cs-m2-layer-group-title {
     margin: 0;
     font-size: 0.62rem;

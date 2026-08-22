@@ -16,7 +16,7 @@ import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import Dropdown from '../components/Dropdown.jsx'
 import ColorPicker from '../components/ColorPicker.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
-import { getCardPrices, getMediaVideos, getMediaMusic } from '../lib/api.js'
+import { getCardPrices, getMediaVideos, getMediaMusic, trackEvent } from '../lib/api.js'
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
 import { GALAXY_THEMES } from '../lib/galaxyThemes.js'
 import { getMotionIntensity } from '../lib/deviceCapability.js'
@@ -490,6 +490,34 @@ function CardStudio() {
     return base
   })
   const [activeTool, setActiveTool] = useState(defaultToolId)
+  // 6.1: "Collapse Studio panels — CONTENT expanded, STYLE / EFFECTS /
+  // INTERACTIVE collapsed by default." All four groups used to render
+  // fully expanded, always, with no way to collapse any of them.
+  const [collapsedGroups, setCollapsedGroups] = useState(
+    () => new Set(TOOL_GROUP_ORDER.filter((g) => g !== 'Content')),
+  )
+  const toggleToolGroup = (group) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(group)) next.delete(group)
+      else next.add(group)
+      return next
+    })
+  }
+  // Auto-expand whichever group holds the active tool -- otherwise loading
+  // an existing draft whose last-edited tool lives in a collapsed group
+  // (e.g. Background) would highlight a tool the sender can't see.
+  useEffect(() => {
+    const tool = activeTools.find((t) => t.id === activeTool)
+    if (tool && collapsedGroups.has(tool.group)) {
+      setCollapsedGroups((prev) => {
+        const next = new Set(prev)
+        next.delete(tool.group)
+        return next
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool])
   const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'envelope' : 'card')
   const [showPreview, setShowPreview] = useState(false)
   const [savedState, setSavedState] = useState(initialAutoSaved ? 'Restored from last session' : 'Unsaved draft')
@@ -1156,6 +1184,7 @@ function CardStudio() {
       trivia: studioType === 'trivia' ? sourceTrivia : undefined,
       chain: sourceChain.enabled ? sourceChain : undefined,
       anonTemplate: studioType === 'anonymous' ? { enabled: true, tier: sourceTier } : undefined,
+      creationPath: 'studio',
     }
 
     const result = await createCardOnBackend?.(flushedCardObject, extras)
@@ -1212,6 +1241,7 @@ function CardStudio() {
     // the tier/cost breakdown at least once instead of it happening silently.
     // handleSend() itself only runs once they confirm in the modal.
     setShowSendModal(true)
+    trackEvent('create_flow_step', { step: 'reached_review', path: 'studio', type: studioType })
   }
 
   const handleConfirmSend = async () => {
@@ -3418,10 +3448,19 @@ function CardStudio() {
           {TOOL_GROUP_ORDER.map((group) => {
             const tools = activeTools.filter(t => t.group === group)
             if (tools.length === 0) return null
+            const isCollapsed = collapsedGroups.has(group)
             return (
-              <div key={group} className="cs-toolgroup">
-                <p className="cs-toolgroup-label">{group}</p>
-                {tools.map(tool => {
+              <div key={group} className={`cs-toolgroup ${isCollapsed ? 'collapsed' : ''}`}>
+                <button
+                  type="button"
+                  className="cs-toolgroup-label cs-toolgroup-toggle"
+                  onClick={() => toggleToolGroup(group)}
+                  aria-expanded={!isCollapsed}
+                >
+                  {group}
+                  <span className="cs-toolgroup-chevron">{isCollapsed ? '▸' : '▾'}</span>
+                </button>
+                {!isCollapsed && tools.map(tool => {
                   const Icon = tool.icon
                   return (
                     <button
@@ -3936,10 +3975,19 @@ function CardStudio() {
                       {TOOL_GROUP_ORDER.map(group => {
                         const groupTools = activeTools.filter(t => t.group === group)
                         if (!groupTools.length) return null
+                        const isCollapsed = collapsedGroups.has(group)
                         return (
-                          <section key={group} className="cs-m2-layer-group">
-                            <p className="cs-m2-layer-group-title">{group}</p>
-                            {groupTools.map(tool => {
+                          <section key={group} className={`cs-m2-layer-group ${isCollapsed ? 'collapsed' : ''}`}>
+                            <button
+                              type="button"
+                              className="cs-m2-layer-group-title cs-toolgroup-toggle"
+                              onClick={() => toggleToolGroup(group)}
+                              aria-expanded={!isCollapsed}
+                            >
+                              {group}
+                              <span className="cs-toolgroup-chevron">{isCollapsed ? '▸' : '▾'}</span>
+                            </button>
+                            {!isCollapsed && groupTools.map(tool => {
                               const Icon = tool.icon
                               return (
                                 <button
