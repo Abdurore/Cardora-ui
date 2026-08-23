@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import QuickCreate from './QuickCreate.jsx'
 import { getCardPrices, trackEvent } from '../lib/api.js'
+import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
 
 // 6.5: "Send one back" hands off to QuickCreate via
 // ?type=personal&replyTo=<slug>&replySender=<name> -- these tests cover the
@@ -21,6 +22,11 @@ vi.mock('../lib/api.js', () => ({
 
 vi.mock('../lib/cloudinary.js', () => ({
   uploadToCloudinary: vi.fn(),
+}))
+
+vi.mock('../lib/anonShareImage.js', () => ({
+  generateAnonShareImage: vi.fn(),
+  shareOrDownloadAnonImage: vi.fn(),
 }))
 
 const createCardOnBackend = vi.fn(async () => ({ ok: true, data: { slug: 'new-card-1' }, message: 'Card created' }))
@@ -93,5 +99,57 @@ describe('QuickCreate — 6.5 reply context', () => {
     await waitFor(() => expect(createCardOnBackend).toHaveBeenCalled())
     const whatsappLink = await screen.findByRole('link', { name: /WhatsApp/i })
     expect(decodeURIComponent(whatsappLink.getAttribute('href'))).toContain('Sending one back to you, Ada!')
+  })
+})
+
+// 6.6: "Share to status" on the anonymous-card send-success screen --
+// generates a themed image from the just-sent card's own prompt and the
+// signed-in sender's username.
+describe('QuickCreate — 6.6 anonymous share image', () => {
+  afterEach(() => {
+    vi.mocked(getCardPrices).mockClear()
+    vi.mocked(trackEvent).mockClear()
+    vi.mocked(generateAnonShareImage).mockReset()
+    vi.mocked(shareOrDownloadAnonImage).mockReset()
+    createCardOnBackend.mockClear()
+  })
+
+  async function sendAnonymousCard(message) {
+    renderAt('/quick?type=anonymous')
+    fireEvent.change(screen.getByPlaceholderText('Recipients can reply to this card anonymously…'), { target: { value: message } })
+    fireEvent.click(screen.getByRole('button', { name: /Create Card/ }))
+    const sendBtn = await screen.findByRole('button', { name: /Send free/i })
+    fireEvent.click(sendBtn)
+    await waitFor(() => expect(createCardOnBackend).toHaveBeenCalled())
+  }
+
+  it('shows a "Share to status" button once the card is sent', async () => {
+    await sendAnonymousCard('Ask me anything!')
+    expect(await screen.findByRole('button', { name: 'Share to status' })).toBeInTheDocument()
+  })
+
+  it('clicking it generates an image from the current prompt, palette, and username', async () => {
+    const fakeBlob = new Blob(['fake'], { type: 'image/png' })
+    vi.mocked(generateAnonShareImage).mockResolvedValueOnce(fakeBlob)
+    vi.mocked(shareOrDownloadAnonImage).mockResolvedValueOnce()
+    await sendAnonymousCard('Ask me anything!')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Share to status' }))
+
+    await waitFor(() => expect(generateAnonShareImage).toHaveBeenCalledWith({
+      prompt: 'Ask me anything!',
+      username: 'replier',
+      colors: { background: '#0b0f12', accent: '#7ef7ff' },
+    }))
+    await waitFor(() => expect(shareOrDownloadAnonImage).toHaveBeenCalledWith(fakeBlob, 'cardora-ask-replier.png'))
+  })
+
+  it('shows an error message if image generation fails, without crashing the page', async () => {
+    vi.mocked(generateAnonShareImage).mockRejectedValueOnce(new Error('canvas boom'))
+    await sendAnonymousCard('Ask me anything!')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Share to status' }))
+
+    await waitFor(() => expect(screen.getByText('canvas boom')).toBeInTheDocument())
   })
 })
