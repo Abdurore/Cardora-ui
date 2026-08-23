@@ -41,7 +41,19 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
       markNotificationRead(notification.id).catch(() => {})
       setUnreadCount((c) => Math.max(0, c - 1))
     }
-    if (notification.actionUrl) navigate(notification.actionUrl)
+    // 6.7 fix: two existing notification producers (6.3's scheduled-send
+    // wa.me share, 6.4's chain-delivery link) already emit a full absolute
+    // URL, not an in-app route -- react-router's navigate() can't handle
+    // an absolute/external URL (it tries to treat the whole string as a
+    // path within this app). Route those through a real navigation
+    // instead; only a genuine relative path goes through navigate().
+    if (notification.actionUrl) {
+      if (/^https?:\/\//i.test(notification.actionUrl)) {
+        window.open(notification.actionUrl, '_blank', 'noopener,noreferrer')
+      } else {
+        navigate(notification.actionUrl)
+      }
+    }
   }
 
   const [theme, setTheme] = useState(() => {

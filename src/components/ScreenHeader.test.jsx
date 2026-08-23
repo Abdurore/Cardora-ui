@@ -64,6 +64,29 @@ describe('ScreenHeader — notification bell', () => {
     expect(navigateSpy).toHaveBeenCalledWith('/quick?type=personal')
   })
 
+  // 6.7: found while wiring an unrelated feature -- two existing
+  // notification producers (6.3's scheduled-send wa.me share, 6.4's chain
+  // delivery) already emit a full absolute/external URL, which
+  // react-router's navigate() cannot handle (it tries to treat the whole
+  // string as an in-app path).
+  it('opens an absolute/external action url in a new tab instead of navigate()', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {})
+    vi.mocked(getNotifications).mockResolvedValue({
+      notifications: [{ id: 'n1', title: 'Chain complete', body: 'x', read: false, actionUrl: 'https://wa.me/?text=hi' }],
+      unreadCount: 1,
+    })
+    vi.mocked(markNotificationRead).mockResolvedValue({})
+    renderHeader({ id: 'u1', username: 'test' })
+
+    await waitFor(() => screen.getByLabelText('Notifications'))
+    fireEvent.click(screen.getByLabelText('Notifications'))
+    fireEvent.click(screen.getByText('Chain complete'))
+
+    expect(openSpy).toHaveBeenCalledWith('https://wa.me/?text=hi', '_blank', 'noopener,noreferrer')
+    expect(navigateSpy).not.toHaveBeenCalled()
+    openSpy.mockRestore()
+  })
+
   it('does not re-mark an already-read notification', async () => {
     vi.mocked(getNotifications).mockResolvedValue({
       notifications: [{ id: 'n1', title: 'Old one', body: 'x', read: true, actionUrl: '/profile' }],
