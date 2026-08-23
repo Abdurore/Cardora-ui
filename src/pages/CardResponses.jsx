@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
 import { HiOutlineTrophy } from 'react-icons/hi2'
 import { getMyCard, revokeCard, releaseCardClaim, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard } from '../lib/api.js'
+import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
@@ -96,7 +97,7 @@ function EmptyState({ icon, message }) {
 }
 
 // ── Anonymous inbox ───────────────────────────────────────────────────
-function AnonInboxView({ state, content, username, isActiveInbox, onSetActive, settingActive, activeMsg }) {
+function AnonInboxView({ state, content, username, isActiveInbox, onSetActive, settingActive, activeMsg, onShareImage, sharingImage, shareImageError }) {
   const responses = state?.responses || []
   return (
     <div className="cr-section">
@@ -113,6 +114,13 @@ function AnonInboxView({ state, content, username, isActiveInbox, onSetActive, s
             </button>
           )}
           {activeMsg && <p className="cr-anon-active-msg">{activeMsg}</p>}
+          {/* 6.6: generated fresh every click from the prompt above, so a
+              sender who edited it always gets an up-to-date image --
+              "regenerate on prompt change" without persisting anything. */}
+          <button type="button" className="cr-anon-active-btn" onClick={onShareImage} disabled={sharingImage}>
+            {sharingImage ? 'Preparing image…' : 'Share to status'}
+          </button>
+          {shareImageError && <p className="cr-anon-active-msg">{shareImageError}</p>}
         </div>
       )}
       {content?.message && (
@@ -505,6 +513,8 @@ function CardResponses() {
   const [activeAnonResolved, setActiveAnonResolved] = useState(false)
   const [settingActiveAnon, setSettingActiveAnon] = useState(false)
   const [activeAnonMsg, setActiveAnonMsg] = useState('')
+  const [sharingAnonImage, setSharingAnonImage] = useState(false)
+  const [anonImageError, setAnonImageError] = useState('')
 
   const loadCard = useCallback(async () => {
     try {
@@ -590,6 +600,28 @@ function CardResponses() {
       setActiveAnonMsg(err.message || 'Could not update your active inbox.')
     } finally {
       setSettingActiveAnon(false)
+    }
+  }
+
+  const handleShareAnonImage = async () => {
+    if (!currentUser?.username) return
+    setSharingAnonImage(true)
+    setAnonImageError('')
+    try {
+      const colors = rawCard.config?.colors || {}
+      // fontFamily deliberately omitted -- "the display serif" is
+      // Cardora's own fixed brand serif (the generator's default), not
+      // whatever font this card's own theme happens to use.
+      const blob = await generateAnonShareImage({
+        prompt: content?.message || '',
+        username: currentUser.username,
+        colors: { background: colors.background, accent: colors.accent },
+      })
+      await shareOrDownloadAnonImage(blob, `cardora-ask-${currentUser.username}.png`)
+    } catch (err) {
+      setAnonImageError(err.message || 'Could not generate the share image.')
+    } finally {
+      setSharingAnonImage(false)
     }
   }
 
@@ -775,6 +807,9 @@ function CardResponses() {
             onSetActive={handleSetActiveAnon}
             settingActive={settingActiveAnon}
             activeMsg={activeAnonMsg}
+            onShareImage={handleShareAnonImage}
+            sharingImage={sharingAnonImage}
+            shareImageError={anonImageError}
           />
         )}
         {type === 'poll' && <PollResultsView state={state} content={content} />}

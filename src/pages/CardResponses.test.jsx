@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import CardResponses from './CardResponses.jsx'
 import { getMyCard, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard } from '../lib/api.js'
+import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
 
 // 6.4: originator moderation (delete a chain entry, no tombstone) and the
 // terminal-recipient delivery status line -- nothing like either existed
@@ -31,6 +32,11 @@ vi.mock('../lib/api.js', () => ({
   setActiveAnonymousCard: vi.fn(),
   getNotifications: vi.fn(),
   markNotificationRead: vi.fn(),
+}))
+
+vi.mock('../lib/anonShareImage.js', () => ({
+  generateAnonShareImage: vi.fn(),
+  shareOrDownloadAnonImage: vi.fn(),
 }))
 
 function chainCard(overrides = {}) {
@@ -143,6 +149,8 @@ describe('CardResponses — 6.6 durable anonymous link', () => {
     vi.mocked(getMyCard).mockReset()
     vi.mocked(getActiveAnonymousCard).mockReset()
     vi.mocked(setActiveAnonymousCard).mockReset()
+    vi.mocked(generateAnonShareImage).mockReset()
+    vi.mocked(shareOrDownloadAnonImage).mockReset()
     outletContext = { currentUser: null, balance: 0, openAuthModal: () => {} }
   })
 
@@ -188,5 +196,27 @@ describe('CardResponses — 6.6 durable anonymous link', () => {
     await waitFor(() => expect(screen.getByText('Your prompt')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: /Set as my/ })).not.toBeInTheDocument()
     expect(screen.queryByText(/This is your active/)).not.toBeInTheDocument()
+  })
+
+  it('clicking "Share to status" generates a fresh image from the current prompt', async () => {
+    outletContext = { currentUser: { username: 'ada' }, balance: 0, openAuthModal: () => {} }
+    vi.mocked(getMyCard).mockResolvedValueOnce({
+      card: anonCard({ config: { colors: { background: '#111', accent: '#7ef7ff' }, content: { message: 'Send me a secret!' } } }),
+    })
+    vi.mocked(getActiveAnonymousCard).mockResolvedValueOnce({ slug: 'ada-inbox' })
+    const fakeBlob = new Blob(['fake'], { type: 'image/png' })
+    vi.mocked(generateAnonShareImage).mockResolvedValueOnce(fakeBlob)
+    vi.mocked(shareOrDownloadAnonImage).mockResolvedValueOnce()
+    renderPage()
+
+    const btn = await screen.findByRole('button', { name: 'Share to status' })
+    fireEvent.click(btn)
+
+    await waitFor(() => expect(generateAnonShareImage).toHaveBeenCalledWith({
+      prompt: 'Send me a secret!',
+      username: 'ada',
+      colors: { background: '#111', accent: '#7ef7ff' },
+    }))
+    await waitFor(() => expect(shareOrDownloadAnonImage).toHaveBeenCalledWith(fakeBlob, 'cardora-ask-ada.png'))
   })
 })

@@ -13,6 +13,7 @@ import { computeCardTier, trimCardToTier, getTierCost, getCardTotalCost, compute
 import TierPip from '../components/TierPip.jsx'
 import TierMeter from '../components/TierMeter.jsx'
 import SendReceipt from '../components/SendReceipt.jsx'
+import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
 
 // Labels/sample copy only now — pip tier is derived live via the shared
 // `fontTier()` (tierRequirements.js), not a hardcoded tag here. That list
@@ -215,6 +216,12 @@ function QuickCreate() {
   const [reminderSaved, setReminderSaved] = useState(false)
   const [error, setError] = useState(null)
   const [selectedGiftId, setSelectedGiftId] = useState('none')
+  // 6.6: "Auto-generate a 1080x1920 share image on inbox creation... Offer
+  // as Share to status." Generated on demand (not persisted) so there's
+  // nothing to regenerate later -- the next click always reflects whatever
+  // the prompt currently is.
+  const [sharingAnonImage, setSharingAnonImage] = useState(false)
+  const [anonImageError, setAnonImageError] = useState('')
 
   const fileInputRef = useRef(null)
 
@@ -512,6 +519,27 @@ function QuickCreate() {
       // Non-critical -- the card already sent successfully either way.
     } finally {
       setSavingReminder(false)
+    }
+  }
+
+  const handleShareAnonImage = async () => {
+    if (!currentUser?.username) return
+    setSharingAnonImage(true)
+    setAnonImageError('')
+    try {
+      // fontFamily is deliberately omitted -- "prompt text in the display
+      // serif" names Cardora's own fixed brand serif (the default), not
+      // whichever font the sender picked for their card body.
+      const blob = await generateAnonShareImage({
+        prompt: anonMessage.trim(),
+        username: currentUser.username,
+        colors: { background: selectedPalette.surface, accent: selectedPalette.primary },
+      })
+      await shareOrDownloadAnonImage(blob, `cardora-ask-${currentUser.username}.png`)
+    } catch (err) {
+      setAnonImageError(err.message || 'Could not generate the share image.')
+    } finally {
+      setSharingAnonImage(false)
     }
   }
 
@@ -1126,6 +1154,22 @@ function QuickCreate() {
                   )}
                 </div>
               </>
+            )}
+
+            {/* 6.6: "Share to status" -- a themed 1080x1920 image for the
+                durable /ask/:username inbox link, generated fresh on demand. */}
+            {!isSending && sendResult?.ok && cardType === 'anonymous' && currentUser?.username && (
+              <div className="qc-anon-share-block">
+                <button
+                  type="button"
+                  className="qc-anon-share-btn"
+                  disabled={sharingAnonImage}
+                  onClick={handleShareAnonImage}
+                >
+                  {sharingAnonImage ? 'Preparing image…' : 'Share to status'}
+                </button>
+                {anonImageError && <p className="qc-error">{anonImageError}</p>}
+              </div>
             )}
 
             {/* 6.2: optional occasion reminder, personal cards only */}

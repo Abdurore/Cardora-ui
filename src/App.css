@@ -18673,6 +18673,29 @@ a {
 .qc-reminder-fields button { grid-column: 1 / -1; }
 .qc-reminder-saved { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
 
+/* 6.6: "Share to status" button -- token-based, no light-mode override
+   needed. */
+.qc-anon-share-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.qc-anon-share-btn {
+  align-self: flex-start;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qc-anon-share-btn:hover { border-color: var(--text-dim); }
+.qc-anon-share-btn:disabled { opacity: 0.6; cursor: default; }
+
 /* 6.5: "Send one back" reply-context banner -- token-based, no light-mode
    override needed. */
 .qc-reply-banner {
