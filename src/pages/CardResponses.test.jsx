@@ -2,20 +2,23 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import CardResponses from './CardResponses.jsx'
-import { getMyCard, deleteChainEntry } from '../lib/api.js'
+import { getMyCard, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard } from '../lib/api.js'
 
 // 6.4: originator moderation (delete a chain entry, no tombstone) and the
 // terminal-recipient delivery status line -- nothing like either existed
 // before this feature.
+// 6.6: "set as my /ask/:username inbox" -- lets the sender point their one
+// durable link at this specific anonymous card.
 
 const navigateSpy = vi.fn()
+let outletContext = { currentUser: null, balance: 0, openAuthModal: () => {} }
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal()
   return {
     ...actual,
     useNavigate: () => navigateSpy,
     useParams: () => ({ slug: 'test-chain' }),
-    useOutletContext: () => ({ currentUser: null, balance: 0, openAuthModal: () => {} }),
+    useOutletContext: () => outletContext,
   }
 })
 
@@ -24,6 +27,8 @@ vi.mock('../lib/api.js', () => ({
   revokeCard: vi.fn(),
   releaseCardClaim: vi.fn(),
   deleteChainEntry: vi.fn(),
+  getActiveAnonymousCard: vi.fn(),
+  setActiveAnonymousCard: vi.fn(),
   getNotifications: vi.fn(),
   markNotificationRead: vi.fn(),
 }))
@@ -119,5 +124,69 @@ describe('CardResponses — 6.4 chain moderation', () => {
 
     await waitFor(() => expect(screen.getByText('First entry')).toBeInTheDocument())
     expect(screen.queryByText(/Delivers to|Delivered to/)).not.toBeInTheDocument()
+  })
+})
+
+function anonCard(overrides = {}) {
+  return {
+    id: 'card_1',
+    slug: 'ada-inbox',
+    type: 'anonymous',
+    config: { content: { message: 'Send me a secret!' } },
+    state: { responses: [] },
+    ...overrides,
+  }
+}
+
+describe('CardResponses — 6.6 durable anonymous link', () => {
+  afterEach(() => {
+    vi.mocked(getMyCard).mockReset()
+    vi.mocked(getActiveAnonymousCard).mockReset()
+    vi.mocked(setActiveAnonymousCard).mockReset()
+    outletContext = { currentUser: null, balance: 0, openAuthModal: () => {} }
+  })
+
+  it('shows "Set as active" when this card is not the resolved active inbox', async () => {
+    outletContext = { currentUser: { username: 'ada' }, balance: 0, openAuthModal: () => {} }
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: anonCard() })
+    vi.mocked(getActiveAnonymousCard).mockResolvedValueOnce({ slug: 'some-other-card' })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Set as my /ask/ada inbox' })).toBeInTheDocument())
+  })
+
+  it('shows the active-inbox note when this card is the resolved active inbox', async () => {
+    outletContext = { currentUser: { username: 'ada' }, balance: 0, openAuthModal: () => {} }
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: anonCard() })
+    vi.mocked(getActiveAnonymousCard).mockResolvedValueOnce({ slug: 'ada-inbox' })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('✓ This is your active /ask/ada inbox.')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Set as my/ })).not.toBeInTheDocument()
+  })
+
+  it('clicking "Set as active" calls the API and flips to the active note', async () => {
+    outletContext = { currentUser: { username: 'ada' }, balance: 0, openAuthModal: () => {} }
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: anonCard() })
+    vi.mocked(getActiveAnonymousCard).mockResolvedValueOnce({ slug: 'some-other-card' })
+    vi.mocked(setActiveAnonymousCard).mockResolvedValueOnce({ message: 'ok' })
+    renderPage()
+
+    const btn = await screen.findByRole('button', { name: 'Set as my /ask/ada inbox' })
+    fireEvent.click(btn)
+
+    await waitFor(() => expect(setActiveAnonymousCard).toHaveBeenCalledWith('card_1'))
+    await waitFor(() => expect(screen.getByText('✓ This is your active /ask/ada inbox.')).toBeInTheDocument())
+  })
+
+  it('shows neither state while still resolving (no flash of the wrong one)', async () => {
+    outletContext = { currentUser: { username: 'ada' }, balance: 0, openAuthModal: () => {} }
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: anonCard() })
+    vi.mocked(getActiveAnonymousCard).mockReturnValueOnce(new Promise(() => {}))
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Your prompt')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Set as my/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/This is your active/)).not.toBeInTheDocument()
   })
 })

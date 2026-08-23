@@ -23557,6 +23557,31 @@ a {
 .cr-chain-delete-btn:hover { color: var(--text); border-color: var(--text-dim); }
 
 /* ── Anonymous inbox ── */
+/* 6.6: token-based, no light-mode override block needed. */
+.cr-anon-active-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.cr-anon-active-note { margin: 0; font-size: 0.82rem; color: var(--text-dim); font-weight: 600; }
+.cr-anon-active-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.cr-anon-active-btn:hover { border-color: var(--text-dim); }
+.cr-anon-active-msg { margin: 0; font-size: 0.76rem; color: var(--text-muted); }
 .cr-anon-list { display: flex; flex-direction: column; gap: 10px; }
 .cr-anon-item { display: flex; align-items: flex-start; gap: 12px; }
 .cr-anon-avatar {

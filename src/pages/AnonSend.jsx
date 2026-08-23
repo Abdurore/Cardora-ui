@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { getPublicProfile } from '../lib/api.js'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { getPublicProfile, getActiveAnonymousCard } from '../lib/api.js'
 
 const bg = '#07111a'
 const accent = '#7ef7ff'
 
-// There is no backend concept of "a user's anonymous inbox card" — an
-// anonymous card is just a card like any other, identified by its own slug
-// (/card/:slug), not by the creator's username. This route used to render a
-// message form that always failed at send time because it had no slug to
-// post to. Rather than keep that dead end, this page now says so plainly
-// and points the visitor at the one thing that actually works: asking the
-// person for their card link directly.
+// 6.6: "/ask/:username becomes canonical. It resolves to whichever
+// anonymous card the user has marked active." Tries the durable-link
+// resolve first and redirects straight to the card if one is set;
+// GET /users/:username/anonymous-card 404s uniformly for "user not found,"
+// "no active inbox," and "pointed-at card gone" -- getPublicProfile is only
+// consulted afterward, purely to render a friendlier fallback (real account
+// with no inbox yet, vs. no account at all).
 function AnonSend() {
   const { username } = useParams()
+  const navigate = useNavigate()
   const [recipient, setRecipient] = useState(null)
   const [loading, setLoading] = useState(true)
   const [recipientNotFound, setRecipientNotFound] = useState(false)
@@ -22,6 +23,18 @@ function AnonSend() {
     if (!username) return
     let cancelled = false
     ;(async () => {
+      try {
+        const activeCard = await getActiveAnonymousCard(username)
+        const slug = activeCard?.slug || activeCard?.data?.slug
+        if (slug) {
+          if (!cancelled) navigate(`/card/${slug}`, { replace: true })
+          return
+        }
+      } catch {
+        // No active inbox (or resolve failed) -- fall through to the
+        // profile lookup below for the fallback screen.
+      }
+
       try {
         const res = await getPublicProfile(username)
         if (cancelled) return
@@ -46,7 +59,7 @@ function AnonSend() {
       }
     })()
     return () => { cancelled = true }
-  }, [username])
+  }, [username, navigate])
 
   if (!loading && recipientNotFound) {
     return (

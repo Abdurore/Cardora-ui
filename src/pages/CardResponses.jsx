@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
 import { HiOutlineTrophy } from 'react-icons/hi2'
-import { getMyCard, revokeCard, releaseCardClaim, deleteChainEntry } from '../lib/api.js'
+import { getMyCard, revokeCard, releaseCardClaim, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard } from '../lib/api.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
@@ -96,10 +96,25 @@ function EmptyState({ icon, message }) {
 }
 
 // ── Anonymous inbox ───────────────────────────────────────────────────
-function AnonInboxView({ state, content }) {
+function AnonInboxView({ state, content, username, isActiveInbox, onSetActive, settingActive, activeMsg }) {
   const responses = state?.responses || []
   return (
     <div className="cr-section">
+      {/* 6.6: durable anonymous link -- lets the sender point their one
+          /ask/:username at this specific anonymous card ("rotate the card
+          underneath"). isActiveInbox is null while still resolving. */}
+      {isActiveInbox !== null && username && (
+        <div className="cr-anon-active-block">
+          {isActiveInbox ? (
+            <p className="cr-anon-active-note">✓ This is your active /ask/{username} inbox.</p>
+          ) : (
+            <button type="button" className="cr-anon-active-btn" onClick={onSetActive} disabled={settingActive}>
+              {settingActive ? 'Setting…' : `Set as my /ask/${username} inbox`}
+            </button>
+          )}
+          {activeMsg && <p className="cr-anon-active-msg">{activeMsg}</p>}
+        </div>
+      )}
       {content?.message && (
         <div className="cr-chain-challenge">
           <p className="cr-chain-challenge-label">Your prompt</p>
@@ -483,6 +498,13 @@ function CardResponses() {
   const [revokeMsg, setRevokeMsg] = useState('')
   const [releasingClaim, setReleasingClaim] = useState(false)
   const [claimMsg, setClaimMsg] = useState('')
+  // 6.6: null while resolving (or not applicable) -- distinguished from
+  // false so AnonInboxView doesn't flash "Set as active" before the real
+  // answer comes back.
+  const [activeAnonSlug, setActiveAnonSlug] = useState(null)
+  const [activeAnonResolved, setActiveAnonResolved] = useState(false)
+  const [settingActiveAnon, setSettingActiveAnon] = useState(false)
+  const [activeAnonMsg, setActiveAnonMsg] = useState('')
 
   const loadCard = useCallback(async () => {
     try {
@@ -534,6 +556,41 @@ function CardResponses() {
     setRefreshing(true)
     await loadCard()
     setRefreshing(false)
+  }
+
+  // 6.6: resolve whether this specific anonymous card is the one
+  // /ask/:username currently points at.
+  useEffect(() => {
+    if (!rawCard || (rawCard.type || '').toLowerCase() !== 'anonymous' || !currentUser?.username) return
+    let cancelled = false
+    getActiveAnonymousCard(currentUser.username)
+      .then((res) => {
+        if (cancelled) return
+        setActiveAnonSlug(res?.slug || res?.data?.slug || null)
+        setActiveAnonResolved(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setActiveAnonSlug(null)
+        setActiveAnonResolved(true)
+      })
+    return () => { cancelled = true }
+  }, [rawCard, currentUser])
+
+  const handleSetActiveAnon = async () => {
+    setSettingActiveAnon(true)
+    setActiveAnonMsg('')
+    try {
+      const cardId = rawCard.id || rawCard.cardId || rawCard._id
+      await setActiveAnonymousCard(cardId)
+      setActiveAnonSlug(rawCard.slug)
+      setActiveAnonResolved(true)
+      setActiveAnonMsg('This is now your active /ask link.')
+    } catch (err) {
+      setActiveAnonMsg(err.message || 'Could not update your active inbox.')
+    } finally {
+      setSettingActiveAnon(false)
+    }
   }
 
   // 5.5: sender revoke -- immediate kill switch, reversible (the same
@@ -709,7 +766,17 @@ function CardResponses() {
         )}
 
         {/* Type-specific content */}
-        {(type === 'anonymous' || type === 'anon') && <AnonInboxView state={state} content={content} />}
+        {(type === 'anonymous' || type === 'anon') && (
+          <AnonInboxView
+            state={state}
+            content={content}
+            username={currentUser?.username}
+            isActiveInbox={activeAnonResolved ? activeAnonSlug === rawCard.slug : null}
+            onSetActive={handleSetActiveAnon}
+            settingActive={settingActiveAnon}
+            activeMsg={activeAnonMsg}
+          />
+        )}
         {type === 'poll' && <PollResultsView state={state} content={content} />}
         {type === 'trivia' && <TriviaLeaderboardView state={state} content={triviaContent} />}
         {type === 'chain' && (

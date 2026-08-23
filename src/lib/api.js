@@ -636,6 +636,18 @@ export async function getPublicProfile(identifier) {
   return request(`/users/${identifier}/profile`, { auth: true })
 }
 
+// 6.6: durable anonymous link -- public, no account required to resolve
+// someone's /ask/:username to their currently-active anonymous card.
+export async function getActiveAnonymousCard(username) {
+  return request(`/users/${username}/anonymous-card`)
+}
+
+// 6.6: owner-only -- points the caller's /ask/:username at a different one
+// of their own anonymous cards ("rotate the card underneath").
+export async function setActiveAnonymousCard(cardId) {
+  return request('/users/me/active-anonymous-card', { method: 'POST', auth: true, body: { cardId } })
+}
+
 export async function submitBroadcastRequest(payload) {
   return request('/admin/broadcast-requests', { method: 'POST', auth: true, body: payload })
 }
