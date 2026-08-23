@@ -11,6 +11,7 @@ import { useDepthMotion } from '../lib/useDepthMotion.js'
 import { claimGiftFromCard } from '../lib/api.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
 import ReportModal from './ReportModal.jsx'
+import { buildSendOneBackPath } from '../lib/replyPath.js'
 
 // Code-split: three.js is a large dependency and must never load for a card
 // that doesn't use the galaxy.
@@ -810,7 +811,7 @@ function CardPreviewModal({
     // second GET /cards/:slug here would double-count this card's view
     // (getCardBySlug increments `views` on every non-owner fetch) purely
     // to look up a name the replier's own screen already has in memory.
-    const replyPath = `/quick?type=personal&replyTo=${encodeURIComponent(cardId)}${senderName ? `&replySender=${encodeURIComponent(senderName)}` : ''}`
+    const replyPath = buildSendOneBackPath(cardId, senderName)
     if (!currentUser) {
       if (openAuthModal) {
         openAuthModal(null, replyPath, {
