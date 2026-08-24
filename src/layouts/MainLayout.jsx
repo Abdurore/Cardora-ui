@@ -138,6 +138,14 @@ function MainLayout() {
   const [authModalContext, setAuthModalContext] = useState(null)
   const pendingAuthActionRef = useRef(null)
   const pendingLikesRef = useRef(new Set())
+  // 6.8: "prompt install after first successful send" -- the browser only
+  // ever fires beforeinstallprompt once eligibility criteria are met, and
+  // only a user gesture can consume it, so it's captured globally here and
+  // handed down as `canInstall`/`promptInstall` for the send-success
+  // screens to use whenever they're ready, rather than each page having to
+  // listen for the event itself.
+  const deferredInstallPromptRef = useRef(null)
+  const [canInstall, setCanInstall] = useState(false)
 
   const openAuthModal = (onAuthenticated, returnTo, context) => {
     pendingAuthActionRef.current = typeof onAuthenticated === 'function'
@@ -282,6 +290,41 @@ function MainLayout() {
     window.addEventListener('beforeunload', saveActive)
     return () => window.removeEventListener('beforeunload', saveActive)
   }, [])
+
+  // 6.8 PWA install prompt. Chrome/Edge fire this once, early, whenever the
+  // installability criteria (manifest + service worker + engagement) are
+  // met -- calling preventDefault() suppresses the browser's own mini-infobar
+  // so the send-success screen controls exactly when it's offered instead.
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault()
+      deferredInstallPromptRef.current = e
+      setCanInstall(true)
+    }
+    const handleAppInstalled = () => {
+      deferredInstallPromptRef.current = null
+      setCanInstall(false)
+    }
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
+  // The prompt() call only works once per captured event and must happen
+  // from a user gesture -- resolved by the InstallPrompt component's own
+  // button click, not by an effect.
+  const promptInstall = async () => {
+    const promptEvent = deferredInstallPromptRef.current
+    if (!promptEvent) return { outcome: 'unavailable' }
+    promptEvent.prompt()
+    const choice = await promptEvent.userChoice
+    deferredInstallPromptRef.current = null
+    setCanInstall(false)
+    return choice
+  }
 
   useEffect(() => {
     if (!hydratedUser?.id) return
@@ -1070,6 +1113,8 @@ function MainLayout() {
             window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
             navigate('/studio', { state: { cardData: data || null, isNew: !data } })
           },
+          canInstall,
+          promptInstall,
         }}
       />
 

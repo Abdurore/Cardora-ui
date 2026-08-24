@@ -32,6 +32,7 @@ import { computeCardTier, trimCardToTier, getTierCost, getCardTotalCost, compute
 import TierMeter from '../components/TierMeter.jsx'
 import TierPip from '../components/TierPip.jsx'
 import SendReceipt from '../components/SendReceipt.jsx'
+import InstallPrompt from '../components/InstallPrompt.jsx'
 
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 const STUDIO_AUTOSAVE_PREFIX = 'cardora:studioAutoSave:'
@@ -346,7 +347,7 @@ function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const { currentUser, publishTemplate, updateMarketplaceTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, consumeGift } = useOutletContext() || {}
+  const { currentUser, publishTemplate, updateMarketplaceTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, consumeGift, canInstall, promptInstall } = useOutletContext() || {}
   const [cardPrices, setCardPrices] = useState(TIER_COST_BY_TYPE)
   const [featureSurcharges, setFeatureSurcharges] = useState(() => normalizeFeatureSurcharges(null))
   // Scales the Studio's own live-preview ambient particles the same way
@@ -4584,6 +4585,10 @@ function CardStudio() {
                 </a>
               </div>
             </div>
+            )}
+
+            {!isSending && sendResult?.ok && (
+              <InstallPrompt canInstall={canInstall} promptInstall={promptInstall} />
             )}
 
             {!isSending && (

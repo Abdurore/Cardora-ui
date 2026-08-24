@@ -14,6 +14,7 @@ import TierPip from '../components/TierPip.jsx'
 import TierMeter from '../components/TierMeter.jsx'
 import SendReceipt from '../components/SendReceipt.jsx'
 import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
+import InstallPrompt from '../components/InstallPrompt.jsx'
 
 // Labels/sample copy only now — pip tier is derived live via the shared
 // `fontTier()` (tierRequirements.js), not a hardcoded tag here. That list
@@ -95,7 +96,7 @@ function QuickCreate() {
   const navigate = useNavigate()
   const cardType = params.get('type') || 'personal'
 
-  const { createCardOnBackend, currentUser, openAuthModal, balance, inventory = [] } = useOutletContext()
+  const { createCardOnBackend, currentUser, openAuthModal, balance, inventory = [], canInstall, promptInstall } = useOutletContext()
 
   // Live pricing, same source CardStudio uses — Quick mode used to rely on
   // the hardcoded fallback table only, so a backend price change would
@@ -1224,6 +1225,10 @@ function QuickCreate() {
                   </a>
                 </div>
               </div>
+            )}
+
+            {!isSending && sendResult?.ok && (
+              <InstallPrompt canInstall={canInstall} promptInstall={promptInstall} />
             )}
 
             {/* Bottom actions after success */}
