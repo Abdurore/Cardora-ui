@@ -318,22 +318,6 @@ function QuickCreate() {
     [tierCost, builtCardObject, cardType, pollDataForTier, triviaDataForTier],
   )
 
-  // All hooks must run above this line — the gate below is a conditional
-  // return, and every render (logged in or not) has to call the exact same
-  // hooks in the exact same order.
-  if (!currentUser) {
-    return (
-      <div className="qc-gate">
-        <div className="qc-gate-inner">
-          <span className="qc-gate-icon">✦</span>
-          <h2>Sign in to create a card</h2>
-          <p>Your creations are saved to your profile and ready to share.</p>
-          <button className="qc-gate-btn" type="button" onClick={openAuthModal}>Sign In</button>
-        </div>
-      </div>
-    )
-  }
-
   const validate = () => {
     if (cardType === 'personal') {
       if (!heading.trim()) return 'Please add a heading.'
@@ -357,6 +341,13 @@ function QuickCreate() {
     setError(null)
     const err = validate()
     if (err) { setError(err); return }
+    // 6.8: no account is required to build a card -- only to send it. The
+    // in-progress card is untouched here because AuthModal is an overlay
+    // (MainLayout.jsx), not a route change, so this component never unmounts.
+    if (!currentUser) {
+      openAuthModal?.()
+      return
+    }
     setSendResult(null)
     // Always show the receipt first, even for free sends — same as the
     // Studio, so the tier/cost breakdown is never skipped silently.
@@ -367,6 +358,9 @@ function QuickCreate() {
   // `overrides` lets "Trim extras & send free" pass freshly-trimmed content
   // straight through instead of waiting on setState to flush.
   const handleSend = async (overrides = {}) => {
+    // Last-resort guard -- handleSendClick is the primary gate, but this is
+    // also reachable directly from the "Try Again" button.
+    if (!currentUser) { openAuthModal?.(); return }
     setIsSending(true)
     try {
       const cardObject = overrides.cardObject || buildCardObject()

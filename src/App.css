@@ -26305,21 +26305,6 @@ a {
   background: rgba(255,255,255,0.05); color: var(--border);
 }
 
-/* Gate (not logged in) */
-.qc-gate { min-height: 70vh; display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
-.qc-gate-inner {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 14px; text-align: center; max-width: 320px;
-}
-.qc-gate-icon { font-size: 2.2rem; color: rgba(126,239,255,0.55); }
-.qc-gate-inner h2 { margin: 0; font-size: 1.4rem; color: var(--border); }
-.qc-gate-inner p { margin: 0; color: rgba(226,234,240,0.48); }
-.qc-gate-btn {
-  padding: 12px 28px; border-radius: 12px; border: none;
-  font-size: 0.95rem; font-weight: 700; cursor: pointer;
-  background: linear-gradient(135deg, #7ef7ff, #62ffa2); color: #0b0f12;
-}
-
 /* ── Light theme overrides ─────────────────────────── */
 [data-theme="light"] .qc-shell { background: var(--bg); }
 [data-theme="light"] .qc-body { background: var(--bg); }
@@ -26454,11 +26439,6 @@ a {
   border-color: var(--accent-border);
   color: var(--text);
 }
-
-[data-theme="light"] .qc-gate { background: var(--bg); }
-[data-theme="light"] .qc-gate-icon { color: rgba(10,122,143,0.55); }
-[data-theme="light"] .qc-gate-inner h2 { color: var(--text); }
-[data-theme="light"] .qc-gate-inner p { color: var(--text-muted); }
 
 /* ═══════════════════════════════════════════════════════
    LIGHT MODE — MISSED COMPONENTS PASS 2
