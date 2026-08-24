@@ -4788,6 +4788,24 @@
 
 .cv-gate-lock { font-size: 2.2rem; }
 
+/* 6.7: expiry page -- "soft visual echo of the card's theme colour." */
+.cv-expired-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 60% 45% at 50% 30%, color-mix(in srgb, var(--expired-accent, #7ef7ff) 16%, transparent), transparent 70%);
+}
+.cv-expired-reopen-btn {
+  background: none;
+  border: none;
+  color: rgba(220, 242, 247, 0.55);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px;
+}
+.cv-expired-reopen-btn:hover { color: rgba(220, 242, 247, 0.85); }
+
 .cv-report-trigger {
   position: fixed;
   top: 14px;

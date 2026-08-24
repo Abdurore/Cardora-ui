@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import CardResponses from './CardResponses.jsx'
-import { getMyCard, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard } from '../lib/api.js'
+import { getMyCard, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard, extendCardLifetime } from '../lib/api.js'
 import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
 
 // 6.4: originator moderation (delete a chain entry, no tombstone) and the
@@ -30,6 +30,7 @@ vi.mock('../lib/api.js', () => ({
   deleteChainEntry: vi.fn(),
   getActiveAnonymousCard: vi.fn(),
   setActiveAnonymousCard: vi.fn(),
+  extendCardLifetime: vi.fn(),
   getNotifications: vi.fn(),
   markNotificationRead: vi.fn(),
 }))
@@ -218,5 +219,53 @@ describe('CardResponses — 6.6 durable anonymous link', () => {
       colors: { background: '#111', accent: '#7ef7ff' },
     }))
     await waitFor(() => expect(shareOrDownloadAnonImage).toHaveBeenCalledWith(fakeBlob, 'cardora-ask-ada.png'))
+  })
+})
+
+describe('CardResponses — 6.7 card retention', () => {
+  afterEach(() => {
+    vi.mocked(getMyCard).mockReset()
+    vi.mocked(extendCardLifetime).mockReset()
+  })
+
+  it('shows the closing date and an extend button for a card with an active expiry', async () => {
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: chainCard({ id: 'card_1', expiresAt: '2026-06-15T00:00:00.000Z' }) })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText(/Closes/)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Extend lifetime (3 CC)' })).toBeInTheDocument()
+  })
+
+  it('shows neither for a card that never expires', async () => {
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: chainCard({ id: 'card_1', expiresAt: null }) })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Add your memory')).toBeInTheDocument())
+    expect(screen.queryByText(/Closes/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Extend lifetime/ })).not.toBeInTheDocument()
+  })
+
+  it('accounts for bonusLifetimeDays when displaying the closing date', async () => {
+    vi.mocked(getMyCard).mockResolvedValueOnce({
+      card: chainCard({ id: 'card_1', expiresAt: '2026-06-15T00:00:00.000Z', bonusLifetimeDays: 365 }),
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText(/Closes/)).toBeInTheDocument())
+    // 2026-06-15 + 365 days -> 2027-06-15, not the raw stored date.
+    expect(screen.getByText(/Jun 15, 2027/)).toBeInTheDocument()
+  })
+
+  it('clicking "Extend lifetime" calls the API and updates the shown closing date', async () => {
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: chainCard({ id: 'card_1', expiresAt: '2026-06-15T00:00:00.000Z' }) })
+    vi.mocked(extendCardLifetime).mockResolvedValueOnce({ message: 'ok' })
+    renderPage()
+
+    const btn = await screen.findByRole('button', { name: 'Extend lifetime (3 CC)' })
+    fireEvent.click(btn)
+
+    await waitFor(() => expect(extendCardLifetime).toHaveBeenCalledWith('card_1'))
+    await waitFor(() => expect(screen.getByText(/Jun 15, 2027/)).toBeInTheDocument())
+    expect(screen.getByText('Extended by 12 months.')).toBeInTheDocument()
   })
 })

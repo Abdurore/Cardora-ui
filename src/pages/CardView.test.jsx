@@ -8,6 +8,12 @@ import { getCardBySlug, notifyMeForScheduledCard } from '../lib/api.js'
 // first client paint matches the server-rendered gate with zero flash,
 // instead of always showing a generic "Preparing your surprise" spinner.
 
+const navigateSpy = vi.fn()
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, useNavigate: () => navigateSpy }
+})
+
 vi.mock('../lib/api.js', () => ({
   // Never resolves -- keeps the component in its loading state for the
   // whole test, which is exactly the state under test here.
@@ -104,6 +110,72 @@ describe('CardView — 5.5 blocked states', () => {
 
     await waitFor(() => expect(screen.getByText('This card has already been opened by its recipient.')).toBeInTheDocument())
     expect(screen.getByText('Already opened')).toBeInTheDocument()
+  })
+})
+
+// 6.7: "The expiry page is a conversion page, not a 404" -- its own
+// dedicated screen, distinct from 5.5's revoked/alreadyOpened screens even
+// though the backend also uses 410 for revoked.
+describe('CardView — 6.7 expired card', () => {
+  afterEach(() => {
+    navigateSpy.mockClear()
+  })
+
+  it('shows the closed-card screen with the sender name and send date', async () => {
+    const err = new Error('Gone')
+    err.status = 410
+    err.payload = { expired: true, senderName: 'Ada', createdAt: '2026-01-15T00:00:00.000Z', colors: { accent: '#ff00aa' } }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByText('This card has closed.')).toBeInTheDocument())
+    expect(screen.getByText(/Ada sent this on January 15, 2026/)).toBeInTheDocument()
+  })
+
+  it('falls back to a generic sender label when none is given', async () => {
+    const err = new Error('Gone')
+    err.status = 410
+    err.payload = { expired: true, senderName: '', createdAt: null, colors: null }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByText(/The sender sent this\./)).toBeInTheDocument())
+  })
+
+  it('"Send one of your own" navigates to the create flow', async () => {
+    const err = new Error('Gone')
+    err.status = 410
+    err.payload = { expired: true, senderName: 'Ada', createdAt: null, colors: null }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send one of your own' }))
+    expect(navigateSpy).toHaveBeenCalledWith('/create')
+  })
+
+  it('"Ask sender to reopen it" copies a prefilled message when Web Share is unavailable', async () => {
+    const originalShare = navigator.share
+    const originalClipboard = navigator.clipboard
+    delete navigator.share
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue() }, configurable: true })
+
+    const err = new Error('Gone')
+    err.status = 410
+    err.payload = { expired: true, senderName: 'Ada', createdAt: null, colors: null }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask Ada to reopen it' }))
+
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('Hey Ada')))
+    await waitFor(() => expect(screen.getByText('Copied — paste it to them!')).toBeInTheDocument())
+
+    navigator.share = originalShare
+    Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true })
   })
 })
 

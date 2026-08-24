@@ -31,6 +31,9 @@ function CardView() {
   const [lockHint, setLockHint] = useState('')
   const [isRevoked, setIsRevoked] = useState(false)
   const [alreadyOpenedElsewhere, setAlreadyOpenedElsewhere] = useState(false)
+  const [isExpired, setIsExpired] = useState(false)
+  const [expiredInfo, setExpiredInfo] = useState({ senderName: '', createdAt: null, colors: null })
+  const [reopenAskCopied, setReopenAskCopied] = useState(false)
   const [isScheduled, setIsScheduled] = useState(false)
   const [scheduledUnlockAt, setScheduledUnlockAt] = useState(null)
   const [countdownText, setCountdownText] = useState('')
@@ -135,6 +138,16 @@ function CardView() {
         }
         if (err.payload?.revoked) {
           setIsRevoked(true)
+          setLoading(false)
+          if (!cancelled) return
+        }
+        if (err.payload?.expired) {
+          setIsExpired(true)
+          setExpiredInfo({
+            senderName: err.payload?.senderName || '',
+            createdAt: err.payload?.createdAt || null,
+            colors: err.payload?.colors || null,
+          })
           setLoading(false)
           if (!cancelled) return
         }
@@ -322,6 +335,50 @@ function CardView() {
           <span className="cv-gate-lock">🚫</span>
           <h2>This card was withdrawn</h2>
           <p>This card was withdrawn by the sender.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Expired (6.7: card retention) ── a conversion page, not a 404 ──────
+  if (isExpired) {
+    const senderLabel = expiredInfo.senderName || 'The sender'
+    const sentOn = expiredInfo.createdAt ? new Date(expiredInfo.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) : ''
+    const accent = expiredInfo.colors?.accent || expiredInfo.colors?.gradient?.[1] || '#7ef7ff'
+    return (
+      <div className="cv-page-gate">
+        {/* "Soft visual echo of the card's theme colour" */}
+        <div className="cv-expired-glow" style={{ '--expired-accent': accent }} />
+        <div className="cv-gate-card">
+          <span className="cv-gate-lock">⏳</span>
+          <h2>This card has closed.</h2>
+          <p>
+            {senderLabel} sent this{sentOn ? ` on ${sentOn}` : ''}. Cards are made to be opened —
+            this one's moment has passed.
+          </p>
+          <button className="primary" type="button" onClick={() => navigate('/create')}>
+            Send one of your own
+          </button>
+          <button
+            type="button"
+            className="cv-expired-reopen-btn"
+            onClick={async () => {
+              const text = `Hey ${senderLabel}, my Cardora card from you has closed — would you mind reopening it? ${window.location.href}`
+              try {
+                if (navigator.share) {
+                  await navigator.share({ title: 'Cardora', text })
+                  return
+                }
+              } catch { /* cancelled */ }
+              try {
+                await navigator.clipboard.writeText(text)
+                setReopenAskCopied(true)
+                setTimeout(() => setReopenAskCopied(false), 2000)
+              } catch { /* ignore */ }
+            }}
+          >
+            {reopenAskCopied ? 'Copied — paste it to them!' : `Ask ${senderLabel} to reopen it`}
+          </button>
         </div>
       </div>
     )

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
 import { HiOutlineTrophy } from 'react-icons/hi2'
-import { getMyCard, revokeCard, releaseCardClaim, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard } from '../lib/api.js'
+import { getMyCard, revokeCard, releaseCardClaim, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard, extendCardLifetime } from '../lib/api.js'
 import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -515,6 +515,8 @@ function CardResponses() {
   const [activeAnonMsg, setActiveAnonMsg] = useState('')
   const [sharingAnonImage, setSharingAnonImage] = useState(false)
   const [anonImageError, setAnonImageError] = useState('')
+  const [extending, setExtending] = useState(false)
+  const [extendMsg, setExtendMsg] = useState('')
 
   const loadCard = useCallback(async () => {
     try {
@@ -642,6 +644,24 @@ function CardResponses() {
     }
   }
 
+  // 6.7: "one-tap extend (3 CC)" -- 3.7's existing sink, +365 days via
+  // bonusLifetimeDays. Optimistic local update so the shown expiry date
+  // reflects the extension immediately.
+  const handleExtendLifetime = async () => {
+    setExtending(true)
+    setExtendMsg('')
+    try {
+      const cardId = rawCard.id || rawCard.cardId || rawCard._id
+      await extendCardLifetime(cardId)
+      setRawCard((prev) => ({ ...prev, bonusLifetimeDays: (prev.bonusLifetimeDays || 0) + 365 }))
+      setExtendMsg('Extended by 12 months.')
+    } catch (err) {
+      setExtendMsg(err.message || 'Could not extend this card.')
+    } finally {
+      setExtending(false)
+    }
+  }
+
   // 6.4: originator moderation -- removes the entry outright, no
   // tombstone. Optimistic local removal since the backend $pull can't fail
   // for any reason the sender needs to see (card/ownership were already
@@ -713,6 +733,13 @@ function CardResponses() {
   const title = rawCard.title || content.header || content.message || content.question || 'Card'
   const createdAt = rawCard.createdAt || rawCard.created_at
 
+  // 6.7: card retention. rawCard.expiresAt is null/absent for a card that
+  // never expires (anonymous, or a Premium sender's free card) -- the
+  // extend action only makes sense when there's an actual clock running.
+  const effectiveExpiresAt = rawCard.expiresAt
+    ? new Date(new Date(rawCard.expiresAt).getTime() + (Number(rawCard.bonusLifetimeDays) || 0) * 24 * 60 * 60 * 1000)
+    : null
+
   const isChain = type === 'chain'
 
   return (
@@ -738,6 +765,7 @@ function CardResponses() {
           </div>
           <h1 className="cr-card-title">{title}</h1>
           {createdAt && <p className="cr-card-date">Created {formatDate(createdAt)}</p>}
+          {effectiveExpiresAt && <p className="cr-card-date">Closes {formatDate(effectiveExpiresAt)}</p>}
 
           <div className="cr-actions-row">
             <button className="cr-action-btn" type="button" onClick={handleRefresh} disabled={refreshing}>
@@ -774,9 +802,15 @@ function CardResponses() {
                 {releasingClaim ? 'Working…' : 'Release claim'}
               </button>
             )}
+            {effectiveExpiresAt && (
+              <button className="cr-action-btn" type="button" onClick={handleExtendLifetime} disabled={extending}>
+                {extending ? 'Working…' : 'Extend lifetime (3 CC)'}
+              </button>
+            )}
           </div>
           {revokeMsg && <p className="cr-card-date">{revokeMsg}</p>}
           {claimMsg && <p className="cr-card-date">{claimMsg}</p>}
+          {extendMsg && <p className="cr-card-date">{extendMsg}</p>}
           {isChain && (
             <p className="cr-live-badge">
               <span className="cr-live-dot" />
