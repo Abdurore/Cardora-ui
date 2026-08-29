@@ -376,7 +376,7 @@ function QuickCreate() {
             const cloudUrl = await uploadToCloudinary(images[i].file, 'image')
             cloudImages.push(cloudUrl)
           } catch (err) {
-            setSendResult({ ok: false, message: 'Failed to upload images. Please try again.' })
+            setSendResult({ ok: false, message: 'Failed to upload images. Your draft is safe — try again.' })
             setIsSending(false)
             return
           }
@@ -422,7 +422,7 @@ function QuickCreate() {
       })
 
       if (!result.ok) {
-        setSendResult({ ok: false, message: result.message || 'Something went wrong.' })
+        setSendResult({ ok: false, message: (result.message ? `${result.message} ` : 'Card creation failed. ') + 'Your draft is safe — try again.' })
         return
       }
 
@@ -465,7 +465,7 @@ function QuickCreate() {
 
       setSendResult({ ok: true, slug, message: finalMessage })
     } catch (err) {
-      setSendResult({ ok: false, message: 'Something went wrong. Please try again.' })
+      setSendResult({ ok: false, message: 'Something went wrong. Your draft is safe — try again.' })
     } finally {
       setIsSending(false)
     }

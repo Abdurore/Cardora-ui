@@ -1155,7 +1155,7 @@ function CardStudio() {
       flushedCardObject = await flushPendingUploads(overrides.cardObject || cardObject)
       setCardObject(flushedCardObject)
     } catch (err) {
-      setSendResult({ ok: false, message: 'Media upload failed: ' + err.message })
+      setSendResult({ ok: false, message: `Media upload failed: ${err.message}. Your draft is safe — try again.` })
       setIsSending(false)
       return
     }
@@ -1240,7 +1240,7 @@ function CardStudio() {
       // starts fresh instead of restoring the just-sent card.
       try { localStorage.removeItem(autoSaveKey) } catch { /* ignore */ }
     } else {
-      setSendResult({ ok: false, message: result?.message || 'Card creation failed.' })
+      setSendResult({ ok: false, message: (result?.message ? `${result.message} ` : 'Card creation failed. ') + 'Your draft is safe — try again.' })
     }
   }
 
@@ -4483,9 +4483,15 @@ function CardStudio() {
               </div>
             )}
             {!isSending && !sendResult?.ok && sendResult !== null && (
-              <p className="cs-send-modal-note" style={{ color: '#ffb4b4' }}>
-                {sendResult.message || 'Something went wrong. Please try again.'}
-              </p>
+              <>
+                <p className="cs-send-modal-note" style={{ color: '#ffb4b4' }}>
+                  {sendResult.message || 'Something went wrong. Your draft is safe — try again.'}
+                </p>
+                <div className="cs-send-confirm-actions" style={{ marginTop: 4 }}>
+                  <button type="button" className="cs-send-confirm-cancel" onClick={() => { setShowSendModal(false); setSendResult(null) }}>Close</button>
+                  <button type="button" className="cs-send-confirm-btn" onClick={handleConfirmSend}>Try Again</button>
+                </div>
+              </>
             )}
 
             {!isSending && sendResult?.ok && (

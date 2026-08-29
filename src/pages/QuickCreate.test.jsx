@@ -157,6 +157,50 @@ describe('QuickCreate — 6.6 anonymous share image', () => {
   })
 })
 
+// 6.9 (master execution prompt failure-states table): "Card creation
+// errors after Studio work | Surface `Your draft is safe` explicitly."
+// QuickCreate already had a "Try Again" retry button before this phase;
+// what was missing was the explicit reassurance text.
+describe('QuickCreate — 6.9 send failure and retry', () => {
+  afterEach(() => {
+    vi.mocked(getCardPrices).mockClear()
+    vi.mocked(trackEvent).mockClear()
+    createCardOnBackend.mockClear()
+  })
+
+  it('tells the sender their draft is safe when card creation fails, and offers Try Again', async () => {
+    createCardOnBackend.mockResolvedValueOnce({ ok: false, message: 'Insufficient balance' })
+    renderAt('/quick?type=anonymous')
+    fireEvent.change(screen.getByPlaceholderText('Recipients can reply to this card anonymously…'), { target: { value: 'Ask me anything!' } })
+    fireEvent.click(screen.getByRole('button', { name: /Create Card/ }))
+
+    const sendBtn = await screen.findByRole('button', { name: /Send free/i })
+    fireEvent.click(sendBtn)
+
+    await waitFor(() => expect(screen.getByText(/Insufficient balance/)).toBeInTheDocument())
+    expect(screen.getByText(/Your draft is safe/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument()
+  })
+
+  it('clicking "Try Again" retries with the same draft, not a fresh one', async () => {
+    createCardOnBackend
+      .mockResolvedValueOnce({ ok: false, message: 'Server error' })
+      .mockResolvedValueOnce({ ok: true, data: { slug: 'retried-card' }, message: 'Card created' })
+    renderAt('/quick?type=anonymous')
+    fireEvent.change(screen.getByPlaceholderText('Recipients can reply to this card anonymously…'), { target: { value: 'Ask me anything!' } })
+    fireEvent.click(screen.getByRole('button', { name: /Create Card/ }))
+
+    const sendBtn = await screen.findByRole('button', { name: /Send free/i })
+    fireEvent.click(sendBtn)
+    await waitFor(() => expect(createCardOnBackend).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Try Again' }))
+
+    await waitFor(() => expect(createCardOnBackend).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Your unique card link')).toBeInTheDocument()
+  })
+})
+
 // 6.8: "No account required to build a card. Auth is required at send
 // only." -- QuickCreate used to gate the entire page behind a sign-in
 // screen, blocking building outright. These prove a signed-out visitor can
