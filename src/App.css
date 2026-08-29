@@ -992,6 +992,19 @@
 }
 .profile-reminder-delete:hover { background: rgba(255,107,107,0.15); color: #ff6b6b; }
 
+.profile-push {
+  margin-top: 24px;
+  padding: 22px 24px;
+  border-radius: 22px;
+  border: 1px solid rgba(126, 247, 255, 0.12);
+  background: linear-gradient(180deg, rgba(10, 18, 22, 0.7), rgba(6, 12, 15, 0.5));
+  box-shadow: inset 0 1px 0 rgba(126, 247, 255, 0.06);
+}
+.profile-push-head .section-title { margin: 0; }
+.profile-push-desc { margin: 8px 0 0; font-size: 0.85rem; color: var(--text-dim); }
+.profile-push-error { margin: 8px 0 0; font-size: 0.8rem; color: #ff6b6b; }
+.profile-push button { margin-top: 14px; }
+
 .page {
   padding: 48px 6vw calc(80px + env(safe-area-inset-bottom));
   display: flex;

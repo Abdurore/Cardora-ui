@@ -976,4 +976,19 @@ export async function markNotificationRead(id) {
   return request(`/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH', auth: true })
 }
 
+/* ═══════════════════════════════════════════════
+   6.8: WEB PUSH SUBSCRIPTIONS
+   ═══════════════════════════════════════════════ */
+// Backend's Joi schema (userSchemas.subscribeToPush) is allowUnknown:false on
+// exactly {endpoint, keys:{p256dh,auth}} -- PushSubscription.toJSON() also
+// includes expirationTime, so callers must pass that trimmed shape, not the
+// raw subscription object, or this 400s.
+export async function subscribeToPush(subscription) {
+  return request('/users/me/push-subscription', { method: 'POST', auth: true, body: subscription })
+}
+
+export async function unsubscribeFromPush(endpoint) {
+  return request('/users/me/push-subscription', { method: 'DELETE', auth: true, body: { endpoint } })
+}
+
 export { API_BASE }

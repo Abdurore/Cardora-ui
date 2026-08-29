@@ -76,12 +76,23 @@ export default defineConfig(({ command, mode }) => {
   return {
     plugins: [
       react(),
-      // 6.8: PWA manifest + offline app shell. Precaches only the built app
-      // shell (JS/CSS/HTML/icons) via workbox's default globPatterns — it
-      // deliberately does NOT runtime-cache API responses, so a card someone
-      // opens is never served stale from a service-worker cache.
+      // 6.8: PWA manifest + offline app shell + web push. Custom service
+      // worker (src/sw.js) via injectManifest -- generateSW mode (the
+      // original 6.8 commit) can only configure precaching/runtime-caching
+      // routes, not attach `push`/`notificationclick` listeners, so it
+      // couldn't carry the web push work. Precaching (default globPatterns:
+      // built JS/CSS/HTML/icons) and the offline navigate fallback both moved
+      // into src/sw.js itself; still deliberately does NOT runtime-cache API
+      // responses, so a card someone opens is never served stale from a
+      // service-worker cache.
       VitePWA({
         registerType: 'autoUpdate',
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.js',
+        injectManifest: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
+        },
         includeAssets: ['favicon.svg', 'favicon.png', 'cardora-favicon.png', 'cardora-icon.png'],
         manifest: {
           name: 'Cardora',
@@ -96,13 +107,6 @@ export default defineConfig(({ command, mode }) => {
             { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' },
             { src: '/maskable-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
           ],
-        },
-        workbox: {
-          // SPA offline fallback -- any uncached navigation (e.g. reload
-          // while offline) still renders the app shell instead of a browser
-          // error page; React Router then handles the route client-side.
-          navigateFallback: '/index.html',
-          navigateFallbackDenylist: [/^\/api\//],
         },
       }),
     ],

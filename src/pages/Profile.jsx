@@ -11,6 +11,7 @@ import Dropdown from '../components/Dropdown.jsx'
 import AvatarCropModal from '../components/AvatarCropModal.jsx'
 import ShareCardModal from '../components/ShareCardModal.jsx'
 import StatusModal from '../components/StatusModal.jsx'
+import PushNotificationToggle from '../components/PushNotificationToggle.jsx'
 import { useAppConfirm } from '../hooks/useAppConfirm.jsx'
 import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
@@ -979,6 +980,8 @@ function Profile() {
         )}
 
         <RemindersSection currentUser={currentUser} />
+
+        <PushNotificationToggle currentUser={currentUser} />
 
         {currentUser && savedDrafts.length > 0 ? (
           <div>
