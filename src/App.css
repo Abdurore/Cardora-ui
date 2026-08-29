@@ -13391,6 +13391,33 @@ a {
   background: rgba(255, 155, 210, 0.08);
 }
 
+/* 6.9: payment-return banner (Store.jsx) -- shown after redirecting back
+   from Paystack while the webhook-driven credit is confirmed. */
+.store-payment-return {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.store-payment-return p { margin: 0; }
+.store-payment-return.confirming,
+.store-payment-return.timeout {
+  color: var(--text);
+  background: rgba(126, 247, 255, 0.08);
+}
+.store-payment-return.completed {
+  color: #62ffa2;
+  background: rgba(98, 255, 162, 0.08);
+}
+.store-payment-return.failed {
+  color: #ff9bd2;
+  background: rgba(255, 155, 210, 0.08);
+}
+
 @media (max-width: 680px) {
   .store-earn-section {
     grid-template-columns: 1fr;

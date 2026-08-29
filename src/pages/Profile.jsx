@@ -541,12 +541,11 @@ function Profile() {
     setPremiumLoading(true)
     setPremiumMsg({ text: '', ok: false })
     try {
-      const callbackUrl = `${window.location.origin}/profile?premium=callback`
-      const res = await createPremiumCheckout({
-        callbackUrl,
-        callback_url: callbackUrl,
-        redirectUrl: callbackUrl,
-      })
+      // 6.9: createPremiumCheckout's Joi schema is allowUnknown:false on an
+      // empty body -- these callback fields (the backend builds its own
+      // callback URL from its own env config and never read them) 400'd
+      // every premium checkout attempt before it ever reached Paystack.
+      const res = await createPremiumCheckout()
       const checkout = normalizeCheckoutSession(res)
       if (checkout.checkoutUrl) {
         window.location.href = checkout.checkoutUrl

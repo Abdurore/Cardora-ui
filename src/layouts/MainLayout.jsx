@@ -7,7 +7,6 @@ import WelcomeBackBanner from '../components/WelcomeBackBanner.jsx'
 import '../App.css'
 import {
   clearStoredToken,
-  createCouponCheckout,
   createPaystackCheckout,
   createTemplate,
   updateTemplate,
@@ -474,29 +473,26 @@ function MainLayout() {
     }
     setCart((prev) => [...prev, pack])
     try {
-      let response = null
-      const callbackUrl = `${window.location.origin}/store`
-      const checkoutPayload = {
-        packageId: pack.packageId || pack.id,
-        callbackUrl,
-        callback_url: callbackUrl,
-        redirectUrl: callbackUrl,
-        redirect_url: callbackUrl,
-        returnUrl: callbackUrl
-      }
-      try {
-        response = await createPaystackCheckout(checkoutPayload)
-      } catch (paystackError) {
-        // Only fall back to coupon checkout if the endpoint itself is unsupported (404)
-        // — not on network errors or server failures, which could cause double-charges
-        if (paystackError.status === 404) {
-          response = await createCouponCheckout(checkoutPayload)
-        } else {
-          throw paystackError
-        }
-      }
+      // 6.9: the backend's createCheckout Joi schema is allowUnknown:false
+      // on exactly { packageId } -- this used to also send callbackUrl/
+      // callback_url/redirectUrl/redirect_url/returnUrl (the backend
+      // constructs its own callback URL from its own env config and never
+      // read any of these), which 400'd every single checkout attempt
+      // before it ever reached Paystack. createCouponCheckout's 404
+      // fallback below never actually helped either -- that endpoint has
+      // never existed on the backend, only in this file.
+      const packageId = pack.packageId || pack.id
+      const response = await createPaystackCheckout({ packageId })
       const checkout = normalizeCheckoutSession(response)
       if (checkout.checkoutUrl) {
+        // 6.9: "Payment fails mid-flow | Return to store, pack still
+        // selected, clear retry" -- the browser fully navigates away to
+        // Paystack and back, so React state (activePack) doesn't survive
+        // the round trip. Store.jsx reads this back once it lands on
+        // ?reference=... to restore the selection and poll payment status.
+        try {
+          localStorage.setItem('cardora:pendingCheckout', JSON.stringify({ pack, packageId }))
+        } catch { /* ignore */ }
         window.location.href = checkout.checkoutUrl
         return { ok: true, checkout: true }
       }

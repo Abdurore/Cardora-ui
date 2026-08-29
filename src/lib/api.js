@@ -362,12 +362,13 @@ export async function createPaystackCheckout(payload) {
   return request('/create-paystack-checkout', { method: 'POST', auth: true, body: payload })
 }
 
-export async function createCouponCheckout(payload) {
-  return request('/create-coupon-checkout', { method: 'POST', auth: true, body: payload })
-}
-
 export async function createPremiumCheckout(payload = {}) {
   return request('/create-premium-checkout', { method: 'POST', auth: true, body: payload })
+}
+
+// 6.9: polled by Store.jsx after landing back on ?reference=... from Paystack.
+export async function getPaymentSessionStatus(reference) {
+  return request(`/payments/status/${encodeURIComponent(reference)}`, { auth: true })
 }
 
 export async function giftPremium(username) {

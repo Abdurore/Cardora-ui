@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from 'react'
-import { useOutletContext, useLocation } from 'react-router-dom'
+import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useOutletContext, useLocation, useNavigate } from 'react-router-dom'
 import { IoSparkles } from 'react-icons/io5'
 import { TiGift } from 'react-icons/ti'
 import { MdHandshake } from 'react-icons/md'
@@ -8,9 +8,18 @@ import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
 import PackCard from '../components/PackCard.jsx'
 import RewardedAds from '../components/RewardedAds.jsx'
-import { getUserCoupons } from '../lib/api.js'
+import { getUserCoupons, getPaymentSessionStatus } from '../lib/api.js'
 
 const REWARD_TABS = ['earn', 'redeem', 'referral']
+const PENDING_CHECKOUT_KEY = 'cardora:pendingCheckout'
+// 6.9: Paystack redirects back with the reference under either name
+// depending on how the transaction was initialized -- our own
+// createPaystackCheckout always includes `reference` in its redirect
+// target, but reading both is cheap insurance.
+function readReturnedReference(search) {
+  const params = new URLSearchParams(search)
+  return params.get('reference') || params.get('trxref') || null
+}
 
 function Store() {
   const {
@@ -30,12 +39,16 @@ function Store() {
   const [activePack, setActivePack] = useState(null)
   const [isLaunchingCheckout, setIsLaunchingCheckout] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
   const queryTab = useMemo(() => {
     const search = new URLSearchParams(location.search)
     return search.get('tab')
   }, [location.search])
 
   const [activeSection, setActiveSection] = useState('buy')
+  // 6.9: "Payment succeeds, CC uncredited" / "Payment fails mid-flow" --
+  // idle | confirming | completed | failed | timeout
+  const [paymentReturn, setPaymentReturn] = useState({ status: 'idle', message: '', reference: null })
 
   useEffect(() => {
     if (queryTab && ['buy', 'rewards'].includes(queryTab)) {
@@ -87,6 +100,76 @@ function Store() {
       setActivePack(null)
     }
   }
+
+  // 6.9: "Payment succeeds, CC uncredited | Reconciliation per 1.2. Show
+  // 'Payment received — crediting your balance'. Alert admin." Crediting
+  // happens asynchronously via the Paystack webhook, not on the redirect
+  // back here, so this polls rather than assuming the session is already
+  // resolved. Returns true once the session has reached a terminal state
+  // (completed/failed) so the caller knows whether to keep polling.
+  const checkPaymentStatus = useCallback(async (reference) => {
+    try {
+      const res = await getPaymentSessionStatus(reference)
+      const status = res?.status
+      if (status === 'completed') {
+        setPaymentReturn({ status: 'completed', message: 'Payment received — crediting your balance.', reference })
+        await refreshBalance?.()
+        try { localStorage.removeItem(PENDING_CHECKOUT_KEY) } catch { /* ignore */ }
+        setActivePack(null)
+        return true
+      }
+      if (status === 'failed') {
+        // 6.9: "Payment fails mid-flow | Return to store, pack still
+        // selected, clear retry." activePack was already restored from
+        // localStorage by the effect below -- the existing pack modal's
+        // "Continue to Paystack" button IS the clear retry.
+        setPaymentReturn({ status: 'failed', message: 'Payment failed. Your pack is still selected — try again below.', reference })
+        return true
+      }
+      return false
+    } catch (err) {
+      setPaymentReturn({ status: 'failed', message: err.message || 'Could not confirm payment status.', reference })
+      return true
+    }
+  }, [refreshBalance])
+
+  // Detects a return from Paystack (?reference=... or ?trxref=...) once on
+  // mount, restores the pack selection React state didn't survive the
+  // full-page redirect round trip, and polls for the webhook-driven credit.
+  useEffect(() => {
+    const reference = readReturnedReference(location.search)
+    if (!reference) return undefined
+
+    // Strip the query params immediately so a later refresh of /store
+    // doesn't re-trigger this against an already-resolved reference.
+    navigate(location.pathname, { replace: true })
+
+    try {
+      const pending = JSON.parse(localStorage.getItem(PENDING_CHECKOUT_KEY) || 'null')
+      if (pending?.pack) setActivePack(pending.pack)
+    } catch { /* ignore */ }
+
+    setPaymentReturn({ status: 'confirming', message: 'Confirming your payment…', reference })
+
+    let cancelled = false
+    let attempt = 0
+    const maxAttempts = 6
+    const poll = async () => {
+      if (cancelled) return
+      attempt += 1
+      const resolved = await checkPaymentStatus(reference)
+      if (resolved || cancelled) return
+      if (attempt >= maxAttempts) {
+        setPaymentReturn({ status: 'timeout', message: 'Still confirming your payment — this can take a minute. We\'ll keep it safe either way.', reference })
+        return
+      }
+      setTimeout(poll, 2000)
+    }
+    poll()
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleClaimDaily = async () => {
     if (!currentUser) {
@@ -171,6 +254,21 @@ function Store() {
         </div>
 
         {checkoutMessage ? <p className="form-error">{checkoutMessage}</p> : null}
+
+        {paymentReturn.status !== 'idle' && (
+          <div className={`store-payment-return ${paymentReturn.status}`} role="status">
+            <p>{paymentReturn.message}</p>
+            {paymentReturn.status === 'timeout' && (
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => checkPaymentStatus(paymentReturn.reference)}
+              >
+                Check again
+              </button>
+            )}
+          </div>
+        )}
 
         {activeSection === 'buy' && (
           <div className="pack-grid">
