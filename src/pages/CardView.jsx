@@ -34,6 +34,11 @@ function CardView() {
   const [isExpired, setIsExpired] = useState(false)
   const [expiredInfo, setExpiredInfo] = useState({ senderName: '', createdAt: null, colors: null })
   const [reopenAskCopied, setReopenAskCopied] = useState(false)
+  // 6.9: view cap reached -- same shape as the expiry gate above (senderName/
+  // createdAt/colors), same visual family, distinct copy/state.
+  const [isViewCapReached, setIsViewCapReached] = useState(false)
+  const [viewCapInfo, setViewCapInfo] = useState({ senderName: '', createdAt: null, colors: null })
+  const [raiseAskCopied, setRaiseAskCopied] = useState(false)
   const [isScheduled, setIsScheduled] = useState(false)
   const [scheduledUnlockAt, setScheduledUnlockAt] = useState(null)
   const [countdownText, setCountdownText] = useState('')
@@ -144,6 +149,16 @@ function CardView() {
         if (err.payload?.expired) {
           setIsExpired(true)
           setExpiredInfo({
+            senderName: err.payload?.senderName || '',
+            createdAt: err.payload?.createdAt || null,
+            colors: err.payload?.colors || null,
+          })
+          setLoading(false)
+          if (!cancelled) return
+        }
+        if (err.payload?.viewCapReached) {
+          setIsViewCapReached(true)
+          setViewCapInfo({
             senderName: err.payload?.senderName || '',
             createdAt: err.payload?.createdAt || null,
             colors: err.payload?.colors || null,
@@ -378,6 +393,48 @@ function CardView() {
             }}
           >
             {reopenAskCopied ? 'Copied — paste it to them!' : `Ask ${senderLabel} to reopen it`}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── View cap reached (6.9) ── same visual family as expiry, not a 404 ──
+  if (isViewCapReached) {
+    const senderLabel = viewCapInfo.senderName || 'The sender'
+    const accent = viewCapInfo.colors?.accent || viewCapInfo.colors?.gradient?.[1] || '#7ef7ff'
+    return (
+      <div className="cv-page-gate">
+        <div className="cv-expired-glow" style={{ '--expired-accent': accent }} />
+        <div className="cv-gate-card">
+          <span className="cv-gate-lock">👀</span>
+          <h2>This card has reached its view limit.</h2>
+          <p>
+            {senderLabel}'s card has been opened by as many people as it's set up to allow.
+            Cards are made to be opened — this one's just reached capacity.
+          </p>
+          <button className="primary" type="button" onClick={() => navigate('/create')}>
+            Send one of your own
+          </button>
+          <button
+            type="button"
+            className="cv-expired-reopen-btn"
+            onClick={async () => {
+              const text = `Hey ${senderLabel}, your Cardora card hit its view limit — would you mind raising it? ${window.location.href}`
+              try {
+                if (navigator.share) {
+                  await navigator.share({ title: 'Cardora', text })
+                  return
+                }
+              } catch { /* cancelled */ }
+              try {
+                await navigator.clipboard.writeText(text)
+                setRaiseAskCopied(true)
+                setTimeout(() => setRaiseAskCopied(false), 2000)
+              } catch { /* ignore */ }
+            }}
+          >
+            {raiseAskCopied ? 'Copied — paste it to them!' : `Ask ${senderLabel} to raise the limit`}
           </button>
         </div>
       </div>

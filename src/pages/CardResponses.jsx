@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
 import { HiOutlineTrophy } from 'react-icons/hi2'
-import { getMyCard, revokeCard, releaseCardClaim, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard, extendCardLifetime } from '../lib/api.js'
+import { getMyCard, revokeCard, releaseCardClaim, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard, extendCardLifetime, raiseCardViewCap } from '../lib/api.js'
 import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
 import ScreenHeader from '../components/ScreenHeader.jsx'
 import ScreenNav from '../components/ScreenNav.jsx'
@@ -517,6 +517,8 @@ function CardResponses() {
   const [anonImageError, setAnonImageError] = useState('')
   const [extending, setExtending] = useState(false)
   const [extendMsg, setExtendMsg] = useState('')
+  const [raisingViewCap, setRaisingViewCap] = useState(false)
+  const [raiseViewCapMsg, setRaiseViewCapMsg] = useState('')
 
   const loadCard = useCallback(async () => {
     try {
@@ -662,6 +664,26 @@ function CardResponses() {
     }
   }
 
+  // 6.9: "raise view cap" -- 3.7's existing sink (2 CC), previously
+  // real-charge-but-inert since nothing enforced a cap to raise. Now that
+  // getCardBySlug enforces one (VIEW_CAP_BY_TIER, cards/constants.js),
+  // +50 views per purchase via card.viewCapBonus. Optimistic local update
+  // mirrors handleExtendLifetime above.
+  const handleRaiseViewCap = async () => {
+    setRaisingViewCap(true)
+    setRaiseViewCapMsg('')
+    try {
+      const cardId = rawCard.id || rawCard.cardId || rawCard._id
+      await raiseCardViewCap(cardId)
+      setRawCard((prev) => ({ ...prev, viewCapBonus: (prev.viewCapBonus || 0) + 1 }))
+      setRaiseViewCapMsg('View cap raised by 50.')
+    } catch (err) {
+      setRaiseViewCapMsg(err.message || 'Could not raise the view cap.')
+    } finally {
+      setRaisingViewCap(false)
+    }
+  }
+
   // 6.4: originator moderation -- removes the entry outright, no
   // tombstone. Optimistic local removal since the backend $pull can't fail
   // for any reason the sender needs to see (card/ownership were already
@@ -740,6 +762,15 @@ function CardResponses() {
     ? new Date(new Date(rawCard.expiresAt).getTime() + (Number(rawCard.bonusLifetimeDays) || 0) * 24 * 60 * 60 * 1000)
     : null
 
+  // 6.9: view cap. Mirrors cards/constants.js's VIEW_CAP_BY_TIER/
+  // VIEW_CAP_RAISE_AMOUNT on the backend (classic 100, premium 500,
+  // elite unlimited; +50 per raise) -- anonymous cards are exempt (6.6),
+  // same as they're exempt from expiry.
+  const VIEW_CAP_BY_TIER = { classic: 100, premium: 500, elite: null }
+  const viewCapBase = VIEW_CAP_BY_TIER[rawCard.tier] ?? null
+  const hasViewCap = type !== 'anonymous' && viewCapBase !== null
+  const effectiveViewCap = hasViewCap ? viewCapBase + (Number(rawCard.viewCapBonus) || 0) * 50 : null
+
   const isChain = type === 'chain'
 
   return (
@@ -766,6 +797,7 @@ function CardResponses() {
           <h1 className="cr-card-title">{title}</h1>
           {createdAt && <p className="cr-card-date">Created {formatDate(createdAt)}</p>}
           {effectiveExpiresAt && <p className="cr-card-date">Closes {formatDate(effectiveExpiresAt)}</p>}
+          {hasViewCap && <p className="cr-card-date">Views {rawCard.views || 0} / {effectiveViewCap}</p>}
 
           <div className="cr-actions-row">
             <button className="cr-action-btn" type="button" onClick={handleRefresh} disabled={refreshing}>
@@ -807,10 +839,16 @@ function CardResponses() {
                 {extending ? 'Working…' : 'Extend lifetime (3 CC)'}
               </button>
             )}
+            {hasViewCap && (
+              <button className="cr-action-btn" type="button" onClick={handleRaiseViewCap} disabled={raisingViewCap}>
+                {raisingViewCap ? 'Working…' : 'Raise view cap (2 CC)'}
+              </button>
+            )}
           </div>
           {revokeMsg && <p className="cr-card-date">{revokeMsg}</p>}
           {claimMsg && <p className="cr-card-date">{claimMsg}</p>}
           {extendMsg && <p className="cr-card-date">{extendMsg}</p>}
+          {raiseViewCapMsg && <p className="cr-card-date">{raiseViewCapMsg}</p>}
           {isChain && (
             <p className="cr-live-badge">
               <span className="cr-live-dot" />

@@ -179,6 +179,71 @@ describe('CardView — 6.7 expired card', () => {
   })
 })
 
+// 6.9: "View cap reached" -- same visual family as 6.7's expiry screen
+// (also a 410, also senderName/createdAt/colors), distinct copy and CTA.
+describe('CardView — 6.9 view cap reached', () => {
+  afterEach(() => {
+    navigateSpy.mockClear()
+  })
+
+  it('shows the view-cap screen with the sender name', async () => {
+    const err = new Error('Gone')
+    err.status = 410
+    err.payload = { viewCapReached: true, senderName: 'Ada', createdAt: null, colors: { accent: '#ff00aa' } }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByText('This card has reached its view limit.')).toBeInTheDocument())
+    expect(screen.getByText(/Ada's card has been opened by as many people/)).toBeInTheDocument()
+  })
+
+  it('falls back to a generic sender label when none is given', async () => {
+    const err = new Error('Gone')
+    err.status = 410
+    err.payload = { viewCapReached: true, senderName: '', createdAt: null, colors: null }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByText(/The sender's card has been opened/)).toBeInTheDocument())
+  })
+
+  it('"Send one of your own" navigates to the create flow', async () => {
+    const err = new Error('Gone')
+    err.status = 410
+    err.payload = { viewCapReached: true, senderName: 'Ada', createdAt: null, colors: null }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send one of your own' }))
+    expect(navigateSpy).toHaveBeenCalledWith('/create')
+  })
+
+  it('"Ask sender to raise the limit" copies a prefilled message when Web Share is unavailable', async () => {
+    const originalShare = navigator.share
+    const originalClipboard = navigator.clipboard
+    delete navigator.share
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue() }, configurable: true })
+
+    const err = new Error('Gone')
+    err.status = 410
+    err.payload = { viewCapReached: true, senderName: 'Ada', createdAt: null, colors: null }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ask Ada to raise the limit' }))
+
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('Hey Ada')))
+    await waitFor(() => expect(screen.getByText('Copied — paste it to them!')).toBeInTheDocument())
+
+    navigator.share = originalShare
+    Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true })
+  })
+})
+
 // 6.3: scheduled send. The backend gate is also a 403, like the password
 // lock -- these tests exist specifically to prove the two never get
 // conflated (a real bug caught while building this: the password-lock

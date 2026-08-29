@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import CardResponses from './CardResponses.jsx'
-import { getMyCard, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard, extendCardLifetime } from '../lib/api.js'
+import { getMyCard, deleteChainEntry, getActiveAnonymousCard, setActiveAnonymousCard, extendCardLifetime, raiseCardViewCap } from '../lib/api.js'
 import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
 
 // 6.4: originator moderation (delete a chain entry, no tombstone) and the
@@ -31,6 +31,7 @@ vi.mock('../lib/api.js', () => ({
   getActiveAnonymousCard: vi.fn(),
   setActiveAnonymousCard: vi.fn(),
   extendCardLifetime: vi.fn(),
+  raiseCardViewCap: vi.fn(),
   getNotifications: vi.fn(),
   markNotificationRead: vi.fn(),
 }))
@@ -267,5 +268,59 @@ describe('CardResponses — 6.7 card retention', () => {
     await waitFor(() => expect(extendCardLifetime).toHaveBeenCalledWith('card_1'))
     await waitFor(() => expect(screen.getByText(/Jun 15, 2027/)).toBeInTheDocument())
     expect(screen.getByText('Extended by 12 months.')).toBeInTheDocument()
+  })
+})
+
+describe('CardResponses — 6.9 view cap', () => {
+  afterEach(() => {
+    vi.mocked(getMyCard).mockReset()
+    vi.mocked(raiseCardViewCap).mockReset()
+  })
+
+  it('shows the view count and a raise button for a classic card', async () => {
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: chainCard({ id: 'card_1', tier: 'classic', views: 42 }) })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Views 42 / 100')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Raise view cap (2 CC)' })).toBeInTheDocument()
+  })
+
+  it('accounts for viewCapBonus when displaying the effective cap', async () => {
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: chainCard({ id: 'card_1', tier: 'premium', views: 520, viewCapBonus: 3 }) })
+    renderPage()
+
+    // 500 + 3*50 = 650
+    await waitFor(() => expect(screen.getByText('Views 520 / 650')).toBeInTheDocument())
+  })
+
+  it('shows neither for an elite (unlimited) card', async () => {
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: chainCard({ id: 'card_1', tier: 'elite', views: 42 }) })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Add your memory')).toBeInTheDocument())
+    expect(screen.queryByText(/^Views /)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Raise view cap/ })).not.toBeInTheDocument()
+  })
+
+  it('shows neither for an anonymous card regardless of tier (6.6 exemption)', async () => {
+    vi.mocked(getMyCard).mockResolvedValueOnce({
+      card: chainCard({ id: 'card_1', type: 'anonymous', tier: 'classic', views: 42, config: { content: { message: 'Ask away' } } }),
+    })
+    renderPage()
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Raise view cap/ })).not.toBeInTheDocument())
+  })
+
+  it('clicking "Raise view cap" calls the API and updates the shown cap', async () => {
+    vi.mocked(getMyCard).mockResolvedValueOnce({ card: chainCard({ id: 'card_1', tier: 'classic', views: 42 }) })
+    vi.mocked(raiseCardViewCap).mockResolvedValueOnce({ message: 'ok' })
+    renderPage()
+
+    const btn = await screen.findByRole('button', { name: 'Raise view cap (2 CC)' })
+    fireEvent.click(btn)
+
+    await waitFor(() => expect(raiseCardViewCap).toHaveBeenCalledWith('card_1'))
+    await waitFor(() => expect(screen.getByText('Views 42 / 150')).toBeInTheDocument())
+    expect(screen.getByText('View cap raised by 50.')).toBeInTheDocument()
   })
 })
