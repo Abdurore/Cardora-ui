@@ -1232,6 +1232,10 @@ function CardStudio() {
       const selectedGift = flushedCardObject.giftEffect || {}
 
       setSendResult({ ok: true, slug, message: result.message })
+      // 6.1: "instrument both paths -- entry, step completion, send." The
+      // reached_review step only proves the sender opened the receipt, not
+      // that they actually sent -- they can still cancel from there.
+      trackEvent('create_flow_step', { step: 'sent', path: 'studio', type: studioType, tier: sourceTier })
       refreshBalance?.()
       if (selectedGift.enabled && selectedGift.giftId) {
         consumeGift?.(selectedGift.id || selectedGift.inventoryId || selectedGift.giftId || selectedGift._id)

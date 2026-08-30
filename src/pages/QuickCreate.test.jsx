@@ -201,6 +201,45 @@ describe('QuickCreate — 6.9 send failure and retry', () => {
   })
 })
 
+// 6.1: "instrument both paths -- entry, step completion, send." reached_review
+// only proves the sender opened the receipt, not that they actually sent --
+// they can still cancel from there. This is the send-completion event that
+// was missing.
+describe('QuickCreate — 6.1 send-completion instrumentation', () => {
+  afterEach(() => {
+    vi.mocked(getCardPrices).mockClear()
+    vi.mocked(trackEvent).mockClear()
+    createCardOnBackend.mockClear()
+  })
+
+  it('fires create_flow_step "sent" only after a successful send, not on reaching the receipt', async () => {
+    renderAt('/quick?type=anonymous')
+    fireEvent.change(screen.getByPlaceholderText('Recipients can reply to this card anonymously…'), { target: { value: 'Ask me anything!' } })
+    fireEvent.click(screen.getByRole('button', { name: /Create Card/ }))
+
+    await screen.findByRole('button', { name: /Send free/i })
+    expect(trackEvent).not.toHaveBeenCalledWith('create_flow_step', expect.objectContaining({ step: 'sent' }))
+
+    fireEvent.click(screen.getByRole('button', { name: /Send free/i }))
+
+    await waitFor(() => expect(trackEvent).toHaveBeenCalledWith(
+      'create_flow_step',
+      expect.objectContaining({ step: 'sent', path: 'quick', type: 'anonymous' }),
+    ))
+  })
+
+  it('does not fire "sent" when the send fails', async () => {
+    createCardOnBackend.mockResolvedValueOnce({ ok: false, message: 'Insufficient balance' })
+    renderAt('/quick?type=anonymous')
+    fireEvent.change(screen.getByPlaceholderText('Recipients can reply to this card anonymously…'), { target: { value: 'Ask me anything!' } })
+    fireEvent.click(screen.getByRole('button', { name: /Create Card/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Send free/i }))
+
+    await waitFor(() => expect(screen.getByText(/Insufficient balance/)).toBeInTheDocument())
+    expect(trackEvent).not.toHaveBeenCalledWith('create_flow_step', expect.objectContaining({ step: 'sent' }))
+  })
+})
+
 // 6.8: "No account required to build a card. Auth is required at send
 // only." -- QuickCreate used to gate the entire page behind a sign-in
 // screen, blocking building outright. These prove a signed-out visitor can

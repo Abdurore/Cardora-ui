@@ -464,6 +464,10 @@ function QuickCreate() {
       }
 
       setSendResult({ ok: true, slug, message: finalMessage })
+      // 6.1: "instrument both paths -- entry, step completion, send." The
+      // reached_review step only proves the sender opened the receipt, not
+      // that they actually sent -- they can still cancel from there.
+      trackEvent('create_flow_step', { step: 'sent', path: 'quick', type: cardType, tier: sourceTier })
     } catch (err) {
       setSendResult({ ok: false, message: 'Something went wrong. Your draft is safe — try again.' })
     } finally {
