@@ -195,7 +195,9 @@ function CardPreviewModal({
     setGiftClaimMessage('')
     try {
       const res = await claimGiftFromCard(cardId)
-      setGiftClaimMessage(res?.message || 'Gift claimed successfully! The payout has been added to your Gift Wallet.')
+      // 4.1: cash gifts / gift wallet are cut until v2 -- claiming no longer
+      // pays out currency, so this fallback must not promise a wallet credit.
+      setGiftClaimMessage(res?.message || 'Gift claimed successfully!')
       setLocalClaimed(true)
       if (refreshBalance) {
         await refreshBalance()
