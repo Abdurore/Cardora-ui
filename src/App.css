@@ -1036,7 +1036,13 @@
   background: none;
   border-radius: 0;
   padding: 0;
-  padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  /* 7.1: .screen-nav's real footprint is 82px tall + a 12px bottom offset =
+     94px before any safe-area inset -- the previous 90px here was actually
+     4px short of clearing it even on a device with zero inset. Used by
+     every page that renders ScreenNav (Home, Explore, Store, Profile,
+     Artists, and the four dashboards), so this is the one shared fix for
+     the true end of each of those pages' scrollable content. */
+  padding-bottom: calc(110px + env(safe-area-inset-bottom));
 }
 
 .page-title {
@@ -1089,6 +1095,14 @@
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
+  /* 7.1: the fixed bottom nav (.screen-nav) sits over whatever content is in
+     its own screen-space footprint regardless of scroll position -- a tall
+     hero on a short viewport puts this row (the "Explore Templates" link)
+     right at that boundary at rest, with zero scrolling. Page-level bottom
+     padding (.page-body) only protects the true end of a scrollable page,
+     not a fixed overlay covering content mid-page, so this needs its own
+     clearance. */
+  margin-bottom: 64px;
 }
 
 .hero-bonus-banner {
