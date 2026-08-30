@@ -4567,6 +4567,118 @@
   transform-origin: left;
 }
 
+/* ── Starter grant moment (3.4) ── token-based, no [data-theme="light"]
+   override needed -- see the note on App.css's light-mode overrides. ── */
+.sgm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.sgm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 10, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.sgm-card {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 24px;
+  padding: 36px 28px 28px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--accent-border);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--accent-tint);
+  animation: sgm-pop-in 0.4s cubic-bezier(0.34, 1.26, 0.64, 1) forwards;
+}
+
+@keyframes sgm-pop-in {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.sgm-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent-soft);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.sgm-close:hover { background: var(--accent-tint); color: var(--text-muted); }
+
+.sgm-icon {
+  font-size: 2.4rem;
+  margin-bottom: 4px;
+}
+
+.sgm-eyebrow {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.sgm-amount {
+  margin: 6px 0 0;
+  font-size: 2.6rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #7ef7ff, #62ffa2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sgm-sub {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.sgm-actions {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sgm-cta {
+  padding: 13px 20px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #7ef7ff, #62ffa2);
+  color: #041015;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: opacity 0.18s, transform 0.18s;
+}
+.sgm-cta:hover { opacity: 0.9; transform: scale(1.02); }
+
+.sgm-dismiss {
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.sgm-dismiss:hover { color: var(--text-muted); }
+
 .experience {
   position: fixed;
   inset: 0;

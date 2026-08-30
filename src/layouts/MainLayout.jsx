@@ -4,6 +4,7 @@ import CardDetailModal from '../components/CardDetailModal.jsx'
 import CardTypeModal from '../components/CardTypeModal.jsx'
 import AuthModal from '../components/AuthModal.jsx'
 import WelcomeBackBanner from '../components/WelcomeBackBanner.jsx'
+import StarterGrantMoment from '../components/StarterGrantMoment.jsx'
 import '../App.css'
 import {
   clearStoredToken,
@@ -67,6 +68,10 @@ import {
 import { forgetConfirmedGift, normalizeGiftInventory } from '../lib/gifts.js'
 
 const USER_META_PREFIX = 'cardora:userMeta:'
+// 3.4: set the moment handleSignup succeeds, consumed the first time
+// hydrateSession() sees signupBonusApplied on the now-verified account --
+// see StarterGrantMoment.jsx.
+const PENDING_STARTER_GRANT_KEY = 'cardora:pendingStarterGrantMoment'
 
 function readUserMeta(userId) {
   if (!userId) return { favorites: [], likedTemplates: [], inventory: [], avatarColor: '' }
@@ -145,6 +150,8 @@ function MainLayout() {
   // listen for the event itself.
   const deferredInstallPromptRef = useRef(null)
   const [canInstall, setCanInstall] = useState(false)
+  // 3.4: null | the granted amount, shown once via StarterGrantMoment.
+  const [starterGrantAmount, setStarterGrantAmount] = useState(null)
 
   const openAuthModal = (onAuthenticated, returnTo, context) => {
     pendingAuthActionRef.current = typeof onAuthenticated === 'function'
@@ -221,6 +228,18 @@ function MainLayout() {
       const normalized = session.normalized
       setCurrentUser(normalized)
       setBalance(normalized.balance)
+      // 3.4: "surface immediately after first signup as a moment." Only
+      // fires once, ever, per browser -- the flag is set by handleSignup
+      // and cleared the instant it's consumed here, regardless of whether
+      // this hydration is the one right after verification or a later one
+      // (e.g. the sender verified from a different device/tab and this
+      // browser only picks it up on its next load).
+      try {
+        if (localStorage.getItem(PENDING_STARTER_GRANT_KEY) && normalized.signupBonusApplied && normalized.signupBonusAmount > 0) {
+          setStarterGrantAmount(normalized.signupBonusAmount)
+          localStorage.removeItem(PENDING_STARTER_GRANT_KEY)
+        }
+      } catch { /* ignore */ }
       setFavorites(meta.favorites || [])
       setLikedTemplates((prev) => Array.from(new Set([...(prev || []), ...(meta.likedTemplates || [])])))
       const mappedGifts = normalizeGiftInventory(normalized.giftsInventory, true)
@@ -579,6 +598,12 @@ function MainLayout() {
       }
       const response = await signup(signupPayload)
       const auth = normalizeAuthResponse(response)
+      // 3.4: the bonus itself isn't granted until email verification, which
+      // may happen well after this call returns (or resolve on a later
+      // hydration if verification happens in another tab/device) --
+      // hydrateSession() is the actual trigger, this just marks "this
+      // browser is due to see the moment once it lands."
+      try { localStorage.setItem(PENDING_STARTER_GRANT_KEY, '1') } catch { /* ignore */ }
       if (auth.token) {
         setStoredToken(auth.token)
         await hydrateSession()
@@ -1148,6 +1173,7 @@ function MainLayout() {
         openAuthModal={openAuthModal}
       />
       <WelcomeBackBanner currentUser={hydratedUser} />
+      <StarterGrantMoment amount={starterGrantAmount} onDismiss={() => setStarterGrantAmount(null)} />
     </div>
   )
 }

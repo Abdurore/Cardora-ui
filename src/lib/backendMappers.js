@@ -170,6 +170,10 @@ export function normalizeUser(userPayload, extras = {}, couponPayload = null) {
     premiumUntil: couponPayload?.premiumUntil || user.premiumUntil || null,
     giftsInventory: Array.isArray(giftsInventory) ? giftsInventory : [],
     giftWalletNgn: user.giftWalletNgn ?? user.giftWallet ?? user.giftBalanceNgn ?? 0,
+    // 3.4: lets MainLayout show the starter-grant moment exactly once,
+    // right after it's actually granted (on email verification).
+    signupBonusApplied: !!user.signupBonusApplied,
+    signupBonusAmount: Number(user.signupBonusAmount || 0),
     profileBackground: user.equippedProfileBackground || user.profileBackground || user.equippedBackground || user.selectedProfileBackground || user.background || null,
     equippedBackground: user.equippedProfileBackground || user.equippedBackground || user.profileBackground || user.selectedProfileBackground || null,
     profileBackgroundUrl: user.profileBackgroundUrl || user.equippedProfileBackground?.url || user.backgroundUrl || user.selectedProfileBackgroundUrl || user.profileBackground?.url || user.equippedBackground?.url || user.selectedProfileBackground?.url || '',
