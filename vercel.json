@@ -6,13 +6,6 @@
     },
     {
       "source": "/ask/:username",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*(facebookexternalhit|Facebot|Twitterbot|WhatsApp|TelegramBot|Slackbot|Discordbot|LinkedInBot|Googlebot|Pinterest|redditbot|Applebot|SkypeUriPreview|vkShare|W3C_Validator|Bitrix link preview|iframely|Embedly).*"
-        }
-      ],
       "destination": "/api/ask-meta?username=:username"
     },
     { "source": "/(.*)", "destination": "/" }
