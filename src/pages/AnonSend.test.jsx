@@ -40,7 +40,11 @@ describe('AnonSend — 6.6 durable anonymous link', () => {
     vi.mocked(getActiveAnonymousCard).mockResolvedValueOnce({ slug: 'ada-inbox', username: 'ada' })
     renderAt('ada')
 
-    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith('/card/ada-inbox', { replace: true }))
+    // 5.3: the inbox owner's username IS the card's sender, passed through
+    // so CardView's loading screen can say "Preparing Ada's surprise"
+    // instead of the fully generic fallback (no SSR embed for this
+    // client-side navigation to read instead).
+    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith('/card/ada-inbox', { replace: true, state: { senderName: 'ada' } }))
     expect(getPublicProfile).not.toHaveBeenCalled()
   })
 

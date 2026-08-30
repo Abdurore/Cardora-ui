@@ -27,7 +27,12 @@ function AnonSend() {
         const activeCard = await getActiveAnonymousCard(username)
         const slug = activeCard?.slug || activeCard?.data?.slug
         if (slug) {
-          if (!cancelled) navigate(`/card/${slug}`, { replace: true })
+          // 5.3: this is a client-side navigation (no SSR embed to read
+          // instead) -- the inbox owner's username IS the card's sender,
+          // known here before CardView's own fetch resolves, so its
+          // loading screen can say "Preparing {username}'s surprise"
+          // instead of the fully generic fallback.
+          if (!cancelled) navigate(`/card/${slug}`, { replace: true, state: { senderName: username } })
           return
         }
       } catch {

@@ -37,6 +37,16 @@ function renderAt(slug) {
   )
 }
 
+function renderAtWithState(slug, state) {
+  return render(
+    <MemoryRouter initialEntries={[{ pathname: `/card/${slug}`, state }]}>
+      <Routes>
+        <Route path="/card/:id" element={<CardView />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
 describe('CardView — SSR gate handoff', () => {
   afterEach(() => {
     delete window.__CARDORA_SSR_CARD__
@@ -81,6 +91,26 @@ describe('CardView — SSR gate handoff', () => {
     renderAt('abc123')
 
     expect(screen.getByText('Someone sent you a card')).toBeInTheDocument()
+  })
+})
+
+// 5.3: "sender attribution ... the loading screen ('Preparing {Sender}'s
+// surprise')." No SSR embed here (this is the generic fallback path, e.g.
+// a client-side navigation into this route from elsewhere in the app) --
+// AnonSend.jsx's /ask/:username redirect is the one in-app case that
+// already knows the sender before CardView's own fetch resolves, passed
+// via navigate(..., { state }).
+describe('CardView — 5.3 loading-screen sender attribution (no SSR embed)', () => {
+  it('says "Preparing {Sender}\'s surprise" when the sender is already known via router state', () => {
+    renderAtWithState('abc123', { senderName: 'Ada' })
+
+    expect(screen.getByText("Preparing Ada's surprise")).toBeInTheDocument()
+  })
+
+  it('falls back to the fully generic message when no sender is known at all', () => {
+    renderAt('abc123')
+
+    expect(screen.getByText('Preparing your surprise')).toBeInTheDocument()
   })
 })
 

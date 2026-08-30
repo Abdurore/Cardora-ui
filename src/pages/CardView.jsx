@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams, useOutletContext } from 'react-router-dom'
+import { useNavigate, useParams, useOutletContext, useLocation } from 'react-router-dom'
 import { getCardBySlug, submitCardResponse, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage, reactToCard, notifyMeForScheduledCard } from '../lib/api.js'
 import { mapBackendCard } from '../lib/backendMappers.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
@@ -23,6 +23,7 @@ function formatCountdown(ms) {
 function CardView() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { currentUser, openAuthModal, refreshBalance } = useOutletContext() || {}
   const [card, setCard] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -294,12 +295,21 @@ function CardView() {
     // (the SPA shell is already warm, so a brief spinner is normal), or
     // the gate function failing to reach the backend in time. This is the
     // slow-connection path now, not the standard one.
+    //
+    // 5.3: "sender attribution ... the loading screen ('Preparing
+    // {Sender}'s surprise')." A handful of in-app client-side navigations
+    // into this route already know the sender before the fetch resolves
+    // (AnonSend.jsx's /ask/:username -> /card/:slug redirect knows the
+    // inbox owner's username, which IS the card's sender) -- passed via
+    // navigate(..., { state }) since there's no SSR embed for a
+    // same-SPA-session navigation to read instead.
+    const knownSenderName = location.state?.senderName
     return (
       <div className="cv-page-loading">
         <div className="cv-logo-loader">
           <img src="/cardora-logo.png?v=4" alt="" />
         </div>
-        <p>Preparing your surprise</p>
+        <p>{knownSenderName ? `Preparing ${knownSenderName}'s surprise` : 'Preparing your surprise'}</p>
       </div>
     )
   }
