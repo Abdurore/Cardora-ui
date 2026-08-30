@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { getRewardedAd, completeAd, getAdStats, clickAd, trackAdView, redeemAdRewardGrant } from '../lib/api.js'
 
 // 3.6: rewarded ads grant non-currency, per-card unlocks now, never CC.
 // premium_feature applies automatically to whatever card the user makes
-// next (nothing to pick), so it needs no redemption UI here.
+// next (nothing to pick), so it needs no redemption UI here. themed_template
+// needs a marketplace template picked, not a card -- distinct target type
+// from view_boost/lifetime_extension.
 const GRANT_LABELS = {
   premium_feature: { emoji: '🎁', title: 'A premium feature is free on your next card!', needsCard: false },
   view_boost: { emoji: '👀', title: '+20 views on one of your cards', needsCard: true },
   lifetime_extension: { emoji: '⏳', title: "+7 days on one of your card's lifetime", needsCard: true },
+  themed_template: { emoji: '🎨', title: 'A themed template unlocked for 24 hours!', needsTemplate: true },
 }
 
 const AD_COOLDOWN_SECS = 30
@@ -84,7 +87,7 @@ function mergeLocalAdStats(payload) {
 }
 
 function RewardedAds({ onBalanceUpdate }) {
-  const { getUserCardsFromBackend } = useOutletContext() || {}
+  const { getUserCardsFromBackend, marketplaceTemplates } = useOutletContext() || {}
   const [ad, setAd] = useState(null)
   const [stats, setStats] = useState(null)
   const [phase, setPhase] = useState('idle')
@@ -97,12 +100,20 @@ function RewardedAds({ onBalanceUpdate }) {
   const [grant, setGrant] = useState(null)
   const [userCards, setUserCards] = useState(null)
   const [selectedCardId, setSelectedCardId] = useState('')
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [redeemState, setRedeemState] = useState('idle') // idle | redeeming | done | error
   const [redeemMsg, setRedeemMsg] = useState('')
 
   const timerRef = useRef(null)       // fallback interval for non-video ads
   const cooldownRef = useRef(null)
   const videoRef = useRef(null)
+
+  // themed_template's picker only offers templates actually worth unlocking
+  // -- priced (isLocked) ones. A free template has nothing to grant.
+  const lockedTemplates = useMemo(
+    () => (marketplaceTemplates || []).filter((t) => t.isLocked && Number(t.price) > 0),
+    [marketplaceTemplates],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -158,6 +169,7 @@ function RewardedAds({ onBalanceUpdate }) {
       const grantData = res?.grant || null
       setGrant(grantData)
       setSelectedCardId('')
+      setSelectedTemplateId('')
       setRedeemState('idle')
       setRedeemMsg('')
       if (grantData && GRANT_LABELS[grantData.grantType]?.needsCard && !userCards) {
@@ -198,11 +210,17 @@ function RewardedAds({ onBalanceUpdate }) {
   }, [onBalanceUpdate, userCards, getUserCardsFromBackend])
 
   const handleRedeemGrant = async () => {
-    if (!grant || !selectedCardId) return
+    const needsTemplate = GRANT_LABELS[grant?.grantType]?.needsTemplate
+    const target = needsTemplate ? selectedTemplateId : selectedCardId
+    if (!grant || !target) return
     setRedeemState('redeeming')
     setRedeemMsg('')
     try {
-      const res = await redeemAdRewardGrant({ token: grant.token, cardId: selectedCardId })
+      const res = await redeemAdRewardGrant(
+        needsTemplate
+          ? { token: grant.token, templateId: selectedTemplateId }
+          : { token: grant.token, cardId: selectedCardId },
+      )
       setRedeemState('done')
       setRedeemMsg(res?.message || 'Applied!')
     } catch (err) {
@@ -218,6 +236,7 @@ function RewardedAds({ onBalanceUpdate }) {
     setGrant(null)
     setUserCards(null)
     setSelectedCardId('')
+    setSelectedTemplateId('')
     setRedeemState('idle')
     setRedeemMsg('')
     setWatchedSecs(0)
@@ -442,6 +461,34 @@ function RewardedAds({ onBalanceUpdate }) {
                       disabled={!selectedCardId || redeemState === 'redeeming'}
                     >
                       {redeemState === 'redeeming' ? 'Applying…' : 'Apply to card'}
+                    </button>
+                    {redeemState === 'error' && <p className="form-error">{redeemMsg}</p>}
+                  </div>
+                )
+              ) : GRANT_LABELS[grant.grantType]?.needsTemplate ? (
+                redeemState === 'done' ? (
+                  <p className="success">{redeemMsg}</p>
+                ) : (
+                  <div className="rad-grant-redeem">
+                    <select
+                      value={selectedTemplateId}
+                      onChange={(e) => setSelectedTemplateId(e.target.value)}
+                      disabled={!lockedTemplates.length}
+                    >
+                      <option value="">
+                        {lockedTemplates.length === 0 ? 'No locked templates to unlock' : 'Choose a template'}
+                      </option>
+                      {lockedTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>{t.title || t.id}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="rad-watch-btn"
+                      type="button"
+                      onClick={handleRedeemGrant}
+                      disabled={!selectedTemplateId || redeemState === 'redeeming'}
+                    >
+                      {redeemState === 'redeeming' ? 'Applying…' : 'Unlock template'}
                     </button>
                     {redeemState === 'error' && <p className="form-error">{redeemMsg}</p>}
                   </div>
