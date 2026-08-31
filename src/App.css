@@ -17,6 +17,30 @@
    ═══════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════
+   REDUCED MOTION — sitewide floor
+   The JS-side motion system (deviceCapability.js's getMotionIntensity/
+   getDepthProfile/getGalaxyProfile) already reads prefers-reduced-motion
+   for the interactive stuff it drives (Galaxy, depth tilt, gift reveals).
+   Everything else in this file -- the hundreds of plain CSS @keyframes
+   (aurora drift, dust/particle loops, orbit spins, hover/press
+   transitions) -- had zero reduced-motion handling at all. This is the
+   floor: collapses every animation/transition to effectively instant
+   (a state change still lands, it just doesn't visibly move), and stops
+   infinite decorative loops after one pass instead of cycling forever.
+   Deliberately global rather than per-component -- curating "keep this
+   loop, cut that one" across every animation in this file isn't
+   tractable, and a fast-but-present transition is a safe floor per this
+   skill's own guidance (fewer/gentler, not necessarily zero). ═══════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
    ENVELOPE (cinematic card reveal)
    ═══════════════════════════════════════════════════ */
 .envelope-scene {
@@ -842,7 +866,7 @@
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .profile-edit-btn:hover {
@@ -6933,7 +6957,7 @@ a {
   font-size: 1.1rem;
   display: grid;
   place-items: center;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -7001,7 +7025,7 @@ a {
   border: 1px solid rgba(118, 239, 255, 0.18);
   background:
     linear-gradient(135deg, rgba(118, 239, 255, 0.07), rgba(98, 255, 162, 0.04));
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .cs-cc-pill:hover {
@@ -7247,7 +7271,7 @@ a {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .cs-icon-btn:hover:not(:disabled) {
@@ -7269,7 +7293,7 @@ a {
   font-size: 0.8rem;
   font-weight: 500;
   letter-spacing: 0.02em;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -7448,7 +7472,7 @@ a {
   border: 1px solid transparent;
   background: transparent;
   color: rgba(200, 230, 240, 0.5);
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
   text-align: left;
   width: 100%;
 }
@@ -7558,7 +7582,7 @@ a {
   background: rgba(118, 239, 255, 0.06);
   color: #b8f6ff;
   font-size: 0.78rem;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .cs-preview-toggle:hover {
@@ -7589,7 +7613,7 @@ a {
   background: transparent;
   color: rgba(180, 220, 230, 0.45);
   font-size: 0.72rem;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -8541,7 +8565,7 @@ a {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   margin-bottom: 4px;
 }
 
@@ -8565,7 +8589,7 @@ a {
   color: rgba(200, 230, 240, 0.55);
   font-size: 0.76rem;
   text-transform: capitalize;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   white-space: nowrap;
   min-width: 0;
   text-align: center;
@@ -8597,7 +8621,7 @@ a {
   color: #c4f2ff;
   font-size: 0.8rem;
   font-weight: 500;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .cs-button:hover {
@@ -8908,7 +8932,7 @@ a {
   color: #ffa0a0;
   font-size: 0.72rem;
   justify-self: start;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .cs-remove-btn:hover {
@@ -9147,7 +9171,7 @@ a {
     font-size: 0.74rem;
     white-space: nowrap;
     flex-shrink: 0;
-    transition: all 0.18s ease;
+    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
   }
 
   .cs-mobile-tool-chip.active {
@@ -9497,7 +9521,7 @@ a {
     font-size: 0.72rem;
     white-space: nowrap;
     flex-shrink: 0;
-    transition: all 0.16s ease;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
   }
   .cs-mobile-tool-chip.active {
     border-color: var(--type-accent, #7ef7ff);
@@ -9980,7 +10004,7 @@ a {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .cp-close-btn:hover {
@@ -10009,7 +10033,7 @@ a {
   color: rgba(255, 255, 255, 0.65);
   font-size: 0.78rem;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .cp-reset-btn:hover {
@@ -10051,7 +10075,7 @@ a {
   letter-spacing: 0.04em;
   justify-self: center;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .cp-open-btn:hover {
@@ -10722,7 +10746,7 @@ a {
   font-weight: 600;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .cp-q-btn:hover {
@@ -10880,7 +10904,7 @@ a {
   font-weight: 600;
   font-size: 0.82rem;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .cp-end-btn.ghost {
@@ -12126,7 +12150,7 @@ a {
   font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .profile-admin-link:hover {
@@ -12218,7 +12242,7 @@ a {
   color: rgba(200, 220, 230, 0.7);
   font-size: 0.72rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   text-align: center;
 }
 
@@ -12407,7 +12431,7 @@ a {
   color: rgba(216, 244, 251, 0.75);
   font-size: 0.74rem;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .admin-pagination-btn:hover:not(:disabled) {
@@ -14544,7 +14568,7 @@ a {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .admin-tab:hover {
@@ -15193,7 +15217,7 @@ a {
   background: rgba(126, 247, 255, 0.06);
   color: #7ef7ff;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .store-inline-copy:hover:not(:disabled) {
@@ -15383,7 +15407,7 @@ a {
   font-weight: 600;
   letter-spacing: 0.04em;
   cursor: pointer;
-  transition: all 0.22s ease;
+  transition: background 0.22s ease, border-color 0.22s ease, color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease;
   white-space: nowrap;
 }
 
@@ -16656,7 +16680,7 @@ a {
   color: rgba(220, 242, 247, 0.7);
   font-size: 0.82rem;
   font-weight: 600;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
   margin-top: 2px;
 }
 
@@ -16901,7 +16925,7 @@ a {
   background: rgba(8, 16, 20, 0.65);
   text-align: left;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
   width: 100%;
 }
 
@@ -17008,7 +17032,7 @@ a {
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: all 0.25s;
+  transition: background 0.25s, border-color 0.25s, color 0.25s, transform 0.25s, box-shadow 0.25s;
 }
 
 .ctm-start:hover:not(:disabled) {
@@ -17200,7 +17224,7 @@ a {
   background: rgba(255, 255, 255, 0.04);
   font-size: 0.82rem;
   text-align: left;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -17321,7 +17345,7 @@ a {
   background: rgba(255, 255, 255, 0.03);
   font-size: 0.78rem;
   text-align: left;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .cs-preview-trivia-opt:hover {
@@ -17600,7 +17624,7 @@ a {
   background: rgba(255, 255, 255, 0.04);
   font-size: 0.9rem;
   text-align: left;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
   cursor: pointer;
   position: relative;
   overflow: hidden;
@@ -17650,7 +17674,7 @@ a {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .cp-poll-option.selected .cp-poll-radio {
@@ -17674,7 +17698,7 @@ a {
   letter-spacing: 0.02em;
   justify-self: center;
   min-width: 160px;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .cp-poll-submit:hover {
@@ -17708,7 +17732,7 @@ a {
   font-weight: 700;
   letter-spacing: 0.02em;
   min-width: 120px;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 .cp-question-yes:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3); }
 .cp-question-yes:disabled { opacity: 0.4; pointer-events: none; }
@@ -17720,7 +17744,7 @@ a {
   font-size: 0.92rem;
   font-weight: 600;
   min-width: 120px;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 .cp-question-no:hover { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.08); transform: translateY(-1px); }
 .cp-question-no:disabled { opacity: 0.4; pointer-events: none; }
@@ -17788,7 +17812,7 @@ a {
   background: rgba(255, 255, 255, 0.03);
   font-size: 0.88rem;
   text-align: left;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -17856,7 +17880,7 @@ a {
   font-weight: 700;
   justify-self: center;
   min-width: 160px;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .cp-trivia-next:hover {
@@ -18073,7 +18097,7 @@ a {
   padding: 16px 20px;
   font-size: 1.05rem;
   outline: none;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 
@@ -18102,7 +18126,7 @@ a {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
   box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 
@@ -18829,7 +18853,7 @@ a {
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .cs-send-modal-close:hover {
@@ -19483,7 +19507,7 @@ a {
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .cs-publish-close-btn:hover {
@@ -19923,7 +19947,7 @@ a {
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .cs-send-confirm-cancel:hover {
   background: rgba(30, 41, 59, 0.7);
@@ -19940,7 +19964,7 @@ a {
   font-size: 0.84rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 4px 16px rgba(118, 239, 255, 0.2);
 }
 .cs-send-confirm-btn:hover:not(:disabled) {
@@ -20533,7 +20557,7 @@ a {
   font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .amt-trim-toggle:hover {
@@ -22415,7 +22439,7 @@ a {
     border-bottom: 2px solid transparent;
     color: rgba(200,230,240,0.38);
     font-size: 0.72rem;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
     white-space: nowrap;
     position: relative;
   }
@@ -22460,7 +22484,7 @@ a {
     color: rgba(200,230,240,0.4);
     font-size: 0.58rem;
     letter-spacing: 0.04em;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
   }
   .cs-m2-tool-tab.active {
     color: #7ef7ff;
@@ -22595,7 +22619,7 @@ a {
     color: rgba(200,230,240,0.45);
     white-space: nowrap;
     flex-shrink: 0;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
   }
   .cs-m2-sheet-tab.active {
     background: rgba(118,239,255,0.1);
@@ -22737,7 +22761,7 @@ a {
     color: rgba(200,230,240,0.55);
     font-size: 0.78rem;
     flex-shrink: 0;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
   }
   .cs-m2-font-chip.active {
     border-color: rgba(118,239,255,0.3);
@@ -22766,7 +22790,7 @@ a {
     background: rgba(255,255,255,0.04);
     color: rgba(200,230,240,0.5);
     font-size: 0.72rem;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
   }
   .cs-m2-chip.active {
     border-color: rgba(118,239,255,0.3);
@@ -23321,7 +23345,7 @@ a {
   text-transform: uppercase;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 
     0 12px 32px rgba(0, 0, 0, 0.5),
     inset 0 2px 4px rgba(255, 255, 255, 0.3),
@@ -23457,7 +23481,7 @@ a {
   padding: 7px 16px 7px 12px;
   font-size: 0.82rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 .cr-back-btn:hover { background: rgba(255,255,255,0.09); color: #e2eaf0; }
 
@@ -23507,7 +23531,7 @@ a {
   padding: 6px 14px;
   font-size: 0.78rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 .cr-action-btn:hover:not(:disabled) { background: rgba(255,255,255,0.09); color: #e2eaf0; }
 .cr-action-btn:disabled { opacity: 0.5; cursor: default; }
@@ -23785,7 +23809,7 @@ a {
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.05);
   border-radius: 14px;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
   position: relative;
 }
 .cr-trivia-row-top {
@@ -26189,7 +26213,7 @@ a {
   background: rgba(255,255,255,0.05);
   border: 1.5px solid rgba(255,255,255,0.12);
   color: rgba(226,234,240,0.4); font-size: 0.8rem; font-weight: 700;
-  cursor: pointer; transition: all 0.15s;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
   display: flex; align-items: center; justify-content: center;
 }
 .qc-trivia-option-row.correct .qc-trivia-correct-btn {
