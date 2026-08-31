@@ -1238,6 +1238,19 @@ function Profile() {
               </div>
             </div>
 
+            {/* Phase 9 launch checklist: ToS/Privacy/contact were only ever
+                linked from the signup/login page -- once a user is logged
+                in (i.e. every returning visitor) there was no way to reach
+                them from inside the app at all. This app has no traditional
+                page footer (the bottom nav takes that space), so Account
+                settings is the one persistent, always-reachable place for
+                them. */}
+            <div className="profile-legal-links">
+              <Link to="/legal/terms">Terms and Conditions</Link>
+              <Link to="/legal/privacy">Privacy Policy</Link>
+              <a href="mailto:support@cardora.studio">Contact support</a>
+            </div>
+
             <button className="ghost" type="button" onClick={handleLogoutClick}>
               Log Out
             </button>

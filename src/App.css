@@ -13435,6 +13435,25 @@ a {
   color: #ff9bd2;
 }
 
+/* Phase 9 launch checklist: the only persistent, always-reachable place
+   for these links now that the app has no page footer. Token-based, so
+   it needs no separate light-mode override. */
+.profile-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 4px;
+}
+.profile-legal-links a {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.profile-legal-links a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 .profile-delete-btn {
   padding: 10px 18px;
   border-radius: 14px;
