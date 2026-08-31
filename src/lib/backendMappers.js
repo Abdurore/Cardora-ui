@@ -1107,6 +1107,21 @@ export function mapBackendCard(card) {
   const layout = card.layoutdata || card.layoutData || card.layoutConfig || {}
   const content = config.content || card.content || layout.content || {}
   const enhancements = card.enhancements || {}
+  // 7.9: "My Cards" thumbnails were a purely decorative blurred gradient,
+  // keyed only to card TYPE (4 hardcoded color presets cycled by
+  // personal/poll/trivia/chain), never the sender's own chosen theme or
+  // an uploaded photo. First photo (if any) still wins in CardItem.jsx;
+  // this is the fallback that makes the fallback actually themed.
+  const firstMediaImage = Array.isArray(enhancements.media)
+    ? enhancements.media.find((m) => m?.type === 'image' && m?.url)?.url || ''
+    : ''
+  const previewColors = config.colors && (config.colors.background || config.colors.accent)
+    ? {
+        background: config.colors.background || '#111111',
+        accent: config.colors.accent || '#7ef7ff',
+        gradient: Array.isArray(config.colors.gradient) ? config.colors.gradient : null,
+      }
+    : null
 
   const type = normaliseType(card.type)
   const tier = normaliseTier(card.tier || card.layoutdata?.tier)
@@ -1155,6 +1170,11 @@ export function mapBackendCard(card) {
     title,
     subtitle: content.body || '',
     message: content.body || content.message || '',
+    // 7.9: real thumbnail preview -- CardItem.jsx uses the photo when
+    // present, else the card's own chosen theme colors, instead of a
+    // generic type-keyed gradient.
+    previewImage: firstMediaImage,
+    previewColors,
     type,
     templateId: card.templateId || '',
     tier,

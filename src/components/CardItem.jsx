@@ -38,6 +38,7 @@ function CardItem({
   showOccasion = true,
   showTypeBadge = true,
   previewImage,
+  previewColors,
   onClick,
   isLiked,
   onToggleLike,
@@ -59,6 +60,13 @@ function CardItem({
   const giftClaimed = giftEnabled && giftEffect?.status === 'claimed'
   const templatePrice = Number(price || 0)
   const unlockLabel = templatePrice <= 0 ? 'Use free' : isUnlocked ? 'Use' : `${templatePrice} CC`
+  // 7.9: a real photo always wins; otherwise use the card's own chosen
+  // theme colors instead of the generic type-keyed .v1-.v4 gradient, so
+  // different cards actually look different from each other at a glance.
+  const [gradA, gradB] = previewColors?.gradient || []
+  const thumbStyle = !previewImage && previewColors
+    ? { background: `linear-gradient(135deg, ${gradA || previewColors.accent}, ${gradB || previewColors.background})` }
+    : undefined
 
   return (
     <div
@@ -97,7 +105,7 @@ function CardItem({
         </button>
       )}
 
-      <div className="card-thumb">
+      <div className="card-thumb" style={thumbStyle}>
         {previewImage ? <img src={previewImage} alt={title || ''} className="card-thumb-image" /> : null}
         <div className="card-thumb-glow" />
         <div className="card-thumb-aura" />
