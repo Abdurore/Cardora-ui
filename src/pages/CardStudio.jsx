@@ -360,7 +360,7 @@ function CardStudio() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const { currentUser, publishTemplate, updateMarketplaceTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, consumeGift, canInstall, promptInstall } = useOutletContext() || {}
+  const { currentUser, authReady, publishTemplate, updateMarketplaceTemplate, createCardOnBackend, refreshBalance, balance, openAuthModal, consumeGift, canInstall, promptInstall } = useOutletContext() || {}
   const [cardPrices, setCardPrices] = useState(TIER_COST_BY_TYPE)
   const [featureSurcharges, setFeatureSurcharges] = useState(() => normalizeFeatureSurcharges(null))
   // Scales the Studio's own live-preview ambient particles the same way
@@ -714,6 +714,38 @@ function CardStudio() {
   // shares) — previously the canvas could only ever show the static
   // pre-vote mock, never what the results screen actually looks like.
   const [pollPreviewShowResults, setPollPreviewShowResults] = useState(false)
+
+  // 8.2: currentUser starts null and resolves asynchronously
+  // (MainLayout's hydrateSession) -- autoSaveKey/readAutoSave above use
+  // whatever currentUser is at THIS render, but cardObject's useState
+  // initializer only ever runs once, on the very first render. A returning
+  // logged-in user reloading straight into the Studio hits that first
+  // render before auth resolves, so the initializer reads the `guest`
+  // autosave slot (empty) and never gets a second chance -- their real,
+  // saved draft silently fails to restore on every ordinary reload. Catch
+  // up once auth actually settles, but only while nothing has touched the
+  // pristine initial state yet, so a user who started typing during that
+  // (usually sub-second) window is never overwritten.
+  const pristineCardObjectRef = useRef(cardObject)
+  const lateRestoreAttemptedRef = useRef(false)
+  useEffect(() => {
+    if (!authReady || lateRestoreAttemptedRef.current) return
+    lateRestoreAttemptedRef.current = true
+    if (autoSavedRef.current) return // the first render already found and applied a draft
+    if (cardObject !== pristineCardObjectRef.current) return // something already changed it
+    const saved = readAutoSave()
+    if (!saved?.cardObject) return
+    autoSavedRef.current = saved
+    setCardObject(deepMerge(structuredClone(defaultCardObject), saved.cardObject))
+    if (saved.pollData) setPollData(saved.pollData)
+    if (saved.triviaData) setTriviaData(saved.triviaData)
+    if (saved.chainData) setChainData({ terminal: DEFAULT_CHAIN_TERMINAL, ...saved.chainData })
+    if (saved.anonTemplate) {
+      setAnonTemplate({ ...saved.anonTemplate, tier: saved.anonTemplate.tier === 'premium' ? 'elite' : (saved.anonTemplate.tier || 'classic') })
+    }
+    setSavedState('Restored from last session')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady])
 
   // The card's tier and CC cost, computed live from what's actually on it —
   // "design free, pay at send": there's no upfront tier choice anymore, so
