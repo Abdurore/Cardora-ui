@@ -18832,23 +18832,77 @@ a {
   font-family: monospace;
 }
 
+/* 7.12: this used to force flex-wrap:nowrap + overflow-x:auto, which
+   scrolled the row instead of wrapping it -- with no scroll affordance or
+   trailing padding, the last icon sat flush against the modal edge and
+   read as cut off. WhatsApp no longer lives in this row (see
+   .cs-send-modal-whatsapp-btn below), so what's left (Telegram, X, native
+   Share) wraps onto a second line on narrow screens instead. */
 .cs-send-modal-platforms {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 2px;
+  flex-wrap: wrap;
 }
 
-.cs-send-modal-platforms::-webkit-scrollbar {
+.cs-send-modal-whatsapp-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #25D366;
+  color: #04150c;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 16px rgba(37, 211, 102, 0.25);
+}
+
+.cs-send-modal-whatsapp-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(37, 211, 102, 0.35);
+}
+
+.cs-send-modal-more {
+  padding-top: 4px;
+  border-top: 1px solid rgba(118, 239, 255, 0.06);
+}
+
+.cs-send-modal-more > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(220, 242, 247, 0.55);
+  padding: 4px 0;
+}
+
+.cs-send-modal-more > summary:hover {
+  color: rgba(220, 242, 247, 0.8);
+}
+
+.cs-send-modal-more > summary::-webkit-details-marker {
   display: none;
+}
+
+.cs-send-modal-more > summary::before {
+  content: '›';
+  display: inline-block;
+  margin-right: 5px;
+  transition: transform 0.15s;
+}
+
+.cs-send-modal-more[open] > summary::before {
+  transform: rotate(90deg);
 }
 
 .cs-send-modal-email-row {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 4px;
-  border-top: 1px solid rgba(118, 239, 255, 0.06);
+  padding-top: 8px;
 }
 
 /* 6.2: styled via tokens so it needs no separate light-mode block. */

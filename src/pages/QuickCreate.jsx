@@ -1139,44 +1139,59 @@ function QuickCreate() {
             )}
 
             {/* Social sharing */}
-            {!isSending && sendResult?.ok && cardLink && (
-              <>
-                <p className="detail-share-label">Share via</p>
-                <div className="detail-share-platforms cs-send-modal-platforms">
-                  {SHARE_PLATFORMS.map((p) => (
+            {!isSending && sendResult?.ok && cardLink && (() => {
+              const whatsapp = SHARE_PLATFORMS.find((p) => p.id === 'whatsapp')
+              const otherPlatforms = SHARE_PLATFORMS.filter((p) => p.id !== 'whatsapp')
+              return (
+                <>
+                  <p className="detail-share-label">Share via</p>
+                  {whatsapp && (
                     <a
-                      key={p.id}
-                      href={p.getUrl(cardLink, shareText)}
+                      href={whatsapp.getUrl(cardLink, shareText)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="detail-share-platform-btn"
-                      style={{ '--platform-color': p.color }}
+                      className="cs-send-modal-whatsapp-btn"
                     >
-                      {p.icon}
-                      <span>{p.label}</span>
+                      {whatsapp.icon}
+                      <span>Share on WhatsApp</span>
                     </a>
-                  ))}
-                  {navigator.share && (
-                    <button
-                      type="button"
-                      className="detail-share-platform-btn"
-                      style={{ '--platform-color': 'rgba(118,239,255,0.7)' }}
-                      onClick={async () => {
-                        try {
-                          await navigator.share({ title: 'Cardora Card', text: shareText, url: cardLink })
-                        } catch { /* cancelled */ }
-                      }}
-                    >
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                      </svg>
-                      <span>More</span>
-                    </button>
                   )}
-                </div>
-              </>
-            )}
+                  <div className="detail-share-platforms cs-send-modal-platforms">
+                    {otherPlatforms.map((p) => (
+                      <a
+                        key={p.id}
+                        href={p.getUrl(cardLink, shareText)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="detail-share-platform-btn"
+                        style={{ '--platform-color': p.color }}
+                      >
+                        {p.icon}
+                        <span>{p.label}</span>
+                      </a>
+                    ))}
+                    {navigator.share && (
+                      <button
+                        type="button"
+                        className="detail-share-platform-btn"
+                        style={{ '--platform-color': 'rgba(118,239,255,0.7)' }}
+                        onClick={async () => {
+                          try {
+                            await navigator.share({ title: 'Cardora Card', text: shareText, url: cardLink })
+                          } catch { /* cancelled */ }
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        </svg>
+                        <span>More</span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
 
             {/* 6.6: "Share to status" -- a themed 1080x1920 image for the
                 durable /ask/:username inbox link, generated fresh on demand. */}
@@ -1232,26 +1247,29 @@ function QuickCreate() {
             )}
 
             {/* Email row */}
-            {!isSending && sendResult?.ok && (
-              <div className="cs-send-modal-email-row">
-                <p className="cs-send-link-label">Send via Email</p>
-                <div className="cs-send-modal-email-input-wrap">
-                  <input
-                    type="email"
-                    className="cs-send-modal-email-input"
-                    placeholder="recipient@email.com"
-                    value={sendEmail}
-                    onChange={e => setSendEmail(e.target.value)}
-                  />
-                  <a
-                    className="cs-nav-btn accent"
-                    href={`mailto:${encodeURIComponent(sendEmail)}?subject=${encodeURIComponent("You've got a Cardora card!")}&body=${encodeURIComponent(`Check out this card I made for you on Cardora:\n\n${cardLink || ''}`)}`}
-                    style={{ textDecoration: 'none', textAlign: 'center' }}
-                  >
-                    Send
-                  </a>
+            {!isSending && sendResult?.ok && cardLink && (
+              <details className="cs-send-modal-more">
+                <summary>More ways to send</summary>
+                <div className="cs-send-modal-email-row">
+                  <p className="cs-send-link-label">Send via Email</p>
+                  <div className="cs-send-modal-email-input-wrap">
+                    <input
+                      type="email"
+                      className="cs-send-modal-email-input"
+                      placeholder="recipient@email.com"
+                      value={sendEmail}
+                      onChange={e => setSendEmail(e.target.value)}
+                    />
+                    <a
+                      className="cs-nav-btn accent"
+                      href={`mailto:${encodeURIComponent(sendEmail)}?subject=${encodeURIComponent("You've got a Cardora card!")}&body=${encodeURIComponent(`Check out this card I made for you on Cardora:\n\n${cardLink}`)}`}
+                      style={{ textDecoration: 'none', textAlign: 'center' }}
+                    >
+                      Send
+                    </a>
+                  </div>
                 </div>
-              </div>
+              </details>
             )}
 
             {!isSending && sendResult?.ok && (

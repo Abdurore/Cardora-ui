@@ -4516,14 +4516,27 @@ function CardStudio() {
               </div>
             )}
 
-            {!isSending && sendResult?.ok && sendResult?.slug && (
-              <>
-                <p className="detail-share-label">Share via</p>
-                <div className="detail-share-platforms cs-send-modal-platforms">
-                  {SHARE_PLATFORMS.map((p) => {
-                    const shareUrl = `${window.location.origin}/card/${sendResult.slug}`
-                    const shareTitle = `Check out this card I made on Cardora`
-                    return (
+            {!isSending && sendResult?.ok && sendResult?.slug && (() => {
+              const shareUrl = `${window.location.origin}/card/${sendResult.slug}`
+              const shareTitle = `Check out this card I made on Cardora`
+              const whatsapp = SHARE_PLATFORMS.find((p) => p.id === 'whatsapp')
+              const otherPlatforms = SHARE_PLATFORMS.filter((p) => p.id !== 'whatsapp')
+              return (
+                <>
+                  <p className="detail-share-label">Share via</p>
+                  {whatsapp && (
+                    <a
+                      href={whatsapp.getUrl(shareUrl, shareTitle)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="cs-send-modal-whatsapp-btn"
+                    >
+                      {whatsapp.icon}
+                      <span>Share on WhatsApp</span>
+                    </a>
+                  )}
+                  <div className="detail-share-platforms cs-send-modal-platforms">
+                    {otherPlatforms.map((p) => (
                       <a
                         key={p.id}
                         href={p.getUrl(shareUrl, shareTitle)}
@@ -4535,55 +4548,55 @@ function CardStudio() {
                         {p.icon}
                         <span>{p.label}</span>
                       </a>
-                    )
-                  })}
-                  {navigator.share && (
-                    <button
-                      type="button"
-                      className="detail-share-platform-btn"
-                      style={{ '--platform-color': 'rgba(118,239,255,0.7)' }}
-                      onClick={async () => {
-                        try {
-                          await navigator.share({
-                            title: 'Cardora Card',
-                            text: 'Check out this card I made on Cardora',
-                            url: `${window.location.origin}/card/${sendResult.slug}`,
-                          })
-                        } catch { /* cancelled */ }
-                      }}
-                    >
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                      </svg>
-                      <span>More</span>
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-
-            {!isSending && (
-            <div className="cs-send-modal-email-row">
-              <p className="cs-send-link-label">Send via Email</p>
-              <div className="cs-send-modal-email-input-wrap">
-                <input
-                  type="email"
-                  className="cs-send-modal-email-input"
-                  placeholder="recipient@email.com"
-                  value={sendEmail}
-                  onChange={(e) => setSendEmail(e.target.value)}
-                />
-                <a
-                  className="cs-nav-btn accent"
-                  href={`mailto:${encodeURIComponent(sendEmail)}?subject=${encodeURIComponent('You\'ve got a Cardora card!')}&body=${encodeURIComponent(`Check out this card I made for you on Cardora:\n\n${window.location.origin}/card/${sendResult?.slug || ''}`)}`}
-                  style={{ textDecoration: 'none', textAlign: 'center' }}
-                >
-                  Send
-                </a>
-              </div>
-            </div>
-            )}
+                    ))}
+                    {navigator.share && (
+                      <button
+                        type="button"
+                        className="detail-share-platform-btn"
+                        style={{ '--platform-color': 'rgba(118,239,255,0.7)' }}
+                        onClick={async () => {
+                          try {
+                            await navigator.share({
+                              title: 'Cardora Card',
+                              text: 'Check out this card I made on Cardora',
+                              url: shareUrl,
+                            })
+                          } catch { /* cancelled */ }
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        </svg>
+                        <span>More</span>
+                      </button>
+                    )}
+                  </div>
+                  <details className="cs-send-modal-more">
+                    <summary>More ways to send</summary>
+                    <div className="cs-send-modal-email-row">
+                      <p className="cs-send-link-label">Send via Email</p>
+                      <div className="cs-send-modal-email-input-wrap">
+                        <input
+                          type="email"
+                          className="cs-send-modal-email-input"
+                          placeholder="recipient@email.com"
+                          value={sendEmail}
+                          onChange={(e) => setSendEmail(e.target.value)}
+                        />
+                        <a
+                          className="cs-nav-btn accent"
+                          href={`mailto:${encodeURIComponent(sendEmail)}?subject=${encodeURIComponent('You\'ve got a Cardora card!')}&body=${encodeURIComponent(`Check out this card I made for you on Cardora:\n\n${shareUrl}`)}`}
+                          style={{ textDecoration: 'none', textAlign: 'center' }}
+                        >
+                          Send
+                        </a>
+                      </div>
+                    </div>
+                  </details>
+                </>
+              )
+            })()}
 
             {!isSending && sendResult?.ok && (
               <InstallPrompt canInstall={canInstall} promptInstall={promptInstall} />
