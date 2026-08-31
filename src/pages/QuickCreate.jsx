@@ -10,9 +10,11 @@ import { effectKeyToGiftName } from '../lib/gifts.js'
 import { GiftIcon } from '../components/GiftCard.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { computeCardTier, trimCardToTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, fontTier } from '../lib/tierRequirements.js'
+import { getTierLimits } from '../lib/tierLimits.js'
 import TierPip from '../components/TierPip.jsx'
 import TierMeter from '../components/TierMeter.jsx'
 import SendReceipt from '../components/SendReceipt.jsx'
+import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonShareImage.js'
 import InstallPrompt from '../components/InstallPrompt.jsx'
 
@@ -319,6 +321,35 @@ function QuickCreate() {
     [tierCost, builtCardObject, cardType, pollDataForTier, triviaDataForTier],
   )
 
+  // 7.5: "make it run the actual reveal on tap" -- CardPreviewModal is the
+  // same envelope/open/effects renderer the real recipient sees
+  // (CardStudio's own "Full Preview" uses it too), not a second mockup to
+  // keep in sync. previewTierLimits mirrors what CardStudio computes for
+  // the same reason: this must reflect the tier the card will actually
+  // send at, not an always-unlocked editing view.
+  const [showPreview, setShowPreview] = useState(false)
+  const previewTierLimits = useMemo(() => getTierLimits(cardTier), [cardTier])
+  // A chain card's challenge text lives in chainChallenge, a separate piece
+  // of state from builtCardObject.content.heading -- CardPreviewModal only
+  // ever reads content.heading for the chain stage, so without this
+  // substitution the reveal would show a blank/default heading instead of
+  // the actual challenge just typed in. Mirrors CardStudio.jsx's identical
+  // previewCardObject fix.
+  const previewCardObject = useMemo(() => {
+    if (cardType !== 'chain' || !chainChallenge.trim()) return builtCardObject
+    return { ...builtCardObject, content: { ...builtCardObject.content, heading: chainChallenge.trim() } }
+  }, [builtCardObject, cardType, chainChallenge])
+  const previewPollData = useMemo(
+    () => (cardType === 'poll' ? { question: pollQuestion.trim(), options: pollOptions.filter(o => o.trim()) } : null),
+    [cardType, pollQuestion, pollOptions],
+  )
+  const previewTriviaData = useMemo(
+    () => (cardType === 'trivia'
+      ? { questions: [{ question: triviaQuestion.trim(), text: triviaQuestion.trim(), options: triviaOptions.filter(o => o.trim()), correctIndex: triviaCorrect }] }
+      : null),
+    [cardType, triviaQuestion, triviaOptions, triviaCorrect],
+  )
+
   const validate = () => {
     if (cardType === 'personal') {
       if (!heading.trim()) return 'Please add a heading.'
@@ -611,6 +642,7 @@ function QuickCreate() {
                 heading={previewHeading}
                 body={previewBody}
                 image={images[0]?.blobUrl}
+                onOpen={() => setShowPreview(true)}
               />
             </div>
 
@@ -653,7 +685,8 @@ function QuickCreate() {
                     below the grid. Hands off to Studio (the full library)
                     rather than expanding this page into theme-browsing. */}
                 <button type="button" className="qc-palette-swatch qc-palette-more" onClick={openInStudio}>
-                  <span className="qc-palette-more-num">+{PALETTES.length - PALETTE_INITIAL_COUNT}</span>
+                  {/* 7.4: "+18" alone reads as an age rating, not a theme count. */}
+                  <span className="qc-palette-more-num">{PALETTES.length - PALETTE_INITIAL_COUNT} more</span>
                   <span className="qc-swatch-name">See all in Studio</span>
                 </button>
               </div>
@@ -1006,14 +1039,26 @@ function QuickCreate() {
                 body={previewBody}
                 image={images[0]?.blobUrl}
                 large
+                onOpen={() => setShowPreview(true)}
               />
-              <p className="qc-preview-note">
-                Simplified preview — the delivered card includes the full envelope reveal and effects.
-              </p>
             </div>
           </div>
         </div>
       </div>
+
+      {/* 7.5: the real envelope/open/effects reveal, not a second mockup --
+          same component the actual recipient sees. */}
+      {showPreview && (
+        <CardPreviewModal
+          cardObject={previewCardObject}
+          studioType={cardType}
+          tier={cardTier}
+          tierLimits={previewTierLimits}
+          pollData={previewPollData}
+          triviaData={previewTriviaData}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
 
       {/* ── Send Modal (portal) ── mirrors CardStudio cs-send-modal ── */}
       {showSendModal && createPortal(
@@ -1263,10 +1308,15 @@ function QuickCreate() {
 }
 
 // Extracted mini-card preview — used in both mobile and desktop panes
-function CardMiniPreview({ palette, font, heading, body, image, large = false }) {
+// 7.5: "Open Card" genuinely opens the real reveal (CardPreviewModal) now,
+// not a static mockup label -- this thumbnail is a launcher for it, not
+// the preview experience itself.
+function CardMiniPreview({ palette, font, heading, body, image, large = false, onOpen }) {
   return (
-    <div
+    <button
+      type="button"
       className={`qc-card-mini${large ? ' large' : ''}`}
+      onClick={onOpen}
       style={{
         backgroundColor: palette.surface,
         borderColor: `${palette.primary}30`,
@@ -1299,7 +1349,7 @@ function CardMiniPreview({ palette, font, heading, body, image, large = false })
           Open Card
         </span>
       </div>
-    </div>
+    </button>
   )
 }
 

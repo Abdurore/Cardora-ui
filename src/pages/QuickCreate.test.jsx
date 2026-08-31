@@ -31,6 +31,19 @@ vi.mock('../lib/anonShareImage.js', () => ({
   shareOrDownloadAnonImage: vi.fn(),
 }))
 
+// 7.5: the real component is ~2.4k lines (envelope/open/effects, lazy
+// three.js, audio) -- a stub that records its props is enough to prove
+// QuickCreate wires the real reveal in on tap, without mounting all of
+// that for a page-level test.
+vi.mock('../components/CardPreviewModal.jsx', () => ({
+  default: (props) => (
+    <div data-testid="card-preview-modal">
+      <span data-testid="cpm-heading">{props.cardObject?.content?.heading}</span>
+      <button type="button" onClick={props.onClose}>Close preview</button>
+    </div>
+  ),
+}))
+
 const createCardOnBackend = vi.fn(async () => ({ ok: true, data: { slug: 'new-card-1' }, message: 'Card created' }))
 const openAuthModal = vi.fn()
 let outletContext = { createCardOnBackend, currentUser: { username: 'replier' }, openAuthModal, balance: 100, inventory: [] }
@@ -237,6 +250,63 @@ describe('QuickCreate — 6.1 send-completion instrumentation', () => {
 
     await waitFor(() => expect(screen.getByText(/Insufficient balance/)).toBeInTheDocument())
     expect(trackEvent).not.toHaveBeenCalledWith('create_flow_step', expect.objectContaining({ step: 'sent' }))
+  })
+})
+
+// 7.5: "make it run the actual reveal on tap, then delete the 'Simplified
+// preview' disclaimer." The mini preview card used to be a static mockup
+// (a <span> reading "Open Card", no click handler at all) -- tapping it
+// now opens the real CardPreviewModal, the same envelope/open/effects
+// component the actual recipient sees.
+describe('QuickCreate — 7.5 preview opens the real reveal', () => {
+  afterEach(() => {
+    vi.mocked(getCardPrices).mockClear()
+  })
+
+  it('does not render the preview modal until the mini preview is tapped', () => {
+    renderAt('/quick?type=personal')
+    expect(screen.queryByTestId('card-preview-modal')).not.toBeInTheDocument()
+  })
+
+  it('tapping the mini preview opens the real CardPreviewModal', () => {
+    renderAt('/quick?type=personal')
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Open Card/i })[0])
+
+    expect(screen.getByTestId('card-preview-modal')).toBeInTheDocument()
+  })
+
+  it('passes the current heading into the real preview for a personal card', () => {
+    renderAt('/quick?type=personal')
+    fireEvent.change(screen.getByPlaceholderText('A short, memorable heading…'), { target: { value: 'Happy Birthday!' } })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Open Card/i })[0])
+
+    expect(screen.getByTestId('cpm-heading')).toHaveTextContent('Happy Birthday!')
+  })
+
+  it('folds the chain challenge into the preview heading (CardPreviewModal only reads content.heading for chain)', () => {
+    renderAt('/quick?type=chain')
+    fireEvent.change(screen.getByPlaceholderText(/challenge|memory|prompt/i), { target: { value: 'Share your favorite memory!' } })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Open Card/i })[0])
+
+    expect(screen.getByTestId('cpm-heading')).toHaveTextContent('Share your favorite memory!')
+  })
+
+  it('closing the preview (its own onClose) hides it again', () => {
+    renderAt('/quick?type=personal')
+    fireEvent.click(screen.getAllByRole('button', { name: /Open Card/i })[0])
+    expect(screen.getByTestId('card-preview-modal')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))
+
+    expect(screen.queryByTestId('card-preview-modal')).not.toBeInTheDocument()
+  })
+
+  it('no longer shows the "Simplified preview" disclaimer anywhere on the page', () => {
+    renderAt('/quick?type=personal')
+    expect(screen.queryByText(/Simplified preview/i)).not.toBeInTheDocument()
   })
 })
 

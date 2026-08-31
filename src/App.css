@@ -26113,9 +26113,12 @@ a {
   border-color: rgba(126, 239, 255, 0.4);
 }
 .qc-palette-more-num {
-  font-size: 1.1rem;
+  /* 7.4: was 1.1rem sized for a bare "+18" -- "18 more" is two words now,
+     shrunk to fit the same swatch-sized cell without wrapping awkwardly. */
+  font-size: 0.85rem;
   font-weight: 800;
   color: #7ef7ff;
+  white-space: nowrap;
 }
 .qc-palette-more .qc-swatch-name {
   position: static;
@@ -26452,8 +26455,17 @@ a {
 .qc-card-mini {
   border-radius: 22px; border: 1px solid;
   overflow: hidden; display: flex; flex-direction: column;
-  transition: box-shadow 0.3s;
+  transition: box-shadow 0.3s, transform 0.18s;
+  /* 7.5: this is a <button> now (opens the real reveal on tap) -- reset
+     the button-element defaults a plain div never had. */
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
+.qc-card-mini:hover { transform: translateY(-2px); }
 .qc-mini-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 16px 10px;
