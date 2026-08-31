@@ -108,6 +108,26 @@ export function createGalaxyScene({ canvas, theme: themeKey, memories, profile, 
   const galaxy = new THREE.Points(galaxyGeometry, galaxyMaterial)
   scene.add(galaxy)
 
+  // ── Entrance: the tapped intro dot "explodes" into the spiral ──
+  // Every star's real position is already computed above (a full,
+  // resting galaxy) -- that array becomes the animation's target. The
+  // live buffer starts collapsed to the origin (a single bright point,
+  // continuous with .gx-intro-star's dot) and lerps out to the target
+  // over INTRO_DURATION. Cost is one lerp per star per frame for ~1.4s
+  // only -- cheaper than the continuous per-frame planet-orbit math
+  // below, which runs for the entire lifetime of the scene regardless.
+  const INTRO_DURATION = 1.4
+  const introEase = (t) => 1 - Math.pow(1 - t, 3) // ease-out: fast start, settles in
+  const starTargets = galaxyGeometry.attributes.position.array.slice()
+  const starLive = galaxyGeometry.attributes.position.array
+  starLive.fill(0)
+  galaxyGeometry.attributes.position.needsUpdate = true
+  let introT = 0 // 0..1, advanced in frame()
+  const cameraRest = camera.position.clone()
+  const cameraStart = cameraRest.clone().multiplyScalar(0.26)
+  camera.position.copy(cameraStart)
+  controls.enabled = false
+
   // ── Core ──
   const coreGeometry = track(new THREE.SphereGeometry(1.5, 32, 32))
   const coreMaterial = track(new THREE.MeshBasicMaterial({ color: new THREE.Color(theme.core) }))
@@ -123,7 +143,8 @@ export function createGalaxyScene({ canvas, theme: themeKey, memories, profile, 
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   }))
-  scene.add(new THREE.Mesh(glowGeometry, glowMaterial))
+  const glow = new THREE.Mesh(glowGeometry, glowMaterial)
+  scene.add(glow)
 
   scene.add(new THREE.AmbientLight(0xffffff, 1.5))
   const keyLight = new THREE.PointLight(new THREE.Color(theme.core), 120, 60)
@@ -209,16 +230,46 @@ export function createGalaxyScene({ canvas, theme: themeKey, memories, profile, 
     const delta = Math.min(clock.getDelta(), 0.1)
     elapsed += delta
     galaxy.rotation.y += delta * 0.035
-    core.scale.setScalar(1 + Math.sin(elapsed * 1.6) * 0.05)
+
+    const pulse = 1 + Math.sin(elapsed * 1.6) * 0.05
+    const introDone = introT >= 1
+    let introScale = 1
+    if (!introDone) {
+      introT = Math.min(introT + delta / INTRO_DURATION, 1)
+      const eased = introEase(introT)
+      introScale = eased
+      for (let i = 0; i < starLive.length; i++) starLive[i] = starTargets[i] * eased
+      galaxyGeometry.attributes.position.needsUpdate = true
+      camera.position.lerpVectors(cameraStart, cameraRest, eased)
+      if (introT >= 1) {
+        camera.position.copy(cameraRest)
+        controls.enabled = true
+      }
+    }
+    // core starts a visible fraction of its size (it IS the tapped dot),
+    // not zero -- scaling straight from 0 would make it briefly vanish.
+    core.scale.setScalar(Math.max(0.15, introScale) * pulse)
+    // The glow sphere used to sit outside this loop entirely, at a fixed
+    // radius of 3.4 units regardless of the intro -- with the camera
+    // starting close in (see cameraStart above), that fixed-size haze filled
+    // most of the frame from frame one and made the whole entrance read as
+    // "stuck" even while the stars/planets underneath it were animating.
+    glow.scale.setScalar(Math.max(0.1, introScale))
+
     for (const mesh of planets) {
       const orbit = mesh.userData.orbit
       orbit.angle += delta * orbit.speed
-      mesh.position.x = Math.cos(orbit.angle) * orbit.radius
-      mesh.position.z = Math.sin(orbit.angle) * orbit.radius
-      mesh.position.y = orbit.y + Math.sin(elapsed * 0.5 + orbit.angle) * 0.4
+      mesh.position.x = Math.cos(orbit.angle) * orbit.radius * introScale
+      mesh.position.z = Math.sin(orbit.angle) * orbit.radius * introScale
+      mesh.position.y = (orbit.y + Math.sin(elapsed * 0.5 + orbit.angle) * 0.4) * introScale
       mesh.rotation.y += delta * 0.15
     }
-    controls.update()
+    // Skip during the intro -- OrbitControls.update() re-derives its
+    // internal spherical state from camera.position on every call, and
+    // calling it while we're scripting that position directly (with no
+    // user input queued, since controls are disabled) is an unnecessary
+    // round-trip at best and a fight with the lerp above at worst.
+    if (introDone) controls.update()
     renderer.render(scene, camera)
   }
 
