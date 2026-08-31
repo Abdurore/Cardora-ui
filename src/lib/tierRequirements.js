@@ -1,9 +1,8 @@
 // Single source of truth for "what does this card cost and why" under the
 // computed-tier model ("design free, pay at send"). No upfront tier choice —
 // the sender uses whatever features they want and the tier/cost is derived
-// live from what's actually on the card. Pips, the send receipt, and the
-// "trim extras & send free" action all read this same rule list, so they can
-// never drift from each other.
+// live from what's actually on the card. The tier meter and the send receipt
+// both read this same rule list, so they can never drift from each other.
 //
 // Mirrors the backend's real gates — keep in sync with:
 //   Backend/Cardora/src/cards/engine.js `assertNoInvalidEnhancements`
@@ -400,8 +399,11 @@ export function computeCardTier(cardObject, { type = 'personal', pollData = null
 
 /**
  * Returns a deep-cloned, trimmed-down version of the card (+ typed content)
- * that computes to `targetTier` or below, plus the list of what got removed
- * — powers "Trim extras & send free" in the send receipt.
+ * that computes to `targetTier` or below, plus the list of what got removed.
+ * Not currently wired to any UI action (7.6 removed the "trim extras & send
+ * free" button, once the tier meter made the live cost visible while
+ * editing rather than only at send time) — kept as the tested primitive a
+ * future trim-style action would build on.
  */
 export function trimCardToTier(cardObject, targetTier, { type = 'personal', pollData = null, triviaData = null, chainData = null } = {}) {
   const clonedCard = structuredClone(cardObject)

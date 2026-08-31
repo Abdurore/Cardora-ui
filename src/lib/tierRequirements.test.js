@@ -3,10 +3,10 @@ import { computeCardTier, trimCardToTier, computeFeatureSurcharges, getCardTotal
 import { defaultCardObject } from '../data/cardDefaults.js'
 
 // `computeCardTier` is the single source of truth for what a card costs and
-// why (see the file header) — it drives the tier meter, the send receipt,
-// and "trim extras & send free". Getting it wrong either overcharges every
-// sender or lets paid features through for free, so it's the most
-// consequential piece of logic in the app to leave untested.
+// why (see the file header) — it drives the tier meter and the send
+// receipt. Getting it wrong either overcharges every sender or lets paid
+// features through for free, so it's the most consequential piece of logic
+// in the app to leave untested.
 
 function freshCard() {
   return structuredClone(defaultCardObject)

@@ -9,7 +9,7 @@ import { EXPLORE_OCCASION_TABS } from '../lib/occasionTaxonomy.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import { GiftIcon } from '../components/GiftCard.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
-import { computeCardTier, trimCardToTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, fontTier } from '../lib/tierRequirements.js'
+import { computeCardTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, fontTier } from '../lib/tierRequirements.js'
 import { getTierLimits } from '../lib/tierLimits.js'
 import TierPip from '../components/TierPip.jsx'
 import TierMeter from '../components/TierMeter.jsx'
@@ -316,11 +316,6 @@ function QuickCreate() {
     () => computeFeatureSurcharges(builtCardObject, { type: cardType }, featureSurcharges).breakdown,
     [builtCardObject, cardType, featureSurcharges],
   )
-  const trimPreview = useMemo(
-    () => (tierCost > 0 ? trimCardToTier(builtCardObject, 'classic', { type: cardType, pollData: pollDataForTier, triviaData: triviaDataForTier, chainData: null }) : null),
-    [tierCost, builtCardObject, cardType, pollDataForTier, triviaDataForTier],
-  )
-
   // 7.5: "make it run the actual reveal on tap" -- CardPreviewModal is the
   // same envelope/open/effects renderer the real recipient sees
   // (CardStudio's own "Full Preview" uses it too), not a second mockup to
@@ -387,8 +382,8 @@ function QuickCreate() {
     trackEvent('create_flow_step', { step: 'reached_review', path: 'quick', type: cardType })
   }
 
-  // `overrides` lets "Trim extras & send free" pass freshly-trimmed content
-  // straight through instead of waiting on setState to flush.
+  // `overrides` lets a caller pass freshly-built content straight through
+  // instead of waiting on setState to flush.
   const handleSend = async (overrides = {}) => {
     // Last-resort guard -- handleSendClick is the primary gate, but this is
     // also reachable directly from the "Try Again" button.
@@ -510,21 +505,6 @@ function QuickCreate() {
     if (isSending) return
     setShowSendModal(false)
     setSendResult(null)
-  }
-
-  // "Trim extras & send free" — strips every reason keeping the card above
-  // Classic, applies it to Quick-mode state, and sends that exact content.
-  const handleTrimAndSend = async () => {
-    const trimmed = trimCardToTier(builtCardObject, 'classic', { type: cardType, pollData: pollDataForTier, triviaData: triviaDataForTier, chainData: null })
-    if (cardType === 'poll' && trimmed.pollData?.options) setPollOptions(trimmed.pollData.options)
-    if (cardType === 'trivia' && trimmed.triviaData?.questions?.[0]?.options) setTriviaOptions(trimmed.triviaData.questions[0].options)
-    if (trimmed.cardObject.giftEffect?.enabled === false) setSelectedGiftId('none')
-    await handleSend({
-      cardObject: trimmed.cardObject,
-      tier: 'classic',
-      pollOptions: trimmed.pollData?.options,
-      triviaOptions: trimmed.triviaData?.questions?.[0]?.options,
-    })
   }
 
   const openInStudio = () => {
@@ -1093,8 +1073,6 @@ function QuickCreate() {
                 balance={bal}
                 sending={isSending}
                 onSend={handleSend}
-                onTrim={handleTrimAndSend}
-                trimPreview={trimPreview}
                 onCancel={closeSendModal}
               />
             )}

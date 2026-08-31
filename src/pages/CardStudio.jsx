@@ -28,7 +28,7 @@ import { getTierLimits } from '../lib/tierLimits.js'
 import { PALETTES, getPalettesForTier, applyPalette } from '../lib/palettes.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import InlineColorPicker from '../components/InlineColorPicker.jsx'
-import { computeCardTier, trimCardToTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, TIER_COST_BY_TYPE, fontTier } from '../lib/tierRequirements.js'
+import { computeCardTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, TIER_COST_BY_TYPE, fontTier } from '../lib/tierRequirements.js'
 import TierMeter from '../components/TierMeter.jsx'
 import TierPip from '../components/TierPip.jsx'
 import SendReceipt from '../components/SendReceipt.jsx'
@@ -757,13 +757,6 @@ function CardStudio() {
     if (studioType !== 'chain' || !chainData.prompt) return cardObject
     return { ...cardObject, content: { ...cardObject.content, heading: chainData.prompt } }
   }, [cardObject, studioType, chainData.prompt])
-  // What "Trim extras & send free" would actually remove — computed ahead of
-  // time so the send receipt can show it before the sender commits to it.
-  const trimPreview = useMemo(
-    () => (tierCost > 0 ? trimCardToTier(cardObject, 'classic', { type: studioType, pollData, triviaData, chainData }) : null),
-    [tierCost, cardObject, studioType, pollData, triviaData, chainData],
-  )
-
   // Auto-save: every change persists to localStorage after a short debounce so
   // an accidental reload, browser close, or navigation away doesn't lose the
   // user's work. The blob: URLs in c.media.images can't be revived after a
@@ -1143,9 +1136,8 @@ function CardStudio() {
     setActiveStep('preview')
   }
 
-  // `overrides` lets "Trim extras & send free" pass freshly-trimmed content
-  // straight through instead of relying on setState (async, wouldn't have
-  // flushed yet) — see handleTrimAndSend below.
+  // `overrides` lets a caller pass freshly-built content straight through
+  // instead of relying on setState (async, wouldn't have flushed yet).
   const handleSend = async (overrides = {}) => {
     if (!currentUser) return
     // Guard against a double-click/double-submit firing this twice before the
@@ -1280,25 +1272,6 @@ function CardStudio() {
 
   const handleConfirmSend = async () => {
     await handleSend()
-  }
-
-  // "Trim extras & send free" — strips every reason keeping the card above
-  // Classic, applies the result to studio state (so the editor reflects what
-  // actually got sent), and sends that exact trimmed content immediately
-  // rather than waiting a render for state to catch up.
-  const handleTrimAndSend = async () => {
-    const trimmed = trimCardToTier(cardObject, 'classic', { type: studioType, pollData, triviaData, chainData })
-    setCardObject(trimmed.cardObject)
-    if (studioType === 'poll') setPollData(trimmed.pollData)
-    if (studioType === 'trivia') setTriviaData(trimmed.triviaData)
-    if (studioType === 'chain') setChainData(trimmed.chainData)
-    await handleSend({
-      cardObject: trimmed.cardObject,
-      pollData: trimmed.pollData,
-      triviaData: trimmed.triviaData,
-      chainData: trimmed.chainData,
-      tier: 'classic',
-    })
   }
 
   const handleSave = () => {
@@ -4478,8 +4451,6 @@ function CardStudio() {
                 balance={balance ?? 0}
                 sending={isSending}
                 onSend={handleConfirmSend}
-                onTrim={handleTrimAndSend}
-                trimPreview={trimPreview}
                 onCancel={() => { setShowSendModal(false); setSendResult(null) }}
               />
             )}

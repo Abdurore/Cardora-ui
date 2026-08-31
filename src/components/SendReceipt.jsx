@@ -1,10 +1,14 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 // The send-time receipt: replaces the old opaque "this costs N CC" confirm
 // step with a transparent breakdown of exactly which features raised the
-// price, plus a one-tap way to strip them and send free instead of forcing
-// the sender back into the studio to hunt for what to remove.
+// price. 7.6: this used to also offer a one-tap "trim extras & send free"
+// escape hatch, back when this receipt was the first place a sender saw
+// the cost at all. Now the tier/cost is live in the Studio/Quick Create
+// header (TierMeter) the whole time a card is being built, so trimming
+// here would just be a second, later place to do what the header already
+// invites the sender to do while editing -- removed rather than kept as a
+// redundant path.
 function SendReceipt({
   reasons = [],
   tier = 'classic',
@@ -21,43 +25,10 @@ function SendReceipt({
   balance = 0,
   sending = false,
   onSend,
-  onTrim,
-  trimPreview = null,
   onCancel,
 }) {
-  const [confirmingTrim, setConfirmingTrim] = useState(false)
   const short = balance < cost
   const tierLabel = tier === 'classic' ? 'Classic' : tier === 'premium' ? 'Premium' : 'Elite'
-
-  if (confirmingTrim) {
-    const removed = trimPreview?.removed || []
-    return (
-      <div className="cs-send-confirm cs-send-receipt">
-        <div className="cs-send-confirm-icon">✂️</div>
-        <h3>Trim these and send free?</h3>
-        {removed.length === 0 ? (
-          <p className="cs-send-confirm-note">This card is already free — nothing to trim.</p>
-        ) : (
-          <ul className="cs-tier-meter-reasons cs-send-receipt-removed">
-            {removed.map((r) => (
-              <li key={r.id} className={`cs-tier-meter-reason cs-tier-meter-reason-${r.tier}`}>
-                <span>{r.label}</span>
-                <span className="cs-tier-meter-reason-tag">removed</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="cs-send-confirm-actions">
-          <button type="button" className="cs-send-confirm-btn primary" onClick={() => onTrim?.()} disabled={sending}>
-            {sending ? 'Sending…' : 'Trim & send free'}
-          </button>
-          <button type="button" className="cs-send-confirm-btn ghost" onClick={() => setConfirmingTrim(false)} disabled={sending}>
-            Back
-          </button>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="cs-send-confirm cs-send-receipt">
@@ -111,18 +82,13 @@ function SendReceipt({
       <div className="cs-send-confirm-actions">
         <button
           type="button"
-          className="cs-send-confirm-btn primary"
+          className="cs-send-confirm-btn"
           onClick={() => onSend?.()}
           disabled={sending || short}
         >
           {sending ? 'Sending…' : cost > 0 ? `Send · ${cost} CC` : 'Send free'}
         </button>
-        {cost > 0 && (
-          <button type="button" className="cs-send-confirm-btn ghost" onClick={() => setConfirmingTrim(true)} disabled={sending}>
-            Trim extras & send free
-          </button>
-        )}
-        <button type="button" className="cs-send-confirm-btn ghost" onClick={() => onCancel?.()} disabled={sending}>
+        <button type="button" className="cs-send-confirm-cancel" onClick={() => onCancel?.()} disabled={sending}>
           Cancel
         </button>
       </div>
