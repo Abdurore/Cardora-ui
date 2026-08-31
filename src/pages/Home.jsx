@@ -6,10 +6,10 @@ import CardItem from '../components/CardItem.jsx'
 import { getSignupBonusAvailability } from '../lib/api.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from '../components/CardIcons.jsx'
 
+// 7.15: trimmed from five to the three formats that read most distinctly
+// at a glance in the hero -- Poll/Trivia stayed in Card Formats below.
 const FORMAT_CHIPS = [
   { Icon: PersonalCardIcon, label: 'Personal', cls: 'chip-greeting' },
-  { Icon: PollCardIcon,     label: 'Poll',     cls: 'chip-poll' },
-  { Icon: TriviaCardIcon,  label: 'Trivia',   cls: 'chip-trivia' },
   { Icon: AnonCardIcon,    label: 'Anonymous', cls: 'chip-anon' },
   { Icon: ChainCardIcon,   label: 'Chain',    cls: 'chip-chain' },
 ]
@@ -175,12 +175,12 @@ function Home() {
           {isArtist ? (
             <h1>Design templates<br />people save and send.</h1>
           ) : (
-            <h1>Create interactive<br />card experiences.</h1>
+            <h1>A moment,<br />not a message.</h1>
           )}
           <p className="subtext">
             {isArtist
               ? 'Publish signature card designs to the marketplace — every tier and effect is unlocked for you, no CC cost.'
-              : 'Cardora turns simple messages into interactive digital card experiences that people can engage with, not just read.'}
+              : 'Create interactive card experiences — Cardora turns simple messages into something people engage with, not just read.'}
           </p>
           <div className="hero-format-chips" aria-hidden="true">
             {FORMAT_CHIPS.map((chip, i) => (
@@ -226,12 +226,27 @@ function Home() {
             <div className="hero-cinema-scene">
               <div className="hero-aurora" />
               <div className="hero-card-halo" />
-              <div className="hero-floating-card">
-                <span className="hero-fc-eyebrow">Cardora</span>
-                <span className="hero-fc-title">A moment,<br />not a message.</span>
-                <span className="hero-card-shimmer" />
-                <span className="hero-fc-line long" />
-                <span className="hero-fc-line short" />
+              {/* 7.15: was a static "card" mockup with the headline copied
+                  onto it. Replaced with a muted, looping envelope -> letter
+                  peek -> galaxy reveal -- the same three beats a recipient
+                  actually sees opening a card, at low-key hero-decoration
+                  intensity (CSS only, no WebGL -- GalaxyExperience stays
+                  lazy-loaded for the real reveal). */}
+              <div className="hero-reveal-loop">
+                <div className="hero-reveal-envelope">
+                  <span className="hre-envelope-flap" />
+                  <span className="hre-envelope-seal" />
+                </div>
+                <div className="hero-reveal-letter">
+                  <span className="hero-fc-line long" />
+                  <span className="hero-fc-line short" />
+                  <span className="hero-fc-line long" />
+                </div>
+                <div className="hero-reveal-galaxy">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <span key={`spark-${i}`} className={`hero-reveal-spark s${i + 1}`} />
+                  ))}
+                </div>
               </div>
               {Array.from({ length: 8 }).map((_, i) => (
                 <span key={`dust-${i}`} className={`hero-dust d${i + 1}`} />
