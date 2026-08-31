@@ -3531,10 +3531,12 @@
   transform: translateX(-50%);
   width: min(520px, 92vw);
   display: grid;
-  /* Was repeat(5, 1fr) from when Chat was a fifth nav item -- ScreenNav.jsx
-     only ever renders 4 (Home, Explore, the Create FAB, Store) now, so the
-     5th column sat empty and threw the FAB off-center. */
-  grid-template-columns: repeat(4, 1fr);
+  /* Back to 5: with only 4 items (2 left of the FAB, 1 right), the row
+     read as lopsided rather than just missing a slot -- added Profile as
+     a real 5th item (Home/Explore left, Store/Profile right) instead of
+     re-balancing 4 items into an even grid, matching the standard
+     2-FAB-2 mobile nav shape. */
+  grid-template-columns: repeat(5, 1fr);
   gap: 6px;
   padding: 8px;
   border-radius: 16px;
