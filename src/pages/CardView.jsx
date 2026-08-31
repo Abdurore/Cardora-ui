@@ -493,6 +493,12 @@ function CardView() {
   }
 
   // ── Not found ────────────────────────────────────────────────────────
+  // 7.13: .cv-page-loading (shared with the earlier loading state) is
+  // fixed-dark on purpose, like the card render tree itself -- a
+  // recipient arriving here has no relationship to the site's own
+  // light/dark toggle, and the card hasn't loaded yet to theme off of its
+  // own colors. Checked: 0.7-alpha near-white on this screen's #080e14
+  // clears 8:1+.
   if (!card) {
     return (
       <div className="cv-page-loading">

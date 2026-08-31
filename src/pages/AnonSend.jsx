@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getPublicProfile, getActiveAnonymousCard } from '../lib/api.js'
 
+// 7.13: fixed on purpose, not a missed token conversion -- this page is a
+// recipient-facing inbox teaser (evokes the card-open aesthetic), not app
+// chrome, so it stays outside data-theme like the card renderer does.
+// Contrast checked against this exact bg: #e9fbff and the 0.7-alpha body
+// copy both clear 8:1+.
 const bg = '#07111a'
 const accent = '#7ef7ff'
 

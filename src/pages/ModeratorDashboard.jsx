@@ -435,7 +435,7 @@ function ModeratorDashboard() {
           <div className="ban-confirm-backdrop" onClick={() => !banSubmitting && setBanConfirm(null)} />
           <div className="ban-confirm-card">
             <h3 className="ban-confirm-title">Confirm ban</h3>
-            <p style={{ color: 'rgba(220,240,247,0.7)', marginBottom: 12 }}>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 12 }}>
               Ban <strong>{banConfirm.identifier}</strong> for {banConfirm.payload.durationDays} day(s)?
               {banConfirm.payload.reason && <><br /><em>Reason: {banConfirm.payload.reason}</em></>}
             </p>

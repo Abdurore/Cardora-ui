@@ -1361,7 +1361,7 @@ const handleBroadcast = async () => {
             <div className="admin-sub-section">
               <h4>Pending Broadcast Requests ({pendingBroadcastRequests.length})</h4>
               {pendingBroadcastRequests.length === 0 ? (
-                <p style={{ color: 'rgba(220,240,247,0.4)' }}>No pending requests.</p>
+                <p style={{ color: 'var(--text-dim)' }}>No pending requests.</p>
               ) : (
                 <div className="admin-table-wrap">
                   <table className="admin-table">
@@ -1404,7 +1404,7 @@ const handleBroadcast = async () => {
                   <div className="admin-stat-card"><div className="admin-stat-value">{signupBonus.remaining ?? '—'}</div><div className="admin-stat-label">Remaining</div></div>
                   <div className="admin-stat-card"><div className="admin-stat-value">{signupBonus.amount ?? signupBonus.bonusCC ?? '—'}</div><div className="admin-stat-label">CC Amount</div></div>
                 </div>
-              ) : <p style={{ color: 'rgba(220,240,247,0.4)' }}>Loading…</p>}
+              ) : <p style={{ color: 'var(--text-dim)' }}>Loading…</p>}
               <button className="primary" type="button" onClick={handleResetSignupBonus} style={{ marginTop: 12 }}>Reset Signup Bonus Counter</button>
             </div>
 

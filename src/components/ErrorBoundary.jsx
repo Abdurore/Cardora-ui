@@ -25,8 +25,8 @@ class ErrorBoundary extends Component {
             minHeight: '100vh',
             display: 'grid',
             placeItems: 'center',
-            background: '#0b0f12',
-            color: '#e8f1f4',
+            background: 'var(--bg)',
+            color: 'var(--text)',
             padding: 24,
             textAlign: 'center',
             fontFamily: 'Manrope, sans-serif',
@@ -34,7 +34,7 @@ class ErrorBoundary extends Component {
         >
           <div style={{ maxWidth: 420 }}>
             <h1 style={{ fontSize: '1.4rem', marginBottom: 12 }}>Something went wrong</h1>
-            <p style={{ color: 'rgba(232, 241, 244, 0.72)', marginBottom: 24, lineHeight: 1.6 }}>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.6 }}>
               This page hit an unexpected error. Reloading usually fixes it — your work is
               auto-saved.
             </p>
@@ -45,8 +45,8 @@ class ErrorBoundary extends Component {
                 padding: '10px 22px',
                 borderRadius: 999,
                 border: 'none',
-                background: 'linear-gradient(135deg, #7ef7ff, #62ffa2)',
-                color: '#0b0f12',
+                background: 'var(--btn-primary-bg)',
+                color: 'var(--btn-primary-text)',
                 fontWeight: 700,
                 cursor: 'pointer',
               }}

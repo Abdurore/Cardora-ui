@@ -730,7 +730,7 @@ function CardResponses() {
       <div className="cr-page">
         <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
         <div className="cr-loading">
-          <p style={{ color: 'rgba(220,242,247,0.6)', marginBottom: 16 }}>{error || 'Card not found'}</p>
+          <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>{error || 'Card not found'}</p>
           <button className="primary" type="button" onClick={() => navigate('/profile')}>Back to Profile</button>
         </div>
         <ScreenNav />

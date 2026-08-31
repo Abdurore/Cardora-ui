@@ -9817,7 +9817,12 @@ a {
 }
 .cp-tap-hint {
   font-size: 0.82rem;
-  color: rgba(255,255,255,0.45);
+  /* 7.14: was 0.45 -- measured ~4.5:1 against this surface's near-black
+     base, the AA floor with no margin for a sender's slightly lighter
+     dark background. This is the card render tree (never theme-aware,
+     see App.css's CardPreviewModal notes) so the fix is a fixed color,
+     not a token. */
+  color: rgba(255,255,255,0.62);
   margin: 0;
 }
 
@@ -21202,11 +21207,17 @@ a {
   position: relative;
   width: 100%;
   max-width: 440px;
-  background: linear-gradient(160deg, rgba(18, 26, 34, 0.96), rgba(12, 18, 26, 0.98));
+  /* 7.13/7.14: was a fixed dark gradient + hardcoded near-white text --
+     app chrome (admin/moderator tooling), so it should track the site
+     theme like the rest of this dashboard. Danger-red accents (border,
+     the destructive submit button) stay fixed on purpose -- this is a ban
+     confirmation, and that warning color isn't meant to soften in light
+     mode. */
+  background: var(--elevated);
   border: 1px solid rgba(255, 140, 140, 0.3);
   border-radius: 18px;
   padding: 22px 22px 20px;
-  color: #e8f1f4;
+  color: var(--text);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 40px rgba(255, 90, 90, 0.08);
   max-height: 90vh;
   overflow-y: auto;
@@ -21215,21 +21226,21 @@ a {
   margin: 0 0 14px;
   font-family: 'Cinzel', serif;
   font-size: 1.25rem;
-  color: #ffb4b4;
+  color: var(--danger);
   letter-spacing: 0.02em;
 }
 .ban-confirm-user {
   display: flex;
   gap: 14px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--hover);
+  border: 1px solid var(--border);
   border-radius: 12px;
   margin-bottom: 14px;
 }
 .ban-confirm-user-missing {
   display: block;
-  color: rgba(232, 241, 244, 0.7);
+  color: var(--text-muted);
   font-size: 0.88rem;
 }
 .ban-confirm-user-missing code {
@@ -21240,7 +21251,7 @@ a {
   border: 1px solid rgba(255, 140, 140, 0.2);
   border-radius: 6px;
   font-family: monospace;
-  color: #ffd0d0;
+  color: var(--danger);
   word-break: break-all;
 }
 .ban-confirm-avatar {
@@ -21270,11 +21281,11 @@ a {
 .ban-confirm-username {
   font-weight: 700;
   font-size: 1rem;
-  color: #e9fbff;
+  color: var(--text);
 }
 .ban-confirm-email {
   font-size: 0.82rem;
-  color: rgba(232, 241, 244, 0.7);
+  color: var(--text-muted);
   margin-top: 2px;
   word-break: break-all;
 }
@@ -21284,14 +21295,14 @@ a {
   gap: 8px;
   margin-top: 8px;
   font-size: 0.78rem;
-  color: rgba(232, 241, 244, 0.75);
+  color: var(--text-muted);
   align-items: center;
 }
 .ban-confirm-id {
   margin-top: 6px;
   font-size: 0.72rem;
   font-family: monospace;
-  color: rgba(232, 241, 244, 0.5);
+  color: var(--text-dim);
   word-break: break-all;
 }
 .ban-confirm-details {
@@ -21301,8 +21312,8 @@ a {
   margin-bottom: 14px;
 }
 .ban-confirm-details > div {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--inset);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
   display: flex;
@@ -21313,11 +21324,11 @@ a {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(232, 241, 244, 0.5);
+  color: var(--text-dim);
 }
 .ban-confirm-details strong {
   font-size: 0.92rem;
-  color: #e9fbff;
+  color: var(--text);
   font-weight: 600;
   word-break: break-word;
 }
@@ -21328,7 +21339,7 @@ a {
   border-left: 3px solid rgba(255, 140, 140, 0.6);
   border-radius: 6px;
   font-size: 0.84rem;
-  color: #ffd0d0;
+  color: var(--danger);
 }
 .ban-confirm-actions {
   display: flex;
@@ -21346,12 +21357,12 @@ a {
 }
 .ban-confirm-cancel {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: rgba(232, 241, 244, 0.8);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
 }
 .ban-confirm-cancel:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.26);
+  background: var(--hover);
+  border-color: var(--text-dim);
 }
 .ban-confirm-submit {
   background: linear-gradient(135deg, rgba(255, 90, 90, 0.85), rgba(220, 50, 50, 0.9));
@@ -23343,7 +23354,10 @@ a {
 /* Tap hint */
 .cp-entry-tap-hint {
   font-size: 0.72rem;
-  color: rgba(220, 240, 255, 0.35);
+  /* 7.14: was 0.35 -- measured ~2.9:1 against this screen's dark base, well
+     under the 4.5:1 AA floor. Fixed color, not a token: this is the card
+     render tree, which stays dark regardless of site theme. */
+  color: rgba(220, 240, 255, 0.6);
   letter-spacing: 0.05em;
   margin-top: -4px;
 }
@@ -23389,8 +23403,14 @@ a {
   gap: 24px;
   position: relative;
   border-radius: 24px;
-  background: rgba(10, 20, 26, 0.45);
-  border: 1px solid rgba(126, 247, 255, 0.08);
+  /* 7.13/7.14: was a fixed dark navy tint (rgba(10,20,26,.45)) regardless of
+     theme -- fine on the dark page bg it was tuned for, but in light mode
+     the near-white text below (.cr-empty-msg etc, now token-based) sat on
+     a surface that was *also* light, an accidental white-on-white. Mixing
+     the surface token with transparent keeps the glass-panel look while
+     tracking whichever theme is active. */
+  background: color-mix(in srgb, var(--elevated) 55%, transparent);
+  border: 1px solid var(--border);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
@@ -23445,13 +23465,13 @@ a {
 .cr-card-title {
   font-size: clamp(1.4rem, 4vw, 2rem);
   font-weight: 800;
-  color: #e2eaf0;
+  color: var(--text);
   margin: 0;
   line-height: 1.25;
 }
 .cr-card-date {
   font-size: 0.78rem;
-  color: rgba(220,242,247,0.4);
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -23676,7 +23696,7 @@ a {
   flex: 1;
   font-size: 1rem;
   font-weight: 700;
-  color: #e2eaf0;
+  color: var(--text);
   margin: 0;
 }
 .cr-count-badge {
@@ -23699,12 +23719,12 @@ a {
   text-align: center;
 }
 .cr-empty-icon { font-size: 2rem; opacity: 0.5; }
-.cr-empty-msg { color: rgba(220,242,247,0.45); font-size: 0.88rem; margin: 0; line-height: 1.5; max-width: 280px; }
+.cr-empty-msg { color: var(--text-dim); font-size: 0.88rem; margin: 0; line-height: 1.5; max-width: 280px; }
 
 /* ── Poll bars ── */
 .cr-poll-question {
   font-size: 0.95rem;
-  color: rgba(220,242,247,0.8);
+  color: var(--text);
   margin: 0;
   line-height: 1.5;
   font-style: italic;
@@ -23713,8 +23733,8 @@ a {
 .cr-poll-bar { display: flex; flex-direction: column; gap: 4px; }
 .cr-poll-bar-top .cr-poll-bar-fill { background: linear-gradient(90deg, #7ef7ff, #62ffa2); }
 .cr-poll-bar-label-row { display: flex; justify-content: space-between; align-items: center; }
-.cr-poll-bar-text { font-size: 0.88rem; color: #e2eaf0; font-weight: 500; }
-.cr-poll-bar-pct { font-size: 0.82rem; color: rgba(220,242,247,0.6); font-weight: 700; }
+.cr-poll-bar-text { font-size: 0.88rem; color: var(--text); font-weight: 500; }
+.cr-poll-bar-pct { font-size: 0.82rem; color: var(--text-muted); font-weight: 700; }
 .cr-poll-bar-track {
   height: 8px;
   background: rgba(255,255,255,0.06);
@@ -23733,7 +23753,7 @@ a {
   from { width: 0; }
   to   { width: var(--pct, 0%); }
 }
-.cr-poll-bar-votes { font-size: 0.72rem; color: rgba(220,242,247,0.38); }
+.cr-poll-bar-votes { font-size: 0.72rem; color: var(--text-dim); }
 
 /* ── Trivia leaderboard ── */
 .cr-trivia-board { display: flex; flex-direction: column; gap: 8px; }
@@ -23754,7 +23774,7 @@ a {
   border-color: rgba(255,220,60,0.15);
 }
 .cr-trivia-rank { font-size: 1.3rem; text-align: center; }
-.cr-trivia-rank-num { font-size: 0.8rem; font-weight: 700; color: rgba(220,242,247,0.4); }
+.cr-trivia-rank-num { font-size: 0.8rem; font-weight: 700; color: var(--text-dim); }
 .cr-trivia-player-info { display: flex; align-items: center; gap: 10px; }
 .cr-trivia-avatar {
   width: 32px; height: 32px; border-radius: 50%;
@@ -23763,11 +23783,11 @@ a {
   display: flex; align-items: center; justify-content: center;
   font-size: 0.85rem; font-weight: 700; flex-shrink: 0;
 }
-.cr-trivia-name { font-size: 0.88rem; font-weight: 600; color: #e2eaf0; }
+.cr-trivia-name { font-size: 0.88rem; font-weight: 600; color: var(--text); }
 .cr-trivia-score-col { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.cr-trivia-score-num { font-size: 0.95rem; font-weight: 800; color: #e2eaf0; }
-.cr-trivia-score-total { font-size: 0.72rem; color: rgba(220,242,247,0.4); font-weight: 400; }
-.cr-trivia-pct { font-size: 0.7rem; color: rgba(220,242,247,0.4); }
+.cr-trivia-score-num { font-size: 0.95rem; font-weight: 800; color: var(--text); }
+.cr-trivia-score-total { font-size: 0.72rem; color: var(--text-dim); font-weight: 400; }
+.cr-trivia-pct { font-size: 0.7rem; color: var(--text-dim); }
 .cr-trivia-pct.perfect { color: #ffe066; }
 .cr-trivia-bar-mini {
   position: absolute;
@@ -23791,11 +23811,11 @@ a {
 }
 .cr-trivia-answer-row { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .cr-trivia-answer-row:last-child { border-bottom: none; }
-.cr-trivia-answer-q { margin: 0 0 4px; font-size: 0.82rem; font-weight: 600; color: rgba(220,242,247,0.85); }
-.cr-trivia-answer-picked { margin: 0; font-size: 0.78rem; color: rgba(220,242,247,0.65); }
+.cr-trivia-answer-q { margin: 0 0 4px; font-size: 0.82rem; font-weight: 600; color: var(--text); }
+.cr-trivia-answer-picked { margin: 0; font-size: 0.78rem; color: var(--text-muted); }
 .cr-trivia-answer-row.right .cr-trivia-answer-picked { color: #62ffa2; }
 .cr-trivia-answer-row.wrong .cr-trivia-answer-picked { color: #ff9b9b; }
-.cr-trivia-answer-correct { margin: 2px 0 0; font-size: 0.76rem; color: rgba(220,242,247,0.5); }
+.cr-trivia-answer-correct { margin: 2px 0 0; font-size: 0.76rem; color: var(--text-dim); }
 .cr-trivia-bar-mini-fill {
   height: 100%;
   background: linear-gradient(90deg, #7ef7ff, #62ffa2);
@@ -23818,14 +23838,14 @@ a {
   color: #62ffa2;
   margin: 0 0 6px;
 }
-.cr-chain-challenge-text { color: rgba(220,242,247,0.85); font-size: 0.9rem; margin: 0; line-height: 1.5; }
+.cr-chain-challenge-text { color: var(--text); font-size: 0.9rem; margin: 0; line-height: 1.5; }
 .cr-chain-rules {
   background: rgba(126,247,255,0.05);
   border: 1px solid rgba(126,247,255,0.15);
   border-radius: 14px;
   padding: 14px 16px;
 }
-.cr-chain-rules-list { margin: 0; padding-left: 18px; color: rgba(220,242,247,0.85); font-size: 0.88rem; line-height: 1.6; }
+.cr-chain-rules-list { margin: 0; padding-left: 18px; color: var(--text); font-size: 0.88rem; line-height: 1.6; }
 
 .cr-views-stat {
   display: flex;
@@ -23837,7 +23857,7 @@ a {
   border: 1px solid rgba(126,247,255,0.12);
 }
 .cr-views-stat-num { font-size: 1.1rem; font-weight: 800; color: #7ef7ff; }
-.cr-views-stat-label { font-size: 0.78rem; color: rgba(220,242,247,0.6); }
+.cr-views-stat-label { font-size: 0.78rem; color: var(--text-muted); }
 
 .cr-gift-status {
   display: flex;
@@ -23850,8 +23870,8 @@ a {
 .cr-gift-status-claimed { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
 .cr-gift-status-icon { font-size: 1.4rem; line-height: 1; }
 .cr-gift-status-body { display: flex; flex-direction: column; gap: 2px; }
-.cr-gift-status-title { margin: 0; font-weight: 700; font-size: 0.88rem; color: rgba(220,242,247,0.92); }
-.cr-gift-status-sub { margin: 0; font-size: 0.78rem; color: rgba(220,242,247,0.6); }
+.cr-gift-status-title { margin: 0; font-weight: 700; font-size: 0.88rem; color: var(--text); }
+.cr-gift-status-sub { margin: 0; font-size: 0.78rem; color: var(--text-muted); }
 .cr-chain-list { display: flex; flex-direction: column; gap: 10px; }
 .cr-chain-item { display: flex; align-items: flex-start; gap: 12px; }
 .cr-chain-avatar {
@@ -23862,9 +23882,9 @@ a {
 }
 .cr-chain-body { flex: 1; }
 .cr-chain-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.cr-chain-name { font-size: 0.82rem; font-weight: 700; color: #e2eaf0; }
-.cr-chain-time { font-size: 0.72rem; color: rgba(220,242,247,0.38); }
-.cr-chain-text { font-size: 0.88rem; color: rgba(220,242,247,0.8); margin: 0; line-height: 1.5; }
+.cr-chain-name { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+.cr-chain-time { font-size: 0.72rem; color: var(--text-dim); }
+.cr-chain-text { font-size: 0.88rem; color: var(--text); margin: 0; line-height: 1.5; }
 /* 6.4: token-based (not the hardcoded-rgba pattern above) so no separate
    light-mode override block is needed -- see CLAUDE.md's 7.13 note. */
 .cr-chain-terminal {
@@ -23939,10 +23959,10 @@ a {
   font-size: 0.8rem;
 }
 .cr-anon-content { flex: 1; }
-.cr-anon-text { font-size: 0.9rem; color: rgba(220,242,247,0.85); margin: 0 0 4px; line-height: 1.5; }
+.cr-anon-text { font-size: 0.9rem; color: var(--text); margin: 0 0 4px; line-height: 1.5; }
 .cr-anon-voice { height: 34px; width: 100%; max-width: 260px; margin: 4px 0; display: block; }
 .cr-anon-media { max-width: 200px; max-height: 160px; border-radius: 10px; margin: 4px 0; display: block; cursor: pointer; object-fit: cover; }
-.cr-anon-time { font-size: 0.7rem; color: rgba(220,242,247,0.35); }
+.cr-anon-time { font-size: 0.7rem; color: var(--text-muted); }
 
 /* Refresh spin keyframe */
 @keyframes crSpin {
@@ -25562,20 +25582,20 @@ a {
 }
 
 /* ── Card Responses Page ─────────────────────────────── */
-[data-theme="light"] .cr-page { background: transparent !important; }
+/* 7.13/7.14: this section used to carry a full parallel set of text-color
+   overrides (title/date/question/poll/trivia/chain/gift/empty-state copy)
+   duplicating, at the "when light mode is on" layer, exactly what the base
+   .cr-* rules above now do directly via var(--text)/var(--text-muted)/
+   var(--text-dim) -- the hardcoded-then-fought pattern this phase's rule
+   says to remove. What's left here is the genuinely different-per-theme
+   styling: accent-tinted washes/badges and a couple of colors (back-btn,
+   trivia-perfect, chain-challenge-label, views-stat-num) that are
+   intentionally a *stronger* accent color in light mode than their dark
+   equivalent, not just a token restatement of the same value. */
 [data-theme="light"] .cr-wrap {
-  background: rgba(255, 255, 255, 0.62) !important;
   border: 1px solid rgba(0, 214, 255, 0.12) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05) !important;
 }
-[data-theme="light"] .cr-card-title,
-[data-theme="light"] .cr-section-title,
-[data-theme="light"] .cr-poll-question { color: var(--text) !important; }
-[data-theme="light"] .cr-card-date,
-[data-theme="light"] .cr-anon-time { color: var(--text-muted) !important; }
-[data-theme="light"] .cr-anon-text { color: var(--text) !important; }
 [data-theme="light"] .cr-anon-item { background: var(--accent-soft) !important; border-color: var(--accent-mid) !important; }
 [data-theme="light"] .cr-count-badge { background: var(--accent-tint) !important; color: var(--primary) !important; }
 [data-theme="light"] .cr-type-chip { background: var(--accent-soft) !important; color: var(--text-muted) !important; }
@@ -25608,17 +25628,11 @@ a {
   background: var(--accent-soft) !important;
   color: var(--text) !important;
 }
-[data-theme="light"] .cr-poll-bar-text {
-  color: var(--text) !important;
-}
 [data-theme="light"] .cr-poll-bar-pct {
   color: var(--text) !important;
 }
 [data-theme="light"] .cr-poll-bar-track {
   background: var(--border) !important;
-}
-[data-theme="light"] .cr-poll-bar-votes {
-  color: var(--text-dim) !important;
 }
 
 /* Trivia leaderboard */
@@ -25629,21 +25643,6 @@ a {
 [data-theme="light"] .cr-trivia-row-top {
   background: rgba(255, 220, 60, 0.08) !important;
   border-color: rgba(255, 220, 60, 0.3) !important;
-}
-[data-theme="light"] .cr-trivia-rank-num {
-  color: var(--text-dim) !important;
-}
-[data-theme="light"] .cr-trivia-name {
-  color: var(--text) !important;
-}
-[data-theme="light"] .cr-trivia-score-num {
-  color: var(--text) !important;
-}
-[data-theme="light"] .cr-trivia-score-total {
-  color: var(--text-dim) !important;
-}
-[data-theme="light"] .cr-trivia-pct {
-  color: var(--text-dim) !important;
 }
 [data-theme="light"] .cr-trivia-pct.perfect {
   color: var(--warning) !important;
@@ -25660,24 +25659,9 @@ a {
 [data-theme="light"] .cr-chain-challenge-label {
   color: var(--secondary) !important;
 }
-[data-theme="light"] .cr-chain-challenge-text {
-  color: var(--text) !important;
-}
-[data-theme="light"] .cr-chain-name {
-  color: var(--text) !important;
-}
-[data-theme="light"] .cr-chain-time {
-  color: var(--text-dim) !important;
-}
-[data-theme="light"] .cr-chain-text {
-  color: var(--text) !important;
-}
 [data-theme="light"] .cr-chain-rules {
   background: var(--accent-soft) !important;
   border-color: var(--accent-mid) !important;
-}
-[data-theme="light"] .cr-chain-rules-list {
-  color: var(--text) !important;
 }
 
 /* Gift status block */
@@ -25689,12 +25673,6 @@ a {
   background: var(--surface) !important;
   border-color: var(--border) !important;
 }
-[data-theme="light"] .cr-gift-status-title {
-  color: var(--text) !important;
-}
-[data-theme="light"] .cr-gift-status-sub {
-  color: var(--text-muted) !important;
-}
 
 /* Link-open views stat */
 [data-theme="light"] .cr-views-stat {
@@ -25703,9 +25681,6 @@ a {
 }
 [data-theme="light"] .cr-views-stat-num {
   color: var(--primary) !important;
-}
-[data-theme="light"] .cr-views-stat-label {
-  color: var(--text-muted) !important;
 }
 
 /* Trivia per-question answer breakdown */
@@ -25719,98 +25694,21 @@ a {
 [data-theme="light"] .cr-trivia-answer-row {
   border-bottom-color: var(--border) !important;
 }
-[data-theme="light"] .cr-trivia-answer-q {
-  color: var(--text) !important;
-}
-[data-theme="light"] .cr-trivia-answer-picked {
-  color: var(--text-muted) !important;
-}
 [data-theme="light"] .cr-trivia-answer-row.right .cr-trivia-answer-picked {
   color: #059669 !important;
 }
 [data-theme="light"] .cr-trivia-answer-row.wrong .cr-trivia-answer-picked {
   color: #dc2626 !important;
 }
-[data-theme="light"] .cr-trivia-answer-correct {
-  color: var(--text-dim) !important;
-}
 
-/* Empty states */
-[data-theme="light"] .cr-empty-msg {
-  color: var(--text-dim) !important;
-}
+/* 7.13: .cp-trivia-option/.cp-trivia-review-* (removed from here) render
+   inside CardPreviewModal -- the card render tree, which per this phase's
+   rule must never pick up the site's data-theme. They already inherit
+   their text color from the card's own chosen palette (see
+   CardPreviewModal.jsx); the light-mode overrides that used to sit here
+   were incorrectly repainting a recipient's trivia-answer buttons with
+   the *viewer's* site theme instead of the sender's card colors. */
 
-/* Trivia recipient flow options */
-[data-theme="light"] .cp-trivia-option {
-  border-color: var(--border-strong) !important;
-  background: var(--surface) !important;
-  color: var(--text) !important;
-}
-[data-theme="light"] .cp-trivia-option:hover {
-  background: var(--hover) !important;
-  border-color: var(--primary) !important;
-}
-[data-theme="light"] .cp-trivia-option.selected {
-  background: var(--accent-tint) !important;
-  border-color: var(--primary) !important;
-}
-[data-theme="light"] .cp-trivia-option-letter {
-  background: var(--btn-bg) !important;
-  color: var(--text-muted) !important;
-}
-[data-theme="light"] .cp-trivia-option.selected .cp-trivia-option-letter {
-  background: var(--primary) !important;
-  color: var(--text-inverse) !important;
-}
-[data-theme="light"] .cp-trivia-option.correct {
-  background: rgba(5, 150, 105, 0.1) !important;
-  border-color: rgba(5, 150, 105, 0.5) !important;
-  color: #047857 !important;
-}
-[data-theme="light"] .cp-trivia-option.correct .cp-trivia-option-letter {
-  background: #059669 !important;
-  color: #ffffff !important;
-}
-[data-theme="light"] .cp-trivia-option.wrong {
-  background: rgba(220, 38, 38, 0.1) !important;
-  border-color: rgba(220, 38, 38, 0.5) !important;
-  color: #b91c1c !important;
-}
-[data-theme="light"] .cp-trivia-option.wrong .cp-trivia-option-letter {
-  background: #dc2626 !important;
-  color: #ffffff !important;
-}
-
-[data-theme="light"] .cp-trivia-review-item {
-  background: rgba(0, 0, 0, 0.03) !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
-}
-[data-theme="light"] .cp-trivia-review-option {
-  background: rgba(0, 0, 0, 0.02) !important;
-  border-color: rgba(0, 0, 0, 0.05) !important;
-}
-[data-theme="light"] .cp-trivia-review-option.correct {
-  border-color: rgba(22, 163, 74, 0.45) !important;
-  background: rgba(22, 163, 74, 0.08) !important;
-  color: #16a34a !important;
-}
-[data-theme="light"] .cp-trivia-review-option.wrong {
-  border-color: rgba(220, 38, 38, 0.45) !important;
-  background: rgba(220, 38, 38, 0.08) !important;
-  color: #dc2626 !important;
-}
-[data-theme="light"] .cp-trivia-review-badge.correct {
-  background: rgba(22, 163, 74, 0.15) !important;
-  color: #16a34a !important;
-}
-[data-theme="light"] .cp-trivia-review-badge.wrong {
-  background: rgba(220, 38, 38, 0.15) !important;
-  color: #dc2626 !important;
-}
-[data-theme="light"] .cp-trivia-review-badge.correct-choice {
-  background: rgba(2, 132, 199, 0.15) !important;
-  color: #0284c7 !important;
-}
 /* ── Card Detail Modal (Template Preview) ────────────── */
 [data-theme="light"] .detail-card {
   background: var(--elevated) !important;
@@ -28595,13 +28493,14 @@ a {
 [data-theme="light"] .qc-img-grid-item,
 [data-theme="light"] .cs-q-preview-item,
 [data-theme="light"] .chat-profile-stats,
-[data-theme="light"] .ban-confirm-details > div,
 [data-theme="light"] .anon-section,
-[data-theme="light"] .anon-card-live-preview,
-[data-theme="light"] .cp-media-item-full {
+[data-theme="light"] .anon-card-live-preview {
   border-color: var(--border) !important;
   background-color: var(--inset) !important;
 }
+/* 7.13: .cp-media-item-full (removed from the group above) renders inside
+   CardPreviewModal's photo frame -- card render tree, never theme-aware.
+   Its own faint white-on-dark wash is correct regardless of site theme. */
 /* Decorative border-only overlay (no fill — it sits on top of a card
    thumbnail image and must stay transparent). */
 [data-theme="light"] .card-thumb-aura {

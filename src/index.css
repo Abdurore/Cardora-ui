@@ -46,7 +46,10 @@
   /* ── Text ── */
   --text:         #e8f1f4;
   --text-muted:   rgba(232, 241, 244, 0.72);
-  --text-dim:     rgba(232, 241, 244, 0.5);
+  /* 7.14: was 0.5 (~4.5:1, no real margin above the AA floor); 0.56 gives
+     ~5.75:1. The light-mode value below needed the bigger fix -- its old
+     #748b9b measured ~3.3:1, a real failure. */
+  --text-dim:     rgba(232, 241, 244, 0.56);
   --text-inverse: #0b0f12;                 /* text on accent buttons */
   --placeholder:  rgba(232, 241, 244, 0.4);
 
@@ -129,7 +132,9 @@
   /* Text — dark ink on white, plenty of contrast */
   --text:         #0c1929;
   --text-muted:   #4b6577;
-  --text-dim:     #748b9b;
+  /* 7.14: #748b9b measured ~3.3:1 against this page's #f4f8fb -- fails the
+     4.5:1 AA floor. #577082 measures ~4.86:1. */
+  --text-dim:     #577082;
   --text-inverse: #ffffff;
   --placeholder:  #94adb9;
 

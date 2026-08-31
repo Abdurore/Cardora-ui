@@ -26,7 +26,7 @@ const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 
 function RouteFallback() {
   return (
-    <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center', color: 'rgba(232,241,244,0.5)' }}>
+    <div style={{ minHeight: '60vh', display: 'grid', placeItems: 'center', color: 'var(--text-dim)' }}>
       Loading…
     </div>
   )

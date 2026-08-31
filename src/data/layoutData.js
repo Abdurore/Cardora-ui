@@ -1,3 +1,7 @@
+// 7.13: fixed colors on purpose, not a missed token conversion -- this is
+// the fallback theme/content for a card whose own layoutdata is missing
+// (see CardView.jsx), i.e. card-render data, not app chrome. A card's
+// palette must never react to the viewer's site theme, default or not.
 const layoutData = {
   theme: {
     background: 'linear-gradient(160deg, rgba(10, 18, 25, 0.98), rgba(8, 18, 22, 0.98))',
