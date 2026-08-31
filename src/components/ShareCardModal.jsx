@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { trackEvent } from '../lib/api.js'
 
 const SHARE_PLATFORMS = [
   {
@@ -37,8 +38,12 @@ const SHARE_PLATFORMS = [
   },
 ]
 
-function ShareCardModal({ open, onClose, url, title = 'Check out this card I made on Cardora' }) {
+function ShareCardModal({ open, onClose, url, title = 'Check out this card I made on Cardora', cardId = '', cardType = '', tier = '' }) {
   const [copied, setCopied] = useState(false)
+  // Card funnel: a re-share from Profile later is still the sender
+  // "completing the send action" for this card, same as the post-creation
+  // share row -- same event, same channel vocabulary.
+  const trackSent = (channel) => trackEvent('card_sent', { cardId, cardType, tier, channel })
 
   useEffect(() => {
     if (!open) return undefined
@@ -61,6 +66,7 @@ function ShareCardModal({ open, onClose, url, title = 'Check out this card I mad
       await navigator.clipboard.writeText(url)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
+      trackSent('copy_link')
     } catch { /* ignore */ }
   }
 
@@ -68,6 +74,7 @@ function ShareCardModal({ open, onClose, url, title = 'Check out this card I mad
     if (!navigator.share) return
     try {
       await navigator.share({ title, text: title, url })
+      trackSent('native_share')
     } catch { /* cancelled */ }
   }
 
@@ -103,6 +110,7 @@ function ShareCardModal({ open, onClose, url, title = 'Check out this card I mad
               rel="noopener noreferrer"
               className="share-modal-platform-btn"
               style={{ '--platform-color': p.color }}
+              onClick={() => trackSent(p.id)}
             >
               {p.icon}
               <span>{p.label}</span>

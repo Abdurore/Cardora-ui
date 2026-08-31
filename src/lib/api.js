@@ -767,6 +767,18 @@ export async function getAdminStatsCards() {
   return request('/admin/stats/cards', { auth: true })
 }
 
+// Card funnel dashboard: Created -> Sent -> Opened -> Completed, with
+// counts and stage-to-stage conversion. { from, to } are ISO date strings;
+// omitted defaults to the last 7 days server-side. cardType is optional.
+export async function getAdminCardFunnel({ from, to, cardType } = {}) {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  if (cardType) params.set('cardType', cardType)
+  const qs = params.toString()
+  return request(`/admin/stats/card-funnel${qs ? `?${qs}` : ''}`, { auth: true })
+}
+
 export async function getAdminStatsTemplates() {
   return request('/admin/stats/templates', { auth: true })
 }

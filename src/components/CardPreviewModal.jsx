@@ -8,7 +8,7 @@ import { fireOpenEffect } from '../lib/studioEffects.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
 import { prefersReducedMotion, getMotionIntensity } from '../lib/deviceCapability.js'
 import { useDepthMotion } from '../lib/useDepthMotion.js'
-import { claimGiftFromCard } from '../lib/api.js'
+import { claimGiftFromCard, trackEvent } from '../lib/api.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
 import ReportModal from './ReportModal.jsx'
 import { buildSendOneBackPath } from '../lib/replyPath.js'
@@ -84,6 +84,10 @@ function CardPreviewModal({
   currentUser = null,
   openAuthModal = null,
   refreshBalance = null,
+  // Card funnel: whether the *viewer*, not the card, is the sender --
+  // default false so every other caller (Studio/Quick Create previews,
+  // which never pass this) can't accidentally count as a real recipient.
+  isOwnerView = false,
 }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -524,6 +528,24 @@ function CardPreviewModal({
       if (audioRef.current) audioRef.current.pause()
     }
   }, [c.background.music.url, c.background.music.volume, stage, musicAllowed, musicTrimmed, musicStartSec, musicEndSec])
+
+  // Card funnel: "completed" = reached 'end', the one stage every card
+  // type's flow already converges on (personal after reading the full
+  // message, poll after voting, trivia after results, chain after
+  // replying, anonymous after submitting, gift flows, ...) -- including a
+  // Galaxy-enabled card, which passes through the galaxy experience and
+  // then this same content before reaching 'end'. Deliberately not a
+  // second, earlier signal for "explored the galaxy" specifically: that
+  // would double-count completions for galaxy cards against every other
+  // type's single completion event. Real-recipient-only (pageMode and not
+  // the sender checking their own card) and fired at most once per mount,
+  // even if stage somehow leaves and re-enters 'end'.
+  const completedFiredRef = useRef(false)
+  useEffect(() => {
+    if (stage !== 'end' || !pageMode || isOwnerView || completedFiredRef.current) return
+    completedFiredRef.current = true
+    trackEvent('card_completed', { cardId, cardType: studioType, tier })
+  }, [stage, pageMode, isOwnerView, cardId, studioType, tier])
 
   // Card music should not keep playing into a tab the viewer has switched away
   // from. Resume only if the stage still wants sound — `stage` is read through

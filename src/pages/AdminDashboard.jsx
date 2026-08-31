@@ -11,6 +11,7 @@ import {
   getAdminDashboard,
   getAdminStatsUsers,
   getAdminStatsCards,
+  getAdminCardFunnel,
   getAdminStatsTemplates,
   getAdminStatsOverview,
   getAdminUsers,
@@ -254,6 +255,14 @@ function AdminDashboard() {
   const [deliveryLogs, setDeliveryLogs] = useState([])
   const [deliveryBroadcastId, setDeliveryBroadcastId] = useState('')
   const [pendingBroadcastRequests, setPendingBroadcastRequests] = useState([])
+  // Card funnel: Created -> Sent -> Opened -> Completed. Kept separate from
+  // the loadTabData/Promise.allSettled batch the rest of Overview uses --
+  // this one has its own filters (date range, card type) that should
+  // refetch on their own, not on every tab switch.
+  const [cardFunnel, setCardFunnel] = useState(null)
+  const [funnelLoading, setFunnelLoading] = useState(false)
+  const [funnelDays, setFunnelDays] = useState(7)
+  const [funnelCardType, setFunnelCardType] = useState('all')
 
   // New package form
   const [newPkg, setNewPkg] = useState({ name: '', description: '', numberOfCC: 20, price: 9.99, isActive: true, featured: false, badge: '' })
@@ -568,6 +577,23 @@ function AdminDashboard() {
     if (!isAdminGate) return
     loadTabData(activeTab)
   }, [activeTab, isAdminGate, currentUser?.id])
+
+  useEffect(() => {
+    if (!isAdminGate || activeTab !== 'Overview') return
+    let cancelled = false
+    setFunnelLoading(true)
+    const to = new Date()
+    const from = new Date(to.getTime() - (funnelDays - 1) * 24 * 60 * 60 * 1000)
+    getAdminCardFunnel({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      cardType: funnelCardType === 'all' ? undefined : funnelCardType,
+    })
+      .then((res) => { if (!cancelled) setCardFunnel(res?.funnel || res?.data?.funnel || null) })
+      .catch(() => { if (!cancelled) setCardFunnel(null) })
+      .finally(() => { if (!cancelled) setFunnelLoading(false) })
+    return () => { cancelled = true }
+  }, [isAdminGate, activeTab, funnelDays, funnelCardType, currentUser?.id])
 
   const openBanConfirm = () => {
     const id = banForm.identifier.trim()
@@ -1327,6 +1353,80 @@ const handleBroadcast = async () => {
                 </div>
               </div>
             )}
+
+            {/* Card funnel: Created -> Sent -> Opened -> Completed */}
+            <div className="admin-sub-section">
+              <h4>Card Funnel</h4>
+              <p className="admin-section-note">
+                Launch diagnostic -- how many created cards actually get sent, opened, and read.
+              </p>
+              <div className="admin-broadcast-form" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                <select
+                  value={funnelDays}
+                  onChange={(e) => setFunnelDays(Number(e.target.value))}
+                  className="admin-broadcast-subject"
+                  style={{ width: 'auto' }}
+                >
+                  <option value={7}>Last 7 days</option>
+                  <option value={30}>Last 30 days</option>
+                  <option value={90}>Last 90 days</option>
+                </select>
+                <select
+                  value={funnelCardType}
+                  onChange={(e) => setFunnelCardType(e.target.value)}
+                  className="admin-broadcast-subject"
+                  style={{ width: 'auto' }}
+                >
+                  <option value="all">All types</option>
+                  <option value="personal">Personal</option>
+                  <option value="poll">Poll</option>
+                  <option value="trivia">Trivia</option>
+                  <option value="chain">Chain</option>
+                  <option value="anonymous">Anonymous</option>
+                </select>
+              </div>
+              {funnelLoading ? (
+                <p style={{ color: 'var(--text-dim)' }}>Loading…</p>
+              ) : !cardFunnel ? (
+                <p style={{ color: 'var(--text-dim)' }}>No funnel data for this range.</p>
+              ) : (
+                <>
+                  <div className="admin-table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr><th>Stage</th><th>Count</th><th>Conversion from previous</th></tr>
+                      </thead>
+                      <tbody>
+                        {cardFunnel.stages.map((s) => (
+                          <tr key={s.stage}>
+                            <td style={{ textTransform: 'capitalize' }}>{s.stage}</td>
+                            <td>{s.count}</td>
+                            <td>{s.conversionFromPrevious == null ? '—' : `${s.conversionFromPrevious}%`}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {cardFunnel.channels?.length > 0 && (
+                    <div className="admin-table-wrap" style={{ marginTop: 10 }}>
+                      <table className="admin-table">
+                        <thead>
+                          <tr><th>Sent via</th><th>Count</th></tr>
+                        </thead>
+                        <tbody>
+                          {cardFunnel.channels.map((c) => (
+                            <tr key={c.channel}>
+                              <td style={{ textTransform: 'capitalize' }}>{c.channel.replace(/_/g, ' ')}</td>
+                              <td>{c.count}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
 
             {/* Broadcast Message */}
             <div className="admin-sub-section">

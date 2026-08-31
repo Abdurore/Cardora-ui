@@ -56,6 +56,12 @@ function CardView() {
   // `res.renderModel`, not `res.card`.
   const [interaction, setInteraction] = useState(null)
   const [reactions, setReactions] = useState(null)
+  // Card funnel: only a real recipient's view should count toward
+  // card_completed -- the sender checking their own sent link must not
+  // inflate that stage. Only buildCardRenderModel's response carries this
+  // (sanitizeCardForClient's `card` object never did), so it comes from
+  // renderModel specifically, same place interaction/reactions come from.
+  const [isOwnerView, setIsOwnerView] = useState(false)
   // 5.1: api/card-meta.js now server-renders a real gate (sender name, card
   // title, Open Card button) for every request, not just bots, and embeds
   // this global for the client to pick up on mount so the very first paint
@@ -118,6 +124,7 @@ function CardView() {
           setCard(mapped)
           setInteraction(res?.renderModel?.interaction || res?.data?.renderModel?.interaction || null)
           setReactions(res?.renderModel?.reactions || res?.data?.renderModel?.reactions || null)
+          setIsOwnerView(!!(res?.renderModel?.isOwner || res?.data?.renderModel?.isOwner))
           if (mapped.locked && mapped.lockType === 'password') setNeedsPassword(true)
           setLoading(false)
           return
@@ -588,6 +595,7 @@ function CardView() {
         pollData={pollData}
         triviaData={triviaData}
         pageMode={true}
+        isOwnerView={isOwnerView}
         onPollSubmit={handlePollSubmit}
         onTriviaComplete={handleTriviaComplete}
         onChainReply={handleChainReply}

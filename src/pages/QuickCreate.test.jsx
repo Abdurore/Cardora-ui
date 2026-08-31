@@ -253,6 +253,32 @@ describe('QuickCreate — 6.1 send-completion instrumentation', () => {
   })
 })
 
+// Card funnel: "sent" is the sender actually distributing the link (a
+// click on a share action), distinct from create_flow_step:sent above
+// (which only proves they finished the create wizard).
+describe('QuickCreate — card funnel: card_sent', () => {
+  afterEach(() => {
+    vi.mocked(getCardPrices).mockClear()
+    vi.mocked(trackEvent).mockClear()
+    createCardOnBackend.mockClear()
+  })
+
+  it('fires card_sent with channel "whatsapp" when the WhatsApp share link is clicked', async () => {
+    renderAt('/quick?type=anonymous')
+    fireEvent.change(screen.getByPlaceholderText('Recipients can reply to this card anonymously…'), { target: { value: 'Ask me anything!' } })
+    fireEvent.click(screen.getByRole('button', { name: /Create Card/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Send free/i }))
+    await screen.findByText('Your unique card link')
+
+    fireEvent.click(screen.getByRole('link', { name: /Share on WhatsApp/i }))
+
+    expect(trackEvent).toHaveBeenCalledWith(
+      'card_sent',
+      expect.objectContaining({ cardType: 'anonymous', channel: 'whatsapp' }),
+    )
+  })
+})
+
 // 7.5: "make it run the actual reveal on tap, then delete the 'Simplified
 // preview' disclaimer." The mini preview card used to be a static mockup
 // (a <span> reading "Open Card", no click handler at all) -- tapping it

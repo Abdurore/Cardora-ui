@@ -1272,7 +1272,7 @@ function CardStudio() {
       // an otherwise fully successful send.
       const selectedGift = flushedCardObject.giftEffect || {}
 
-      setSendResult({ ok: true, slug, message: result.message })
+      setSendResult({ ok: true, slug, cardId: d.cardId || '', message: result.message })
       // 6.1: "instrument both paths -- entry, step completion, send." The
       // reached_review step only proves the sender opened the receipt, not
       // that they actually sent -- they can still cancel from there.
@@ -4534,6 +4534,9 @@ function CardStudio() {
                           await navigator.clipboard.writeText(`${window.location.origin}/card/${sendResult.slug}`)
                           setSendCopied(true)
                           setTimeout(() => setSendCopied(false), 1600)
+                          trackEvent('card_sent', {
+                            cardId: sendResult.cardId || '', cardType: studioType, tier: studioTier, channel: 'copy_link',
+                          })
                         } catch { /* ignore */ }
                       }}
                     >
@@ -4553,6 +4556,13 @@ function CardStudio() {
               const shareTitle = `Check out this card I made on Cardora`
               const whatsapp = SHARE_PLATFORMS.find((p) => p.id === 'whatsapp')
               const otherPlatforms = SHARE_PLATFORMS.filter((p) => p.id !== 'whatsapp')
+              // Card funnel: "sent" is the sender actually distributing the
+              // link (a click here), not the create_flow_step:sent event
+              // fired earlier at creation -- that one only proves they
+              // finished the create wizard, not that anyone received a link.
+              const trackSent = (channel) => trackEvent('card_sent', {
+                cardId: sendResult.cardId || '', cardType: studioType, tier: studioTier, channel,
+              })
               return (
                 <>
                   <p className="detail-share-label">Share via</p>
@@ -4562,6 +4572,7 @@ function CardStudio() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="cs-send-modal-whatsapp-btn"
+                      onClick={() => trackSent('whatsapp')}
                     >
                       {whatsapp.icon}
                       <span>Share on WhatsApp</span>
@@ -4576,6 +4587,7 @@ function CardStudio() {
                         rel="noopener noreferrer"
                         className="detail-share-platform-btn"
                         style={{ '--platform-color': p.color }}
+                        onClick={() => trackSent(p.id)}
                       >
                         {p.icon}
                         <span>{p.label}</span>
@@ -4593,6 +4605,7 @@ function CardStudio() {
                               text: 'Check out this card I made on Cardora',
                               url: shareUrl,
                             })
+                            trackSent('native_share')
                           } catch { /* cancelled */ }
                         }}
                       >
@@ -4620,6 +4633,7 @@ function CardStudio() {
                           className="cs-nav-btn accent"
                           href={`mailto:${encodeURIComponent(sendEmail)}?subject=${encodeURIComponent('You\'ve got a Cardora card!')}&body=${encodeURIComponent(`Check out this card I made for you on Cardora:\n\n${shareUrl}`)}`}
                           style={{ textDecoration: 'none', textAlign: 'center' }}
+                          onClick={() => trackSent('email')}
                         >
                           Send
                         </a>

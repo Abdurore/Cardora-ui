@@ -489,7 +489,7 @@ function QuickCreate() {
         }
       }
 
-      setSendResult({ ok: true, slug, message: finalMessage })
+      setSendResult({ ok: true, slug, cardId: d?.cardId || '', message: finalMessage })
       // 6.1: "instrument both paths -- entry, step completion, send." The
       // reached_review step only proves the sender opened the receipt, not
       // that they actually sent -- they can still cancel from there.
@@ -1123,6 +1123,9 @@ function QuickCreate() {
                           await navigator.clipboard.writeText(cardLink)
                           setSendCopied(true)
                           setTimeout(() => setSendCopied(false), 1600)
+                          trackEvent('card_sent', {
+                            cardId: sendResult.cardId || '', cardType, tier: cardTier, channel: 'copy_link',
+                          })
                         } catch { /* ignore */ }
                       }}
                     >
@@ -1142,6 +1145,9 @@ function QuickCreate() {
             {!isSending && sendResult?.ok && cardLink && (() => {
               const whatsapp = SHARE_PLATFORMS.find((p) => p.id === 'whatsapp')
               const otherPlatforms = SHARE_PLATFORMS.filter((p) => p.id !== 'whatsapp')
+              const trackSent = (channel) => trackEvent('card_sent', {
+                cardId: sendResult.cardId || '', cardType, tier: cardTier, channel,
+              })
               return (
                 <>
                   <p className="detail-share-label">Share via</p>
@@ -1151,6 +1157,7 @@ function QuickCreate() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="cs-send-modal-whatsapp-btn"
+                      onClick={() => trackSent('whatsapp')}
                     >
                       {whatsapp.icon}
                       <span>Share on WhatsApp</span>
@@ -1165,6 +1172,7 @@ function QuickCreate() {
                         rel="noopener noreferrer"
                         className="detail-share-platform-btn"
                         style={{ '--platform-color': p.color }}
+                        onClick={() => trackSent(p.id)}
                       >
                         {p.icon}
                         <span>{p.label}</span>
@@ -1178,6 +1186,7 @@ function QuickCreate() {
                         onClick={async () => {
                           try {
                             await navigator.share({ title: 'Cardora Card', text: shareText, url: cardLink })
+                            trackSent('native_share')
                           } catch { /* cancelled */ }
                         }}
                       >
@@ -1264,6 +1273,9 @@ function QuickCreate() {
                       className="cs-nav-btn accent"
                       href={`mailto:${encodeURIComponent(sendEmail)}?subject=${encodeURIComponent("You've got a Cardora card!")}&body=${encodeURIComponent(`Check out this card I made for you on Cardora:\n\n${cardLink}`)}`}
                       style={{ textDecoration: 'none', textAlign: 'center' }}
+                      onClick={() => trackEvent('card_sent', {
+                        cardId: sendResult.cardId || '', cardType, tier: cardTier, channel: 'email',
+                      })}
                     >
                       Send
                     </a>

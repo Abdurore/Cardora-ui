@@ -1152,6 +1152,9 @@ function Profile() {
                           onClick={() => setShareTarget({
                             url: `${window.location.origin}/card/${card.slug}`,
                             title: `Check out this "${card.title || 'card'}" I made on Cardora`,
+                            cardId: card.id,
+                            cardType: card.type,
+                            tier: card.tier,
                           })}
                           title="Share card"
                         >
@@ -1282,6 +1285,9 @@ function Profile() {
         onClose={() => setShareTarget(null)}
         url={shareTarget?.url || ''}
         title={shareTarget?.title || 'Check out this card I made on Cardora'}
+        cardId={shareTarget?.cardId || ''}
+        cardType={shareTarget?.cardType || ''}
+        tier={shareTarget?.tier || ''}
       />
 
       {/* Edit Profile Modal */}
