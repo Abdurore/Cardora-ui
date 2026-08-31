@@ -828,7 +828,7 @@ function Profile() {
           <p className="profile-role-note">
             Looking to run brand campaigns or help moderate the community? Moderator and Enterprise
             accounts are set up by our team — reach out at{' '}
-            <a href="mailto:support@cardora.app">support@cardora.app</a> and we'll get you set up.
+            <a href="mailto:support@cardora.studio">support@cardora.studio</a> and we'll get you set up.
           </p>
         )}
 
@@ -955,26 +955,6 @@ function Profile() {
                 ) : null}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Currency preference */}
-        {currentUser && (
-          <div className="profile-currency">
-            <h4 className="section-title">Display Currency</h4>
-            <div className="profile-currency-row">
-              <Dropdown
-                value={userCurrency}
-                onChange={handleCurrencyChange}
-                disabled={isSavingCurrency}
-                placeholder="Select currency"
-                options={(currencies.length ? currencies : CURRENCY_FALLBACK).map((c) => ({
-                  value: typeof c === 'string' ? c : c.code,
-                  label: typeof c === 'string' ? c : `${c.code}${c.name ? ` — ${c.name}` : ''}`,
-                }))}
-              />
-              {isSavingCurrency && <span className="profile-currency-saving">Saving...</span>}
-            </div>
           </div>
         )}
 
@@ -1232,10 +1212,29 @@ function Profile() {
           </div>
         )}
 
-        {/* Danger Zone */}
+        {/* Settings / Danger Zone */}
         {currentUser && (
           <div className="profile-danger-zone">
             <h4 className="section-title">Account</h4>
+
+            {/* 7.11: moved down from above "My Cards" into Settings. */}
+            <div className="profile-currency">
+              <span className="profile-settings-label">Display Currency</span>
+              <div className="profile-currency-row">
+                <Dropdown
+                  value={userCurrency}
+                  onChange={handleCurrencyChange}
+                  disabled={isSavingCurrency}
+                  placeholder="Select currency"
+                  options={(currencies.length ? currencies : CURRENCY_FALLBACK).map((c) => ({
+                    value: typeof c === 'string' ? c : c.code,
+                    label: typeof c === 'string' ? c : `${c.code}${c.name ? ` — ${c.name}` : ''}`,
+                  }))}
+                />
+                {isSavingCurrency && <span className="profile-currency-saving">Saving...</span>}
+              </div>
+            </div>
+
             <button className="ghost" type="button" onClick={handleLogoutClick}>
               Log Out
             </button>

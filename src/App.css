@@ -917,6 +917,25 @@
   margin-top: 10px;
 }
 
+/* 7.11: moved into the Account/Settings section -- .profile-danger-zone
+   already provides its own boxed card, so this drops .profile-currency's
+   own nested box (border/background/padding) to sit as a plain settings
+   row instead of a card-within-a-card. */
+.profile-danger-zone .profile-currency {
+  margin-top: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  width: 100%;
+}
+.profile-settings-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
 .profile-currency-row select {
   flex: 1;
   max-width: 320px;

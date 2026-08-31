@@ -69,7 +69,7 @@ export const legalDocs = {
       },
       {
         heading: '9. Contact',
-        body: ['Questions about these terms can be sent to support@cardora.app.'],
+        body: ['Questions about these terms can be sent to support@cardora.studio.'],
       },
     ],
   },
@@ -119,7 +119,7 @@ export const legalDocs = {
         heading: '6. Your Rights',
         body: [
           'Depending on your location, you may have rights to access, correct, delete, or limit certain uses of your personal data.',
-          'Requests can be sent to support@cardora.app.',
+          'Requests can be sent to support@cardora.studio.',
         ],
       },
       {
