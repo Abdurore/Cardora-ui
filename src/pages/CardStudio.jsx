@@ -34,6 +34,19 @@ import TierPip from '../components/TierPip.jsx'
 import SendReceipt from '../components/SendReceipt.jsx'
 import InstallPrompt from '../components/InstallPrompt.jsx'
 
+// 7.8: the Question Block's placeholder used to be a single hardcoded
+// "Will you be my Valentine?" -- occasion-specific, showing up identically
+// whether the card is a birthday, a thank-you, or anything else. Rotates
+// through neutral examples instead, picked once per Studio session rather
+// than re-randomizing on every keystroke.
+const QUESTION_BLOCK_PLACEHOLDERS = [
+  'Ready for a surprise?',
+  'Can you keep a secret?',
+  'Got a minute for something good?',
+  'Excited yet?',
+  'Want to know what this is about?',
+]
+
 const STUDIO_DRAFT_PREFIX = 'cardora:studioDrafts:'
 const STUDIO_AUTOSAVE_PREFIX = 'cardora:studioAutoSave:'
 const BRAND_LOGO = '/cardora-logo.png?v=4'
@@ -532,6 +545,10 @@ function CardStudio() {
   }, [activeTool])
   const [activeStep, setActiveStep] = useState(defaultToolId === 'closedState' ? 'envelope' : 'card')
   const [showPreview, setShowPreview] = useState(false)
+  // 7.8: picked once per mount, not re-randomized on every keystroke.
+  const [questionPlaceholder] = useState(
+    () => QUESTION_BLOCK_PLACEHOLDERS[Math.floor(Math.random() * QUESTION_BLOCK_PLACEHOLDERS.length)],
+  )
   const [savedState, setSavedState] = useState(initialAutoSaved ? 'Restored from last session' : 'Unsaved draft')
   const [showPublish, setShowPublish] = useState(false)
   const [publishForm, setPublishForm] = useState({
@@ -2397,7 +2414,7 @@ function CardStudio() {
                   <input
                     value={items[0]?.text || ''}
                     onChange={e => setQuestionText(e.target.value)}
-                    placeholder="Will you be my Valentine?"
+                    placeholder={questionPlaceholder}
                   />
                 </label>
                 {hasQuestion && (
