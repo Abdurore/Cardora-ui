@@ -1256,6 +1256,15 @@
   transform: translateY(-2px);
 }
 
+/* These two classes back nearly every primary/secondary button in the app
+   (Create a Card, Send, form submits, ...) -- had a hover lift but no
+   :active press feedback at all. scale(0.97) matches the existing
+   .app-confirm-ok:active precedent elsewhere in this file. */
+.primary:active,
+.ghost:active {
+  transform: scale(0.97);
+}
+
 .screen-header {
   position: fixed;
   top: 18px;
