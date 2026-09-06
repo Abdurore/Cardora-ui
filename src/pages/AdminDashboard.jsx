@@ -230,7 +230,7 @@ function TablePagination({ page, setPage, totalPages, total, pageSize }) {
 }
 
 function AdminDashboard() {
-  const { currentUser, balance, openAuthModal, marketplaceTemplates, deleteMarketplaceTemplate } = useOutletContext()
+  const { currentUser, balance, openAuthModal, marketplaceTemplates, deleteMarketplaceTemplate, authReady } = useOutletContext()
   const navigate = useNavigate()
   const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
   const [statusModal, setStatusModal] = useState(null) // { type, title?, message }
@@ -1255,6 +1255,25 @@ const handleBroadcast = async () => {
     } catch (err) {
       showMsg(err.message || 'Delete failed.', false)
     }
+  }
+
+  // 7.16: session hydration is async (MainLayout's getCurrentUser()) --
+  // on a direct load/refresh of /admin, `currentUser` starts out null and
+  // `isAdminGate` was false for that first render, flashing "Access
+  // Restricted" at a real admin before their session even had a chance to
+  // resolve. Wait for `authReady` before judging the role at all.
+  if (!authReady) {
+    return (
+      <div className="page-body">
+        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
+        <div className="screen-body">
+          <div className="admin-restricted">
+            <h2>Loading…</h2>
+          </div>
+        </div>
+        <ScreenNav />
+      </div>
+    )
   }
 
   if (!isAdminGate) {

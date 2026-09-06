@@ -18,7 +18,7 @@ import {
 const TABS = ['Reports', 'Users', 'Templates', 'Logs', 'Broadcast']
 
 function ModeratorDashboard() {
-  const { currentUser, balance, openAuthModal } = useOutletContext()
+  const { currentUser, balance, openAuthModal, authReady } = useOutletContext()
   const navigate = useNavigate()
   const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
   const [statusModal, setStatusModal] = useState(null)
@@ -160,6 +160,23 @@ function ModeratorDashboard() {
     } finally {
       setBroadcastSubmitting(false)
     }
+  }
+
+  // 7.16: `currentUser` starts null until MainLayout's session hydration
+  // resolves -- without this, a direct load/refresh of /moderator flashed
+  // "Access Restricted" at a real moderator before the role was known.
+  if (!authReady) {
+    return (
+      <div className="page-body">
+        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
+        <div className="screen-body">
+          <div className="admin-restricted">
+            <h2>Loading…</h2>
+          </div>
+        </div>
+        <ScreenNav />
+      </div>
+    )
   }
 
   if (!isModerator) {

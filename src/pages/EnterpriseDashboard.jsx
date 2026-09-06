@@ -5,7 +5,7 @@ import ScreenNav from '../components/ScreenNav.jsx'
 import { getEnterpriseAdStats, updateAdminAd } from '../lib/api.js'
 
 function EnterpriseDashboard() {
-  const { currentUser, balance, openAuthModal } = useOutletContext()
+  const { currentUser, balance, openAuthModal, authReady } = useOutletContext()
   const navigate = useNavigate()
   const [stats, setStats] = useState(null)
   const [ads, setAds] = useState([])
@@ -63,6 +63,23 @@ function EnterpriseDashboard() {
     const uniqueViewers = ads.reduce((sum, ad) => sum + (ad.uniqueViewers ?? ad.uniqueUsers ?? 0), 0)
     return { totalViews, totalClicks, totalImpressions, totalCompletions, uniqueViewers }
   }, [ads])
+
+  // 7.16: `currentUser` starts null until MainLayout's session hydration
+  // resolves -- without this, a direct load/refresh of /enterprise flashed
+  // "Access Restricted" at a real enterprise account before the role was known.
+  if (!authReady) {
+    return (
+      <div className="page-body">
+        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
+        <div className="screen-body">
+          <div className="admin-restricted">
+            <h2>Loading…</h2>
+          </div>
+        </div>
+        <ScreenNav />
+      </div>
+    )
+  }
 
   if (!isEnterprise) {
     return (

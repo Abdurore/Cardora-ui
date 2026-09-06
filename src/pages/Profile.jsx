@@ -1204,13 +1204,16 @@ function Profile() {
           <div>
             <h4 className="section-title">CC Income History</h4>
             <div className="profile-income-list">
-              {currentUser.ccIncomeHistory.slice().reverse().slice(0, 10).map((entry, i) => (
-                <div key={`income-${i}`} className="profile-income-row">
-                  <span className="profile-income-type">{(entry.type || entry.source || 'unknown').replace(/_/g, ' ')}</span>
-                  <span className="profile-income-amount">+{entry.amount || entry.cc || 0} CC</span>
-                  <span className="profile-income-date">{entry.date || entry.createdAt ? new Date(entry.date || entry.createdAt).toLocaleDateString() : ''}</span>
-                </div>
-              ))}
+              {currentUser.ccIncomeHistory.slice().reverse().slice(0, 10).map((entry, i) => {
+                const amount = entry.amount || entry.cc || 0
+                return (
+                  <div key={`income-${i}`} className="profile-income-row">
+                    <span className="profile-income-type">{(entry.type || entry.source || 'unknown').replace(/_/g, ' ')}</span>
+                    <span className={`profile-income-amount${amount < 0 ? ' negative' : ''}`}>{amount > 0 ? '+' : ''}{amount} CC</span>
+                    <span className="profile-income-date">{entry.date || entry.createdAt ? new Date(entry.date || entry.createdAt).toLocaleDateString() : ''}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

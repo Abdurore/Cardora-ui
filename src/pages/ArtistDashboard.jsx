@@ -22,7 +22,7 @@ function ArtistDashboard() {
   const {
     currentUser, balance, openAuthModal,
     likedTemplates, toggleLike, openCardDetails,
-    deleteMarketplaceTemplate,
+    deleteMarketplaceTemplate, authReady,
   } = useOutletContext()
   const navigate = useNavigate()
   const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
@@ -73,6 +73,23 @@ function ArtistDashboard() {
     } else {
       showMsg(res?.message || 'Delete failed.', false)
     }
+  }
+
+  // 7.16: `currentUser` starts null until MainLayout's session hydration
+  // resolves -- without this, a direct load/refresh of /artist flashed
+  // "Access Restricted" at a real artist before the role was known.
+  if (!authReady) {
+    return (
+      <div className="page-body">
+        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
+        <div className="screen-body">
+          <div className="admin-restricted">
+            <h2>Loading…</h2>
+          </div>
+        </div>
+        <ScreenNav />
+      </div>
+    )
   }
 
   if (!isArtist) {
