@@ -1372,11 +1372,8 @@
   transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
 }
 
-.header-user-capsule:hover {
-  border-color: rgba(126, 247, 255, 0.45);
-  box-shadow: 0 0 18px rgba(126, 247, 255, 0.12), inset 0 0 12px rgba(126, 247, 255, 0.04);
-  background: linear-gradient(135deg, rgba(16, 28, 36, 0.85), rgba(8, 18, 24, 0.95));
-}
+/* 7.16: no longer a <Link> (was a redundant second path to Profile,
+   duplicating the bottom nav's own tab) -- no hover affordance either. */
 
 .header-capsule-avatar {
   width: 34px;
@@ -2857,8 +2854,14 @@
   color: rgba(220, 242, 247, 0.5);
 }
 
+/* 7.16: was `display: grid` with no `grid-template-columns` -- below the
+   1024px 2-col override further down, every filter row on Explore (used
+   only there) stacked into one full-width button per row: 15 rows of
+   filter buttons before a single card, on every phone and most tablets.
+   Flex + wrap gives a normal compact chip row instead. */
 .tag-list {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -2870,6 +2873,7 @@
   color: rgba(216, 242, 247, 0.9);
   border: 1px solid transparent;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
 }
 
 .tag.active {
@@ -5467,10 +5471,6 @@
     min-height: 170px;
   }
 
-  .tag-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .tabs {
     gap: 16px;
   }
@@ -6691,12 +6691,15 @@ a {
     letter-spacing: 0.14em;
   }
 
-  .header-capsule-info {
+  /* 7.16: was `display:none` on the whole info block, which hid the CC
+     balance on every phone-width viewport -- balance stays on top per an
+     earlier explicit call; only the username is dropped to save width. */
+  .header-capsule-name {
     display: none;
   }
 
   .header-user-capsule {
-    padding: 5px;
+    padding: 5px 12px 5px 5px;
   }
 
   .screen-header {
@@ -6731,36 +6734,27 @@ a {
     max-width: 100%;
   }
 
+  /* 7.16: dropped on mobile -- these three chips repeat the "Card Formats"
+     section one scroll down with zero new information, and were adding
+     height to an already-long mobile hero. */
   .hero-format-chips {
-    justify-content: center;
-    gap: 6px;
-    margin: 16px 0 20px;
+    display: none;
   }
 
-  .hero-format-chip {
-    padding: 6px 12px;
-    font-size: 0.75rem;
-  }
-
-  .hero-copy .cta-row {
-    justify-content: center;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
+  /* 7.16: shrunk from 260/280px/80vw -- the mockup was competing for
+     attention with the actual CTA above it on a phone-width screen. */
   .hero-preview {
-    min-height: 260px;
+    min-height: 210px;
     order: 2;
   }
 
   .hero-phone {
-    width: min(280px, 80vw);
+    width: min(230px, 68vw);
   }
 
   .hero-card-halo {
-    width: 160px;
-    height: 160px;
+    width: 130px;
+    height: 130px;
   }
 
   .hero-particles,
@@ -6816,14 +6810,28 @@ a {
   .hero-copy .cta-row {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 10px;
+    justify-items: center;
   }
 
-  .hero-copy .primary,
-  .hero-copy .ghost {
+  .hero-copy .primary {
     width: 100%;
     justify-content: center;
     text-align: center;
+  }
+
+  /* 7.16: was a full stacked .ghost button matching .primary's weight --
+     two equally-loud buttons on a phone. Demoted to a small text link so
+     there's one clear primary action. */
+  .hero-copy .ghost {
+    width: auto;
+    padding: 4px 8px;
+    background: none;
+    border: none;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-size: 0.85rem;
+    opacity: 0.8;
   }
 
   .hero-preview-orbit.orbit-two {
@@ -11312,17 +11320,20 @@ a {
     line-height: 1.55;
   }
 
+  /* 7.16: was larger than the 720px tier above it (300px/90vw vs 280px/80vw)
+     -- smaller phones were getting a relatively bigger mockup, backwards
+     from the intent. Now scales down consistently. */
   .hero-preview {
-    min-height: 240px;
+    min-height: 190px;
   }
 
   .hero-phone {
-    width: min(300px, 90vw);
+    width: min(200px, 62vw);
   }
 
   .hero-card-halo {
-    width: 130px;
-    height: 130px;
+    width: 110px;
+    height: 110px;
   }
 
   /* Steps row — single column on small mobile */
@@ -14908,22 +14919,26 @@ a {
 /* ═══════════════════════════════════════════════════
    EXPLORE — TYPE & CATEGORY FILTERS
    ═══════════════════════════════════════════════════ */
-.explore-type-filter {
+/* 7.16: `.explore-occasion-filter` already declared overflow-x/flex-wrap/
+   scrollbar-hiding meant to make this a horizontal scroll row, but they
+   were inert under `.tag-list`'s old `display: grid` -- `display: flex`
+   is the piece that actually activates them. Matched on the type filter
+   too (6-7 items each), for the same compact single-row result the
+   trending rail and marketplace pills already use elsewhere on this page. */
+.explore-type-filter,
+.explore-occasion-filter {
   margin-bottom: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.explore-type-filter::-webkit-scrollbar,
+.explore-occasion-filter::-webkit-scrollbar { display: none; }
 
 .explore-category-filter {
   margin-bottom: 8px;
 }
-
-.explore-occasion-filter {
-  margin-bottom: 8px;
-  overflow-x: auto;
-  flex-wrap: nowrap;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.explore-occasion-filter::-webkit-scrollbar { display: none; }
 
 .tag-sm {
   font-size: 0.75rem;
@@ -28049,10 +28064,13 @@ a {
     padding: 9px 11px;
   }
   .cs-top-left { flex: 1 1 100%; min-width: 0; }
+  /* 7.16: `.cs-top-actions` gets its own full-width row via the wrap above,
+     so there's no real space pressure here. Was also hiding `.cs-status`
+     (the Saved/Saving indicator) and `.cs-icon-btn` (Undo/Redo/Save) --
+     `.cs-cc-pill` no longer exists in the JSX (renamed to
+     `.cs-cc-balance-chip`/`.cs-top-tier-group`), so this rule was stale
+     collateral hiding two working controls along with a dead selector. */
   .cs-top-actions { flex: 1 1 100%; justify-content: flex-end; min-width: 0; }
-  .cs-top-actions .cs-cc-pill,
-  .cs-top-actions .cs-status,
-  .cs-top-actions .cs-icon-btn { display: none; }
   .cs-top-card-title { max-width: 52vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cs-layout {
     grid-template-columns: 142px minmax(0, 1fr);

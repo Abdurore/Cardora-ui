@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { MdLightMode, MdDarkMode, MdNotificationsNone } from 'react-icons/md'
 import { getNotifications, markNotificationRead } from '../lib/api.js'
@@ -136,7 +136,10 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
           </div>
         )}
         {user ? (
-          <Link to="/profile" className="header-user-capsule" aria-label="Profile">
+          // 7.16: was a <Link to="/profile"> -- duplicated the bottom nav's
+          // own Profile tab as a second path to the same screen. This stays
+          // a plain identity/balance readout; the nav tab is the one way in.
+          <div className="header-user-capsule" aria-label={`${user.username || user.name || 'User'}, ${balance} CC`}>
             <span className="header-capsule-avatar">
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt="" className="header-avatar-img" />
@@ -152,7 +155,7 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
                 <span className="header-cc-icon">◈</span> {balance} CC
               </span>
             </span>
-          </Link>
+          </div>
         ) : (
           <button className="user-chip" type="button" onClick={onAuthOpen}>
             <span className="user-dot" />
