@@ -3508,7 +3508,21 @@ function CardStudio() {
   }
 
   return (
-    <div className={`page-body cs-shell${isArtist ? ' cs-shell-artist' : ''}`} style={{ '--type-accent': TYPE_ACCENT[studioType] || TYPE_ACCENT.personal }}>
+    <div
+      className={`page-body cs-shell${isArtist ? ' cs-shell-artist' : ''}`}
+      style={{
+        '--type-accent': TYPE_ACCENT[studioType] || TYPE_ACCENT.personal,
+        // "Play it through" renders CardPreviewModal as an overlay on top of
+        // this whole tree rather than replacing it (see `showPreview` below),
+        // so without this the editor's own animated background/canvas keeps
+        // painting and competing for frame budget underneath the preview --
+        // overhead a real recipient's CardView never pays, since it mounts
+        // nothing but CardPreviewModal. display:none pulls it out of layout
+        // and paint entirely while keeping React state intact (scroll
+        // position, open panels, form inputs) for when the preview closes.
+        display: showPreview ? 'none' : undefined,
+      }}
+    >
       {/* TOPBAR */}
       <div className="cs-topbar">
         {/* Left: back + branding */}

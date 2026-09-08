@@ -609,10 +609,22 @@ export function cardObjectToBackendPayload(cardObject, {
   if (stop2 === stop1) stop2 = FB.gradient[1] === stop1 ? FB.gradient[0] : FB.gradient[1]
 
   const colors = {
-    // surface/dark base — never use a gradient stop as fallback here
-    background: normaliseHex(palette.surface || cardObject.card?.backgroundColor, FB.background),
+    // surface/dark base — never use a gradient stop as fallback here.
+    // Prefer the live card.backgroundColor over palette.surface: applyPalette()
+    // seeds card.backgroundColor from palette.surface when a palette is picked,
+    // but the Studio's own "Card Background" advanced color control only ever
+    // writes card.backgroundColor, not palette.surface — so once a sender
+    // hand-picks a background, palette.surface goes stale while card.backgroundColor
+    // (what the Studio preview actually renders) holds the true current value.
+    background: normaliseHex(cardObject.card?.backgroundColor || palette.surface, FB.background),
     gradient: [stop1, stop2],
-    // primary accent (heading/border emphasis colour, = palette.primary)
+    // primary accent (heading/border emphasis colour, = palette.primary). No live
+    // cardObject field safely substitutes here the way card.backgroundColor does
+    // above: theme.headingColor/card.headingColor round-trip through
+    // backendCardToCardObject as a pure background-luminance black/white
+    // derivation (baseHeadingColor), not the original hue, so preferring either
+    // one here would corrupt this colour the moment an already-sent card is
+    // reopened and resaved. palette.primary is the only faithful source.
     accent: normaliseHex(palette.primary || cardObject.theme?.accentColor || stop1, FB.accent),
   }
   const font = cardObject.theme?.fontFamily || 'Cinzel'

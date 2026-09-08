@@ -10,6 +10,7 @@ import {
   mapTemplateToCard,
 } from './backendMappers.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
+import { applyPalette } from './palettes.js'
 
 // backendMappers is the only translator between the client `cardObject` and the
 // backend's { config, enhancements, layoutdata } payload, in both directions.
@@ -25,8 +26,12 @@ function card(overrides = {}) {
 
 describe('cardObjectToBackendPayload — config.colors', () => {
   it('maps palette anchors onto the backend colour slots', () => {
-    const c = card()
-    c.palette = { primary: '#ff0000', accent: '#00ff00', surface: '#123456', ink: '#ffffff' }
+    // applyPalette() is what Studio actually calls when a palette chip is
+    // picked -- it seeds card.backgroundColor/theme.accentColor from the
+    // palette, exactly like the real app. Setting c.palette directly without
+    // that step doesn't represent anything the app produces.
+    let c = card()
+    c = applyPalette(c, { primary: '#ff0000', accent: '#00ff00', surface: '#123456', ink: '#ffffff' })
     c.background.colors = []
     const { config } = cardObjectToBackendPayload(c, { type: 'personal', tier: 'classic' })
 
@@ -37,6 +42,23 @@ describe('cardObjectToBackendPayload — config.colors', () => {
     expect(config.colors.gradient[0]).toBe('#ff0000')
     expect(config.colors.gradient[1]).toBe('#00ff00')
     expect(config.colors).not.toHaveProperty('ink')
+  })
+
+  it('prefers a hand-picked Card Background over a stale palette anchor', () => {
+    // Studio's "Card Style" panel writes card.backgroundColor directly via a
+    // plain path-setter that never touches cardObject.palette
+    // (CardStudio.jsx's `update()`). So once a sender hand-picks a background
+    // after applying a palette, palette.surface goes stale while
+    // card.backgroundColor (what the Studio preview actually renders) holds
+    // the true current value. The payload sent to the backend must match
+    // what the sender saw in Studio, not the palette's original seed colour.
+    let c = card()
+    c = applyPalette(c, { primary: '#ff0000', accent: '#00ff00', surface: '#123456', ink: '#ffffff' })
+    c.background.colors = []
+    c.card.backgroundColor = '#654321'
+    const { config } = cardObjectToBackendPayload(c, { type: 'personal', tier: 'classic' })
+
+    expect(config.colors.background).toBe('#654321')
   })
 
   it('always emits exactly two gradient stops, never two identical ones', () => {

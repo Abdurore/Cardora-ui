@@ -25,6 +25,40 @@ const ENTRY_DEFAULTS = {
   anonymous: { label: 'Anonymous Card',   Icon: AnonCardIcon,     hint: 'Open to send an anonymous message',  color: '#c084fc' },
 }
 
+// P2.17-class contrast bug: interaction buttons throughout this file fill with
+// theme.accentColor and (wrongly) assumed card.backgroundColor would always read
+// against it, or hardcoded white for ghost buttons. Both assumptions break the
+// moment a sender picks a dark accent or a light-surface palette (paper-ink,
+// jade-parchment) — accent-on-accent or white-on-white renders an invisible
+// label. Compute against the color a button actually sits on instead.
+function hexLuminance(hex) {
+  if (!hex || typeof hex !== 'string') return null
+  let h = hex.trim().replace('#', '')
+  if (h.length === 3) h = h.split('').map((ch) => ch + ch).join('')
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
+  const r = parseInt(h.slice(0, 2), 16) / 255
+  const g = parseInt(h.slice(2, 4), 16) / 255
+  const b = parseInt(h.slice(4, 6), 16) / 255
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+// Readable text color for a filled surface of color bgHex.
+function readableOn(bgHex) {
+  const lum = hexLuminance(bgHex)
+  if (lum == null) return '#ffffff'
+  return lum > 0.55 ? '#0a0a0a' : '#ffffff'
+}
+
+// Ghost-button text color: keep the brand accent when it actually contrasts
+// against the surface behind it, otherwise fall back to a safe readable color
+// rather than trusting the sender's accent/surface pairing to always differ.
+function legibleAccent(bgHex, accentHex) {
+  const bgLum = hexLuminance(bgHex)
+  const accLum = hexLuminance(accentHex)
+  if (bgLum == null || accLum == null) return accentHex || readableOn(bgHex)
+  return Math.abs(bgLum - accLum) > 0.35 ? accentHex : readableOn(bgHex)
+}
+
 // Typewriter hook — elapsed-time-driven via requestAnimationFrame rather than a
 // setInterval tick per character. A per-character interval fires faster than the
 // browser's own paint cycle for anything but very short text, forcing more React
@@ -1516,7 +1550,7 @@ function CardPreviewModal({
                     className="cp-continue-btn"
                     style={{
                       '--action-accent': c.theme.accentColor,
-                      color: c.theme.accentColor,
+                      color: legibleAccent(c.card.backgroundColor, c.theme.accentColor),
                     }}
                     onClick={handleContinue}
                   >
@@ -1574,7 +1608,7 @@ function CardPreviewModal({
                       <button
                         type="button"
                         className="cp-poll-submit"
-                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                         disabled={previewPollVotes.length === 0 || previewPollSubmitting}
                         onClick={async () => {
                           if (previewPollSubmitting) return
@@ -1661,7 +1695,7 @@ function CardPreviewModal({
                       <button
                         type="button"
                         className="cp-continue-btn visible"
-                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                         onClick={() => setStage('end')}
                       >
                         Continue
@@ -1698,7 +1732,7 @@ function CardPreviewModal({
                           <button
                             type="button"
                             className="cp-question-yes"
-                            style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                            style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                             disabled={questionSubmitting}
                             onClick={() => handleAnswerQuestion('yes')}
                           >
@@ -1738,7 +1772,7 @@ function CardPreviewModal({
                       <button
                         type="button"
                         className="cp-continue-btn visible"
-                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                         onClick={handleNextQ}
                       >
                         {questionIdx < c.questions.items.length - 1 ? 'Continue' : 'Done'}
@@ -1803,7 +1837,7 @@ function CardPreviewModal({
                   <button
                     type="button"
                     className="cp-trivia-next"
-                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                    style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                     disabled={previewTriviaAnswers[previewTriviaIdx] == null || previewTriviaSubmitting}
                     onClick={async () => {
                       setPreviewTriviaError('')
@@ -1929,7 +1963,7 @@ function CardPreviewModal({
                       <button
                         type="button"
                         className="cp-continue-btn visible"
-                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                         onClick={() => navigate('/')}
                       >
                         Create yours
@@ -1938,7 +1972,7 @@ function CardPreviewModal({
                     <button
                       type="button"
                       className="cp-end-btn ghost"
-                      style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }}
+                      style={{ color: readableOn(c.card.backgroundColor), borderColor: readableOn(c.card.backgroundColor) === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}
                       onClick={() => navigate('/')}
                     >
                       Done
@@ -1984,7 +2018,7 @@ function CardPreviewModal({
                   <button
                     type="button"
                     className="cp-continue-btn visible"
-                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                    style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                     onClick={() => setStage('end')}
                   >
                     Done
@@ -2018,7 +2052,7 @@ function CardPreviewModal({
                     {hasGift ? (
                       <button
                         className="cp-end-btn"
-                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                         onClick={() => setStage('end')}
                       >
                         Continue
@@ -2027,7 +2061,7 @@ function CardPreviewModal({
                       <>
                         <button
                           className="cp-end-btn"
-                          style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                          style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                           onClick={handleReset}
                         >
                           Replay card
@@ -2035,7 +2069,7 @@ function CardPreviewModal({
                         <button
                           type="button"
                           className="cp-end-btn ghost"
-                          style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                          style={{ color: legibleAccent(c.card.backgroundColor, c.theme.accentColor), borderColor: c.theme.accentColor }}
                           onClick={() => navigate('/')}
                         >
                           Create yours
@@ -2043,7 +2077,7 @@ function CardPreviewModal({
                         <button
                           type="button"
                           className="cp-end-btn ghost"
-                          style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)',  }}
+                          style={{ color: readableOn(c.card.backgroundColor), borderColor: readableOn(c.card.backgroundColor) === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}
                           onClick={() => navigate('/')}
                         >
                           Done
@@ -2084,7 +2118,7 @@ function CardPreviewModal({
 
                   <button
                     className="cp-continue-btn visible"
-                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor, opacity: anonSubmitting ? 0.6 : 1 }}
+                    style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor), opacity: anonSubmitting ? 0.6 : 1 }}
                     disabled={!anonMessage.trim() || anonSubmitting}
                     onClick={async () => {
                       if (!anonMessage.trim()) return
@@ -2178,7 +2212,7 @@ function CardPreviewModal({
                     <p className="cp-chain-sent-msg" style={{ color: c.theme.accentColor }}>This chain has been delivered — no more replies can be added.</p>
                     <button
                       className="cp-continue-btn visible"
-                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                       onClick={() => setStage('end')}
                     >
                       Continue
@@ -2206,7 +2240,7 @@ function CardPreviewModal({
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         className="cp-continue-btn visible"
-                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor, flex: 1, opacity: chainSubmitting ? 0.6 : 1 }}
+                        style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor), flex: 1, opacity: chainSubmitting ? 0.6 : 1 }}
                         disabled={!chainMessage.trim() || chainSubmitting}
                         onClick={async () => {
                           if (!chainMessage.trim()) return
@@ -2248,7 +2282,7 @@ function CardPreviewModal({
                     <p className="cp-chain-sent-msg" style={{ color: c.theme.accentColor }}>✓ Reply added to the chain!</p>
                     <a
                       className="cp-chain-passalong-btn"
-                      style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                      style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                       href={`https://wa.me/?text=${encodeURIComponent(`I just added mine to this chain — add yours! ${typeof window !== 'undefined' ? window.location.href : ''}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -2322,11 +2356,11 @@ function CardPreviewModal({
 
                 <div className="cp-end-actions">
                   {hasGift && (
-                    <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleEndDone}>
+                    <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }} onClick={handleEndDone}>
                       Continue
                     </button>
                   )}
-                  <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleReset}>
+                  <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }} onClick={handleReset}>
                     Replay
                   </button>
                   {studioType === 'personal' ? (
@@ -2340,7 +2374,7 @@ function CardPreviewModal({
                       <button
                         type="button"
                         className="cp-end-btn"
-                        style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                        style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                         onClick={handleSendOneBack}
                       >
                         Send one back
@@ -2348,7 +2382,7 @@ function CardPreviewModal({
                       <button
                         type="button"
                         className="cp-end-btn ghost"
-                        style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }}
+                        style={{ color: readableOn(c.card.backgroundColor), borderColor: readableOn(c.card.backgroundColor) === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}
                         onClick={() => navigate('/')}
                       >
                         Done
@@ -2359,7 +2393,7 @@ function CardPreviewModal({
                       <button
                         type="button"
                         className="cp-end-btn ghost"
-                        style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                        style={{ color: legibleAccent(c.card.backgroundColor, c.theme.accentColor), borderColor: c.theme.accentColor }}
                         onClick={() => navigate('/')}
                       >
                         Create yours
@@ -2367,7 +2401,7 @@ function CardPreviewModal({
                       <button
                         type="button"
                         className="cp-end-btn ghost"
-                        style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.3)',  }}
+                        style={{ color: readableOn(c.card.backgroundColor), borderColor: readableOn(c.card.backgroundColor) === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}
                         onClick={() => navigate('/')}
                       >
                         Done
@@ -2386,14 +2420,14 @@ function CardPreviewModal({
                 </p>
                 <div className="cp-end-actions">
                   {hasGift && (
-                    <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }} onClick={handleEndDone}>
+                    <button className="cp-end-btn" style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }} onClick={handleEndDone}>
                       Continue
                     </button>
                   )}
-                  <button className="cp-end-btn" style={{ backgroundColor: hasGift ? 'transparent' : c.theme.accentColor, color: hasGift ? c.theme.accentColor : c.card.backgroundColor, border: hasGift ? `1.5px solid ${c.theme.accentColor}` : 'none' }} onClick={handleReset}>
+                  <button className="cp-end-btn" style={{ backgroundColor: hasGift ? 'transparent' : c.theme.accentColor, color: hasGift ? legibleAccent(c.card.backgroundColor, c.theme.accentColor) : readableOn(c.theme.accentColor), border: hasGift ? `1.5px solid ${c.theme.accentColor}` : 'none' }} onClick={handleReset}>
                     Replay
                   </button>
-                  <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={onClose}>
+                  <button className="cp-end-btn ghost" style={{ color: legibleAccent(c.card.backgroundColor, c.theme.accentColor), borderColor: c.theme.accentColor }} onClick={onClose}>
                     Back to Editor
                   </button>
                 </div>
@@ -2419,7 +2453,7 @@ function CardPreviewModal({
             </p>
             <button
               className="cp-gift-reveal-btn"
-              style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+              style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
               onClick={() => setStage('giftReveal')}
             >
               Reveal Gift
@@ -2460,7 +2494,7 @@ function CardPreviewModal({
                     className="cp-end-btn"
                     style={{
                       backgroundColor: isClaimed ? 'rgba(255,255,255,0.1)' : c.theme.accentColor,
-                      color: isClaimed ? 'rgba(255,255,255,0.4)' : c.card.backgroundColor,
+                      color: isClaimed ? 'rgba(255,255,255,0.4)' : readableOn(c.theme.accentColor),
                       opacity: claimingGift ? 0.7 : 1,
                       cursor: isClaimed ? 'not-allowed' : 'pointer',
                     }}
@@ -2501,7 +2535,7 @@ function CardPreviewModal({
                   <button
                     type="button"
                     className="cp-end-btn ghost small"
-                    style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }}
+                    style={{ color: legibleAccent(c.card.backgroundColor, c.theme.accentColor), borderColor: c.theme.accentColor }}
                     onClick={handleReset}
                   >
                     Replay animation
@@ -2509,14 +2543,14 @@ function CardPreviewModal({
                   <button
                     type="button"
                     className="cp-end-btn small"
-                    style={{ backgroundColor: c.theme.accentColor, color: c.card.backgroundColor }}
+                    style={{ backgroundColor: c.theme.accentColor, color: readableOn(c.theme.accentColor) }}
                     onClick={() => navigate('/')}
                   >
                     Done
                   </button>
                 </div>
               ) : (
-                <button className="cp-end-btn ghost" style={{ color: c.theme.accentColor, borderColor: c.theme.accentColor }} onClick={onClose}>
+                <button className="cp-end-btn ghost" style={{ color: legibleAccent(c.card.backgroundColor, c.theme.accentColor), borderColor: c.theme.accentColor }} onClick={onClose}>
                   Back to Editor
                 </button>
               )}
