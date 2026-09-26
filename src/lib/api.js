@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = 'https://cardora-uss3.onrender.com'
+const DEFAULT_API_BASE = 'https://cardora-dmut.onrender.com'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, '')
 const TOKEN_KEY = 'cardora:authToken'
 const GUEST_ID_KEY = 'cardora:guestId'
