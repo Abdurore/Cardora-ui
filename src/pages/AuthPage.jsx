@@ -1,6 +1,7 @@
-import { Link, Navigate, useNavigate, useOutletContext } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { getSignupBonusAvailability } from '../lib/api.js'
+import { validateUsername } from '../lib/username.js'
 
 const currencyOptions = ['NGN', 'USD', 'EUR', 'GBP']
 
@@ -11,13 +12,18 @@ const isUnverifiedMsg = (msg = '') => {
 
 function AuthPage({ mode = 'login' }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { currentUser, onLogin, onSignup, onVerifyEmail, onRequestOtp, onForgotPassword, onResetPassword } =
     useOutletContext()
 
-  const [form, setForm] = useState({
+  // The Store's shareable referral link is /signup?ref=CODE -- nothing read
+  // it, so a friend arriving through it signed up with no referral at all
+  // unless they retyped the code by hand.
+  const [form, setForm] = useState(() => ({
     username: '', email: '', password: '', confirmPassword: '',
-    referralCode: '', currency: 'NGN', otp: '', newPassword: '',
-  })
+    referralCode: String(searchParams.get('ref') || searchParams.get('referral') || '').trim().toUpperCase().slice(0, 20),
+    currency: 'NGN', otp: '', newPassword: '',
+  }))
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
@@ -166,6 +172,8 @@ function AuthPage({ mode = 'login' }) {
 
       // ── Signup ──
       if (!form.username || !form.email || !form.password) { setError('Username, email, and password are required.'); return }
+      const usernameError = validateUsername(form.username)
+      if (usernameError) { setError(usernameError); return }
       if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return }
       if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return }
       if (!termsAccepted || !privacyAccepted) { setError('Accept both the Terms and Privacy Policy to continue.'); return }
@@ -191,6 +199,10 @@ function AuthPage({ mode = 'login' }) {
 
       if (result.verified) { navigate('/'); return }
       setPendingVerification({ email: form.email }) // heading copy provides context — no extra toast
+      // ...except when the code never went out (email provider down): the
+      // account exists, so say so and point at "resend" instead of leaving
+      // them waiting on an email that isn't coming.
+      if (/fail/i.test(result.message || '')) setStatus(result.message)
     } finally {
       setIsSubmitting(false)
       setSlowHint(false)
@@ -329,7 +341,7 @@ function AuthPage({ mode = 'login' }) {
               <>
                 <label className="detail-field">
                   Username
-                  <small className="detail-hint">Your unique Cardora identity.</small>
+                  <small className="detail-hint">Your unique Cardora identity — 3–30 letters, numbers, dots, dashes or underscores.</small>
                   <input name="username" type="text" value={form.username} onChange={handleChange}
                     placeholder="cardora_user" autoComplete="username" />
                 </label>

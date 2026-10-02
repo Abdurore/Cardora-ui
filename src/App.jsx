@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout.jsx'
 
 // Route-level code splitting — previously every page shipped in one ~1.1MB
@@ -32,6 +32,15 @@ function RouteFallback() {
   )
 }
 
+// Referral links used to be built as /ref/:code (backend referralLink),
+// a route that never existed -- already-shared links land on signup with
+// the code prefilled instead of the 404 page. A redirect, not a page, so
+// it isn't lazy-loaded like the routes above.
+function RefRedirect() {
+  const { code } = useParams()
+  return <Navigate to={`/signup?ref=${encodeURIComponent(code || '')}`} replace />
+}
+
 function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
@@ -53,6 +62,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/signup" element={<AuthPage mode="signup" />} />
+          <Route path="/ref/:code" element={<RefRedirect />} />
           <Route path="/legal/:doc" element={<LegalPage />} />
           <Route path="*" element={<NotFound />} />
         </Route>
