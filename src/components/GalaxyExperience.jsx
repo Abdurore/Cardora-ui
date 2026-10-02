@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createGalaxyScene } from '../lib/galaxyScene.js'
 import { getGalaxyProfile } from '../lib/deviceCapability.js'
 import { getGalaxyTheme } from '../lib/galaxyThemes.js'
+import { getPerfTier, subscribePerfTier, watchFramePacing } from '../lib/perfTier.js'
+import { optimizedImageUrl } from '../lib/imageUrl.js'
 
 // Full-screen galaxy of memories, shown between the envelope opening and the
 // card itself. Lazy-loaded by CardPreviewModal so three.js never ships with a
@@ -45,7 +47,9 @@ function GalaxyExperience({ experience, images = [], onContinue }) {
   // Resolve each memory's photo once, here, so neither the scene nor the
   // labels have to keep reaching back into media.images by index.
   const memories = (experience?.memories || [])
-    .map(m => ({ ...m, url: images[m.mediaIndex]?.url || '' }))
+    // Photos become GPU textures: a 4000x3000 original is ~48MB of texture
+    // memory each. 1024px is plenty for a planet surface (640 on weak tiers).
+    .map(m => ({ ...m, url: optimizedImageUrl(images[m.mediaIndex]?.url || '', { width: getPerfTier() === 'low' ? 640 : 1024, tier: getPerfTier() }) }))
 
   const [profile] = useState(getGalaxyProfile)
   const [entered, setEntered] = useState(false)
@@ -76,8 +80,27 @@ function GalaxyExperience({ experience, images = [], onContinue }) {
     })
     sceneRef.current = scene
 
-    const observer = new ResizeObserver(() => scene.resize())
+    // Label pill sizes, measured once per layout. Reading offsetWidth/
+    // offsetHeight inside the per-frame loop below, interleaved with the
+    // style writes for each label, forced a synchronous layout per label
+    // per frame.
+    const labelSizes = new Map()
+    const measureLabel = (node) => {
+      let size = labelSizes.get(node)
+      if (!size) {
+        size = { halfW: node.offsetWidth / 2, halfH: node.offsetHeight / 2 }
+        labelSizes.set(node, size)
+      }
+      return size
+    }
+
+    const observer = new ResizeObserver(() => { labelSizes.clear(); scene.resize() })
     observer.observe(canvas)
+
+    // Step the scene's resolution/frame cap down if the tier drops while it
+    // is running, and watch frame pacing so a struggling device does.
+    const unsubscribeTier = subscribePerfTier(() => scene.applyProfile(getGalaxyProfile()))
+    const stopWatching = watchFramePacing()
 
     // A card left open in a background tab must not keep a GPU busy.
     const onVisibility = () => (document.hidden ? scene.stop() : scene.start())
@@ -97,8 +120,7 @@ function GalaxyExperience({ experience, images = [], onContinue }) {
         // otherwise push its label half out of view — barely noticeable on a
         // desktop canvas, but on a phone the labels are a large fraction of
         // the width and were getting clipped into unreadable fragments.
-        const halfW = node.offsetWidth / 2
-        const halfH = node.offsetHeight / 2
+        const { halfW, halfH } = measureLabel(node)
         const x = Math.min(Math.max(p.x, halfW + 6), bounds.width - halfW - 6)
         const y = Math.min(Math.max(p.y, halfH + 6), bounds.height - halfH - 6)
         node.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`
@@ -109,6 +131,8 @@ function GalaxyExperience({ experience, images = [], onContinue }) {
 
     return () => {
       cancelAnimationFrame(labelRaf)
+      unsubscribeTier()
+      stopWatching()
       document.removeEventListener('visibilitychange', onVisibility)
       observer.disconnect()
       scene.dispose()

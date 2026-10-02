@@ -23,6 +23,9 @@ function hexToRgb(hex) {
   return `rgb(${r}, ${g}, ${b})`
 }
 
+// The real loader waits on a <link> load that jsdom never fires.
+vi.mock('./fontLoader.js', () => ({ ensureFonts: vi.fn(async () => []) }))
+
 vi.mock('html2canvas', () => ({
   default: vi.fn(async (container) => {
     capturedContainer = container

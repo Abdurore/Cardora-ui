@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { getPerfTier } from './lib/perfTier.js'
+import { loadSecondaryFontsWhenIdle } from './lib/fontLoader.js'
 
 window.addEventListener('contextmenu', (e) => e.preventDefault())
 
@@ -22,6 +24,10 @@ function applyInitialTheme() {
 }
 
 applyInitialTheme()
+// Resolves the performance tier and stamps <html data-perf> before the first
+// render, so the tiered CSS is in effect from the first paint.
+getPerfTier()
+loadSecondaryFontsWhenIdle()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

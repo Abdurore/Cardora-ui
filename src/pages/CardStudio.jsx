@@ -21,6 +21,8 @@ import { getCardPrices, getMediaVideos, getMediaMusic, trackEvent } from '../lib
 import { OPEN_EFFECTS, AMBIENT_EFFECTS } from '../lib/studioEffects.js'
 import { GALAXY_THEMES } from '../lib/galaxyThemes.js'
 import { getMotionIntensity } from '../lib/deviceCapability.js'
+import { usePerfTier } from '../lib/usePerfTier.js'
+import { ensureFonts } from '../lib/fontLoader.js'
 import { SEAL_ICON_OPTIONS } from '../lib/sealIcons.jsx'
 import StudioEnvelope from '../components/StudioEnvelope.jsx'
 import AmbientParticles from '../components/AmbientParticles.jsx'
@@ -367,7 +369,9 @@ function CardStudio() {
   // CardPreviewModal scales the recipient's — otherwise a weak device got a
   // full-intensity particle canvas while editing even though the send-side
   // preview and the real card both back off for it.
-  const studioMotionIntensity = useMemo(() => getMotionIntensity(), [])
+  const perfTier = usePerfTier()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const studioMotionIntensity = useMemo(() => getMotionIntensity(), [perfTier])
   // Read card type and tier from location state (set by CreateCardPicker)
   const cardData = useMemo(() => location.state?.cardData || null, [location.state])
   // Set when arriving here via Profile's "Edit Design" action — re-saves an
@@ -468,6 +472,19 @@ function CardStudio() {
 
   // Full font library, always — see tierLimits comment above.
   const availableFonts = useMemo(() => getFontsForTier(studioType, 'elite'), [studioType])
+  // Fonts are no longer all shipped in index.html. The font pickers show every
+  // option in its own face, so load the full library -- but at idle, off the
+  // critical path (each is a tiny stylesheet; font files only download for
+  // faces actually painted).
+  useEffect(() => {
+    const run = () => ensureFonts(availableFonts)
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(run, { timeout: 3000 })
+      return () => window.cancelIdleCallback?.(id)
+    }
+    const id = setTimeout(run, 800)
+    return () => clearTimeout(id)
+  }, [availableFonts])
   const fontDropdownOptions = useMemo(
     () => availableFonts.map((f) => {
       const ft = fontTier(f)

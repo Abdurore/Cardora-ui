@@ -19,7 +19,11 @@
     <meta name="twitter:image" content="https://cardora.studio/hero-og.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Allura&family=Amatic+SC:wght@400;700&family=Bebas+Neue&family=Caveat:wght@400;600&family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Dancing+Script:wght@400;600;700&family=DM+Serif+Display:ital@0;1&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Great+Vibes&family=Inter:wght@300;400;500;600;700&family=Italianno&family=Josefin+Sans:wght@300;400;500;600&family=Lobster&family=Lora:ital,wght@0,400;0,600;1,400&family=Manrope:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@300;400;500;600;700&family=Nunito:wght@300;400;600;700&family=Outfit:wght@300;400;500;600;700&family=Pacifico&family=Parisienne&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&family=Quicksand:wght@300;400;500;600;700&family=Raleway:wght@300;400;500;600;700&family=Sacramento&family=Satisfy&family=Tangerine:wght@400;700&display=swap" />
+    <!-- Only the two families the app chrome uses. Everything a card or the
+         Studio can pick (30+ families) loads on demand -- see src/lib/fontLoader.js.
+         media=print + onload makes the stylesheet non-render-blocking. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Manrope:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Manrope:wght@300;400;500;600;700&display=swap" /></noscript>
   </head>
   <body>
     <script>try{var t=localStorage.getItem('cardora-theme');if(t==='light')document.documentElement.dataset.theme='light';}catch(e){}</script>

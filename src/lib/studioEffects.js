@@ -319,9 +319,34 @@ function scalePreset(preset, intensity) {
   return scaled
 }
 
-export function getAmbientPreset(type, intensity = 1) {
+export function getAmbientPreset(type, intensity = 1, tier = 'high') {
   const palette = AMBIENT_COLORS_BY_TYPE[type] || AMBIENT_COLOR_DEFAULT
-  return scalePreset(getAmbientPresetRaw(type, palette), intensity)
+  return applyTierToPreset(scalePreset(getAmbientPresetRaw(type, palette), intensity), tier)
+}
+
+// Same designs, cheaper to draw. `high` is untouched. The levers, in order of
+// how much they save on a weak phone:
+//  - detectRetina: tsParticles sizes the canvas to the device pixel ratio, so
+//    a 3x phone redraws a ~1170x2500px surface every frame for dots a few CSS
+//    pixels wide. At 1x they're softer by a hair and cost ~1/9 the fill.
+//  - fpsLimit: these effects move slowly (speeds well under 2px/frame), so
+//    30-45fps reads the same; tsParticles is delta-time based, so speed is
+//    unchanged, only the redraw rate.
+//  - star -> circle for small stars: at <=3.6px a polygon path and a circle
+//    are indistinguishable, but a circle is a single arc fill.
+//  - particle links (aurora): a neighbour search per particle per frame.
+function applyTierToPreset(preset, tier) {
+  if (!preset || tier === 'high') return preset
+  const out = { ...preset, detectRetina: false, fpsLimit: tier === 'low' ? 30 : 45 }
+  if (out.particles) {
+    const particles = { ...out.particles }
+    if (particles.shape?.type === 'star' && (particles.size?.value?.max ?? 4) <= 4) {
+      particles.shape = { type: 'circle' }
+    }
+    if (particles.links?.enable) particles.links = { ...particles.links, enable: false }
+    out.particles = particles
+  }
+  return out
 }
 
 function getAmbientPresetRaw(type, palette) {
