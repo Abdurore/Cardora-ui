@@ -5054,6 +5054,29 @@
   font-size: 1rem;
 }
 
+/* Gate/loading screens hardcode a dark surface, but their headings and text
+   inherit the theme's text colour -- in light mode that was dark-on-dark. */
+.cv-gate-card { color: var(--text); }
+.cv-gate-card h2 { color: var(--text); }
+.cv-gate-card p { color: var(--text-muted); }
+.cv-gate-card p.cv-gate-countdown { color: var(--primary, #7ef7ff); }
+.cv-gate-card p.cv-gate-notify-done { color: var(--text-dim, rgba(220, 242, 247, 0.7)); }
+:root[data-theme="light"] .cv-page-gate { background: rgba(244, 248, 251, 0.98); }
+:root[data-theme="light"] .cv-page-loading { background: var(--bg); color: var(--text-muted); }
+:root[data-theme="light"] .cv-gate-card {
+  background: var(--surface);
+  border-color: rgba(12, 25, 41, 0.12);
+  box-shadow: 0 12px 40px rgba(12, 25, 41, 0.08);
+}
+:root[data-theme="light"] .cv-gate-input {
+  background: rgba(12, 25, 41, 0.04);
+  border-color: rgba(12, 25, 41, 0.18);
+  color: var(--text);
+}
+:root[data-theme="light"] .cv-expired-reopen-btn { color: var(--text-dim); }
+:root[data-theme="light"] .cv-expired-reopen-btn:hover { color: var(--text); }
+:root[data-theme="light"] .cv-logo-loader { background: var(--surface); border-color: rgba(12, 25, 41, 0.12); }
+
 /* 6.3: scheduled-send countdown + notify-me gate */
 .cv-gate-countdown {
   font-size: 0.9rem;
