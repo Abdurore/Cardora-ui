@@ -459,6 +459,11 @@ function CardPreviewModal({
   // currently being reported, or null when the modal is closed.
   const [reportingEntry, setReportingEntry] = useState(null)
   const [previewTriviaSubmitted, setPreviewTriviaSubmitted] = useState(false)
+  // A recipient never has the answer key (the backend strips correctIndex
+  // for non-owners), so their score and per-question right/wrong come from
+  // the server's trivia-submit response instead. null in the Studio preview,
+  // where the sender's own correctIndex is available locally.
+  const [serverTriviaResult, setServerTriviaResult] = useState(null)
 
   const giftAllowed = pageMode ? true : limit('allowGifts')
   const giftAlreadyClaimed = c.giftEffect?.status === 'claimed'
@@ -523,6 +528,7 @@ function CardPreviewModal({
       const triviaSaved = JSON.parse(localStorage.getItem(`${receiverStorageKey}:trivia`) || 'null')
       if (triviaSaved?.submitted) {
         setPreviewTriviaAnswers(Array.isArray(triviaSaved.answers) ? triviaSaved.answers : [])
+        if (triviaSaved.serverResult) setServerTriviaResult(triviaSaved.serverResult)
         setPreviewTriviaSubmitted(true)
         setTriviaLocked(true)
       }
@@ -619,13 +625,19 @@ function CardPreviewModal({
     fireOpenEffect(c.animation.openEffect, c.animation.confettiColors, motionIntensity)
   }, [c.animation.openEffect, c.animation.confettiColors, allowedTools, tierLimits, lowPowerViewer, motionIntensity])
 
+  const hasTriviaAnswerKey = (q) => q?.correctIndex !== null && q?.correctIndex !== undefined && Number.isInteger(Number(q.correctIndex))
+  const countTriviaCorrect = () => {
+    if (serverTriviaResult && Number.isFinite(serverTriviaResult.score)) return serverTriviaResult.score
+    return (triviaData?.questions || []).filter((q, i) => hasTriviaAnswerKey(q) && Number(previewTriviaAnswers[i]) === Number(q.correctIndex)).length
+  }
+
   // Trivia score reveal — count the number up instead of just printing the
   // final tally, and fire a one-time celebration burst at a strong score.
   // This is an app-level "well done" moment, independent of whatever open
   // effect the sender configured for the card itself.
   useEffect(() => {
     if (stage !== 'triviaResults' || !triviaData) return
-    const correct = triviaData.questions.filter((q, i) => Number(previewTriviaAnswers[i]) === Number(q.correctIndex)).length
+    const correct = countTriviaCorrect()
     const total = triviaData.questions.length
     if (lowPowerViewer) {
       setTriviaScoreDisplay(correct)
@@ -646,7 +658,8 @@ function CardPreviewModal({
       window.setTimeout(() => fireOpenEffect('confetti', c.animation.confettiColors), duration)
     }
     return () => cancelAnimationFrame(raf)
-  }, [stage, triviaData, previewTriviaAnswers, lowPowerViewer, c.animation.confettiColors])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, triviaData, previewTriviaAnswers, serverTriviaResult, lowPowerViewer, c.animation.confettiColors])
 
   // Seed localChainReplies from chainState prop when it becomes available
   useEffect(() => {
@@ -752,6 +765,7 @@ function CardPreviewModal({
       setPreviewTriviaIdx(0)
       setPreviewTriviaAnswers([])
       setPreviewTriviaSubmitted(false)
+      setServerTriviaResult(null)
       setTriviaLocked(false)
       setStage('triviaQ')
       return
@@ -833,6 +847,7 @@ function CardPreviewModal({
     setPreviewTriviaIdx(0)
     setPreviewTriviaAnswers([])
     setPreviewTriviaSubmitted(false)
+    setServerTriviaResult(null)
     setTriviaLocked(false)
     setPreviewTriviaSubmitting(false)
     setPreviewTriviaError('')
@@ -1847,13 +1862,16 @@ function CardPreviewModal({
                       } else {
                         setPreviewTriviaSubmitting(true)
                         try {
-                          if (onTriviaComplete) await onTriviaComplete(previewTriviaAnswers, participantName.trim())
+                          const submitResult = onTriviaComplete ? await onTriviaComplete(previewTriviaAnswers, participantName.trim()) : null
+                          const serverResult = submitResult && Number.isFinite(submitResult.score) ? submitResult : null
+                          setServerTriviaResult(serverResult)
                           setPreviewTriviaSubmitted(true)
                           try {
                             localStorage.setItem(`${receiverStorageKey}:trivia`, JSON.stringify({
                               submitted: true,
                               answers: previewTriviaAnswers,
                               name: participantName.trim(),
+                              serverResult,
                             }))
                           } catch {
                             /* ignore localStorage failures */
@@ -1892,7 +1910,7 @@ function CardPreviewModal({
             >
               <div className="cp-card-inner cp-card-inner-full">
                 {(() => {
-                  const correct = triviaData.questions.filter((q, i) => Number(previewTriviaAnswers[i]) === Number(q.correctIndex)).length
+                  const correct = countTriviaCorrect()
                   const total = triviaData.questions.length
                   const pct = total > 0 ? correct / total : 0
                   const circumference = 2 * Math.PI * 44
@@ -1934,10 +1952,16 @@ function CardPreviewModal({
                             <div className="cp-trivia-review-options">
                               {(q.options || []).map((opt, oi) => {
                                 const isUserSelected = Number(userAnswer) === oi
-                                const isCorrectOpt = Number(q.correctIndex) === oi
+                                // Without the answer key (recipients), only the viewer's own
+                                // pick can be marked, using the server's right/wrong for it.
+                                const keyKnown = hasTriviaAnswerKey(q)
+                                const serverCorrect = serverTriviaResult?.results?.[qi]
+                                const isCorrectOpt = keyKnown
+                                  ? Number(q.correctIndex) === oi
+                                  : isUserSelected && serverCorrect === true
                                 let optionClass = "cp-trivia-review-option"
                                 if (isCorrectOpt) optionClass += " correct"
-                                else if (isUserSelected && !isCorrectOpt) optionClass += " wrong"
+                                else if (isUserSelected && (keyKnown || serverCorrect === false)) optionClass += " wrong"
                                 return (
                                   <div key={oi} className={optionClass}>
                                     <div className="cp-trivia-review-opt-left">
@@ -1946,7 +1970,8 @@ function CardPreviewModal({
                                     </div>
                                     <div className="cp-trivia-review-badges">
                                       {isCorrectOpt && !isUserSelected && <span className="cp-trivia-review-badge correct">Correct Answer</span>}
-                                      {isUserSelected && !isCorrectOpt && <span className="cp-trivia-review-badge wrong">Your Choice</span>}
+                                      {isUserSelected && !isCorrectOpt && (keyKnown || serverCorrect === false) && <span className="cp-trivia-review-badge wrong">Your Choice</span>}
+                                      {isUserSelected && !keyKnown && serverCorrect !== true && serverCorrect !== false && <span className="cp-trivia-review-badge">Your Choice</span>}
                                       {isUserSelected && isCorrectOpt && <span className="cp-trivia-review-badge correct-choice">Your Choice & Correct</span>}
                                     </div>
                                   </div>

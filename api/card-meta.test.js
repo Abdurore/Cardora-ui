@@ -25,12 +25,13 @@ function createRes() {
   return res
 }
 
-function mockFetchImpl(cardPayload) {
+// The backend's read-only GET /cards/:slug/preview shape.
+function mockFetchImpl(previewPayload) {
   return vi.fn(async (url) => {
     if (String(url).includes('/index.html')) {
       return { ok: true, text: async () => FAKE_INDEX_HTML }
     }
-    return { ok: true, json: async () => cardPayload }
+    return { ok: true, status: 200, json: async () => previewPayload }
   })
 }
 
@@ -42,7 +43,7 @@ describe('api/card-meta.js', () => {
   })
 
   it('interpolates the resolved senderName into the OG description', async () => {
-    global.fetch = mockFetchImpl({ card: { type: 'personal', senderName: 'Ada', name: 'Happy Birthday!' } })
+    global.fetch = mockFetchImpl({ preview: { type: 'personal', senderName: 'Ada', title: 'Happy Birthday!' } })
 
     const res = createRes()
     await handler({ query: { slug: 'abc123' } }, res)
@@ -51,7 +52,7 @@ describe('api/card-meta.js', () => {
   })
 
   it('falls back to "Someone", never blank, when the backend has no username', async () => {
-    global.fetch = mockFetchImpl({ card: { type: 'personal', name: 'Happy Birthday!' } })
+    global.fetch = mockFetchImpl({ preview: { type: 'personal', title: 'Happy Birthday!' } })
 
     const res = createRes()
     await handler({ query: { slug: 'abc123' } }, res)
@@ -61,7 +62,7 @@ describe('api/card-meta.js', () => {
   })
 
   it('does the same for a poll card', async () => {
-    global.fetch = mockFetchImpl({ card: { type: 'poll', senderName: 'Bo' } })
+    global.fetch = mockFetchImpl({ preview: { type: 'poll', senderName: 'Bo' } })
 
     const res = createRes()
     await handler({ query: { slug: 'xyz' } }, res)
@@ -70,7 +71,7 @@ describe('api/card-meta.js', () => {
   })
 
   it('renders a real gate — sender, title, and an Open Card button — inside #root', async () => {
-    global.fetch = mockFetchImpl({ card: { type: 'personal', senderName: 'Ada', name: 'Happy Birthday!' } })
+    global.fetch = mockFetchImpl({ preview: { type: 'personal', senderName: 'Ada', title: 'Happy Birthday!' } })
 
     const res = createRes()
     await handler({ query: { slug: 'abc123' } }, res)
@@ -82,7 +83,7 @@ describe('api/card-meta.js', () => {
   })
 
   it('preloads the real built JS bundle so it is warm before the user taps Open', async () => {
-    global.fetch = mockFetchImpl({ card: { type: 'personal', senderName: 'Ada' } })
+    global.fetch = mockFetchImpl({ preview: { type: 'personal', senderName: 'Ada' } })
 
     const res = createRes()
     await handler({ query: { slug: 'abc123' } }, res)
@@ -94,10 +95,10 @@ describe('api/card-meta.js', () => {
 
   it('embeds only non-owner-safe fields for the client to read on mount, never response content', async () => {
     global.fetch = mockFetchImpl({
-      card: {
+      preview: {
         type: 'anonymous',
         senderName: 'Ada',
-        name: 'Ask me anything',
+        title: 'Ask me anything',
         state: { responses: [{ text: 'a secret reply nobody but the owner should see' }] },
       },
     })
@@ -122,5 +123,41 @@ describe('api/card-meta.js', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('id="root"')
     expect(res.body).toContain('<script type="module"')
+  })
+
+  // GET /cards/:slug is a real recipient open (first-open claim, view,
+  // "card opened" notification). This function runs before the recipient's
+  // browser does, so it must only ever use the read-only preview route.
+  it('only ever calls the read-only preview endpoint, never GET /cards/:slug', async () => {
+    global.fetch = mockFetchImpl({ preview: { type: 'personal', senderName: 'Ada', title: 'Hi' } })
+
+    await handler({ query: { slug: 'abc123' } }, createRes())
+
+    const backendCalls = global.fetch.mock.calls.map(([url]) => String(url)).filter((u) => !u.includes('/index.html'))
+    expect(backendCalls).toHaveLength(1)
+    expect(backendCalls[0]).toMatch(/\/cards\/abc123\/preview$/)
+  })
+
+  it('says "Card not found" (404) only when the backend says so', async () => {
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes('/index.html')) return { ok: true, text: async () => FAKE_INDEX_HTML }
+      return { ok: false, status: 404, json: async () => ({ message: 'Card not found' }) }
+    })
+
+    const res = createRes()
+    await handler({ query: { slug: 'gone123' } }, res)
+
+    expect(res.statusCode).toBe(404)
+    expect(res.body).toContain('Card not found')
+  })
+
+  it('never shows a gated card\'s title (the preview endpoint withholds it)', async () => {
+    global.fetch = mockFetchImpl({ preview: { type: 'personal', senderName: 'Ada', title: '', gated: true } })
+
+    const res = createRes()
+    await handler({ query: { slug: 'locked1' } }, res)
+
+    expect(res.body).toContain('Ada sent you a card')
+    expect(res.body).toContain('Open to see what it is')
   })
 })

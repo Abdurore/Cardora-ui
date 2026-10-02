@@ -1153,7 +1153,11 @@ export function mapBackendCard(card) {
         text: q.text || q.question || '',
         question: q.question || q.text || '',
         options: Array.isArray(q.options) ? q.options : [],
-        correctIndex: isNaN(parseInt(q.correctIndex, 10)) ? 0 : parseInt(q.correctIndex, 10),
+        // The backend strips correctIndex for non-owners (sanitizeCardForClient)
+        // so a recipient can't read the answer key. Defaulting it to 0 here
+        // marked option A as "Correct Answer" on every question and scored
+        // recipients against that. null = "answer key not known to this viewer".
+        correctIndex: Number.isInteger(parseInt(q.correctIndex, 10)) ? parseInt(q.correctIndex, 10) : null,
       }))
     : []
 

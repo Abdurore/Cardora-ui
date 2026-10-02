@@ -56,6 +56,11 @@ function CardView() {
   const [notifyError, setNotifyError] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState('')
+  // The backend re-checks a password lock on every interaction endpoint
+  // (vote, reply, answer, react, anonymous message), not just the read --
+  // so the password that unlocked the card has to ride along on each one,
+  // or every action on a locked card 403s with "Password required".
+  const [unlockedPassword, setUnlockedPassword] = useState('')
   const [showReport, setShowReport] = useState(false)
   // The backend's render-model `interaction` block — real server-side vote
   // tallies / already-voted / already-answered state, keyed to this viewer's
@@ -283,6 +288,7 @@ function CardView() {
         }))
         setInteraction(res?.renderModel?.interaction || res?.data?.renderModel?.interaction || null)
         setReactions(res?.renderModel?.reactions || res?.data?.renderModel?.reactions || null)
+        setUnlockedPassword(passwordInput)
         setNeedsPassword(false)
       }
     } catch (err) {
@@ -536,12 +542,19 @@ function CardView() {
   const triviaData = card.trivia || null
 
   // Backend submission callbacks
+  const withPassword = (body) => (unlockedPassword ? { ...body, password: unlockedPassword } : body)
+  // Contributor/player name caps from the backend's Joi schemas (chainReply
+  // name max 24, triviaSubmit name max 80) -- a longer username would 400.
+  const capName = (value, max) => {
+    const trimmed = String(value || '').trim().slice(0, max).trim()
+    return trimmed || undefined
+  }
   const handlePollSubmit = async (optionId) => {
     const options = pollData?.options || []
     const optionIndex = options.findIndex(opt => (typeof opt === 'object' ? opt.id : opt) === optionId)
-    const payload = optionId
+    const payload = withPassword(optionId
       ? { optionId }
-      : { optionIndex }
+      : { optionIndex })
     try {
       await submitPollVote(card.slug || id, payload)
     } catch (e) {
@@ -550,28 +563,24 @@ function CardView() {
       await submitCardResponse(card.slug || id, payload)
     }
   }
+  // Only { answers, name, password } -- the backend scores server-side (a
+  // recipient never has the answer key) and its strict schema rejected the
+  // client-computed score/totalQuestions this used to send, so every trivia
+  // submission 400'd. The server's score/per-question results are returned
+  // for the results screen.
   const handleTriviaComplete = async (answers, name) => {
-    // Calculate score: count how many answers match the correctIndex for each question
-    const questions = triviaData?.questions || []
-    const score = questions.reduce((acc, q, i) => {
-      return acc + (Number(answers[i]) === Number(q.correctIndex) ? 1 : 0)
-    }, 0)
-    const payload = {
-      answers,
-      name: name || currentUser?.username || 'Anonymous',
-      score,
-      totalQuestions: questions.length,
-    }
-    try {
-      await submitTriviaAnswer(card.slug || id, payload)
-    } catch (e) {
-      if (![404, 405].includes(e?.status)) throw e
-      console.warn('Trivia submit route missing, trying generic response endpoint', e)
-      await submitCardResponse(card.slug || id, payload)
+    const payload = withPassword({
+      answers: answers.map((a) => Number(a)),
+      name: capName(name || currentUser?.username, 80) || 'Anonymous',
+    })
+    const res = await submitTriviaAnswer(card.slug || id, payload)
+    return {
+      score: Number.isFinite(Number(res?.score)) ? Number(res.score) : null,
+      results: Array.isArray(res?.results) ? res.results : null,
     }
   }
   const handleChainReply = async (message, name) => {
-    const payload = { response: message, name: name || currentUser?.username || 'Anonymous' }
+    const payload = withPassword({ response: message, name: capName(name || currentUser?.username, 24) || 'Anonymous' })
     try {
       await submitChainReply(card.slug || id, payload)
     } catch (e) {
@@ -581,13 +590,13 @@ function CardView() {
     }
   }
   const handleAnonSubmit = async (message) => {
-    await sendCardAnonymousMessage(card.slug || id, { message })
+    await sendCardAnonymousMessage(card.slug || id, withPassword({ message }))
   }
   const handleQuestionResponse = async (answer) => {
-    await submitCardResponse(card.slug || id, { answer })
+    await submitCardResponse(card.slug || id, withPassword({ answer }))
   }
   const handleReact = async (emoji) => {
-    const res = await reactToCard(card.slug || id, emoji)
+    const res = await reactToCard(card.slug || id, emoji, unlockedPassword || undefined)
     return { counts: res?.counts || res?.data?.counts, viewerReaction: res?.viewerReaction ?? res?.data?.viewerReaction ?? null }
   }
 

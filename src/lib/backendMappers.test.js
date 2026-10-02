@@ -556,3 +556,26 @@ describe('mapCouponPackage', () => {
     expect(mapped.bonus).toBe('Featured')
   })
 })
+
+// The backend strips correctIndex for non-owners. Defaulting it to 0 here
+// showed recipients option A as the "Correct Answer" on every question.
+describe('mapBackendCard — trivia answer key', () => {
+  const triviaCard = (questions) => ({
+    slug: 't1',
+    type: 'trivia',
+    tier: 'classic',
+    config: { colors: { background: '#000', accent: '#fff', gradient: ['#000', '#111'] }, font: 'Inter', content: { questions } },
+    enhancements: {},
+    layoutdata: {},
+  })
+
+  it('leaves correctIndex null when the viewer was not sent the answer key', () => {
+    const mapped = mapBackendCard(triviaCard([{ question: 'Q', options: ['a', 'b'] }]))
+    expect(mapped.trivia.questions[0].correctIndex).toBeNull()
+  })
+
+  it('keeps a real correctIndex (owner view)', () => {
+    const mapped = mapBackendCard(triviaCard([{ question: 'Q', options: ['a', 'b'], correctIndex: 1 }]))
+    expect(mapped.trivia.questions[0].correctIndex).toBe(1)
+  })
+})
