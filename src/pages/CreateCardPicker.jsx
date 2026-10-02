@@ -46,8 +46,10 @@ const CARD_TYPES = [
 
 function pricingHint(typeId) {
   const costs = TIER_COST_BY_TYPE[typeId] || TIER_COST_BY_TYPE.personal
-  const max = Math.max(...Object.values(costs).filter((v) => typeof v === 'number'))
-  return max > 0 ? `Free to start · premium touches up to ${max} CC` : 'Free to start'
+  // Base tier prices only -- music, Galaxy, locks etc. add to this, so quote
+  // the cheapest paid rung ("from") instead of an "up to" that isn't a ceiling.
+  const paid = Object.values(costs).filter((v) => typeof v === 'number' && v > 0)
+  return paid.length ? `Free to start · premium from ${Math.min(...paid)} CC` : 'Free to start'
 }
 
 function CreateCardPicker() {

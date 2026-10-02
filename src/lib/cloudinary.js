@@ -43,7 +43,7 @@ export async function uploadToCloudinary(file, resourceType = 'auto') {
   let response
   try {
     response = await fetch(endpoint, { method: 'POST', body: formData })
-  } catch (networkErr) {
+  } catch {
     throw new Error('Network error — could not reach Cloudinary. Check your internet connection.')
   }
 

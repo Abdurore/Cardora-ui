@@ -7,7 +7,11 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { getPerfTier } from './lib/perfTier.js'
 import { loadSecondaryFontsWhenIdle } from './lib/fontLoader.js'
 
-window.addEventListener('contextmenu', (e) => e.preventDefault())
+// Only card media is shielded from the context menu. Blocking it everywhere
+// removed "open in new tab", copy, and inspect for no real protection.
+window.addEventListener('contextmenu', (e) => {
+  if (e.target instanceof Element && e.target.closest('img, video, canvas')) e.preventDefault()
+})
 
 function applyInitialTheme() {
   try {

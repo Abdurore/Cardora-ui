@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
@@ -421,7 +421,7 @@ function QuickCreate() {
           try {
             const cloudUrl = await uploadToCloudinary(images[i].file, 'image')
             cloudImages.push(cloudUrl)
-          } catch (err) {
+          } catch {
             setSendResult({ ok: false, message: 'Failed to upload images. Your draft is safe — try again.' })
             setIsSending(false)
             return
@@ -495,7 +495,7 @@ function QuickCreate() {
       // reached_review step only proves the sender opened the receipt, not
       // that they actually sent -- they can still cancel from there.
       trackEvent('create_flow_step', { step: 'sent', path: 'quick', type: cardType, tier: sourceTier })
-    } catch (err) {
+    } catch {
       setSendResult({ ok: false, message: 'Something went wrong. Your draft is safe — try again.' })
     } finally {
       setIsSending(false)
@@ -586,7 +586,7 @@ function QuickCreate() {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Back
+          <span className="qc-back-text">Back</span>
         </button>
 
         <div className="qc-topbar-center">
