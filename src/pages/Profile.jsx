@@ -197,7 +197,7 @@ function Profile() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [showEditProfile, setShowEditProfile] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', username: '', bio: '' })
+  const [editForm, setEditForm] = useState({ username: '', bio: '' })
   const [editMsg, setEditMsg] = useState({ text: '', ok: false })
   const [isSavingProfile, setIsSavingProfile] = useState(false)
 
@@ -395,17 +395,22 @@ function Profile() {
   }
 
   const handleSaveProfile = async () => {
-    if (!editForm.name.trim()) {
-      setEditMsg({ text: 'Name is required.', ok: false })
+    if (!editForm.username.trim()) {
+      setEditMsg({ text: 'Username is required.', ok: false })
       return
     }
     setIsSavingProfile(true)
     try {
-      const result = await updateProfile({
-        name: editForm.name.trim(),
-        username: editForm.username.trim(),
-        bio: editForm.bio.trim(),
-      })
+      // The backend's update-profile schema is { username, email, bio,
+      // profilePictureUrl } with unknown keys rejected -- there is no
+      // separate display name, and the `name` this used to send 400'd every
+      // save. Unchanged fields aren't re-sent.
+      const payload = { bio: editForm.bio.trim() }
+      const nextUsername = editForm.username.trim().replace(/^@/, '')
+      if (nextUsername.toLowerCase() !== String(currentUser?.username || '').toLowerCase()) {
+        payload.username = nextUsername
+      }
+      const result = await updateProfile(payload)
       if (!result?.ok) {
         setEditMsg({ text: result?.message || 'Could not update profile.', ok: false })
         return
@@ -774,7 +779,6 @@ function Profile() {
               type="button"
               onClick={() => {
                 setEditForm({
-                  name: currentUser.name || '',
                   username: currentUser.username || '',
                   bio: currentUser.bio || '',
                 })
@@ -1313,15 +1317,6 @@ function Profile() {
           <div className="detail-card artist-apply-modal">
             <p className="eyebrow">Profile</p>
             <h3>Edit your profile</h3>
-            <label className="detail-field">
-              Name
-              <input
-                type="text"
-                value={editForm.name}
-                onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Your name"
-              />
-            </label>
             <label className="detail-field">
               Username
               <input
