@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
 import { PALETTES, applyPalette } from '../lib/palettes.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
+import { ensureFonts } from '../lib/fontLoader.js'
 import { getCardPrices, getTemplateById, getMyCard, trackEvent, createReminder } from '../lib/api.js'
 import { EXPLORE_OCCASION_TABS } from '../lib/occasionTaxonomy.js'
 import { GiftIcon } from '../components/GiftCard.jsx'
@@ -86,6 +87,7 @@ const SHARE_PLATFORMS = [
 ]
 
 const MAX_IMAGES = 3
+const QUICK_FONT_FAMILIES = QUICK_FONTS.map((f) => f.value)
 // Quick Create is the fast, low-friction path — the full ~24-theme library
 // belongs to Studio. Showing all of them here (or expanding to all in place)
 // turned a 30-second flow into theme-browsing. 6 fills two full grid rows;
@@ -94,6 +96,8 @@ const PALETTE_INITIAL_COUNT = 6
 
 function QuickCreate() {
   const [params] = useSearchParams()
+  // The font chips preview each face; index.html no longer preloads them all.
+  useEffect(() => { ensureFonts(QUICK_FONT_FAMILIES) }, [])
   const navigate = useNavigate()
   const cardType = params.get('type') || 'personal'
 

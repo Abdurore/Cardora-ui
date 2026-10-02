@@ -1322,7 +1322,10 @@
   -webkit-text-fill-color: transparent;
   color: transparent;
   line-height: 1;
-  animation: brandShimmer 4s ease-in-out infinite;
+  /* 3 sweeps, not forever: this is a background-position animation (a
+     main-thread repaint of the clipped text, plus its drop-shadow filter,
+     every frame) and it ran on every page of the app indefinitely. */
+  animation: brandShimmer 4s ease-in-out 3;
   filter: drop-shadow(0 0 12px rgba(70, 227, 183, 0.3));
 }
 
@@ -22465,7 +22468,7 @@ a {
   position: absolute;
   inset: -2px;
   border-radius: 100px;
-  border: 1px solid var(--btn-color, #7ef7ff);
+  border: 2px solid var(--btn-color, #7ef7ff);
   opacity: 0;
   animation: cpPremiumRingPulse 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
@@ -22474,8 +22477,11 @@ a {
   animation-delay: 1.5s;
 }
 @keyframes cpPremiumRingPulse {
-  0%   { opacity: 0.8; transform: scale(1); border-width: 2px; }
-  100% { opacity: 0; transform: scale(1.3); border-width: 0px; }
+  /* Opacity + transform only. This also animated border-width (2px -> 0),
+     which re-lays-out and repaints the ring every frame; since the ring is
+     fading to nothing as it scales, the thinning border was imperceptible. */
+  0%   { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.3); }
 }
 
 .cp-entry-open-label { position: relative; z-index: 1; }
@@ -23364,7 +23370,10 @@ a {
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent !important;
-  animation: brandShimmer 4s ease-in-out infinite;
+  /* 3 sweeps, not forever: this is a background-position animation (a
+     main-thread repaint of the clipped text, plus its drop-shadow filter,
+     every frame) and it ran on every page of the app indefinitely. */
+  animation: brandShimmer 4s ease-in-out 3;
   filter: none !important;
   text-shadow: none !important;
 }
@@ -28776,3 +28785,128 @@ textarea:focus-visible,
 
 [data-theme="light"] .cs-gx-memory-head { color: var(--text-muted); }
 [data-theme="light"] .cs-gx-memory.is-on .cs-gx-memory-head { color: var(--text); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PERFORMANCE TIERS  (src/lib/perfTier.js sets <html data-perf="high|mid|low">)
+
+   `high` is the design as-is. Weaker tiers keep every layout, colour and
+   motion that reads as the design, and simplify only the parts that are
+   expensive to paint: big backdrop blurs (re-blurred whenever anything
+   behind them moves), the continuously repainted tilt shadow/sheen, and
+   purely decorative infinite animations. The tier is estimated from the
+   device and then corrected at runtime from measured frame times.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* The tilt-tracking shadow and specular sweep repaint a large blurred
+   shadow and a full-card gradient on every tilt change. The tilt itself
+   (a transform) stays at every tier. */
+:root:not([data-perf="high"]) .cp-card-wrap-depth .cp-card {
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+:root:not([data-perf="high"]) .cp-card-wrap-depth .cp-card::after {
+  display: none;
+}
+
+/* Full-card frosted layer and the very large entry blur: the costliest
+   single backdrop-filters, both on screens that are about to animate. */
+:root[data-perf="mid"] .cp-entry-content {
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+}
+:root[data-perf="mid"] .cp-card-full::before {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+/* Backdrop blur is re-computed whenever the content behind it changes; on a
+   weak GPU that's the difference between smooth and stuttering scrolling.
+   Replace it with a near-opaque surface of the same hue. */
+:root[data-perf="low"] .screen-header,
+:root[data-perf="low"] .cs-topbar,
+:root[data-perf="low"] .cs-m2-header,
+:root[data-perf="low"] .cs-m2-toolbar,
+:root[data-perf="low"] .cs-m2-edit-zone,
+:root[data-perf="low"] .cs-mobile-sticky-bar,
+:root[data-perf="low"] .cs-mobile-footer,
+:root[data-perf="low"] .cs-mobile-state-nav,
+:root[data-perf="low"] .cs-mobile-bottom-bar,
+:root[data-perf="low"] .cs-mobile-edit-bar,
+:root[data-perf="low"] .wb-banner,
+:root[data-perf="low"] .cp-entry-content,
+:root[data-perf="low"] .cp-identity-sheet,
+:root[data-perf="low"] .cp-lock-gate,
+:root[data-perf="low"] .app-status-card,
+:root[data-perf="low"] .auth-page-card {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: var(--surface);
+  background-color: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+:root[data-perf="low"] .cp-card-full::before {
+  display: none;
+}
+/* Dimmed overlays behind modals don't need a blur to do their job. */
+:root[data-perf="low"] .detail-backdrop,
+:root[data-perf="low"] .share-backdrop,
+:root[data-perf="low"] .sgm-backdrop,
+:root[data-perf="low"] .ctm-backdrop,
+:root[data-perf="low"] .ccp-backdrop,
+:root[data-perf="low"] .cs-send-modal-backdrop,
+:root[data-perf="low"] .cs-publish-backdrop,
+:root[data-perf="low"] .cs-m2-sheet-backdrop,
+:root[data-perf="low"] .ban-confirm-backdrop,
+:root[data-perf="low"] .report-modal-overlay,
+:root[data-perf="low"] .app-confirm-overlay {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* Small floating chips/buttons over the card: keep a hint of blur on mid,
+   drop it on low. */
+:root[data-perf="low"] .cp-close-btn,
+:root[data-perf="low"] .cp-reset-btn,
+:root[data-perf="low"] .cp-device-toolbar,
+:root[data-perf="low"] .cv-report-trigger,
+:root[data-perf="low"] .cp-entry-type-chip,
+:root[data-perf="low"] .cp-entry-open-btn,
+:root[data-perf="low"] .hero-format-chip,
+:root[data-perf="low"] .card-like-btn,
+:root[data-perf="low"] .card-type-badge,
+:root[data-perf="low"] .card-gift-badge,
+:root[data-perf="low"] .card-unlock-badge {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Decorative-only infinite motion. The sparks/dust/aurora/halo behind the
+   landing hero and the banner's box-shadow pulse add atmosphere, not
+   information; keep the static look, drop the motion on weaker tiers. */
+:root:not([data-perf="high"]) .hero-bonus-banner,
+:root:not([data-perf="high"]) .brand-wordmark {
+  animation: none;
+}
+:root[data-perf="low"] .hero-dust,
+:root[data-perf="low"] .hero-reveal-spark {
+  display: none;
+}
+:root[data-perf="low"] .hero-aurora,
+:root[data-perf="low"] .hero-card-halo,
+:root[data-perf="low"] .hero-format-chip {
+  animation: none;
+}
+
+/* The light theme pins the header/nav surface with !important (see "App
+   shell — header & nav" above), so the low tier needs to match it. */
+:root[data-perf="low"] .screen-header,
+:root[data-perf="low"] .screen-nav {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+:root[data-perf="low"][data-theme="light"] .screen-header,
+:root[data-perf="low"][data-theme="light"] .screen-nav {
+  background: rgba(255, 255, 255, 0.97) !important;
+}
+:root[data-perf="low"]:not([data-theme="light"]) .screen-nav {
+  background-color: var(--surface);
+  background-color: color-mix(in srgb, var(--surface) 95%, transparent);
+}

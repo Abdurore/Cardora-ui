@@ -4,6 +4,8 @@ import { loadSlim } from '@tsparticles/slim'
 import { loadTextShape } from '@tsparticles/shape-text'
 import { loadEmittersPlugin } from '@tsparticles/plugin-emitters'
 import { getAmbientPreset } from '../lib/studioEffects.js'
+import { usePerfTier } from '../lib/usePerfTier.js'
+import { watchFramePacing } from '../lib/perfTier.js'
 
 let enginePromise = null
 
@@ -33,7 +35,16 @@ function AmbientParticles({ type, zIndex = 1, intensity = 1 }) {
     enginePromise.then(() => setReady(true))
   }, [])
 
-  const options = useMemo(() => getAmbientPreset(type, intensity), [type, intensity])
+  const tier = usePerfTier()
+  const options = useMemo(() => getAmbientPreset(type, intensity, tier), [type, intensity, tier])
+
+  // Particles are the heaviest steady-state thing on a card. If this device
+  // can't hold the frame rate, step the whole app's tier down (see
+  // perfTier.js) -- `tier` changing re-renders this with a lighter preset.
+  useEffect(() => {
+    if (!ready) return undefined
+    return watchFramePacing()
+  }, [ready])
 
   const handleLoaded = useCallback((container) => {
     containerRef.current = container
@@ -99,6 +110,7 @@ function AmbientParticles({ type, zIndex = 1, intensity = 1 }) {
       style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex }}
     >
       <Particles
+        key={tier}
         id={`ambient-${type}-${instanceId}`}
         options={options}
         particlesLoaded={handleLoaded}

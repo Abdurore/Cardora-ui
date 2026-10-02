@@ -1,4 +1,4 @@
-import html2canvas from 'html2canvas'
+import { ensureFonts } from './fontLoader.js'
 
 // 6.6: "Auto-generate a 1080x1920 share image on inbox creation: prompt
 // text in the display serif, themed background, short link legible at
@@ -81,6 +81,14 @@ export async function generateAnonShareImage({ prompt, username, colors = {}, fo
 
   document.body.appendChild(container)
   try {
+    // html2canvas (~200KB) and this image's fonts are only needed when the
+    // user actually taps "share" -- loaded here, not into the pages' bundles
+    // or the first paint. The fonts have to be in before the snapshot or the
+    // image renders in the fallback face.
+    const [{ default: html2canvas }] = await Promise.all([
+      import('html2canvas'),
+      ensureFonts(['Inter', fontFamily]),
+    ])
     if (document.fonts?.ready) await document.fonts.ready
     const canvas = await html2canvas(container, {
       width: WIDTH,

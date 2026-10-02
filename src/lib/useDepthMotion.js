@@ -12,6 +12,11 @@ import { getDepthProfile } from './deviceCapability.js'
 // still, which is what made the envelope read as a flat image.
 
 const IDLE_PERIOD_MS = 9000
+// The idle drift is ~1-2 degrees of slow sine motion; 30Hz is visually
+// indistinguishable from 60Hz for it and halves the style/paint work.
+const IDLE_FRAME_MS = 33
+// Below this (in normalised -1..1 units) the tilt is considered settled.
+const SETTLE_EPSILON = 0.002
 
 export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } = {}) {
   const ref = useRef(null)
@@ -38,6 +43,10 @@ export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } =
     let dragOrigin = null
     let gyroSeen = false
     let lastInput = 0
+    let lastWriteAt = 0
+    let lastWritten = ''
+    // Declared up here so setTarget can wake the loop; assigned below.
+    let wake = () => {}
 
     const setTarget = (x, y) => {
       lastInput = performance.now()
@@ -45,6 +54,7 @@ export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } =
         x: Math.max(-1, Math.min(1, x)),
         y: Math.max(-1, Math.min(1, y)),
       }
+      wake()
     }
 
     const onPointerMove = (e) => {
@@ -94,6 +104,7 @@ export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } =
     const tick = (now) => {
       raf = requestAnimationFrame(tick)
       let { x, y } = targetRef.current
+      const idling = !!idleFactor && !dragging && !gyroSeen
       // The idle drift is a floor, not an overlay: it fades out while real
       // input is driving the tilt and fades back in a second after it stops,
       // so a pointer never fights a sine wave.
@@ -110,9 +121,35 @@ export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } =
       const cur = currentRef.current
       cur.x += (x - cur.x) * 0.08
       cur.y += (y - cur.y) * 0.08
-      el.style.setProperty('--tilt-x', `${(cur.x * amplitude).toFixed(2)}deg`)
-      el.style.setProperty('--tilt-y', `${(-cur.y * amplitude).toFixed(2)}deg`)
-      el.style.setProperty('--depth-parallax', Math.min(1, Math.hypot(cur.x, cur.y)).toFixed(3))
+
+      // These three are inheriting custom properties, so every write
+      // restyles the whole card subtree (and repaints the tracking shadow and
+      // sheen). That made this loop the single largest steady-state cost on
+      // an open card -- it ran forever, 60x/s, even with nobody touching it.
+      // So: skip writes that wouldn't change anything, rate-limit the idle
+      // drift, and stop the loop entirely once the tilt has settled.
+      if (!(idling && now - lastWriteAt < IDLE_FRAME_MS)) {
+        const tx = `${(cur.x * amplitude).toFixed(2)}deg`
+        const ty = `${(-cur.y * amplitude).toFixed(2)}deg`
+        const key = `${tx}|${ty}`
+        if (key !== lastWritten) {
+          lastWritten = key
+          lastWriteAt = now
+          el.style.setProperty('--tilt-x', tx)
+          el.style.setProperty('--tilt-y', ty)
+          el.style.setProperty('--depth-parallax', Math.min(1, Math.hypot(cur.x, cur.y)).toFixed(3))
+        }
+      }
+
+      if (!idling && Math.abs(x - cur.x) < SETTLE_EPSILON && Math.abs(y - cur.y) < SETTLE_EPSILON) {
+        cur.x = x
+        cur.y = y
+        lastWritten = ''
+        el.style.setProperty('--tilt-x', `${(cur.x * amplitude).toFixed(2)}deg`)
+        el.style.setProperty('--tilt-y', `${(-cur.y * amplitude).toFixed(2)}deg`)
+        el.style.setProperty('--depth-parallax', Math.min(1, Math.hypot(cur.x, cur.y)).toFixed(3))
+        stop()
+      }
     }
 
     const stop = () => {
@@ -125,6 +162,9 @@ export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } =
       else if (raf == null) raf = requestAnimationFrame(tick)
     }
 
+    wake = () => {
+      if (raf == null && !document.hidden) raf = requestAnimationFrame(tick)
+    }
     raf = requestAnimationFrame(tick)
     window.addEventListener('pointermove', onPointerMove, { passive: true })
     el.addEventListener('pointerdown', onPointerDown, { passive: true })

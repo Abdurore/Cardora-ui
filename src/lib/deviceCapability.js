@@ -6,12 +6,17 @@
 // particles/confetti/gift reveal everywhere except the one place that happened to
 // check hardwareConcurrency.
 
+import { getPerfTier } from './perfTier.js'
+
+// Everything below reads the shared performance tier (perfTier.js) instead
+// of each keeping its own hardware heuristic. The tier starts from a static
+// estimate and is corrected at runtime from measured frame times, so a phone
+// that claims 8 cores but struggles gets downgraded, and a capable phone is
+// no longer assumed weak just because its viewport is narrow.
+
 export function isLowPowerDevice() {
   if (typeof window === 'undefined') return false
-  const cores = navigator.hardwareConcurrency || 4
-  const narrow = window.innerWidth < 768
-  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  return narrow || cores <= 4 || reduceMotion
+  return getPerfTier() === 'low' || prefersReducedMotion()
 }
 
 export function prefersReducedMotion() {
@@ -21,36 +26,33 @@ export function prefersReducedMotion() {
 
 // Graduated 0-1 scalar for scaling particle counts/durations, rather than a binary
 // on/off — a weak device should get a smaller, faster effect, not the full thing or
-// nothing. Reduced-motion stacks with low-power (both true = most conservative).
+// nothing. Reduced-motion stacks with the tier (both = most conservative).
+//
+// A phone's full-screen canvas is fill-rate bound even when its CPU is fine,
+// so touch devices cap a little below desktop at each tier.
 export function getMotionIntensity() {
-  const lowPower = isLowPowerDevice()
-  const reduceMotion = prefersReducedMotion()
-  if (lowPower && reduceMotion) return 0.25
-  if (lowPower || reduceMotion) return 0.5
-  return 1
+  const touch = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches
+  const byTier = touch
+    ? { high: 0.75, mid: 0.55, low: 0.35 }
+    : { high: 1, mid: 0.7, low: 0.4 }
+  const base = byTier[getPerfTier()] ?? 0.75
+  return prefersReducedMotion() ? Math.min(base, 0.25) : base
 }
 
-// Weak *hardware*, as distinct from isLowPowerDevice() — which also counts any
-// viewport under 768px and so treats every phone as low-power. That's the right
-// call for spawning hundreds of particles, but wrong for anything a phone is
-// the primary consumer of.
-function isWeakHardware() {
-  if (typeof navigator === 'undefined') return false
-  return (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 2
-}
-
-// Depth is graduated rather than on/off. `layers` stays true even on weak
-// hardware: translateZ separation is a compositor-only operation and costs
-// essentially nothing, so the sense of depth survives the downgrade and only
-// the input-driven motion is trimmed. Reduced-motion is the only thing that
-// flattens the scene entirely.
+// Depth is graduated rather than on/off. `layers` stays true at every tier:
+// translateZ separation is a compositor-only operation and costs essentially
+// nothing, so the sense of depth survives the downgrade and only the
+// input-driven motion is trimmed. What gets cut on weaker tiers is the
+// *continuous* work: the idle drift (a perpetual rAF loop restyling the card
+// every frame) and the tracking shadow/sheen repaints. Reduced-motion is the
+// only thing that flattens the scene entirely.
 export function getDepthProfile() {
   if (prefersReducedMotion()) {
     return { level: 'none', layers: false, tilt: 0, idle: false, gyro: false, shadows: false }
   }
-  if (isWeakHardware()) {
-    return { level: 'lite', layers: true, tilt: 0.5, idle: true, gyro: false, shadows: false }
-  }
+  const tier = getPerfTier()
+  if (tier === 'low') return { level: 'lite', layers: true, tilt: 0.5, idle: false, gyro: false, shadows: false }
+  if (tier === 'mid') return { level: 'lite', layers: true, tilt: 0.7, idle: false, gyro: true, shadows: false }
   return { level: 'full', layers: true, tilt: 1, idle: true, gyro: true, shadows: true }
 }
 
@@ -72,10 +74,10 @@ export function hasWebGL() {
 // card link gets opened, and they handle a few thousand points fine.
 export function getGalaxyProfile() {
   if (!hasWebGL() || prefersReducedMotion()) {
-    return { mode: 'fallback', starCount: 0, dpr: 1, autoRotate: false }
+    return { mode: 'fallback', starCount: 0, dpr: 1, autoRotate: false, fpsCap: 0 }
   }
-  if (isWeakHardware()) {
-    return { mode: 'reduced', starCount: 2200, dpr: 1, autoRotate: false }
-  }
-  return { mode: 'full', starCount: 6000, dpr: 2, autoRotate: true }
+  const tier = getPerfTier()
+  if (tier === 'low') return { mode: 'reduced', starCount: 1600, dpr: 1, autoRotate: false, fpsCap: 30 }
+  if (tier === 'mid') return { mode: 'reduced', starCount: 3200, dpr: 1, autoRotate: true, fpsCap: 45 }
+  return { mode: 'full', starCount: 6000, dpr: 2, autoRotate: true, fpsCap: 0 }
 }

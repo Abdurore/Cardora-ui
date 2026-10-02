@@ -7,6 +7,9 @@ import AmbientParticles from './AmbientParticles.jsx'
 import { fireOpenEffect } from '../lib/studioEffects.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
 import { prefersReducedMotion, getMotionIntensity } from '../lib/deviceCapability.js'
+import { usePerfTier } from '../lib/usePerfTier.js'
+import { ensureFonts } from '../lib/fontLoader.js'
+import { optimizedImageUrl } from '../lib/imageUrl.js'
 import { useDepthMotion } from '../lib/useDepthMotion.js'
 import { claimGiftFromCard, trackEvent } from '../lib/api.js'
 import { PersonalCardIcon, PollCardIcon, TriviaCardIcon, ChainCardIcon, AnonCardIcon } from './CardIcons.jsx'
@@ -217,8 +220,19 @@ function CardPreviewModal({
   // weak-but-not-reduced-motion devices — most recipients open a shared card
   // on a phone, and a narrow viewport alone used to be the only thing this
   // checked, missing plenty of weak devices with a normal-sized screen.
-  const motionIntensity = useMemo(() => getMotionIntensity(), [])
+  // Re-evaluated when the performance tier changes (a runtime downgrade).
+  const perfTier = usePerfTier()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const motionIntensity = useMemo(() => getMotionIntensity(), [perfTier])
   const ambientIntensity = motionIntensity
+
+  // The card's own fonts load when a card is rendered (index.html no longer
+  // ships all 30+ families up front).
+  const cardFont = c.theme?.fontFamily
+  const cardHeadingFont = c.closedState?.headingFont
+  useEffect(() => {
+    ensureFonts([cardFont, cardHeadingFont])
+  }, [cardFont, cardHeadingFont])
 
   const [claimingGift, setClaimingGift] = useState(false)
   const [giftClaimMessage, setGiftClaimMessage] = useState('')
@@ -496,9 +510,10 @@ function CardPreviewModal({
   useEffect(() => {
     if (!pageMode) return undefined
     let cancelled = false
+    // Same transformed URLs the <img> tags use, so the preload is the cache hit.
     const imageUrls = [
       '/cardora-logo.png?v=4',
-      ...(mediaAllowed ? c.media.images.map(img => img.url).filter(Boolean) : []),
+      ...(mediaAllowed ? c.media.images.map(img => optimizedImageUrl(img.url, { tier: perfTier })).filter(Boolean) : []),
     ]
     const imageLoads = imageUrls.map(src => new Promise(resolve => {
       const img = new Image()
@@ -508,14 +523,22 @@ function CardPreviewModal({
     }))
     const fontsReady = document.fonts?.ready?.catch(() => {}) || Promise.resolve()
     const minimum = new Promise(resolve => window.setTimeout(resolve, 720))
-    Promise.all([fontsReady, minimum, ...imageLoads]).then(() => {
+    // Cap how long the loader can hold the card back. This waited for every
+    // photo to finish (no limit), so on a slow connection a recipient stared
+    // at the loader for as long as the photos took; the entry screen doesn't
+    // need them, and they keep loading underneath it.
+    const assetsOrTimeout = Promise.race([
+      Promise.all([fontsReady, ...imageLoads]),
+      new Promise(resolve => window.setTimeout(resolve, 3500)),
+    ])
+    Promise.all([minimum, assetsOrTimeout]).then(() => {
       if (cancelled) return
       if (needsTitleBuffer) setStage('typeEntry')
       else if (isPersonalType) setStage('entry')
       else setStage('open')
     })
     return () => { cancelled = true }
-  }, [pageMode, needsTitleBuffer, isPersonalType, mediaAllowed, c.media.images, c.background.music.url])
+  }, [pageMode, needsTitleBuffer, isPersonalType, mediaAllowed, c.media.images, c.background.music.url, perfTier])
 
   useEffect(() => {
     if (!pageMode) return
@@ -1479,7 +1502,8 @@ function CardPreviewModal({
                       {c.media.images.map((img, i) => (
                         <div key={i} className="cp-media-item cp-media-item-full">
                           <img
-                            src={img.url}
+                            src={optimizedImageUrl(img.url, { tier: perfTier })}
+                            decoding="async"
                             alt={img.caption || ''}
                             style={{
                               objectFit: img.fit || 'cover',

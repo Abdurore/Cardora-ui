@@ -70,8 +70,17 @@ export function createGalaxyScene({ canvas, theme: themeKey, memories, profile, 
   const disposables = []
   const track = (obj) => { disposables.push(obj); return obj }
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: profile.mode === 'full', alpha: true })
+  // Weaker tiers also ask the OS for the low-power GPU (a no-op where there
+  // is only one) -- the dedicated one is wasted on a scene this light and is
+  // what drains a laptop battery.
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: profile.mode === 'full',
+    alpha: true,
+    powerPreference: profile.mode === 'full' ? 'high-performance' : 'low-power',
+  })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, profile.dpr))
+  let frameIntervalMs = profile.fpsCap ? 1000 / profile.fpsCap - 1 : 0
   renderer.setClearColor(0x000000, 0)
 
   const scene = new THREE.Scene()
@@ -225,8 +234,14 @@ export function createGalaxyScene({ canvas, theme: themeKey, memories, profile, 
     camera.updateProjectionMatrix()
   }
 
-  const frame = () => {
+  let lastRenderAt = 0
+  const frame = (now) => {
     raf = requestAnimationFrame(frame)
+    // Frame cap for weaker tiers. Motion is driven by clock deltas, so
+    // skipping a render changes smoothness, never speed -- and the skipped
+    // frames cost nothing (no animation update, no draw call).
+    if (frameIntervalMs && now - lastRenderAt < frameIntervalMs) return
+    lastRenderAt = now
     const delta = Math.min(clock.getDelta(), 0.1)
     elapsed += delta
     galaxy.rotation.y += delta * 0.035
@@ -290,6 +305,14 @@ export function createGalaxyScene({ canvas, theme: themeKey, memories, profile, 
 
   return {
     resize,
+    // Re-tune a running scene when the performance tier changes (a runtime
+    // downgrade): resolution and frame cap apply immediately.
+    applyProfile(next) {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, next.dpr))
+      frameIntervalMs = next.fpsCap ? 1000 / next.fpsCap - 1 : 0
+      controls.autoRotate = next.autoRotate
+      resize()
+    },
     start,
     stop,
     // Screen-space positions for the DOM labels, so labels stay themable with

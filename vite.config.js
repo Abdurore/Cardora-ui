@@ -92,6 +92,28 @@ export default defineConfig(({ command, mode }) => {
         filename: 'sw.js',
         injectManifest: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
+          // Precache only what a *recipient* needs to open a card: the app
+          // shell, the card view/renderer, and the small shared chunks. This
+          // used to precache everything (~3.4MB: three.js, html2canvas, the
+          // admin dashboards, the Studio, the 233KB social-share image) on
+          // the very first visit -- on mobile data, for someone who only
+          // came to open one card. Everything ignored here is cached on first
+          // use instead (see the runtime route in src/sw.js), so it still
+          // works offline once visited.
+          globIgnores: [
+            '**/GalaxyExperience-*.js',
+            '**/anonShareImage-*.js',
+            '**/AdminDashboard-*.js',
+            '**/ModeratorDashboard-*.js',
+            '**/EnterpriseDashboard-*.js',
+            '**/ArtistDashboard-*.js',
+            '**/CardStudio-*.js',
+            '**/QuickCreate-*.js',
+            '**/Profile-*.js',
+            '**/Store-*.js',
+            '**/CardResponses-*.js',
+            '**/hero-og.png',
+          ],
         },
         includeAssets: ['favicon.svg', 'favicon.png', 'cardora-favicon.png', 'cardora-icon.png'],
         manifest: {
