@@ -17,6 +17,9 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 function isPushSupported() {
+  // No VAPID key baked into the build means subscribe() can only throw, so
+  // don't offer a button that always fails.
+  if (!import.meta.env.VITE_VAPID_PUBLIC_KEY) return false
   return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 }
 
