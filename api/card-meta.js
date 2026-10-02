@@ -18,7 +18,10 @@
 // window.__CARDORA_SSR_CARD__ carries only the same non-owner-safe fields
 // the public API already exposes (name/type/tier/senderName) — never
 // response content, vote tallies, or anything H2/H7 (Phase 1.3) protects.
-const BACKEND = (process.env.VITE_API_BASE_URL || 'https://cardora-uss3.onrender.com').replace(/\/+$/, '')
+// Fallback must match src/lib/api.js's DEFAULT_API_BASE -- this still
+// pointed at the old Render account, so with VITE_API_BASE_URL unset on the
+// deployment every unfurl resolved to "Card not found".
+const BACKEND = (process.env.VITE_API_BASE_URL || 'https://cardora-dmut.onrender.com').replace(/\/+$/, '')
 const SITE_ORIGIN = process.env.SITE_ORIGIN || 'https://cardora.studio'
 const LOGO_URL = `${SITE_ORIGIN}/cardora-logo.png?v=4`
 
@@ -36,14 +39,26 @@ function escapeHtml(value) {
   }[c]))
 }
 
+// Uses the backend's read-only GET /cards/:slug/preview, never GET
+// /cards/:slug. That one is a real recipient open: this function runs
+// before the recipient's own browser gets the page, so it was consuming
+// every Personal Card's first-open claim (the actual recipient then saw
+// "already opened"), counting a view against the tier's cap, and firing the
+// sender's "your card was opened" notification for a link-preview fetch.
+//
+// Returns { status: 'found', card } | { status: 'missing' } | { status: 'unknown' }.
+// Only a real JSON 404 means the card doesn't exist; anything else (backend
+// asleep, an older backend without /preview, a network error) falls back
+// to generic copy instead of telling a real recipient "Card not found".
 async function fetchCard(slug) {
   try {
-    const res = await fetch(`${BACKEND}/cards/${encodeURIComponent(slug)}`)
-    if (!res.ok) return null
-    const data = await res.json()
-    return data?.card || data?.data?.card || data?.renderModel || data?.data?.renderModel || data
+    const res = await fetch(`${BACKEND}/cards/${encodeURIComponent(slug)}/preview`)
+    const data = await res.json().catch(() => null)
+    if (res.ok && data?.preview) return { status: 'found', card: data.preview }
+    if (res.status === 404 && data && !data.preview) return { status: 'missing' }
+    return { status: 'unknown' }
   } catch {
-    return null
+    return { status: 'unknown' }
   }
 }
 
@@ -142,29 +157,34 @@ export default async function handler(req, res) {
   const slug = req.query?.slug || ''
   const url = `${SITE_ORIGIN}/card/${slug}`
 
-  const [card, shell] = await Promise.all([
-    slug ? fetchCard(slug) : Promise.resolve(null),
+  const [lookup, shell] = await Promise.all([
+    slug ? fetchCard(slug) : Promise.resolve({ status: 'missing' }),
     fetchAppShell(),
   ])
+  const card = lookup.status === 'found' ? lookup.card : null
+  const missing = lookup.status === 'missing'
 
   const type = card?.type || 'personal'
   const copy = TYPE_COPY[type] || TYPE_COPY.personal
-  const heading = card?.config?.content?.header || card?.config?.content?.question || card?.config?.content?.challenge || card?.name || card?.title || ''
+  // `title` is already empty for a gated card (revoked/closed/scheduled/
+  // locked) -- the preview endpoint withholds it so an unfurl never shows
+  // what the gate is hiding.
+  const heading = card?.title || ''
   const senderName = card?.senderName || 'Someone'
   // A stored per-card preview image (rendered from the card's actual design
   // and uploaded at send time) is a natural next step here — until that
   // exists, every unfurl falls back to the app logo, which is still a real
   // improvement over today's identical-for-every-card headline.
-  const image = card?.layoutdata?.styleExtras?.ogImage || LOGO_URL
+  const image = card?.ogImage || LOGO_URL
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   // Short and revalidate-on-stale rather than the old flat 5-minute cache --
   // this response now also carries the interactive shell, and a card can be
   // revoked (5.5) or renamed; a client shouldn't hold a gate for it too long.
   res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
-  res.status(slug ? 200 : 404).send(renderGateHtml({
-    title: card ? copy.title(heading) : (slug ? 'Card not found' : 'You have a surprise'),
-    description: card ? copy.description(senderName) : (slug ? 'This Cardora link is missing its card.' : 'You have a surprise waiting on Cardora.'),
+  res.status(slug && !missing ? 200 : 404).send(renderGateHtml({
+    title: card ? copy.title(heading) : (missing && slug ? 'Card not found' : 'You have a surprise'),
+    description: card ? copy.description(senderName) : (missing && slug ? 'This Cardora link is missing its card.' : 'You have a surprise waiting on Cardora.'),
     image: card ? image : LOGO_URL,
     url: slug ? url : SITE_ORIGIN,
     senderName: card ? senderName : '',

@@ -12,7 +12,7 @@ import { generateAnonShareImage, shareOrDownloadAnonImage } from '../lib/anonSha
 // durable link at this specific anonymous card.
 
 const navigateSpy = vi.fn()
-let outletContext = { currentUser: null, balance: 0, openAuthModal: () => {} }
+let outletContext = { currentUser: { username: 'owner' }, balance: 0, openAuthModal: () => {} }
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal()
   return {
@@ -153,7 +153,7 @@ describe('CardResponses — 6.6 durable anonymous link', () => {
     vi.mocked(setActiveAnonymousCard).mockReset()
     vi.mocked(generateAnonShareImage).mockReset()
     vi.mocked(shareOrDownloadAnonImage).mockReset()
-    outletContext = { currentUser: null, balance: 0, openAuthModal: () => {} }
+    outletContext = { currentUser: { username: 'owner' }, balance: 0, openAuthModal: () => {} }
   })
 
   it('shows "Set as active" when this card is not the resolved active inbox', async () => {
@@ -303,6 +303,7 @@ describe('CardResponses — 6.9 view cap', () => {
   })
 
   it('shows neither for an anonymous card regardless of tier (6.6 exemption)', async () => {
+    vi.mocked(getActiveAnonymousCard).mockResolvedValueOnce({})
     vi.mocked(getMyCard).mockResolvedValueOnce({
       card: chainCard({ id: 'card_1', type: 'anonymous', tier: 'classic', views: 42, config: { content: { message: 'Ask away' } } }),
     })
@@ -322,5 +323,33 @@ describe('CardResponses — 6.9 view cap', () => {
     await waitFor(() => expect(raiseCardViewCap).toHaveBeenCalledWith('card_1'))
     await waitFor(() => expect(screen.getByText('Views 42 / 150')).toBeInTheDocument())
     expect(screen.getByText('View cap raised by 50.')).toBeInTheDocument()
+  })
+})
+
+// An anonymous GET /cards/:slug is a recipient open as far as the backend
+// can tell -- it claims a Personal Card, counts a view, and notifies the
+// sender. This owner-only page must never make one.
+describe('CardResponses — never fetches without a settled session', () => {
+  afterEach(() => {
+    vi.mocked(getMyCard).mockReset()
+    outletContext = { currentUser: { username: 'owner' }, balance: 0, openAuthModal: () => {} }
+  })
+
+  it('does not fetch while the session is still hydrating', async () => {
+    outletContext = { currentUser: null, authReady: false, balance: 0, openAuthModal: () => {} }
+    renderPage()
+
+    await new Promise((r) => setTimeout(r, 20))
+    expect(getMyCard).not.toHaveBeenCalled()
+  })
+
+  it('does not fetch when signed out, and offers sign-in instead', async () => {
+    const openAuthModal = vi.fn()
+    outletContext = { currentUser: null, authReady: true, balance: 0, openAuthModal }
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in to view' }))
+    expect(openAuthModal).toHaveBeenCalled()
+    expect(getMyCard).not.toHaveBeenCalled()
   })
 })

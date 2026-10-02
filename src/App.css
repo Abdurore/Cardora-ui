@@ -1360,6 +1360,25 @@
   margin-left: auto;
 }
 
+/* The wordmark is absolutely centred above, which ignores the actions row.
+   Logged out that row is narrow (theme + Sign in) and only grazes it, but
+   logged in it becomes theme + bell + avatar/CC capsule (~184px) and slid
+   63-94px underneath the wordmark on 320-390px phones. On narrow screens
+   put the wordmark back in the flex flow, left-aligned, so the two can
+   never overlap. */
+@media (max-width: 720px) {
+  .screen-header .brand {
+    position: static;
+    transform: none;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .screen-header .brand-wordmark {
+    letter-spacing: 0.1em;
+  }
+}
+
 .header-user-capsule {
   display: flex;
   align-items: center;

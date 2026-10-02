@@ -20,7 +20,9 @@
 // active inbox yet -- the backend 404s both alike) does this render its
 // own gate, reusing card-meta.js's asset-preload technique so AnonSend.jsx
 // mounts fast and takes over for the exact not-found/no-inbox distinction.
-const BACKEND = (process.env.VITE_API_BASE_URL || 'https://cardora-uss3.onrender.com').replace(/\/+$/, '')
+// Fallback must match src/lib/api.js's DEFAULT_API_BASE (was still the old
+// Render account).
+const BACKEND = (process.env.VITE_API_BASE_URL || 'https://cardora-dmut.onrender.com').replace(/\/+$/, '')
 const SITE_ORIGIN = process.env.SITE_ORIGIN || 'https://cardora.studio'
 const LOGO_URL = `${SITE_ORIGIN}/cardora-logo.png?v=4`
 

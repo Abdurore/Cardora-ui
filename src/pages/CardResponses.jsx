@@ -495,7 +495,14 @@ function PersonalResponsesView({ state, content, giftAttachment, views, firstOpe
 function CardResponses() {
   const { slug } = useParams()
   const navigate = useNavigate()
-  const { currentUser, balance, openAuthModal } = useOutletContext()
+  const { currentUser, balance, openAuthModal, authReady } = useOutletContext()
+  // Owner-only page. Fetching before the session settles (or with no
+  // session at all) is an anonymous GET /cards/:slug -- a real recipient
+  // open as far as the backend can tell: it claims a Personal Card for this
+  // device, counts a view, and fires the "card opened" notification. Wait
+  // for MainLayout's hydration, and don't fetch at all when signed out.
+  const sessionPending = authReady === false
+  const hasUser = !!currentUser
   const [rawCard, setRawCard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -555,7 +562,12 @@ function CardResponses() {
     }
   }, [slug])
 
-  useEffect(() => { loadCard() }, [loadCard])
+  useEffect(() => {
+    if (sessionPending) return
+    if (!hasUser) { setLoading(false); return }
+    setLoading(true)
+    loadCard()
+  }, [loadCard, sessionPending, hasUser])
 
   // Auto-refresh chain cards every 30 seconds
   useEffect(() => {
@@ -715,11 +727,24 @@ function CardResponses() {
     }
   }
 
-  if (loading) {
+  if (loading || sessionPending) {
     return (
       <div className="cr-page">
         <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
         <div className="cr-loading"><div className="chat-loading-spinner" /></div>
+        <ScreenNav />
+      </div>
+    )
+  }
+
+  if (!hasUser) {
+    return (
+      <div className="cr-page">
+        <ScreenHeader user={currentUser} balance={balance} onAuthOpen={openAuthModal} />
+        <div className="cr-loading">
+          <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>Sign in to see this card's responses.</p>
+          <button className="primary" type="button" onClick={() => openAuthModal?.()}>Sign in to view</button>
+        </div>
         <ScreenNav />
       </div>
     )
