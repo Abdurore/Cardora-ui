@@ -364,3 +364,35 @@ describe('CardView — waits for session hydration when a token is stored', () =
     await waitFor(() => expect(getCardBySlug).toHaveBeenCalledTimes(1))
   })
 })
+
+// A timer-locked card 403s with lockType 'timer' + unlockAt. It used to fall
+// into the generic 403 branch and show a password box for a card that has
+// no password.
+describe('CardView — timer lock', () => {
+  beforeEach(() => { vi.mocked(getCardBySlug).mockReset() })
+
+  it('shows a countdown gate, not a password prompt', async () => {
+    const err = new Error('Card is locked until timer expires')
+    err.status = 403
+    err.payload = { lockType: 'timer', unlockAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), lockHint: '' }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('timer123')
+
+    await waitFor(() => expect(screen.getByText('This card is locked')).toBeInTheDocument())
+    expect(await screen.findByText(/^Unlocks in /)).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Password…')).not.toBeInTheDocument()
+  })
+
+  it('re-fetches the card by itself once the unlock time passes', async () => {
+    const err = new Error('locked')
+    err.status = 403
+    err.payload = { lockType: 'timer', unlockAt: new Date(Date.now() + 1500).toISOString() }
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err).mockReturnValue(new Promise(() => {}))
+
+    renderAt('timer456')
+
+    await waitFor(() => expect(screen.getByText('This card is locked')).toBeInTheDocument())
+    await waitFor(() => expect(getCardBySlug).toHaveBeenCalledTimes(2), { timeout: 4000 })
+  })
+})
