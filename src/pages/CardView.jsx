@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useOutletContext, useLocation } from 'react-router-dom'
-import { getCardBySlug, submitCardResponse, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage, reactToCard, notifyMeForScheduledCard } from '../lib/api.js'
+import { getCardBySlug, getStoredToken, submitCardResponse, submitPollVote, submitTriviaAnswer, submitChainReply, sendCardAnonymousMessage, reactToCard, notifyMeForScheduledCard } from '../lib/api.js'
 import { mapBackendCard } from '../lib/backendMappers.js'
 import CardPreviewModal from '../components/CardPreviewModal.jsx'
 import ReportModal from '../components/ReportModal.jsx'
@@ -24,7 +24,14 @@ function CardView() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentUser, openAuthModal, refreshBalance } = useOutletContext() || {}
+  const { currentUser, openAuthModal, refreshBalance, authReady } = useOutletContext() || {}
+  // A stored token may be stale (expired/revoked) -- MainLayout's session
+  // hydration clears it on a 401/403. Fetching before that settles would
+  // send a dead token, which the backend's optionalAuth treats as a guest:
+  // the sender's own open would claim their card and count as a view. So
+  // with a stored token, wait for hydration; with none, fetch immediately
+  // (the recipient case -- no added latency).
+  const waitForSession = authReady === false && !!getStoredToken()
   const [card, setCard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(null)
@@ -78,6 +85,7 @@ function CardView() {
   })
 
   useEffect(() => {
+    if (waitForSession) return undefined
     let cancelled = false
     setLoading(true)
     ;(async () => {
@@ -192,7 +200,7 @@ function CardView() {
       if (!cancelled) { setCard(null); setLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [id])
+  }, [id, waitForSession])
 
   // 6.3: ticks the scheduled-send countdown while the gate is showing.
   useEffect(() => {

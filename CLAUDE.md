@@ -52,7 +52,7 @@ React 19 + Vite SPA, no state library and no TypeScript. Three things carry the 
 
 ### Deployment extras
 
-`vercel.json` rewrites everything to the SPA, except that *bot user-agents* hitting `/card/:slug` and `/ask/:username` are routed to the serverless functions in `api/` (`card-meta.js`, `ask-meta.js`), which render real per-card Open Graph HTML — scrapers never run the SPA's client-side meta injection.
+`vercel.json` rewrites *every* request to `/card/:slug` and `/ask/:username` (not just bots) to the serverless functions in `api/` (`card-meta.js`, `ask-meta.js`), which render real per-card Open Graph HTML plus an instant "Open Card" gate; everything else goes to the SPA. **`card-meta.js` must only ever call the backend's read-only `GET /cards/:slug/preview`, never `GET /cards/:slug`** — the latter is a real recipient open (first-open claim, view count, "card opened" notification), and this function runs before the recipient's browser does. Same rule client-side: `getCardBySlug` sends the session token when one exists, and `CardView`/`CardResponses` wait for `authReady` before fetching, so a sender checking their own link is never mistaken for the recipient. The `BACKEND` fallback in both `api/` files must match `DEFAULT_API_BASE` in `src/lib/api.js`.
 
 ## Frontend tier model: "design free, pay at send"
 

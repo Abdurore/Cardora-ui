@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom'
 import CardView from './CardView.jsx'
 import { getCardBySlug, notifyMeForScheduledCard } from '../lib/api.js'
 
@@ -18,6 +18,7 @@ vi.mock('../lib/api.js', () => ({
   // Never resolves -- keeps the component in its loading state for the
   // whole test, which is exactly the state under test here.
   getCardBySlug: vi.fn(() => new Promise(() => {})),
+  getStoredToken: vi.fn(() => 'stored-token'),
   submitCardResponse: vi.fn(),
   submitPollVote: vi.fn(),
   submitChainReply: vi.fn(),
@@ -330,5 +331,36 @@ describe('CardView — 6.3 scheduled send', () => {
 
     expect(screen.getByText('Enter an email address.')).toBeInTheDocument()
     expect(notifyMeForScheduledCard).not.toHaveBeenCalled()
+  })
+})
+
+// A stale stored token reaches the backend as a guest (optionalAuth drops
+// an invalid JWT), so a sender's own open would claim their card. With a
+// stored token, CardView waits for MainLayout's session hydration -- which
+// clears a dead token -- before fetching.
+describe('CardView — waits for session hydration when a token is stored', () => {
+  beforeEach(() => { vi.mocked(getCardBySlug).mockClear() })
+
+  function renderWithContext(ctx) {
+    const tree = (c) => (
+      <MemoryRouter initialEntries={['/card/abc123']}>
+        <Routes>
+          <Route element={<Outlet context={c} />}>
+            <Route path="/card/:id" element={<CardView />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    )
+    const utils = render(tree(ctx))
+    return { ...utils, update: (c) => utils.rerender(tree(c)) }
+  }
+
+  it('holds the fetch until authReady, then fetches once', async () => {
+    const { update } = renderWithContext({ authReady: false, currentUser: null })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(getCardBySlug).not.toHaveBeenCalled()
+
+    update({ authReady: true, currentUser: { id: 'u1' } })
+    await waitFor(() => expect(getCardBySlug).toHaveBeenCalledTimes(1))
   })
 })
