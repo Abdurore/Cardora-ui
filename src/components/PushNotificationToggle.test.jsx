@@ -40,12 +40,24 @@ function clearSupport() {
 
 describe('PushNotificationToggle', () => {
   beforeEach(() => {
+    // VITE_* vars are build-time and absent under vitest unless a local .env
+    // happens to set one; the component needs a real base64url key to decode.
+    vi.stubEnv('VITE_VAPID_PUBLIC_KEY', 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U')
     vi.mocked(subscribeToPush).mockReset().mockResolvedValue({})
     vi.mocked(unsubscribeFromPush).mockReset().mockResolvedValue({})
   })
 
   afterEach(() => {
     clearSupport()
+    vi.unstubAllEnvs()
+  })
+
+  it('renders nothing when no VAPID key is configured for the build', async () => {
+    vi.stubEnv('VITE_VAPID_PUBLIC_KEY', '')
+    stubSupport()
+    render(<PushNotificationToggle currentUser={USER} />)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(screen.queryByText('Push Notifications')).not.toBeInTheDocument()
   })
 
   it('renders nothing for a signed-out visitor', () => {

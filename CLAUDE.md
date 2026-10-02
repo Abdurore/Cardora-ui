@@ -18,7 +18,7 @@ npx vitest                                        # watch mode
 
 `Backend/Cardora/` is a separate, independently git-tracked repo (gitignored here) kept only as the schema reference this file cites. Both `vite.config.js` (vitest `exclude`) and `eslint.config.js` (`globalIgnores`) skip `Backend/**` — it's a Node/Jest project, so linting it under this config's browser globals reported 275 phantom `no-undef` errors that buried every real frontend one. Keep it excluded when touching either config.
 
-Env (`.env`, gitignored; see `.env.example`): `VITE_API_BASE_URL` (falls back to the deployed Render backend if unset), `VITE_CLOUDINARY_CLOUD_NAME`, `VITE_CLOUDINARY_UPLOAD_PRESET`.
+Env (`.env`, gitignored; see `.env.example`): `VITE_API_BASE_URL` (falls back to the deployed Render backend if unset), `VITE_CLOUDINARY_CLOUD_NAME`, `VITE_CLOUDINARY_UPLOAD_PRESET`, `VITE_VAPID_PUBLIC_KEY` (web push; without it the Profile push toggle hides itself).
 
 **`VITE_*` values are inlined at build time, so they must exist on the deploy host (Vercel → Settings → Environment Variables), and changing them requires a rebuild — setting them on a live project does nothing until you redeploy.** Missing Cloudinary vars fail silently in the worst way: `uploadToCloudinary`'s guard folds to `true`, the minifier drops the whole upload implementation, and the deployed chunk becomes a bare `throw` while the build still reports success. `vite.config.js` now guards this — hard-fails a build on a deploy host (`VERCEL`/`CI` set), warns-but-builds locally so contributors without a `.env` aren't blocked. Override with `SKIP_ENV_CHECK=1`.
 
