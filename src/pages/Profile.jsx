@@ -17,6 +17,7 @@ import { uploadToCloudinary, dataUrlToBlob } from '../lib/cloudinary.js'
 
 const CURRENCY_FALLBACK = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR']
 import { getUserAnalytics, getCurrencies, updateCurrency, getUserCurrency, getMyTemplates, createPremiumCheckout, giftPremium, getProfileBackgrounds, equipProfileBackground, updateTemplate, getEnterpriseAdStats, getReminders, createReminder, deleteReminder } from '../lib/api.js'
+import { validateUsername } from '../lib/username.js'
 import { mapTemplateToCard, normalizeCheckoutSession } from '../lib/backendMappers.js'
 import { EXPLORE_OCCASION_TABS } from '../lib/occasionTaxonomy.js'
 
@@ -395,8 +396,13 @@ function Profile() {
   }
 
   const handleSaveProfile = async () => {
-    if (!editForm.username.trim()) {
-      setEditMsg({ text: 'Username is required.', ok: false })
+    const nextUsername = editForm.username.trim().replace(/^@/, '')
+    const usernameChanged = nextUsername.toLowerCase() !== String(currentUser?.username || '').toLowerCase()
+    // Only a *changed* username is checked -- an account created before the
+    // username rule existed can still edit its bio.
+    const usernameError = usernameChanged ? validateUsername(nextUsername) : (nextUsername ? '' : 'Username is required.')
+    if (usernameError) {
+      setEditMsg({ text: usernameError, ok: false })
       return
     }
     setIsSavingProfile(true)
@@ -406,10 +412,7 @@ function Profile() {
       // separate display name, and the `name` this used to send 400'd every
       // save. Unchanged fields aren't re-sent.
       const payload = { bio: editForm.bio.trim() }
-      const nextUsername = editForm.username.trim().replace(/^@/, '')
-      if (nextUsername.toLowerCase() !== String(currentUser?.username || '').toLowerCase()) {
-        payload.username = nextUsername
-      }
+      if (usernameChanged) payload.username = nextUsername
       const result = await updateProfile(payload)
       if (!result?.ok) {
         setEditMsg({ text: result?.message || 'Could not update profile.', ok: false })

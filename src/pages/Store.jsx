@@ -74,7 +74,7 @@ function Store() {
       referralsCount: currentUser?.referralsCount ?? 0,
       referralCode: currentUser?.referralCode || '',
       referralLink: currentUser?.referralCode
-        ? `https://cardora.studio/signup?ref=${currentUser.referralCode}`
+        ? `${window.location.origin}/signup?ref=${encodeURIComponent(currentUser.referralCode)}`
         : (currentUser?.referralLink || ''),
     }),
     [currentUser],
