@@ -96,7 +96,7 @@ function RewardedAds({ onBalanceUpdate }) {
   const [error, setError] = useState('')
   const [cooldown, setCooldown] = useState(0)
   const [muted, setMuted] = useState(false)
-  const [watchedSecs, setWatchedSecs] = useState(0)
+  const [, setWatchedSecs] = useState(0)
   const [grant, setGrant] = useState(null)
   const [userCards, setUserCards] = useState(null)
   const [selectedCardId, setSelectedCardId] = useState('')

@@ -739,10 +739,6 @@ export function cardObjectToBackendPayload(cardObject, {
       bgValue = normaliseHex(feColors[0] || colors.accent || colors.background, FB.background)
     }
 
-    // lock.type: FE uses 'time', backend requires 'timer' (handbook Common AI Mistakes #3)
-    const rawLock = cardObject.interaction?.lock?.type || 'none'
-    const lockType = safeEnum(rawLock === 'time' ? 'timer' : rawLock, VALID_LOCK)
-
     const AMBIENT_EFFECT_MAP = {
       shimmer: 'starfield',
       aurora: 'starfield',

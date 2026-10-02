@@ -27,7 +27,7 @@ import { SEAL_ICON_OPTIONS } from '../lib/sealIcons.jsx'
 import StudioEnvelope from '../components/StudioEnvelope.jsx'
 import AmbientParticles from '../components/AmbientParticles.jsx'
 import { getTierLimits } from '../lib/tierLimits.js'
-import { PALETTES, getPalettesForTier, applyPalette } from '../lib/palettes.js'
+import { PALETTES, applyPalette } from '../lib/palettes.js'
 import { effectKeyToGiftName } from '../lib/gifts.js'
 import InlineColorPicker from '../components/InlineColorPicker.jsx'
 import { computeCardTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, TIER_COST_BY_TYPE, fontTier } from '../lib/tierRequirements.js'
@@ -237,26 +237,6 @@ function formatTime(seconds) {
   return `${mins}:${String(secs).padStart(2, '0')}`
 }
 
-function wrapCanvasText(ctx, text, centerX, startY, maxWidth, lineHeight) {
-  const words = String(text || '').split(/\s+/).filter(Boolean)
-  if (!words.length) return
-  let line = ''
-  let currentY = startY
-
-  for (const word of words) {
-    const nextLine = line ? `${line} ${word}` : word
-    if (ctx.measureText(nextLine).width > maxWidth && line) {
-      ctx.fillText(line, centerX, currentY)
-      line = word
-      currentY += lineHeight
-    } else {
-      line = nextLine
-    }
-  }
-
-  if (line) ctx.fillText(line, centerX, currentY)
-}
-
 
 // `silenced` is set whenever this preview has no business making noise — the
 // "Play it through" modal is open (it plays the card's own music, so the two
@@ -460,11 +440,6 @@ function CardStudio() {
   )
   const canUseBackgroundMusic = tierLimits.allowMusic
   const availablePalettes = PALETTES
-  const allowedPaletteIds = useMemo(
-    () => new Set(getPalettesForTier('elite').map(p => p.id)),
-    [],
-  )
-
   const activeTools = useMemo(
     () => ALL_TOOLS.filter(t => allowedToolIds.includes(t.id)),
     [allowedToolIds],
@@ -1096,34 +1071,6 @@ function CardStudio() {
     setCardObject(prev => {
       pushUndoSnapshot(JSON.stringify(prev))
       return applyPalette(prev, palette)
-    })
-  }
-
-  const applyPrimaryColor = (color) => {
-    setCardObject(prev => {
-      pushUndoSnapshot(JSON.stringify(prev))
-      const next = structuredClone(prev)
-      next.palette = {
-        ...(next.palette || {}),
-        id: null,
-        primary: color,
-      }
-      next.theme = next.theme || {}
-      next.card = next.card || {}
-      next.closedState = next.closedState || {}
-      next.theme.headingColor = color
-      next.card.headingColor = color
-      next.card.scrollbarColor = color
-      next.closedState.headingColor = color
-      next.closedState.borderColor = color
-      next.closedState.button = next.closedState.button || {}
-      next.closedState.button.backgroundColor = color
-      next.closedState.button.borderColor = color
-      next.questions = next.questions || {}
-      next.questions.button = next.questions.button || {}
-      next.questions.button.backgroundColor = color
-      next.questions.button.borderColor = color
-      return next
     })
   }
 
@@ -3333,24 +3280,7 @@ function CardStudio() {
     const headingSize = c.theme.headingSize ?? 28
     const bodySize = c.theme.bodySize ?? 16
     const imgs = c.media.images
-    const imgCount = Math.min(imgs.length, 3)
     const elementOrder = c.layout?.elementOrder || ['media', 'heading', 'body']
-
-    // Helper: move an element key up (-1) or down (+1) in the order
-    const moveEl = (key, dir) => {
-      const order = [...elementOrder]
-      const idx = order.indexOf(key)
-      if (idx < 0) return
-      const next = idx + dir
-      if (next < 0 || next >= order.length) return
-      ;[order[idx], order[next]] = [order[next], order[idx]]
-      update('layout.elementOrder', order)
-    }
-
-    // Map element type → order key
-    const elKey = activeEditEl?.type === 'image' ? 'media'
-      : activeEditEl?.type === 'heading' ? 'heading'
-      : activeEditEl?.type ? 'body' : null
 
     // ─── Per-element JSX blocks ───────────────────────────────────────────
     const mediaBlock = !compact && imgs.length > 0 ? (

@@ -67,12 +67,12 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme === 'light' ? 'light' : ''
-    try { localStorage.setItem('cardora-theme', theme) } catch {}
+    try { localStorage.setItem('cardora-theme', theme) } catch { /* storage unavailable */ }
   }, [theme])
 
   useEffect(() => {
     let stored = null
-    try { stored = localStorage.getItem('cardora-theme') } catch {}
+    try { stored = localStorage.getItem('cardora-theme') } catch { /* storage unavailable */ }
     if (stored === 'light' || stored === 'dark') return undefined
     const media = window.matchMedia?.('(prefers-color-scheme: light)')
     if (!media) return undefined

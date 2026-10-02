@@ -33,7 +33,6 @@ import {
   createCardClassic,
   createCardPremium,
   createCardElite,
-  createCardAnonymous,
   createCardPollClassic,
   createCardPollElite,
   createCardChainClassic,

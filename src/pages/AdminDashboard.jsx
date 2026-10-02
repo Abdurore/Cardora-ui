@@ -230,7 +230,7 @@ function TablePagination({ page, setPage, totalPages, total, pageSize }) {
 }
 
 function AdminDashboard() {
-  const { currentUser, balance, openAuthModal, marketplaceTemplates, deleteMarketplaceTemplate, authReady } = useOutletContext()
+  const { currentUser, balance, openAuthModal, deleteMarketplaceTemplate, authReady } = useOutletContext()
   const navigate = useNavigate()
   const { confirm: appConfirm, ConfirmModal } = useAppConfirm()
   const [statusModal, setStatusModal] = useState(null) // { type, title?, message }

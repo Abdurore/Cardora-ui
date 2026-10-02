@@ -103,7 +103,6 @@ function CardPreviewModal({
   studioType = 'personal',
   pollData = null,
   triviaData = null,
-  anonTemplate = null,
   pageMode = false,
   cardTitle = '',
   onPollSubmit = null,
@@ -182,7 +181,7 @@ function CardPreviewModal({
   const [questionSubmitting, setQuestionSubmitting] = useState(false)
   const [questionSubmitError, setQuestionSubmitError] = useState('')
   const [fadeBody, setFadeBody] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
-  const [bodyVisible, setBodyVisible] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
+  const [, setBodyVisible] = useState(!envelopeEnabled || (pageMode && !isPersonalType))
   // Delays the typewriter's start until just after the open-effect burst's
   // heaviest initial frame, instead of both firing in the same tick — that
   // concurrent start was a real source of the "lags on open" complaint.
@@ -996,13 +995,6 @@ function CardPreviewModal({
     }
     return children
   }
-
-  const previewImageStyle = primaryImage
-    ? {
-        objectFit: primaryImage.fit || 'cover',
-        objectPosition: `${primaryImage.positionX ?? 50}% ${primaryImage.positionY ?? 50}%`,
-      }
-    : {}
 
   useEffect(() => {
     if (stage !== 'open') return undefined

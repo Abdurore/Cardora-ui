@@ -1,5 +1,5 @@
 import { Link, Navigate, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import { getSignupBonusAvailability } from '../lib/api.js'
 import { validateUsername } from '../lib/username.js'
 
@@ -31,7 +31,7 @@ function AuthPage({ mode = 'login' }) {
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [slowHint, setSlowHint] = useState(false)
+  const [, setSlowHint] = useState(false)
   const [pendingVerification, setPendingVerification] = useState(null) // after signup, show OTP step
   const [showCurrencyMenu, setShowCurrencyMenu] = useState(false)
   const [forgotFlow, setForgotFlow] = useState(null) // null | 'email' | 'reset'

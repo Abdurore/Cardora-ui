@@ -66,9 +66,7 @@ function Store() {
 
   const validPacks = (couponPackages || []).filter(p => (p.cc || 0) > 0)
   const packs = validPacks
-  const referralRewards = (currentUser?.ccIncomeHistory || []).filter(
-    (entry) => (entry.type || entry.source) === 'referral_milestone',
-  )
+
   const referralStats = useMemo(
     () => ({
       referralsCount: currentUser?.referralsCount ?? 0,

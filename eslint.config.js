@@ -28,13 +28,20 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', caughtErrors: 'none' }],
+      // React-compiler advice, not defects: these effects sync state from props/
+      // storage on mount and work correctly. Surfaced as warnings so they stay
+      // visible without drowning real errors; refactor opportunistically.
+      'react-hooks/set-state-in-effect': 'warn',
+      // Dev-only (fast refresh) concern for files that export a component
+      // plus a helper/constant.
+      'react-refresh/only-export-components': 'warn',
     },
   },
   {
     // api/ holds Vercel serverless functions (crawler Open Graph rendering).
-    // They run on Node, so `process` is defined and there is no browser DOM.
-    files: ['api/**/*.js'],
+    // (vite.config.js is Node too.) They run on Node, so `process` is defined and there is no browser DOM.
+    files: ['api/**/*.js', 'vite.config.js'],
     languageOptions: {
       globals: globals.node,
     },

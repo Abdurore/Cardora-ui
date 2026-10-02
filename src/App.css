@@ -28933,3 +28933,57 @@ textarea:focus-visible,
   background-color: var(--surface);
   background-color: color-mix(in srgb, var(--surface) 95%, transparent);
 }
+
+/* ═══════════════════════════════════════════════════
+   LOW-PRIORITY POLISH (light-mode contrast + mobile hero/topbar)
+   ═══════════════════════════════════════════════════ */
+
+/* The 7.16 rule hiding these on mobile sits earlier in the file than the
+   base `display: flex` above it, so it lost. Re-assert at the end. */
+@media (max-width: 720px) {
+  .hero-format-chips { display: none; }
+}
+
+/* Quick Create topbar on phones: the right-hand cluster stacked the CC pill
+   over the Studio button, making a three-row bar. Keep it to one row. */
+@media (max-width: 540px) {
+  .qc-topbar-right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  .qc-back-text { display: none; }
+  .qc-back { padding: 6px; }
+  .qc-topbar { gap: 4px; }
+  .qc-topbar-title { font-size: 0.82rem; }
+}
+
+/* Light mode: these only had dark-theme colours. */
+[data-theme="light"] .qc-cc-balance-chip {
+  color: var(--primary-strong, var(--primary));
+  font-weight: 700;
+}
+[data-theme="light"] .qc-palette-more {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+}
+[data-theme="light"] .qc-palette-more:hover { background: var(--accent-tint); }
+[data-theme="light"] .qc-palette-more-num { color: var(--primary-strong, var(--primary)); }
+[data-theme="light"] .qc-palette-more .qc-swatch-name { color: var(--text-muted); }
+
+[data-theme="light"] .hero-bonus-banner {
+  color: var(--text);
+  background: linear-gradient(135deg, rgba(16, 163, 98, 0.14), rgba(10, 122, 143, 0.08));
+  border-color: rgba(16, 163, 98, 0.45);
+  box-shadow: 0 8px 24px rgba(16, 163, 98, 0.12);
+}
+[data-theme="light"] .hero-bonus-text strong { color: #0b7a4c; }
+[data-theme="light"] .hero-bonus-arrow { color: #0b7a4c; }
+
+@media (max-width: 400px) {
+  .qc-topbar { padding: 10px 8px; }
+  .qc-cc-balance-chip { font-size: 0.7rem; }
+  .qc-topbar-title { overflow: hidden; text-overflow: ellipsis; }
+  .qc-studio-link-btn { padding: 7px 7px; min-width: 30px; }
+}
