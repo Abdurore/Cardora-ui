@@ -50,6 +50,14 @@ function CardView() {
   const [isScheduled, setIsScheduled] = useState(false)
   const [scheduledUnlockAt, setScheduledUnlockAt] = useState(null)
   const [countdownText, setCountdownText] = useState('')
+  // Timer lock (enhancements.lock.type === 'timer'): the backend 403s the
+  // read with lockType 'timer' + unlockAt until the time passes. This used
+  // to fall into the generic 403 branch and show a password box for a card
+  // that has no password.
+  const [isTimerLocked, setIsTimerLocked] = useState(false)
+  const [timerUnlockAt, setTimerUnlockAt] = useState(null)
+  const [timerCountdownText, setTimerCountdownText] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
   const [notifyEmail, setNotifyEmail] = useState('')
   const [notifySubmitting, setNotifySubmitting] = useState(false)
   const [notifySubmitted, setNotifySubmitted] = useState(false)
@@ -156,6 +164,13 @@ function CardView() {
           setLoading(false)
           if (!cancelled) return
         }
+        if (err.payload?.lockType === 'timer') {
+          setIsTimerLocked(true)
+          setTimerUnlockAt(err.payload?.unlockAt || null)
+          setLockHint(err.payload?.lockHint || '')
+          setLoading(false)
+          if (!cancelled) return
+        }
         if (err.status === 403 || err.payload?.locked) {
           setNeedsPassword(true)
           setLockHint(err.payload?.lockHint || '')
@@ -205,7 +220,7 @@ function CardView() {
       if (!cancelled) { setCard(null); setLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [id, waitForSession])
+  }, [id, waitForSession, reloadKey])
 
   // 6.3: ticks the scheduled-send countdown while the gate is showing.
   useEffect(() => {
@@ -216,6 +231,26 @@ function CardView() {
     const interval = setInterval(tick, 30000)
     return () => clearInterval(interval)
   }, [isScheduled, scheduledUnlockAt])
+
+  // Ticks the timer-lock countdown, then re-fetches the card on its own the
+  // moment the unlock time passes -- no reload needed.
+  useEffect(() => {
+    if (!timerUnlockAt) return undefined
+    const target = new Date(timerUnlockAt).getTime()
+    if (!Number.isFinite(target)) return undefined
+    const tick = () => {
+      const remaining = target - Date.now()
+      setTimerCountdownText(formatCountdown(remaining))
+      if (remaining <= 0) {
+        setIsTimerLocked(false)
+        setTimerUnlockAt(null)
+        setReloadKey((k) => k + 1)
+      }
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [timerUnlockAt])
 
   const handleNotifyMeSubmit = async () => {
     const trimmed = notifyEmail.trim()
@@ -365,6 +400,23 @@ function CardView() {
               </button>
             </div>
           )}
+          <button className="ghost" type="button" onClick={() => navigate('/')}>
+            Back Home
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Timer lock: not open yet ──────────────────────────────────────────
+  if (isTimerLocked) {
+    return (
+      <div className="cv-page-gate">
+        <div className="cv-gate-card">
+          <span className="cv-gate-lock">⏳</span>
+          <h2>This card is locked</h2>
+          <p>{lockHint.trim() || (timerUnlockAt ? `It unlocks on ${new Date(timerUnlockAt).toLocaleString()}.` : 'The sender set this card to unlock later.')}</p>
+          {timerCountdownText && <p className="cv-gate-countdown">{timerCountdownText}</p>}
           <button className="ghost" type="button" onClick={() => navigate('/')}>
             Back Home
           </button>

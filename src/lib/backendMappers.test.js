@@ -579,3 +579,24 @@ describe('mapBackendCard — trivia answer key', () => {
     expect(mapped.trivia.questions[0].correctIndex).toBe(1)
   })
 })
+
+// <input type="datetime-local"> gives local wall time with no zone; the
+// backend (UTC) used to read it as UTC, unlocking the card hours off.
+describe('cardObjectToBackendPayload — timer lock timezone', () => {
+  it('sends the unlock time as an absolute ISO instant in the sender\'s timezone', () => {
+    const cardObject = structuredClone(defaultCardObject)
+    cardObject.content.heading = 'Hi'
+    cardObject.content.body = 'Body'
+    cardObject.interaction.lock = { type: 'time', value: '2026-12-24T20:00' }
+    const { enhancements } = cardObjectToBackendPayload(cardObject, { type: 'personal', tier: 'elite' })
+    expect(enhancements.lock.type).toBe('timer')
+    expect(enhancements.lock.value).toBe(new Date('2026-12-24T20:00').toISOString())
+  })
+
+  it('leaves an already-absolute value alone', () => {
+    const cardObject = structuredClone(defaultCardObject)
+    cardObject.interaction.lock = { type: 'time', value: '2026-12-24T19:00:00.000Z' }
+    const { enhancements } = cardObjectToBackendPayload(cardObject, { type: 'personal', tier: 'elite' })
+    expect(enhancements.lock.value).toBe('2026-12-24T19:00:00.000Z')
+  })
+})

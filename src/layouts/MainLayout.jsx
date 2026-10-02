@@ -881,6 +881,15 @@ function MainLayout() {
       } else if (resolvedType === 'anonymous') {
         if (!String(c.message || '').trim()) missing = 'Anonymous template needs a message.'
       }
+      // A password/timer lock with no value used to be sent anyway, with the
+      // mapper silently filling in "0000" / "unlocks in 24h" -- the sender
+      // never knew what their card was actually locked with.
+      const lock = cardObject?.interaction?.lock
+      if (!missing && lock?.type === 'password' && !String(lock.value || '').trim()) {
+        missing = 'Set a password for the lock, or choose a different lock type.'
+      } else if (!missing && lock?.type === 'time' && !String(lock.value || '').trim()) {
+        missing = 'Pick an unlock date and time for the timer lock.'
+      }
       if (missing) {
         return { ok: false, message: missing }
       }

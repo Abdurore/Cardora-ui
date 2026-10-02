@@ -4,9 +4,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useOutletContext } from 'react-router-dom'
 import { PALETTES, applyPalette } from '../lib/palettes.js'
 import { defaultCardObject } from '../data/cardDefaults.js'
-import { attachGiftToCard, getCardPrices, getTemplateById, getMyCard, trackEvent, createReminder } from '../lib/api.js'
+import { getCardPrices, getTemplateById, getMyCard, trackEvent, createReminder } from '../lib/api.js'
 import { EXPLORE_OCCASION_TABS } from '../lib/occasionTaxonomy.js'
-import { effectKeyToGiftName } from '../lib/gifts.js'
 import { GiftIcon } from '../components/GiftCard.jsx'
 import { uploadToCloudinary } from '../lib/cloudinary.js'
 import { computeCardTier, getTierCost, getCardTotalCost, computeFeatureSurcharges, normalizeCardPrices, normalizeFeatureSurcharges, fontTier } from '../lib/tierRequirements.js'
@@ -98,7 +97,7 @@ function QuickCreate() {
   const navigate = useNavigate()
   const cardType = params.get('type') || 'personal'
 
-  const { createCardOnBackend, currentUser, openAuthModal, balance, inventory = [], canInstall, promptInstall } = useOutletContext()
+  const { createCardOnBackend, currentUser, openAuthModal, balance, inventory = [], consumeGift, canInstall, promptInstall } = useOutletContext()
 
   // Live pricing, same source CardStudio uses — Quick mode used to rely on
   // the hardcoded fallback table only, so a backend price change would
@@ -264,6 +263,11 @@ function QuickCreate() {
   }
 
   // Build the cardObject from current QC state — used for both sending and "Open in Studio"
+  const selectedGift = useMemo(() => {
+    if (!selectedGiftId || selectedGiftId === 'none') return null
+    return inventory.find((g, i) => (g.id || `${g.inventoryId || g.giftId || g.effectKey || g.title}-${i}`) === selectedGiftId) || null
+  }, [selectedGiftId, inventory])
+
   const buildCardObject = () => {
     const baseCard = applyPalette({ ...defaultCardObject }, selectedPalette)
     return {
@@ -287,10 +291,22 @@ function QuickCreate() {
       // Fed into computeCardTier below — gift selection lives in its own
       // `selectedGiftId` state here (attach happens post-create), so it has
       // to be mirrored onto the built object for the shared tier rules to see it.
-      giftEffect: {
-        ...(baseCard.giftEffect || {}),
-        enabled: !!selectedGiftId && selectedGiftId !== 'none',
-      },
+      giftEffect: (() => {
+        const gift = cardType === 'personal' ? selectedGift : null
+        const inventoryId = gift?.inventoryId || ''
+        return {
+          ...(baseCard.giftEffect || {}),
+          enabled: !!gift,
+          // Rides on the create-card request itself (cardObjectToBackendPayload
+          // -> giftInventoryId), same as the Studio: the backend consumes the
+          // gift atomically with the card and rolls the card back if it's no
+          // longer available. The separate post-create /cards/attach-gift call
+          // this replaces sent fields that endpoint's schema rejects, so every
+          // Quick Create gift failed to attach. A local placeholder id (an
+          // unconfirmed purchase) is never a real inventory entry -- not sent.
+          ...(inventoryId && !inventoryId.startsWith('local-') ? { giftInventoryId: inventoryId } : {}),
+        }
+      })(),
     }
   }
 
@@ -298,7 +314,7 @@ function QuickCreate() {
   // selected — same model as the Studio (src/lib/tierRequirements.js).
   const builtCardObject = useMemo(
     buildCardObject,
-    [selectedPalette, selectedFont, cardType, heading, body, anonMessage, images, selectedGiftId],
+    [selectedPalette, selectedFont, cardType, heading, body, anonMessage, images, selectedGift],
   )
   const pollDataForTier = useMemo(() => ({ options: pollOptions }), [pollOptions])
   const triviaDataForTier = useMemo(() => ({ questions: [{ options: triviaOptions }] }), [triviaOptions])
@@ -463,31 +479,12 @@ function QuickCreate() {
         }
       }
 
-      let finalMessage = result.message
-
-      // Attach gift if selected
-      if (selectedGiftId && selectedGiftId !== 'none') {
-        const gift = inventory.find((g, i) => {
-          const instanceId = g.id || `${g.inventoryId || g.giftId || g.effectKey || g.title}-${i}`
-          return instanceId === selectedGiftId
-        })
-        if (gift) {
-          try {
-            const cardId = d?.card?.cardId || d?.cardId || d?.card?.id || d?.id || slug
-            const backendGiftId = gift.inventoryId || gift.giftId || gift._id || gift.id || ''
-            await attachGiftToCard({
-              cardId: cardId,
-              giftId: backendGiftId,
-              giftInventoryId: backendGiftId,
-              giftName: gift.giftName || gift.name || effectKeyToGiftName(gift.effectKey),
-              effectKey: gift.effectKey,
-              amount: gift.amount || ''
-            })
-          } catch (err) {
-            finalMessage = `Card created, but we failed to attach the gift: ${err.message || 'Unknown error'}. Please try again or check your inventory.`
-          }
-        }
+      // The gift (if any) was attached by the create request itself -- drop
+      // it from local inventory so it can't be picked again this session.
+      if (cardObject.giftEffect?.giftInventoryId) {
+        if (selectedGift) consumeGift?.(selectedGift.id || selectedGift.inventoryId)
       }
+      const finalMessage = result.message
 
       setSendResult({ ok: true, slug, cardId: d?.cardId || '', message: finalMessage })
       // 6.1: "instrument both paths -- entry, step completion, send." The

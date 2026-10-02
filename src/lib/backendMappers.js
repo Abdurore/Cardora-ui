@@ -794,11 +794,24 @@ export function cardObjectToBackendPayload(cardObject, {
         if (lockType === 'none' || lockType === 'tap' || lockType === 'scratch') {
           return { type: lockType, value: '' }
         }
-        // password/timer — must have a non-empty value
+        // password/timer — must have a non-empty value. MainLayout's
+        // handleCreateCard refuses to send an empty one (this used to
+        // silently lock the card with "0000" or "unlocks tomorrow"); the
+        // fallbacks below only keep the payload schema-valid for any other
+        // caller.
         const rawVal = cardObject.interaction?.lock?.value
-        const lockValue = (rawVal != null && String(rawVal).trim())
+        let lockValue = (rawVal != null && String(rawVal).trim())
           ? String(rawVal).trim()
           : (lockType === 'timer' ? new Date(Date.now() + 86400000).toISOString() : '0000')
+        // The Studio's <input type="datetime-local"> yields "2026-10-03T20:00"
+        // -- local wall time with no zone. The backend parses that as UTC
+        // (Render's clock), so the card unlocked hours off for anyone not on
+        // UTC. Resolve it to an absolute instant here, in the sender's own
+        // browser timezone.
+        if (lockType === 'timer' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(lockValue)) {
+          const parsed = new Date(lockValue)
+          if (!Number.isNaN(parsed.getTime())) lockValue = parsed.toISOString()
+        }
         return { type: lockType, value: lockValue }
       })(),
       ambientEffect: {
