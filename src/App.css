@@ -3847,6 +3847,18 @@
   border-color: rgba(98, 255, 162, 0.3);
 }
 
+/* Light mode: the neon cyan/mint above is ~1.3:1 on the light send modal. */
+:root[data-theme="light"] .detail-share-copy-btn {
+  color: var(--primary-strong);
+  background: var(--accent-tint);
+  border-color: var(--accent-border);
+}
+:root[data-theme="light"] .detail-share-copy-btn.copied {
+  color: var(--success);
+  background: rgba(5, 150, 105, 0.1);
+  border-color: rgba(5, 150, 105, 0.3);
+}
+
 .detail-share-label {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -5158,6 +5170,22 @@
   text-shadow: 0 0 12px color-mix(in srgb, var(--loader-accent, #7ef7ff) 30%, transparent);
   animation: premiumLoaderTextPulse 3s ease-in-out infinite;
 }
+
+/* CardView error state. Static (no pulse) -- it isn't loading anything. */
+.cv-page-loading p.cv-error-title { margin-bottom: 8px; animation: none; }
+.cv-page-loading p.cv-error-detail {
+  margin-bottom: 20px;
+  font-size: 0.78rem;
+  letter-spacing: normal;
+  text-transform: none;
+  opacity: 0.6;
+  animation: none;
+}
+/* The light-mode .cv-page-loading override switches the background to
+   var(--bg) but the text above stays near-white -- the loading label and
+   the "could not find that card" message were white-on-white. */
+:root[data-theme="light"] .cv-page-loading p { color: var(--text-muted); text-shadow: none; }
+:root[data-theme="light"] .cv-page-loading p.cv-error-title { color: var(--text); }
 
 /* 5.1: the client-rendered mirror of api/card-meta.js's server gate --
    same content, same class names, so there's no flash on handoff. */

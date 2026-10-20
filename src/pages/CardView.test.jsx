@@ -396,3 +396,29 @@ describe('CardView — timer lock', () => {
     await waitFor(() => expect(getCardBySlug).toHaveBeenCalledTimes(2), { timeout: 4000 })
   })
 })
+
+// A network failure (fetch rejects with no status -- e.g. a blocked CORS
+// preflight) is not "card not found": the recipient gets a retry instead of
+// being told their card doesn't exist.
+describe('CardView — fetch failures', () => {
+  it('says it could not reach Cardora and offers a retry on a network error', async () => {
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByText("We couldn't reach Cardora.")).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(screen.queryByText('We could not find that card.')).not.toBeInTheDocument()
+  })
+
+  it('still says not found, with no retry, on a 404', async () => {
+    const err = new Error('Card not found')
+    err.status = 404
+    vi.mocked(getCardBySlug).mockRejectedValueOnce(err)
+
+    renderAt('abc123')
+
+    await waitFor(() => expect(screen.getByText('We could not find that card.')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+  })
+})
