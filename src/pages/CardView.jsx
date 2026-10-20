@@ -35,6 +35,7 @@ function CardView() {
   const [card, setCard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(null)
+  const [fetchErrorStatus, setFetchErrorStatus] = useState(null)
   const [needsPassword, setNeedsPassword] = useState(false)
   const [lockHint, setLockHint] = useState('')
   const [isRevoked, setIsRevoked] = useState(false)
@@ -208,6 +209,7 @@ function CardView() {
           if (!cancelled) return
         }
         console.warn('[CardView] Fetch failed:', err.status, err.message)
+        setFetchErrorStatus(err.status || 0)
         setFetchError(err.status ? `${err.status} — ${err.message}` : err.message)
       }
 
@@ -573,13 +575,27 @@ function CardView() {
   // own colors. Checked: 0.7-alpha near-white on this screen's #080e14
   // clears 8:1+.
   if (!card) {
+    // A network failure (no status) or a server error is transient -- telling
+    // the recipient the card doesn't exist sent them away from a card that
+    // was fine. Only a 404 means "not found".
+    const isNetworkError = fetchErrorStatus === 0
+    const canRetry = isNetworkError || fetchErrorStatus >= 500
+    const errorTitle = isNetworkError
+      ? "We couldn't reach Cardora."
+      : fetchErrorStatus >= 500
+        ? 'Something went wrong opening this card.'
+        : 'We could not find that card.'
+    const errorDetail = isNetworkError
+      ? 'Check your connection and try again.'
+      : fetchError
     return (
       <div className="cv-page-loading">
-        <p style={{ color: 'rgba(220,242,247,0.7)', marginBottom: 8 }}>We could not find that card.</p>
-        {fetchError && (
-          <p style={{ fontSize: '0.78rem', opacity: 0.45, marginBottom: 20 }}>{fetchError}</p>
+        <p className="cv-error-title">{errorTitle}</p>
+        {errorDetail && <p className="cv-error-detail">{errorDetail}</p>}
+        {canRetry && (
+          <button className="primary" type="button" onClick={() => window.location.reload()}>Try again</button>
         )}
-        <button className="primary" type="button" onClick={() => navigate('/')}>Back to home</button>
+        <button className={canRetry ? 'ghost' : 'primary'} type="button" onClick={() => navigate('/')}>Back to home</button>
       </div>
     )
   }
