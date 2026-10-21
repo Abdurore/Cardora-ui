@@ -2199,6 +2199,29 @@
   gap: 16px;
 }
 
+/* Light mode: the sections and doc switcher kept their dark slabs while the
+   generic light text colour turned their copy dark -- Terms and Privacy were
+   dark-on-dark (~1.5:1). */
+:root[data-theme="light"] .auth-legal-section {
+  background: var(--surface);
+  border-color: var(--border);
+}
+:root[data-theme="light"] .auth-legal-section h4 { color: var(--text); }
+:root[data-theme="light"] .auth-legal-section p,
+:root[data-theme="light"] .legal-page-updated { color: var(--text-muted); }
+:root[data-theme="light"] .legal-page-link {
+  background: var(--btn-bg);
+  border-color: var(--accent-border);
+  color: var(--text-muted);
+}
+:root[data-theme="light"] .legal-page-link:hover,
+:root[data-theme="light"] .legal-page-link.active {
+  color: var(--primary-strong);
+  border-color: var(--primary);
+  box-shadow: none;
+}
+:root[data-theme="light"] .legal-page-shell { box-shadow: 0 12px 40px rgba(12, 25, 41, 0.08); }
+
 .brand-name {
   font-family: 'Cinzel', serif;
   letter-spacing: 0.2em;
@@ -15974,6 +15997,9 @@ a {
    cyan one measured 1.26:1 on white); the icon and hover border still use
    them, but the pricing text needs a readable colour on a light surface. */
 [data-theme="light"] .ccp-type-pricing { color: var(--text-muted); opacity: 1; }
+/* Same for the icons: keep each type's hue, darkened to clear the 3:1
+   graphics minimum (the anonymous cyan icon was ~1.3:1). */
+[data-theme="light"] .ccp-type-icon { color: color-mix(in srgb, var(--type-accent, var(--primary)) 50%, #0c1929); }
 
 .ccp-tier-list {
   display: flex;
@@ -18005,9 +18031,10 @@ a {
   align-items: center;
   padding: 0.28rem 0.75rem;
   border-radius: 999px;
-  border: 1px solid rgba(126, 247, 255, 0.18);
-  background: rgba(126, 247, 255, 0.08);
-  color: rgba(225, 247, 255, 0.8);
+  /* Inside a card preview: derive from the card's ink (cardSurfaceCss). */
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -18044,7 +18071,8 @@ a {
   justify-content: space-between;
   gap: 10px;
   font-size: 0.7rem;
-  color: rgba(214, 236, 242, 0.58);
+  color: inherit;
+  opacity: 0.7;
 }
 
 .cs-preview-pill-toggle {
@@ -22693,8 +22721,8 @@ a {
   border-color: rgba(16, 185, 129, 0.3) !important;
 }
 [data-theme="light"] .profile-income-type { color: var(--text) !important; }
-[data-theme="light"] .profile-income-amount { color: #059669 !important; }
-[data-theme="light"] .profile-income-amount.negative { color: #dc2626 !important; }
+[data-theme="light"] .profile-income-amount { color: var(--success) !important; }
+[data-theme="light"] .profile-income-amount.negative { color: var(--danger) !important; }
 [data-theme="light"] .profile-income-date { color: var(--text-dim) !important; }
 
 /* ── Profile: Danger Zone light ── */
@@ -22702,11 +22730,11 @@ a {
   border-color: rgba(239, 68, 68, 0.18) !important;
   background: rgba(254, 242, 242, 0.6) !important;
 }
-[data-theme="light"] .profile-danger-zone .section-title { color: #dc2626 !important; }
+[data-theme="light"] .profile-danger-zone .section-title { color: var(--danger) !important; }
 [data-theme="light"] .profile-delete-btn {
   border-color: rgba(239, 68, 68, 0.25) !important;
   background: rgba(254, 226, 226, 0.5) !important;
-  color: #dc2626 !important;
+  color: var(--danger) !important;
 }
 [data-theme="light"] .profile-delete-btn:hover:not(:disabled) {
   background: rgba(254, 202, 202, 0.7) !important;
@@ -22723,7 +22751,7 @@ a {
 [data-theme="light"] .profile-template-status-approved,
 [data-theme="light"] .profile-template-status-live {
   background: rgba(16, 185, 129, 0.1) !important;
-  color: #059669 !important;
+  color: var(--success) !important;
   border-color: rgba(16, 185, 129, 0.2) !important;
 }
 [data-theme="light"] .profile-template-status-pending {
@@ -22733,7 +22761,7 @@ a {
 }
 [data-theme="light"] .profile-template-status-rejected {
   background: rgba(239, 68, 68, 0.08) !important;
-  color: #dc2626 !important;
+  color: var(--danger) !important;
   border-color: rgba(239, 68, 68, 0.18) !important;
 }
 
@@ -22753,7 +22781,7 @@ a {
 [data-theme="light"] .profile-card-action-pill.delete {
   border-color: rgba(239, 68, 68, 0.2) !important;
   background: rgba(254, 242, 242, 0.6) !important;
-  color: #dc2626 !important;
+  color: var(--danger) !important;
 }
 [data-theme="light"] .profile-card-action-pill.delete:hover {
   border-color: rgba(239, 68, 68, 0.4) !important;
@@ -22777,7 +22805,7 @@ a {
 }
 [data-theme="light"] .gift-tier-badge.gift-tier-epic {
   background: rgba(220, 38, 38, 0.06) !important;
-  color: #dc2626 !important;
+  color: var(--danger) !important;
   border-color: rgba(220, 38, 38, 0.18) !important;
 }
 [data-theme="light"] .gift-tier-badge.gift-tier-legendary {
@@ -23448,7 +23476,7 @@ a {
   -webkit-backdrop-filter: blur(16px) !important;
   border: 1px solid var(--accent-tint) !important;
 }
-[data-theme="light"] .nav-item { color: #3a7a8e !important; }
+[data-theme="light"] .nav-item { color: var(--text-muted) !important; }
 [data-theme="light"] .nav-item.active { color: var(--primary-strong) !important; font-weight: 700; }
 [data-theme="light"] .nav-icon-svg {
   color: var(--text-dim) !important;
@@ -23468,7 +23496,7 @@ a {
   box-shadow: 0 4px 18px rgba(10,122,143,0.35) !important;
   color: #fff !important;
 }
-[data-theme="light"] .nav-create-label { color: var(--text-dim) !important; }
+[data-theme="light"] .nav-create-label { color: var(--text-muted) !important; }
 
 /* ── Hero (decorative — cyan + mint, light tones) ────── */
 [data-theme="light"] .topbar,
@@ -23705,9 +23733,9 @@ a {
   color: var(--text-muted) !important;
   border-bottom-color: var(--border) !important;
 }
-[data-theme="light"] .wallet-status-processing { background: rgba(217, 119, 6, 0.1) !important; color: #d97706 !important; }
-[data-theme="light"] .wallet-status-successful { background: rgba(5, 150, 105, 0.1) !important; color: #059669 !important; }
-[data-theme="light"] .wallet-status-failed { background: rgba(220, 38, 38, 0.1) !important; color: #dc2626 !important; }
+[data-theme="light"] .wallet-status-processing { background: rgba(217, 119, 6, 0.1) !important; color: var(--warning) !important; }
+[data-theme="light"] .wallet-status-successful { background: rgba(5, 150, 105, 0.1) !important; color: var(--success) !important; }
+[data-theme="light"] .wallet-status-failed { background: rgba(220, 38, 38, 0.1) !important; color: var(--danger) !important; }
 [data-theme="light"] .profile-referral {
   background: var(--surface);
   border-color: var(--accent-mid);
@@ -23929,7 +23957,7 @@ a {
 [data-theme="light"] .ctm-tier-premium .ctm-tier-check {
   background: rgba(217, 119, 6, 0.1) !important;
   border-color: rgba(217, 119, 6, 0.3) !important;
-  color: #d97706 !important;
+  color: var(--warning) !important;
 }
 [data-theme="light"] .ctm-tier-elite .ctm-tier-check {
   background: rgba(124, 58, 237, 0.1) !important;
@@ -24804,10 +24832,10 @@ a {
   border-bottom-color: var(--border) !important;
 }
 [data-theme="light"] .cr-trivia-answer-row.right .cr-trivia-answer-picked {
-  color: #059669 !important;
+  color: var(--success) !important;
 }
 [data-theme="light"] .cr-trivia-answer-row.wrong .cr-trivia-answer-picked {
-  color: #dc2626 !important;
+  color: var(--danger) !important;
 }
 
 /* 7.13: .cp-trivia-option/.cp-trivia-review-* (removed from here) render
@@ -26093,11 +26121,11 @@ a {
 .cs-poll-opt-editable:empty::before { content: attr(data-placeholder); opacity: 0.35; }
 .cs-preview-poll-add-opt {
   margin-top: 6px; width: 100%; padding: 6px 10px;
-  border-radius: 8px; border: 1px dashed rgba(126,239,255,0.25);
-  background: rgba(126,239,255,0.04); color: rgba(126,239,255,0.55);
+  border-radius: 8px; border: 1px dashed color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, currentColor 4%, transparent); color: inherit; opacity: 0.75;
   font-size: 0.78rem; cursor: pointer; text-align: center;
 }
-.cs-preview-poll-add-opt:hover { background: rgba(126,239,255,0.08); color: rgba(126,239,255,0.8); }
+.cs-preview-poll-add-opt:hover { background: color-mix(in srgb, currentColor 8%, transparent); opacity: 1; }
 
 /* Chain prompt inline edit — make the strip flex properly */
 .cs-chain-reply-strip { display: flex; align-items: center; gap: 8px; }
@@ -26485,7 +26513,7 @@ a {
     background: var(--accent-soft) !important;
   }
   [data-theme="light"] .cs-mobile-edit-remove {
-    color: #dc2626 !important;
+    color: var(--danger) !important;
     border-color: rgba(220,38,38,0.2) !important;
   }
 
@@ -26753,7 +26781,7 @@ a {
 [data-theme="light"] .cs-live-badge {
   background: rgba(16,185,129,0.08) !important;
   border-color: rgba(16,185,129,0.2) !important;
-  color: #059669 !important;
+  color: var(--success) !important;
 }
 [data-theme="light"] .cs-sidebar-tab {
   background: transparent !important;
@@ -28837,6 +28865,112 @@ textarea:focus-visible,
 [data-theme="light"] .cs-gx-memory-head { color: var(--text-muted); }
 [data-theme="light"] .cs-gx-memory.is-on .cs-gx-memory-head { color: var(--text); }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   LIGHT MODE — contrast audit fixes
+   Each rule below was measured under WCAG AA in light mode only (dark
+   untouched): dark-theme neon (#7ef7ff/#62ffa2/#c9f7ff…) left on light
+   surfaces, or dark slabs that never got a light override.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Studio — step tracker, tool hints, panel buttons (all ~1.0-2.5:1) */
+[data-theme="light"] .cs-step-num { background: var(--accent-tint); color: var(--text-muted); }
+[data-theme="light"] .cs-step-node.active .cs-step-num { background: var(--primary); color: #fff; }
+[data-theme="light"] .cs-m2-step-num { opacity: 1; }
+[data-theme="light"] .cs-tool-hint { background: var(--accent-tint); color: var(--primary-strong); }
+[data-theme="light"] .cs-tool:hover .cs-tool-hint,
+[data-theme="light"] .cs-tool.active .cs-tool-hint { background: var(--primary); color: #fff; }
+[data-theme="light"] .cs-button {
+  background: var(--btn-bg);
+  border-color: var(--accent-border);
+  color: var(--primary-strong);
+}
+[data-theme="light"] .cs-button:hover { border-color: var(--primary); box-shadow: 0 6px 16px var(--accent-soft); }
+[data-theme="light"] .cs-tier-meter-cost { opacity: 1; }
+[data-theme="light"] .cs-tier-pip-elite { color: #7a5c1e; }
+
+/* Send receipt — Cancel was pale cyan on grey (2.4:1) */
+[data-theme="light"] .cs-send-confirm-cancel {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text-muted);
+}
+[data-theme="light"] .cs-send-confirm-cancel:hover { background: var(--hover); color: var(--text); }
+[data-theme="light"] .cs-send-confirm-balance { color: var(--text-muted); }
+[data-theme="light"] .cs-send-confirm-balance strong { color: var(--text); }
+[data-theme="light"] .cs-send-confirm-short { color: var(--danger); }
+
+/* Profile — Edit Profile was invisible (1.1:1); reminders panel stayed a
+   dark slab (added after .profile-currency got its light override). */
+[data-theme="light"] .profile-edit-btn {
+  background: var(--btn-bg);
+  border-color: var(--accent-border);
+  color: var(--primary-strong);
+}
+[data-theme="light"] .profile-edit-btn:hover { background: var(--btn-bg-hover); border-color: var(--primary); }
+[data-theme="light"] .profile-artist-apply-btn {
+  background: rgba(180, 83, 9, 0.08);
+  border-color: rgba(180, 83, 9, 0.3);
+  color: var(--warning);
+}
+[data-theme="light"] .profile-reminders {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: 0 4px 18px rgba(12, 25, 41, 0.05);
+}
+[data-theme="light"] .profile-reminders .section-title { color: var(--text); }
+[data-theme="light"] .profile-handle { color: var(--primary) !important; }
+[data-theme="light"] .profile-currency-saving { color: var(--success); }
+
+/* Signup bonus banner — cyan on pale cyan (1.3:1) */
+[data-theme="light"] .auth-bonus-banner {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--primary-strong);
+}
+
+/* Card responses — avatars, live badge (neon on white, ~1.1:1) */
+[data-theme="light"] .cr-trivia-avatar { background: var(--accent-tint); color: var(--primary-strong); }
+[data-theme="light"] .cr-chain-avatar { background: rgba(4, 120, 87, 0.12); color: #065f46; }
+[data-theme="light"] .cr-live-badge { color: var(--success); opacity: 1; }
+
+/* Admin */
+[data-theme="light"] .admin-status-ok { color: var(--success); }
+[data-theme="light"] .admin-status-err { color: var(--danger); }
+[data-theme="light"] .admin-role-chip.admin { background: rgba(180, 83, 9, 0.12); color: #92400e; }
+[data-theme="light"] .admin-action-btn.approve { color: #1b5e20; }
+[data-theme="light"] .admin-action-btn.reject,
+[data-theme="light"] .admin-action-btn.danger { color: #b71c1c; }
+[data-theme="light"] .admin-media-block {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* 404 card is dark by design in both themes: the blanket light-mode `p`
+   rule turned its kicker the light theme's muted grey (2.8:1). */
+[data-theme="light"] .notfound-card .notfound-kicker { color: #7ef7ff; }
+[data-theme="light"] .notfound-card .ghost { color: #c9f7ff; border-color: rgba(92, 231, 242, 0.4); }
+
+/* Opacity-dimmed links that slipped under 4.5:1 once on a light page */
+[data-theme="light"] .hero-copy .ghost,
+[data-theme="light"] .format-card-cta { opacity: 1; }
+
+/* Bottom nav: 75% white glass turned grey over the dark hero card, taking
+   its labels to 2.7:1. Still frosted, just less see-through. */
+[data-theme="light"] .screen-nav,
+[data-theme="light"] .screen-header { background: rgba(255, 255, 255, 0.92) !important; }
+
+/* Responses page signature: keep the card type's hue, darkened enough to
+   read on the light page (raw #ffe066/#62ffa2 measured ~1.2:1). */
+[data-theme="light"] .cr-wrap .cp-personal-signature-cardora {
+  color: color-mix(in srgb, var(--sig-accent, var(--primary)) 40%, #0c1929);
+}
+[data-theme="light"] .cs-preview-watermark-cta { color: var(--text-dim); }
+[data-theme="light"] .cs-preview-watermark-cta:hover { color: var(--text); }
+
+/* Card view report trigger floats over the card page in both themes;
+   0.6-alpha white measured 2.7:1 on its own glass. */
+.cv-report-trigger { color: rgba(255, 255, 255, 0.82); background: rgba(8, 14, 20, 0.68); }
+
 
 /* ═══════════════════════════════════════════════════════════════════════
    PERFORMANCE TIERS  (src/lib/perfTier.js sets <html data-perf="high|mid|low">)
@@ -29006,8 +29140,8 @@ textarea:focus-visible,
   border-color: rgba(16, 163, 98, 0.45);
   box-shadow: 0 8px 24px rgba(16, 163, 98, 0.12);
 }
-[data-theme="light"] .hero-bonus-text strong { color: #0b7a4c; }
-[data-theme="light"] .hero-bonus-arrow { color: #0b7a4c; }
+[data-theme="light"] .hero-bonus-text strong { color: #065f46; }
+[data-theme="light"] .hero-bonus-arrow { color: #065f46; }
 
 @media (max-width: 400px) {
   .qc-topbar { padding: 10px 8px; }

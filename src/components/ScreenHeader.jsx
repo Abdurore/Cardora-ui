@@ -2,16 +2,9 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { MdLightMode, MdDarkMode, MdNotificationsNone } from 'react-icons/md'
 import { getNotifications, markNotificationRead } from '../lib/api.js'
+import { applyTheme, getStoredTheme, resolveTheme, storeTheme } from '../lib/theme.js'
 
 const BRAND_LOGO = '/cardora-icon.png?v=3'
-
-function getDeviceTheme() {
-  try {
-    return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
-  } catch {
-    return 'dark'
-  }
-}
 
 function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
   const navigate = useNavigate()
@@ -56,32 +49,30 @@ function ScreenHeader({ user, onAuthOpen, balance = 0 }) {
     }
   }
 
-  const [theme, setTheme] = useState(() => {
-    try {
-      const stored = localStorage.getItem('cardora-theme')
-      return stored === 'light' || stored === 'dark' ? stored : getDeviceTheme()
-    } catch {
-      return getDeviceTheme()
-    }
-  })
+  const [theme, setTheme] = useState(resolveTheme)
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme === 'light' ? 'light' : ''
-    try { localStorage.setItem('cardora-theme', theme) } catch { /* storage unavailable */ }
+    applyTheme(theme)
   }, [theme])
 
+  // No explicit choice yet: follow the OS theme live.
   useEffect(() => {
-    let stored = null
-    try { stored = localStorage.getItem('cardora-theme') } catch { /* storage unavailable */ }
-    if (stored === 'light' || stored === 'dark') return undefined
+    if (getStoredTheme()) return undefined
     const media = window.matchMedia?.('(prefers-color-scheme: light)')
     if (!media) return undefined
-    const handleChange = () => setTheme(media.matches ? 'light' : 'dark')
+    const handleChange = () => {
+      if (!getStoredTheme()) setTheme(media.matches ? 'light' : 'dark')
+    }
     media.addEventListener?.('change', handleChange)
     return () => media.removeEventListener?.('change', handleChange)
   }, [])
 
-  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light')
+  // Only an explicit toggle is remembered.
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light'
+    storeTheme(next)
+    setTheme(next)
+  }
 
   return (
     <header className="screen-header">

@@ -1,17 +1,38 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 const SESSION_SHOWN_KEY = 'cardora:bannerShownThisSession'
 const DISPLAY_DELAY_MS = 2200
 const AUTO_DISMISS_MS = 9000
+// "Welcome back" means back after a while. MainLayout records
+// cardora:lastActive on unload (seeded on first login); without this check
+// the banner greeted every logged-in user once per browser session.
+const ABSENCE_MS = 3 * 24 * 60 * 60 * 1000
+// Never over a card being opened or composed -- it covered the middle of
+// the Studio canvas and interrupted recipients mid-reveal.
+const SUPPRESSED_PATHS = /^\/(card|studio|quick|create)(\/|$)/
+
+function wasAwayLong() {
+  try {
+    const last = Number(localStorage.getItem('cardora:lastActive'))
+    return Number.isFinite(last) && last > 0 && Date.now() - last >= ABSENCE_MS
+  } catch {
+    return false
+  }
+}
 
 function WelcomeBackBanner({ currentUser }) {
   const [visible, setVisible] = useState(false)
   const [exiting, setExiting] = useState(false)
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const suppressed = SUPPRESSED_PATHS.test(pathname)
+  // Read once on mount: the unload handler overwrites lastActive at the end
+  // of this session, and the comparison is against the previous one.
+  const [awayLong] = useState(wasAwayLong)
 
   useEffect(() => {
-    if (!currentUser) return
+    if (!currentUser || !awayLong || suppressed) return
 
     const alreadyShown = sessionStorage.getItem(SESSION_SHOWN_KEY)
     if (alreadyShown) return
@@ -22,7 +43,7 @@ function WelcomeBackBanner({ currentUser }) {
     }, DISPLAY_DELAY_MS)
 
     return () => clearTimeout(timer)
-  }, [currentUser])
+  }, [currentUser, awayLong, suppressed])
 
   // Declared before the auto-dismiss effect that calls it: state setters are
   // stable, so the callback never needs to be re-created, and the effect can
@@ -43,7 +64,7 @@ function WelcomeBackBanner({ currentUser }) {
     navigate('/store')
   }
 
-  if (!visible) return null
+  if (!visible || suppressed) return null
 
   return (
     <div className={`wb-banner ${exiting ? 'wb-banner--exit' : ''}`} role="status" aria-live="polite">
