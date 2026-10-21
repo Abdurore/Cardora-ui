@@ -112,7 +112,11 @@ function AuthPage({ mode = 'login' }) {
         if (!form.email) { setError('Enter your account email.'); return }
         const result = await onRequestOtp(form.email)
         if (!result.ok) { setError(result.message || 'Could not send the code. Try again.'); return }
-        setVerifyFlow('otp') // advance silently — no toast
+        setVerifyFlow('otp')
+        // The backend answers the same whether or not the address has an
+        // account, so say what it says: a typo'd email gets a hint instead
+        // of a silent wait for a code that isn't coming.
+        setStatus(result.message || '')
         return
       }
 
@@ -130,7 +134,8 @@ function AuthPage({ mode = 'login' }) {
         if (!form.email) { setError('Enter your account email.'); return }
         const result = await onForgotPassword(form.email)
         if (!result.ok) { setError(result.message || 'Could not send a reset code. Try again.'); return }
-        setForgotFlow('reset') // advance silently
+        setForgotFlow('reset')
+        setStatus(result.message || '') // see the verify flow above
         return
       }
 
@@ -198,11 +203,10 @@ function AuthPage({ mode = 'login' }) {
       }
 
       if (result.verified) { navigate('/'); return }
-      setPendingVerification({ email: form.email }) // heading copy provides context — no extra toast
-      // ...except when the code never went out (email provider down): the
-      // account exists, so say so and point at "resend" instead of leaving
-      // them waiting on an email that isn't coming.
-      if (/fail/i.test(result.message || '')) setStatus(result.message)
+      // The backend gives every signup the same answer (it never reveals
+      // whether the email already has an account), so this always moves on
+      // to the code step; "resend" covers a code that didn't arrive.
+      setPendingVerification({ email: form.email })
     } finally {
       setIsSubmitting(false)
       setSlowHint(false)
@@ -216,6 +220,7 @@ function AuthPage({ mode = 'login' }) {
     setIsSubmitting(true)
     const result = await onRequestOtp(pendingVerification.email)
     if (!result.ok) setError(result.message || 'Could not resend the code.')
+    else setStatus(result.message || 'A new code is on its way.')
     setIsSubmitting(false)
   }
 
@@ -240,7 +245,7 @@ function AuthPage({ mode = 'login' }) {
     if (verifyFlow === 'email') return `Enter the email you signed up with and we'll send a 6-digit code.`
     if (verifyFlow === 'otp') return `A code was sent to ${form.email}. Enter it below to verify your account.`
     if (forgotFlow === 'email') return `Enter your account email and we'll send a code to reset your password.`
-    if (forgotFlow === 'reset') return `Enter the code sent to ${form.email} and choose a new password.`
+    if (forgotFlow === 'reset') return `Enter the reset code from your email (${form.email}) and choose a new password.`
     if (pendingVerification) return `We sent a code to ${pendingVerification.email}. Enter it below to activate your account.`
     return pageCopy.intro
   }

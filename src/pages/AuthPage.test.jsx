@@ -82,3 +82,29 @@ describe('/ref/:code', () => {
     vi.unstubAllGlobals()
   })
 })
+
+// The backend answers "forgot password" the same for every address (it
+// never reveals whether one has an account), so the page shows that answer
+// instead of advancing silently -- a typo'd email gets a hint.
+describe('AuthPage — forgot password', () => {
+  it('shows the uniform "if an account exists" message on the code step', async () => {
+    const message = 'If an account exists for that email, a reset code is on its way.'
+    const context = { currentUser: null, onForgotPassword: vi.fn(async () => ({ ok: true, message })) }
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route element={<Outlet context={context} />}>
+            <Route path="/login" element={<AuthPage mode="login" />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
+    fill('email', 'maybe@x.io')
+    fireEvent.submit(document.querySelector('form'))
+
+    await vi.waitFor(() => expect(screen.getByText(message)).toBeInTheDocument())
+    expect(context.onForgotPassword).toHaveBeenCalledWith('maybe@x.io')
+    expect(document.querySelector('input[name="otp"]')).toBeInTheDocument()
+  })
+})
