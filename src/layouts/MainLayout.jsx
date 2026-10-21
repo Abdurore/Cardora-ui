@@ -652,7 +652,7 @@ function MainLayout() {
   const handleRequestOtp = async (email) => {
     try {
       const response = await requestOtp({ email })
-      return { ok: true, message: getResponseMessage(response, 'A new code has been sent.') }
+      return { ok: true, message: getResponseMessage(response, 'If that email is waiting for verification, a new code is on its way.') }
     } catch (error) {
       return {
         ok: false,
@@ -1045,7 +1045,7 @@ function MainLayout() {
   const handleForgotPassword = async (email) => {
     try {
       const response = await forgotPassword({ email })
-      return { ok: true, message: getResponseMessage(response, 'Reset code sent to your email.') }
+      return { ok: true, message: getResponseMessage(response, 'If an account exists for that email, a reset code is on its way.') }
     } catch (error) {
       return { ok: false, message: error.message || 'Could not send reset code.' }
     }
