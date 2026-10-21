@@ -2806,8 +2806,11 @@ function CardStudio() {
     const g = parseInt(full.slice(2, 4), 16) || 0
     const b = parseInt(full.slice(4, 6), 16) || 0
     const alpha = 1 - (Number(c.card.backgroundOpacity) || 0)
-    return { backgroundColor: `rgba(${r}, ${g}, ${b}, ${alpha})`, ...cardBorderCss }
-  }, [c.card.backgroundColor, c.card.backgroundOpacity, cardBorderCss])
+    // color: the card's own ink, so preview chrome that inherits (pills, the
+    // poll footer, "+ Add option") follows the card's palette instead of
+    // the site theme -- it was pale-cyan-on-white on any light card.
+    return { backgroundColor: `rgba(${r}, ${g}, ${b}, ${alpha})`, color: c.card.textColor || undefined, ...cardBorderCss }
+  }, [c.card.backgroundColor, c.card.backgroundOpacity, c.card.textColor, cardBorderCss])
 
   const previewBgAnimated = c.background.type === 'gradient' || c.background.type === 'animated'
 

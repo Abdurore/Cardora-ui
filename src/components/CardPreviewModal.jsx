@@ -1395,7 +1395,7 @@ function CardPreviewModal({
                 <img src="/cardora-logo.png?v=4" alt="" className="cp-entry-brand-logo" />
                 <span className="cp-entry-brand-name">Cardora</span>
               </div>
-              <div className="cp-entry-type-chip">
+              <div className="cp-entry-type-chip" style={{ color: c.card.textColor }}>
                 <EntryIcon size={14} color="currentColor" />
                 <span>{entryMeta.label}</span>
               </div>

@@ -11,6 +11,10 @@ function TierPip({ tier, compact = false }) {
       title={`${label} touch — raises the card's send cost`}
     >
       {tier === 'elite' && <span className="cs-tier-pip-star">★</span>}
+      {/* Compact premium had neither the star nor the label, so it rendered
+          as an empty lozenge -- meaningless without the hover title (i.e.
+          on every phone). */}
+      {tier === 'premium' && compact && <span className="cs-tier-pip-star">◆</span>}
       {!compact && label}
     </span>
   )
