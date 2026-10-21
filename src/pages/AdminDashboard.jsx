@@ -1892,7 +1892,7 @@ const handleBroadcast = async () => {
                     )
                   })}
                   {reports.length === 0 && (
-                    <tr><td colSpan={8} style={{ textAlign: 'center', opacity: 0.5 }}>No reports found.</td></tr>
+                    <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-dim)' }}>No reports found.</td></tr>
                   )}
                 </tbody>
               </table>
