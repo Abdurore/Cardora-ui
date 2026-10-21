@@ -277,16 +277,20 @@ function storeClaimTokenIfPresent(slug, response) {
 }
 
 export async function getCardBySlug(slug, password) {
-  const qs = password ? `?password=${encodeURIComponent(password)}` : ''
   const claimToken = getStoredClaimToken(slug)
   // auth when a session exists: without the bearer token the backend can't
   // tell a sender checking their own link from a stranger, so it treated
   // the sender as the recipient -- claimed the Personal Card for the
   // sender's device (the real recipient then got "already opened"),
   // counted a view, and notified the sender that their own card was opened.
-  const response = await request(`/cards/${slug}${qs}`, {
+  // The password goes in a header, not ?password= -- a query string ends up
+  // in access logs, browser history and Referer headers.
+  const response = await request(`/cards/${slug}`, {
     auth: !!getStoredToken(),
-    headers: claimToken ? { 'X-Claim-Token': claimToken } : {},
+    headers: {
+      ...(claimToken ? { 'X-Claim-Token': claimToken } : {}),
+      ...(password ? { 'X-Card-Password': password } : {}),
+    },
   })
   return storeClaimTokenIfPresent(slug, response)
 }
