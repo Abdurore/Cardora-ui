@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import Particles, { initParticlesEngine } from '@tsparticles/react'
-import { loadSlim } from '@tsparticles/slim'
-import { loadTextShape } from '@tsparticles/shape-text'
-import { loadEmittersPlugin } from '@tsparticles/plugin-emitters'
+import Particles from '@tsparticles/react'
+import { loadEngine } from '../lib/particlesEngine.js'
 import { getAmbientPreset } from '../lib/studioEffects.js'
 import { usePerfTier } from '../lib/usePerfTier.js'
 import { watchFramePacing } from '../lib/perfTier.js'
-
-let enginePromise = null
 
 function AmbientParticles({ type, zIndex = 1, intensity = 1 }) {
   const [ready, setReady] = useState(false)
@@ -21,18 +17,7 @@ function AmbientParticles({ type, zIndex = 1, intensity = 1 }) {
   const containerRef = useRef(null)
 
   useEffect(() => {
-    if (!enginePromise) {
-      // `loadSlim` alone doesn't cover the 'char' shape (floating/petals/
-      // lanterns) or the emitters plugin (fountain) — both are loaded
-      // explicitly here so every ambient preset in studioEffects.js has
-      // what it needs, instead of silently rendering zero particles.
-      enginePromise = initParticlesEngine(async (engine) => {
-        await loadSlim(engine)
-        await loadTextShape(engine)
-        await loadEmittersPlugin(engine)
-      })
-    }
-    enginePromise.then(() => setReady(true))
+    loadEngine().then(() => setReady(true))
   }, [])
 
   const tier = usePerfTier()

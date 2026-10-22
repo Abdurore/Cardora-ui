@@ -9,6 +9,18 @@ function normaliseTier(tier) {
   return TIER_ALIASES[key] || key
 }
 
+// Tilt only the parallax wrapper (one element's transform -- no subtree
+// restyle) and slide the pre-blurred shadow layer against it, so the
+// envelope reads as lit from a fixed point without re-blurring an 80px
+// shadow every frame. Plain px offsets: the old calc(deg / 1deg * px)
+// needed typed arithmetic, so browsers without it drew no shadow at all.
+function applyEnvelopeTilt(scene, x, y) {
+  const wrap = scene.querySelector('.envelope-parallax-wrap')
+  if (wrap) wrap.style.transform = x || y ? `rotateY(${x}deg) rotateX(${y}deg)` : ''
+  const shadow = scene.querySelector('.envelope-body-shadow')
+  if (shadow) shadow.style.transform = `translate3d(${(x * -1.4).toFixed(1)}px, ${(y * 1.4).toFixed(1)}px, 0)`
+}
+
 function Envelope({
   cardObject,
   tier = 'classic',
@@ -24,7 +36,7 @@ function Envelope({
   const pacing = getPacingMultiplier(envelope.pacing)
 
   const [stage, setStage] = useState('arriving')
-  const sceneRef = useDepthMotion({ maxTilt: 12, disabled: !profile.parallax })
+  const sceneRef = useDepthMotion({ maxTilt: 12, disabled: !profile.parallax, apply: applyEnvelopeTilt })
   const chimeRef = useRef(null)
   const rustleRef = useRef(null)
   const crackRef = useRef(null)
@@ -123,6 +135,7 @@ function Envelope({
         </div>
       )}
       <div className="envelope-parallax-wrap">
+        <div className="envelope-body-shadow" aria-hidden="true" />
         <div
           className={`envelope-body ${paperTextureClass} ${stage === 'sealed' || stage === 'arriving' ? 'is-tappable' : ''}`}
           style={{
@@ -154,6 +167,11 @@ function Envelope({
             </p>
           </div>
           <div className="envelope-flap" />
+          {/* The seal's "tap me" pulse: a disc behind the seal that grows and
+              fades, so only the ring outside the seal shows. Transform and
+              opacity only -- it used to animate the seal's box-shadow, a
+              repaint every frame while the envelope waits to be tapped. */}
+          {(stage === 'sealed' || stage === 'arriving') && <span className="envelope-seal-pulse" aria-hidden="true" />}
           <span
             className={`envelope-seal ${stage === 'sealed' || stage === 'arriving' ? 'pulsing' : ''}`}
             style={{ '--seal-color': envelope.sealColor || '#b03030' }}

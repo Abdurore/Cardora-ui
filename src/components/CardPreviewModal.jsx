@@ -4,10 +4,12 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import PremiumGiftReveal from './PremiumGiftReveal.jsx'
 import Envelope from './Envelope.jsx'
 import AmbientParticles from './AmbientParticles.jsx'
+import { preloadParticlesEngine } from '../lib/particlesEngine.js'
 import { fireOpenEffect } from '../lib/studioEffects.js'
 import { shouldShowEnvelope } from '../lib/tierLimits.js'
 import { prefersReducedMotion, getMotionIntensity } from '../lib/deviceCapability.js'
 import { usePerfTier } from '../lib/usePerfTier.js'
+import { watchFramePacing } from '../lib/perfTier.js'
 import { ensureFonts } from '../lib/fontLoader.js'
 import { optimizedImageUrl } from '../lib/imageUrl.js'
 import { useDepthMotion } from '../lib/useDepthMotion.js'
@@ -62,35 +64,80 @@ function legibleAccent(bgHex, accentHex) {
   return Math.abs(bgLum - accLum) > 0.35 ? accentHex : readableOn(bgHex)
 }
 
-// Typewriter hook — elapsed-time-driven via requestAnimationFrame rather than a
+// Typewriter -- elapsed-time-driven via requestAnimationFrame rather than a
 // setInterval tick per character. A per-character interval fires faster than the
 // browser's own paint cycle for anything but very short text, forcing more React
 // re-renders than frames actually available and guaranteeing dropped frames — worst
 // exactly when it's competing with an open-effect burst and ambient particles on the
 // same card-open transition. Driving off elapsed time instead means it can never
 // outrun the frame rate, and it self-corrects after a dropped frame instead of drifting.
-function useTypewriter(text, speed, active) {
-  const [displayed, setDisplayed] = useState('')
+//
+// It's its own component so its per-frame state re-renders these two
+// paragraphs only. As a hook inside CardPreviewModal it re-rendered the whole
+// card component on every frame of typing. The untyped remainder is rendered
+// invisibly, so the text block has its full height from the first frame and
+// the card no longer grows line by line while it types. Each paragraph types
+// over `speed` seconds, the extended one after the body, as before. The parent
+// remounts it (key) to restart.
+function TypewriterBody({ body, extended, speed, active, extendedClassName }) {
+  const [shown, setShown] = useState(0)
+  const total = body.length + (extended ? extended.length : 0)
   useEffect(() => {
-    if (!active || !text) { setDisplayed(active ? text : ''); return undefined }
-    setDisplayed('')
+    if (!active || !total) return undefined
     const duration = speed * 1000
-    const startTime = performance.now()
+    const start = performance.now()
     let frame
-    let lastCount = 0
+    let last = -1
     const tick = (now) => {
-      const elapsed = now - startTime
-      const count = Math.min(text.length, Math.floor((elapsed / duration) * text.length))
-      if (count !== lastCount) {
-        lastCount = count
-        setDisplayed(text.slice(0, count))
+      const t = (now - start) / duration
+      const typedBody = Math.floor(Math.min(1, t) * body.length)
+      const typedExtended = extended ? Math.floor(Math.max(0, Math.min(1, t - 1)) * extended.length) : 0
+      const count = typedBody + typedExtended
+      if (count !== last) {
+        last = count
+        setShown(count)
       }
-      if (count < text.length) frame = requestAnimationFrame(tick)
+      if (count < total) frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [text, speed, active])
-  return displayed
+  }, [active, body, extended, speed, total])
+
+  const bodyShown = Math.min(shown, body.length)
+  const extendedShown = Math.max(0, shown - body.length)
+  return (
+    <>
+      <span className="cp-sr-only">{body}</span>
+      <p aria-hidden="true">
+        {body.slice(0, bodyShown)}
+        <span className="cp-type-rest">{body.slice(bodyShown)}</span>
+      </p>
+      {extended && (
+        <>
+          <span className="cp-sr-only">{extended}</span>
+          <p className={extendedClassName} aria-hidden="true">
+            {extended.slice(0, extendedShown)}
+            <span className="cp-type-rest">{extended.slice(extendedShown)}</span>
+          </p>
+        </>
+      )}
+    </>
+  )
+}
+
+// Tilts the open card with an inline transform on the card itself (no
+// inherited variables restyling its whole subtree each frame) and slides /
+// fades the sheen layer. The tracking shadow the variables used to drive moved
+// at most ~5px at this tilt but re-blurred an 80px shadow every frame; the
+// card keeps its static shadow instead.
+function applyCardTilt(wrap, x, y, parallax) {
+  const card = wrap.querySelector('.cp-card')
+  if (card) card.style.transform = x || y ? `rotateY(${x}deg) rotateX(${y}deg)` : ''
+  const sheen = wrap.querySelector('.cp-card-sheen')
+  if (sheen) {
+    sheen.style.transform = `translate3d(${(x * 3).toFixed(2)}%, 0, 0)`
+    sheen.style.opacity = (parallax * 0.5).toFixed(3)
+  }
 }
 
 function CardPreviewModal({
@@ -196,7 +243,7 @@ function CardPreviewModal({
   // tilt fights legibility. Only the 'open' stage gets it: the interaction
   // stages (poll, trivia, question, anon reply, chain) are separate stages with
   // their own wrappers, so precise tap targets are never tilting underneath.
-  const openCardDepthRef = useDepthMotion({ maxTilt: 5, disabled: stage !== 'open' })
+  const openCardDepthRef = useDepthMotion({ maxTilt: 5, disabled: stage !== 'open', apply: applyCardTilt })
   const bodyAutoScrollPausedRef = useRef(false)
   const bodyAutoScrollResumeTimerRef = useRef(null)
   const bodyAutoScrollLastTopRef = useRef(0)
@@ -221,6 +268,15 @@ function CardPreviewModal({
   // checked, missing plenty of weak devices with a normal-sized screen.
   // Re-evaluated when the performance tier changes (a runtime downgrade).
   const perfTier = usePerfTier()
+  // The frame-pacing watchdog used to start only when ambient particles or
+  // the Galaxy mounted, so a card heavy in other ways (animated background
+  // and border, open-effect burst, typewriter) never stepped a struggling
+  // device down. Watch the open card for every recipient; perfTier.js keeps
+  // it to one monitor at a time, so this and the particles' share it.
+  useEffect(() => {
+    if (!pageMode || stage !== 'open') return undefined
+    return watchFramePacing()
+  }, [pageMode, stage])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const motionIntensity = useMemo(() => getMotionIntensity(), [perfTier])
   const ambientIntensity = motionIntensity
@@ -497,8 +553,7 @@ function CardPreviewModal({
   // reported it as "not text-only".
   const isTextOnlyCard = !primaryImage
 
-  const typedBody = useTypewriter(c.content.body, typeSpeed, stage === 'open' && hasTypewriter && typewriterReady)
-  const typedExtended = useTypewriter(c.content.extendedBody, typeSpeed, stage === 'open' && hasTypewriter && typewriterReady && typedBody === c.content.body)
+  const typewriterActive = stage === 'open' && hasTypewriter && typewriterReady
 
   // Music — gated by tier (Classic has no music)
   const musicAllowed = limit('allowMusic') && !!c.background.music.url
@@ -963,6 +1018,15 @@ function CardPreviewModal({
   // design-canvas preview exactly (there used to be a separate legacy
   // CSS/emoji renderer for 'floating' here, which drifted visually from
   // what the sender saw while editing).
+  const ambientType = !lowPowerViewer && toolAllowed('animation') && limit('allowAmbientEffects')
+    ? (c.animation.backgroundEffect?.type || 'none')
+    : 'none'
+  // Warm the particle engine while the envelope waits for its tap, so its
+  // init isn't on the card-open frame.
+  useEffect(() => {
+    if (ambientType !== 'none' && (stage === 'closed' || stage === 'entry')) preloadParticlesEngine()
+  }, [ambientType, stage])
+
   const renderBgEffect = () => {
     if (lowPowerViewer) return null
     if (!toolAllowed('animation') || !limit('allowAmbientEffects')) return null
@@ -989,6 +1053,13 @@ function CardPreviewModal({
             '--border-anim-dur': `${c.card.cardBorder.animationDuration}s`,
           }}
         >
+          {/* Animated borders flow by sliding this strip under the ring's
+              mask (compositor), instead of animating the ring's
+              background-position, which repainted the whole card-sized ring
+              layer every frame. */}
+          {c.card.cardBorder.type === 'animated' && (
+            <span className="cp-border-ring" aria-hidden="true"><span className="cp-border-flow" /></span>
+          )}
           {children}
         </div>
       )
@@ -1468,6 +1539,7 @@ function CardPreviewModal({
               className={`cp-card cp-card-full ${isTextOnlyCard ? 'cp-card-text-only' : 'cp-card-with-media'}`}
               style={cardSurfaceStyle({ ...borderStyle, '--scrollbar-color': c.card.scrollbarColor })}
             >
+              <span className="cp-card-sheen" aria-hidden="true" />
               <div ref={openCardInnerRef} className="cp-card-inner cp-card-inner-full" style={{ '--scrollbar-color': c.card.scrollbarColor }}>
                 {/* Render card body elements in the user-defined order */}
                 {(c.layout?.elementOrder || ['media', 'heading', 'body']).map(key => {
@@ -1520,11 +1592,20 @@ function CardPreviewModal({
                         transitionDuration: hasFadeIn ? `${fadeSpeed}s` : '0.3s',
                       }}
                     >
-                      <p>{hasTypewriter ? typedBody : c.content.body}</p>
-                      {c.content.extendedBody && (
-                        <p className="cp-extended">
-                          {hasTypewriter ? typedExtended : c.content.extendedBody}
-                        </p>
+                      {hasTypewriter ? (
+                        <TypewriterBody
+                          key={typewriterActive ? 'typing' : 'waiting'}
+                          body={c.content.body || ''}
+                          extended={c.content.extendedBody || ''}
+                          speed={typeSpeed}
+                          active={typewriterActive}
+                          extendedClassName="cp-extended"
+                        />
+                      ) : (
+                        <>
+                          <p>{c.content.body}</p>
+                          {c.content.extendedBody && <p className="cp-extended">{c.content.extendedBody}</p>}
+                        </>
                       )}
                       {senderName && (
                         <p className="cp-signoff" style={{ color: c.card.textColor }}>

@@ -153,20 +153,20 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* --tilt-x/--tilt-y are written by useDepthMotion straight onto
-   .envelope-scene (no React re-render per frame); they inherit down to here.
-   The hook already eases, so no CSS transition — one would double-smooth the
-   motion into a laggy drift. */
+/* The tilt is written by useDepthMotion as an inline transform on this one
+   element (Envelope.jsx applyEnvelopeTilt) -- no React re-render and no
+   inherited variables restyling the whole scene per frame. The hook already
+   eases, so no CSS transition: one would double-smooth the motion into a
+   laggy drift. */
 .envelope-parallax-wrap {
   position: relative;
   transform-style: preserve-3d;
-  transform: rotateY(var(--tilt-x, 0deg)) rotateX(var(--tilt-y, 0deg));
   z-index: 3;
   will-change: transform;
 }
 
 .envelope-scene.depth-none .envelope-parallax-wrap {
-  transform: none;
+  transform: none !important;
 }
 
 /* Layer separation is what actually reads as depth — without it the whole
@@ -193,28 +193,37 @@
   border-radius: 10px;
   background: var(--envelope-body, #1a1f2c);
   border: 1px solid var(--envelope-border, rgba(126, 247, 255, 0.25));
-  /* Shadow offset tracks the tilt so the envelope reads as lit from a fixed
-     point rather than carrying its shadow around with it. */
-  box-shadow:
-    calc(var(--tilt-x, 0deg) / 1deg * -1.4px) calc(30px + var(--tilt-y, 0deg) / 1deg * 1.4px) 80px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* The drop shadow lives on .envelope-body-shadow below, which slides
+     against the tilt so the envelope reads as lit from a fixed point. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transform-style: preserve-3d;
   animation: envelopeArrive 0.9s cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
 }
 
-.envelope-scene.depth-lite .envelope-body,
-.envelope-scene.depth-none .envelope-body {
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+/* Painted once, then only translated (applyEnvelopeTilt). It's the body's
+   preceding sibling, coplanar with it, so plain paint order keeps it behind:
+   as a child at translateZ(-1px) Chrome drew it over the body's own
+   background. A gradient rather than box-shadow, which never paints under
+   its own box and so left a hard-edged hole once it slid off the body.
+   Replays envelopeArrive so it rises in step with the envelope; `backwards`
+   fill, since a held animation transform would override the inline tilt. */
+.envelope-body-shadow {
+  position: absolute;
+  inset: -14% -22% -44% -22%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.6) 45%, rgba(0, 0, 0, 0.28) 72%, transparent);
+  pointer-events: none;
+  animation: envelopeArrive 0.9s cubic-bezier(0.2, 0.8, 0.3, 1.2) backwards;
+  will-change: transform;
 }
 
 .envelope-body.is-tappable {
   cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.25s ease;
 }
 
 .envelope-body.is-tappable:hover {
   transform: translateY(-3px);
-  box-shadow: 0 36px 90px rgba(0, 0, 0, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .envelope-body.is-tappable:active {
@@ -389,13 +398,27 @@
   transform: translateY(-1px);
 }
 
-.envelope-seal.pulsing {
+/* Same geometry as the seal and painted just under it; growing it by 14px a
+   side (62px -> 90px) and fading it reproduces the old box-shadow spread
+   ring, on the compositor. */
+.envelope-seal-pulse {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: rgba(255, 180, 120, 0.45);
+  transform: translate(-50%, -50%) translateZ(calc(var(--z-seal, 0px) - 1px)) scale(1);
+  z-index: 4;
+  pointer-events: none;
   animation: envelopeSealPulse 2.4s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 @keyframes envelopeSealPulse {
-  0%, 100% { box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(255, 180, 120, 0.45); }
-  50%      { box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.3), 0 0 0 14px rgba(255, 180, 120, 0); }
+  0%, 100% { transform: translate(-50%, -50%) translateZ(calc(var(--z-seal, 0px) - 1px)) scale(1); opacity: 1; }
+  50%      { transform: translate(-50%, -50%) translateZ(calc(var(--z-seal, 0px) - 1px)) scale(1.4516); opacity: 0; }
 }
 
 .envelope-seal:hover:not(:disabled) {
@@ -5255,9 +5278,12 @@
   50% { transform: translateY(-8px); }
 }
 
+/* Scale + opacity only (compositor). The 50% keyframe also animated a
+   drop-shadow filter -- a repaint of the logo every frame of every card's
+   loading screen -- while the logo already carries a static glow. */
 @keyframes premiumLoaderLogoPulse {
   0%, 100% { transform: scale(0.95); opacity: 0.8; }
-  50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 20px color-mix(in srgb, var(--loader-accent, #7ef7ff) 60%, transparent)); }
+  50% { transform: scale(1.05); opacity: 1; }
 }
 
 @keyframes premiumLoaderGlow {
@@ -10088,14 +10114,33 @@ a {
   z-index: 0;
 }
 
+/* Animated gradient background. This used to animate background-position on
+   the full-screen backdrop itself: a full repaint of the whole screen on the
+   main thread every frame, at every stage of the card, for as long as it was
+   open (~3M device pixels/frame on a 3x phone). The gradient is now painted
+   once onto a 3x-wide layer that the compositor slides -- same drift, no
+   repaint. */
 .cp-backdrop.animated {
-  animation: cpGradientShift 8s ease infinite;
+  overflow: hidden;
 }
 
-@keyframes cpGradientShift {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+.cp-backdrop.animated::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 300%;
+  height: 100%;
+  background: inherit;
+  background-size: 100% 100%;
+  animation: cpGradientDrift 8s ease-in-out infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+@keyframes cpGradientDrift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(-66.6667%, 0, 0); }
 }
 
 .cp-backdrop-video {
@@ -10298,45 +10343,66 @@ a {
    with `both` fill would win over anything set here.
    Per-element translateZ inside the card isn't possible: .cp-card needs
    `overflow: hidden` for its rounded corners and scroll, and that flattens
-   preserve-3d for everything below it. Rotating the card plane against a
-   tracking shadow and a moving sheen gives the same physical read. */
+   preserve-3d for everything below it. Rotating the card plane under a
+   moving sheen gives the same physical read. */
 .cp-card-wrap-depth {
   perspective: 1200px;
   perspective-origin: center;
 }
 
+/* The tilt is an inline transform written by applyCardTilt
+   (CardPreviewModal.jsx). */
 .cp-card-wrap-depth .cp-card {
   position: relative;
-  transform: rotateY(var(--tilt-x, 0deg)) rotateX(var(--tilt-y, 0deg));
-  box-shadow:
-    calc(var(--tilt-x, 0deg) / 1deg * -1.1px) calc(30px + var(--tilt-y, 0deg) / 1deg * 1.1px) 80px rgba(0, 0, 0, 0.55);
+  will-change: transform;
 }
 
 /* Specular sweep that tracks the tilt, so the surface reads as catching light
-   rather than as a flat rectangle being rotated. */
-.cp-card-wrap-depth .cp-card::after {
-  content: '';
+   rather than as a flat rectangle being rotated. Painted once and slid/faded
+   by applyCardTilt (it used to re-angle a full-card gradient every frame).
+   Only exists inside the depth wrapper; the card clips it to its corners. */
+.cp-card-sheen {
+  display: none;
+}
+
+.cp-card-wrap-depth .cp-card-sheen {
+  display: block;
   position: absolute;
   inset: 0;
   z-index: 3;
   pointer-events: none;
   border-radius: inherit;
-  opacity: calc(var(--depth-parallax, 0) * 0.5);
+  opacity: 0;
   transition: opacity 0.3s ease;
-  background: linear-gradient(
-    calc(105deg + var(--tilt-x, 0deg) * 2),
-    transparent 35%,
-    rgba(255, 255, 255, 0.10) 50%,
-    transparent 65%);
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.10) 50%, transparent 65%);
+  will-change: transform, opacity;
 }
 
+/* !important: the live tilt is an inline style, which a plain class rule
+   can't override. */
 .cp-card-wrap-depth.is-depth-paused .cp-card {
-  transform: none;
+  transform: none !important;
   transition: transform 0.45s ease-out;
 }
 
-.cp-card-wrap-depth.is-depth-paused .cp-card::after {
-  opacity: 0;
+.cp-card-wrap-depth.is-depth-paused .cp-card-sheen {
+  opacity: 0 !important;
+}
+
+/* Typewriter: the not-yet-typed text holds its space invisibly (no layout
+   growth while typing); the full text is exposed to screen readers at once. */
+.cp-type-rest {
+  visibility: hidden;
+}
+
+.cp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .cp-card {
@@ -11088,9 +11154,40 @@ a {
 }
 
 .cp-gradient-border.animated::before {
+  display: none;
+}
+
+/* Same ring and mask as ::before above, holding a 3x-wide gradient strip
+   that slides -- the old background-position flow, on the compositor. */
+.cp-border-ring {
+  position: absolute;
+  inset: 0;
+  padding: var(--border-width, 2px);
+  border-radius: inherit;
+  overflow: hidden;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.cp-border-flow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 300%;
+  height: 100%;
   background: var(--border-gradient);
-  background-size: 300% 300%;
-  animation: cpBorderSpin var(--border-anim-dur, 2s) linear infinite;
+  background-size: 100% 100%;
+  animation: cpBorderFlow var(--border-anim-dur, 2s) linear infinite;
+  will-change: transform;
+}
+
+@keyframes cpBorderFlow {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(-66.6667%, 0, 0); }
 }
 
 .cp-gradient-border>.cp-card {
@@ -11242,19 +11339,6 @@ a {
   }
 }
 
-@keyframes cpBorderSpin {
-  0% {
-    background-position: 0% 50%;
-  }
-
-  50% {
-    background-position: 100% 50%;
-  }
-
-  100% {
-    background-position: 0% 50%;
-  }
-}
 
 @keyframes cpFloat {
 
@@ -21068,18 +21152,6 @@ a {
   width: 100%;
 }
 
-/* ——— ANIMATED GRADIENT BACKGROUND ——— */
-.cs-phone-screen.cs-bg-anim,
-.cs-mobile-preview.cs-bg-anim {
-  animation: csBgPan 8s ease infinite !important;
-  background-attachment: local;
-}
-@keyframes csBgPan {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
 /* ——— IMAGE HORIZONTAL AUTO-SCROLL STRIP ——— */
 .cs-preview-media-strip-wrap {
   width: 100%;
@@ -28984,14 +29056,47 @@ textarea:focus-visible,
    device and then corrected at runtime from measured frame times.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* The tilt-tracking shadow and specular sweep repaint a large blurred
-   shadow and a full-card gradient on every tilt change. The tilt itself
-   (a transform) stays at every tier. */
-:root:not([data-perf="high"]) .cp-card-wrap-depth .cp-card {
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
-}
-:root:not([data-perf="high"]) .cp-card-wrap-depth .cp-card::after {
+/* The tilt (a transform) stays at every tier. The sheen only slides and
+   fades now (compositor), so mid keeps it too. */
+:root[data-perf="low"] .cp-card-wrap-depth .cp-card-sheen {
   display: none;
+}
+
+/* The animated card background and border are compositor-only, but low tier
+   still holds them still: a struck-through device gets a static gradient
+   instead of a GPU layer moving for as long as the card is open. */
+:root[data-perf="low"] .cp-backdrop.animated::before,
+:root[data-perf="low"] .cp-border-flow {
+  animation: none;
+}
+
+/* The Studio's preview of an animated background/border still pans
+   background-position / spins a conic angle -- a repaint every frame. Fine
+   while composing on a capable device; a low-tier phone shows it static
+   (the recipient view above is what gets the full motion). */
+:root[data-perf="low"] .cs-phone-screen.cs-bg-anim,
+:root[data-perf="low"] .cs-mobile-preview.cs-bg-anim,
+:root[data-perf="low"] .cs-border-glow.cs-border-spin::before {
+  animation: none !important;
+}
+
+/* Reduced motion. The card experience's JS effects (bursts, particles, tilt,
+   video) already stop for it (CardPreviewModal lowPowerViewer, useDepthMotion);
+   these are the CSS loops that didn't. Entrance/exit transitions are left
+   alone -- they're short and carry state changes. */
+@media (prefers-reduced-motion: reduce) {
+  .cp-border-flow,
+  .envelope-seal-pulse,
+  .envelope-dust-particle,
+  .cp-entry-open-ring,
+  .cv-logo-loader img,
+  .cp-asset-loader-mark img {
+    animation: none !important;
+  }
+  .envelope-seal-pulse,
+  .envelope-dust-particle {
+    display: none;
+  }
 }
 
 /* Full-card frosted layer and the very large entry blur: the costliest
