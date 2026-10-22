@@ -18,7 +18,21 @@ const IDLE_FRAME_MS = 33
 // Below this (in normalised -1..1 units) the tilt is considered settled.
 const SETTLE_EPSILON = 0.002
 
-export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } = {}) {
+// Writing the tilt as CSS custom properties on the scene root made every
+// frame restyle the root's ENTIRE subtree (custom properties inherit), and
+// the tilt-tracking shadow/sheen they fed repainted a large blurred box-shadow
+// and a full-card gradient each frame. `apply(el, tiltXDeg, tiltYDeg,
+// parallax)` gets plain numbers and moves only the layers that need it, with
+// transform/opacity -- compositor work, no subtree restyle, no repaint. The
+// default keeps writing the old variables for any caller that still reads
+// them.
+const writeVars = (el, x, y, parallax) => {
+  el.style.setProperty('--tilt-x', `${x.toFixed(2)}deg`)
+  el.style.setProperty('--tilt-y', `${y.toFixed(2)}deg`)
+  el.style.setProperty('--depth-parallax', parallax.toFixed(3))
+}
+
+export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false, apply = writeVars } = {}) {
   const ref = useRef(null)
   // Read every frame by the rAF loop but never a render input, so it lives in
   // a ref rather than state.
@@ -31,8 +45,7 @@ export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } =
 
     const profile = getDepthProfile()
     if (disabled || profile.tilt === 0) {
-      el.style.setProperty('--tilt-x', '0deg')
-      el.style.setProperty('--tilt-y', '0deg')
+      apply(el, 0, 0, 0)
       return undefined
     }
 
@@ -129,15 +142,13 @@ export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } =
       // So: skip writes that wouldn't change anything, rate-limit the idle
       // drift, and stop the loop entirely once the tilt has settled.
       if (!(idling && now - lastWriteAt < IDLE_FRAME_MS)) {
-        const tx = `${(cur.x * amplitude).toFixed(2)}deg`
-        const ty = `${(-cur.y * amplitude).toFixed(2)}deg`
+        const tx = +(cur.x * amplitude).toFixed(2)
+        const ty = +(-cur.y * amplitude).toFixed(2)
         const key = `${tx}|${ty}`
         if (key !== lastWritten) {
           lastWritten = key
           lastWriteAt = now
-          el.style.setProperty('--tilt-x', tx)
-          el.style.setProperty('--tilt-y', ty)
-          el.style.setProperty('--depth-parallax', Math.min(1, Math.hypot(cur.x, cur.y)).toFixed(3))
+          apply(el, tx, ty, Math.min(1, Math.hypot(cur.x, cur.y)))
         }
       }
 
@@ -145,9 +156,7 @@ export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } =
         cur.x = x
         cur.y = y
         lastWritten = ''
-        el.style.setProperty('--tilt-x', `${(cur.x * amplitude).toFixed(2)}deg`)
-        el.style.setProperty('--tilt-y', `${(-cur.y * amplitude).toFixed(2)}deg`)
-        el.style.setProperty('--depth-parallax', Math.min(1, Math.hypot(cur.x, cur.y)).toFixed(3))
+        apply(el, cur.x * amplitude, -cur.y * amplitude, Math.min(1, Math.hypot(cur.x, cur.y)))
         stop()
       }
     }
@@ -184,7 +193,7 @@ export function useDepthMotion({ maxTilt = 10, idle = true, disabled = false } =
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('deviceorientation', onOrientation)
     }
-  }, [maxTilt, idle, disabled])
+  }, [maxTilt, idle, disabled, apply])
 
   return ref
 }

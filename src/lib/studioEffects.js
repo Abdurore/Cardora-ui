@@ -1,5 +1,32 @@
 import confetti from 'canvas-confetti'
 
+// One shared confetti instance on its own canvas, rendering in a Web Worker
+// (OffscreenCanvas). The default confetti() draws every particle on the main
+// thread -- exactly when the card is opening and the reveal, the typewriter
+// and the ambient layer are competing for the same frames. canvas-confetti
+// falls back to the main thread by itself where OffscreenCanvas/workers aren't
+// available. Created once and reused: a canvas can only be handed to a worker
+// once.
+let sharedConfetti = null
+function burst(options) {
+  if (!sharedConfetti) {
+    if (typeof document === 'undefined') return confetti(options)
+    const canvas = document.createElement('canvas')
+    canvas.setAttribute('aria-hidden', 'true')
+    Object.assign(canvas.style, {
+      position: 'fixed',
+      inset: '0',
+      width: '100%',
+      height: '100%',
+      pointerEvents: 'none',
+      zIndex: '100001',
+    })
+    document.body.appendChild(canvas)
+    sharedConfetti = confetti.create(canvas, { resize: true, useWorker: true })
+  }
+  return sharedConfetti(options)
+}
+
 const DEFAULT_COLORS = ['#000000', '#ffffff', '#c0c0c0']
 
 // Ambient background particles always render from this fixed per-effect
@@ -112,7 +139,7 @@ export function fireOpenEffect(type, colors, intensity = 1) {
 }
 
 function fireConfetti(colors, intensity = 1) {
-  confetti({
+  burst({
     particleCount: scaleCount(90, intensity),
     spread: 72,
     startVelocity: 38,
@@ -124,8 +151,8 @@ function fireConfetti(colors, intensity = 1) {
   const end = Date.now() + scaleDuration(1900, intensity)
   const perFrame = scaleCount(4, intensity)
   const frame = () => {
-    confetti({ particleCount: perFrame, angle: 58, spread: 58, origin: { x: 0, y: 0.68 }, colors, scalar: 0.9, zIndex: 100001 })
-    confetti({ particleCount: perFrame, angle: 122, spread: 58, origin: { x: 1, y: 0.68 }, colors, scalar: 0.9, zIndex: 100001 })
+    burst({ particleCount: perFrame, angle: 58, spread: 58, origin: { x: 0, y: 0.68 }, colors, scalar: 0.9, zIndex: 100001 })
+    burst({ particleCount: perFrame, angle: 122, spread: 58, origin: { x: 1, y: 0.68 }, colors, scalar: 0.9, zIndex: 100001 })
     if (Date.now() < end) requestAnimationFrame(frame)
   }
   frame()
@@ -134,7 +161,7 @@ function fireConfetti(colors, intensity = 1) {
 function fireGlitterBurst(colors, intensity = 1) {
   const end = Date.now() + scaleDuration(1800, intensity)
   const frame = () => {
-    confetti({
+    burst({
       particleCount: scaleCount(12, intensity),
       spread: 120,
       startVelocity: 18,
@@ -154,7 +181,7 @@ function fireGlitterBurst(colors, intensity = 1) {
 function fireFireworks(colors, intensity = 1) {
   const end = Date.now() + scaleDuration(2400, intensity)
   const shoot = () => {
-    confetti({
+    burst({
       particleCount: scaleCount(70, intensity),
       startVelocity: 34,
       spread: 360,
@@ -173,7 +200,7 @@ function fireFireworks(colors, intensity = 1) {
 function fireShapeBurst(emoji, colors, { spread = 70, startVelocity = 45, gravity = 0.8 } = {}, intensity = 1) {
   if (typeof confetti.shapeFromText !== 'function') return fireConfetti(colors, intensity)
   const shape = confetti.shapeFromText({ text: emoji, scalar: 2 })
-  confetti({
+  burst({
     particleCount: scaleCount(44, intensity),
     spread,
     startVelocity,
@@ -186,7 +213,7 @@ function fireShapeBurst(emoji, colors, { spread = 70, startVelocity = 45, gravit
     zIndex: 100001,
   })
   setTimeout(() => {
-    confetti({
+    burst({
       particleCount: scaleCount(34, intensity),
       spread: spread + 26,
       startVelocity: Math.max(18, startVelocity - 10),
@@ -205,7 +232,7 @@ function fireStarShower(colors, intensity = 1) {
   const shape = confetti.shapeFromText({ text: '★', scalar: 1.8 })
   const end = Date.now() + scaleDuration(2200, intensity)
   const frame = () => {
-    confetti({
+    burst({
       particleCount: scaleCount(6, intensity),
       spread: 180,
       startVelocity: 22,
@@ -227,7 +254,7 @@ function fireSparkleRain(colors, intensity = 1) {
   const shape = confetti.shapeFromText({ text: '✦', scalar: 1.3 })
   const end = Date.now() + scaleDuration(2000, intensity)
   const frame = () => {
-    confetti({
+    burst({
       particleCount: scaleCount(5, intensity),
       spread: 0,
       startVelocity: 8,
@@ -250,7 +277,7 @@ function fireCometTrail(colors, intensity = 1) {
   const end = Date.now() + scaleDuration(2200, intensity)
   const frame = () => {
     const leftSide = Math.random() > 0.5
-    confetti({
+    burst({
       particleCount: scaleCount(7, intensity),
       angle: leftSide ? 40 : 140,
       spread: 28,
@@ -274,7 +301,7 @@ function fireEmojiRain(emojis, intensity = 1) {
   const shapes = emojis.map((e) => confetti.shapeFromText({ text: e, scalar: 1.6 }))
   const end = Date.now() + scaleDuration(2500, intensity)
   const frame = () => {
-    confetti({
+    burst({
       particleCount: scaleCount(4, intensity),
       spread: 140,
       startVelocity: 15,
@@ -336,7 +363,17 @@ export function getAmbientPreset(type, intensity = 1, tier = 'high') {
 //    are indistinguishable, but a circle is a single arc fill.
 //  - particle links (aurora): a neighbour search per particle per frame.
 function applyTierToPreset(preset, tier) {
-  if (!preset || tier === 'high') return preset
+  if (!preset) return preset
+  if (tier === 'high') {
+    // A phone that reports 6-8 GB classifies 'high', but its CPU is several
+    // times slower than a laptop's, and at DPR 3 a full-screen retina canvas
+    // is ~9x the pixels: measured on a mid-range-phone profile, the starfield
+    // alone held the main thread ~65% of the time once a card opened (11fps).
+    // Touch devices keep the full design and frame rate, drawn at CSS-pixel
+    // resolution -- these are soft points of light, so it reads the same.
+    const touch = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches
+    return touch ? { ...preset, detectRetina: false } : preset
+  }
   const out = { ...preset, detectRetina: false, fpsLimit: tier === 'low' ? 30 : 45 }
   if (out.particles) {
     const particles = { ...out.particles }
